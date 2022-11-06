@@ -12,7 +12,7 @@ use crate::xfr::{
 };
 use merlin::Transcript;
 use noah_algebra::{
-    bls12_381::BLSScalar,
+    bls12_381::BLSFr,
     prelude::*,
     ristretto::{RistrettoPoint, RistrettoScalar},
 };
@@ -177,8 +177,8 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
     let point_p = pc_gens.commit(x, gamma);
     let point_q = pc_gens.commit(y, delta);
 
-    let x_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&x.to_bytes()));
-    let y_in_bls12_381 = BLSScalar::from(&BigUint::from_bytes_le(&y.to_bytes()));
+    let x_in_bls12_381 = BLSFr::from(&BigUint::from_bytes_le(&x.to_bytes()));
+    let y_in_bls12_381 = BLSFr::from(&BigUint::from_bytes_le(&y.to_bytes()));
 
     let (comm, comm_trace) = commit(
         abar_pubkey,
@@ -292,9 +292,9 @@ pub(crate) fn verify_bar_to_abar(
 pub(crate) fn prove_bar_to_abar_cs<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
-    amount: BLSScalar,
-    asset_type: BLSScalar,
-    blind_hash: BLSScalar,
+    amount: BLSFr,
+    asset_type: BLSFr,
+    blind_hash: BLSFr,
     pubkey: &AXfrPubKey,
     delegated_schnorr_proof: &DelegatedSchnorrProof<
         RistrettoScalar,
@@ -304,7 +304,7 @@ pub(crate) fn prove_bar_to_abar_cs<R: CryptoRng + RngCore>(
     inspection: &DelegatedSchnorrInspection<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
-    comm_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
+    comm_trace: &AnemoiVLHTrace<BLSFr, 2, 12>,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(BAR_TO_ABAR_PLONK_PROOF_TRANSCRIPT);
     let (mut cs, _) = build_bar_to_abar_cs(
@@ -335,7 +335,7 @@ pub(crate) fn prove_bar_to_abar_cs<R: CryptoRng + RngCore>(
 /// Verify the inspector's proof.
 pub(crate) fn verify_inspection(
     params: &VerifierParams,
-    hash_comm: BLSScalar,
+    hash_comm: BLSFr,
     proof_zk_part: &DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     proof: &AXfrPlonkPf,
     beta: &RistrettoScalar,
@@ -377,9 +377,9 @@ pub(crate) fn verify_inspection(
 
 /// Construct the confidential-to-anonymous constraint system.
 pub(crate) fn build_bar_to_abar_cs(
-    amount: BLSScalar,
-    asset_type: BLSScalar,
-    blind: BLSScalar,
+    amount: BLSFr,
+    asset_type: BLSFr,
+    blind: BLSFr,
     pubkey: &AXfrPubKey,
     proof: &DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     non_zk_state: &DelegatedSchnorrInspection<
@@ -389,20 +389,20 @@ pub(crate) fn build_bar_to_abar_cs(
     >,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
-    comm_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
+    comm_trace: &AnemoiVLHTrace<BLSFr, 2, 12>,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
     cs.load_anemoi_jive_parameters::<AnemoiJive381>();
 
     let zero_var = cs.zero_var();
 
-    let zero = BLSScalar::zero();
-    let one = BLSScalar::one();
-    let step_1 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB));
-    let step_2 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 2));
-    let step_3 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 3));
-    let step_4 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 4));
-    let step_5 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 5));
+    let zero = BLSFr::zero();
+    let one = BLSFr::one();
+    let step_1 = BLSFr::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB));
+    let step_2 = BLSFr::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 2));
+    let step_3 = BLSFr::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 3));
+    let step_4 = BLSFr::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 4));
+    let step_5 = BLSFr::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 5));
 
     // 1. Input commitment witnesses.
     let amount_var = cs.new_variable(amount);
@@ -472,11 +472,10 @@ pub(crate) fn build_bar_to_abar_cs(
         let mut sum = BigUint::zero();
         for (i, limb) in limbs.iter().enumerate() {
             sum.add_assign(
-                <BLSScalar as Into<BigUint>>::into(*limb)
-                    .shl(SimFrParamsRistretto::BIT_PER_LIMB * i),
+                <BLSFr as Into<BigUint>>::into(*limb).shl(SimFrParamsRistretto::BIT_PER_LIMB * i),
             );
         }
-        compressed_limbs.push(BLSScalar::from(&sum));
+        compressed_limbs.push(BLSFr::from(&sum));
 
         let mut sum_var = {
             let first_var = *limbs_var.get(0).unwrap_or(&zero_var);
@@ -645,7 +644,7 @@ mod test {
     };
     use crate::xfr::structs::AssetType;
     use merlin::Transcript;
-    use noah_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::RistrettoScalar};
+    use noah_algebra::{bls12_381::BLSFr, prelude::*, ristretto::RistrettoScalar};
     use noah_crypto::{
         basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto},
         delegated_schnorr::prove_delegated_schnorr,
@@ -664,8 +663,8 @@ mod test {
         let amount = 71u64;
         let asset_type = AssetType::from_identical_byte(1u8);
 
-        let amount_bls12_381 = BLSScalar::from(amount);
-        let asset_type_bls12_381: BLSScalar = asset_type.as_scalar();
+        let amount_bls12_381 = BLSFr::from(amount);
+        let asset_type_bls12_381: BLSFr = asset_type.as_scalar();
 
         let x = RistrettoScalar::from_bytes(&amount_bls12_381.to_bytes()).unwrap();
         let y: RistrettoScalar =
@@ -677,7 +676,7 @@ mod test {
         let point_p = pc_gens.commit(x, gamma);
         let point_q = pc_gens.commit(y, delta);
 
-        let z_randomizer = BLSScalar::random(&mut prng);
+        let z_randomizer = BLSFr::random(&mut prng);
         let keypair = AXfrKeyPair::generate(&mut prng);
         let pubkey = keypair.get_public_key();
 
@@ -737,7 +736,7 @@ mod test {
 
         // Check the constraints
         assert!(cs.verify_witness(&witness, &online_inputs).is_ok());
-        online_inputs[0].add_assign(&BLSScalar::one());
+        online_inputs[0].add_assign(&BLSFr::one());
         assert!(cs.verify_witness(&witness, &online_inputs).is_err());
     }
 }

@@ -3,7 +3,7 @@ use crate::xfr::structs::{
     AssetTracerDecKeys, AssetTracerEncKeys, AssetType, TracerMemo, ASSET_TYPE_LENGTH,
 };
 use noah_algebra::{
-    bls12_381::{BLSScalar, BLSG1},
+    bls12_381::{BLSFr, BLSG1},
     prelude::*,
     ristretto::{RistrettoPoint, RistrettoScalar},
 };
@@ -201,7 +201,7 @@ impl TracerMemo {
     /// Otherwise, it returns a boolean vector indicating true for every positive match and false otherwise.
     pub fn verify_identity_attributes(
         &self,
-        dec_key: &ElGamalDecKey<BLSScalar>,
+        dec_key: &ElGamalDecKey<BLSFr>,
         expected_attributes: &[u32],
     ) -> Result<Vec<bool>> {
         if self.lock_attributes.len() != expected_attributes.len() {
@@ -209,7 +209,7 @@ impl TracerMemo {
         }
         let mut result = vec![];
         for (ctext, expected) in self.lock_attributes.iter().zip(expected_attributes.iter()) {
-            let scalar_attr = BLSScalar::from(*expected);
+            let scalar_attr = BLSFr::from(*expected);
             let elem = elgamal_partial_decrypt(ctext, dec_key);
             if elem != BLSG1::get_base().mul(&scalar_attr) {
                 result.push(false);
@@ -224,7 +224,7 @@ impl TracerMemo {
 #[cfg(test)]
 mod tests {
     use crate::xfr::structs::{AssetTracerKeyPair, AssetType, TracerMemo};
-    use noah_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::RistrettoScalar};
+    use noah_algebra::{bls12_381::BLSFr, prelude::*, ristretto::RistrettoScalar};
     use noah_crypto::basic::elgamal::elgamal_encrypt;
 
     #[test]
@@ -338,12 +338,12 @@ mod tests {
         let attrs_and_ctexts = attrs
             .iter()
             .map(|x| {
-                let scalar = BLSScalar::from(*x);
+                let scalar = BLSFr::from(*x);
                 (
                     *x,
                     elgamal_encrypt(
                         &scalar,
-                        &BLSScalar::from(1000u32),
+                        &BLSFr::from(1000u32),
                         &tracer_keys.enc_key.attrs_enc_key,
                     ),
                 )

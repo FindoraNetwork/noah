@@ -243,20 +243,20 @@ mod test {
         field_polynomial::FpPolynomial, kzg_poly_com::KZGCommitmentScheme, pcs::PolyComScheme,
     };
     use merlin::Transcript;
-    use noah_algebra::{bls12_381::BLSScalar, prelude::*};
+    use noah_algebra::{bls12_381::BLSFr, prelude::*};
 
     #[test]
     fn test_pcs_eval() {
         let mut prng = test_rng();
-        let zero = BLSScalar::zero();
-        let one = BLSScalar::one();
+        let zero = BLSFr::zero();
+        let one = BLSFr::one();
         let two = one.add(&one);
 
         let poly = FpPolynomial::from_zeroes(&[zero, one, two]);
         let degree = poly.degree();
         let pcs = KZGCommitmentScheme::new(degree, &mut prng);
         let com = pcs.commit(&poly).unwrap();
-        let point = BLSScalar::random(&mut prng);
+        let point = BLSFr::random(&mut prng);
         let proof = pcs.prove(&poly, &point, degree).unwrap();
         let eval = pcs.eval(&poly, &point);
         assert!(pcs.verify(&com, degree, &point, &eval, &proof).is_ok());
@@ -265,7 +265,7 @@ mod test {
     #[test]
     fn test_pcs_batch_eval() {
         let mut prng = test_rng();
-        type Field = BLSScalar;
+        type Field = BLSFr;
         let zero = Field::zero();
         let one = Field::one();
         let two = one.add(&one);

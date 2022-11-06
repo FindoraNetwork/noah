@@ -958,9 +958,9 @@ mod test {
         indexer::indexer,
     };
     use crate::poly_commit::kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS};
-    use noah_algebra::{bls12_381::BLSScalar, prelude::*};
+    use noah_algebra::{bls12_381::BLSFr, prelude::*};
 
-    type F = BLSScalar;
+    type F = BLSFr;
 
     #[test]
     fn test_z_polynomial() {

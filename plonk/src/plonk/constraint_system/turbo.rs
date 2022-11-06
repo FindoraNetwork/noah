@@ -982,9 +982,9 @@ mod test {
     };
     use crate::poly_commit::{kzg_poly_com::KZGCommitmentScheme, pcs::PolyComScheme};
     use merlin::Transcript;
-    use noah_algebra::{bls12_381::BLSScalar, prelude::*};
+    use noah_algebra::{bls12_381::BLSFr, prelude::*};
 
-    type F = BLSScalar;
+    type F = BLSFr;
 
     #[test]
     fn test_select() {

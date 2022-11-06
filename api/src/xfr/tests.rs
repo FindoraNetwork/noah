@@ -816,7 +816,7 @@ mod asset_tracing {
         trace_assets, XfrNotePolicies, XfrNotePoliciesRef,
     };
     use noah_algebra::{
-        bls12_381::BLSScalar,
+        bls12_381::BLSFr,
         ristretto::{RistrettoPoint, RistrettoScalar},
     };
     use noah_crypto::basic::elgamal::ElGamalCiphertext;
@@ -1723,7 +1723,7 @@ mod asset_tracing {
         assert_ne!(at1_rist_scalar, at3_rist_scalar);
         assert_ne!(at2_rist_scalar, at3_rist_scalar);
 
-        let at1_bls_scalar = at1.as_scalar::<BLSScalar>();
+        let at1_bls_scalar = at1.as_scalar::<BLSFr>();
         let v1 = at1_rist_scalar.to_bytes();
         let v2 = at1_bls_scalar.to_bytes();
         assert_eq!(v1, v2);

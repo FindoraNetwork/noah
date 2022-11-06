@@ -1,21 +1,21 @@
 use crate::plonk::constraint_system::{TurboCS, VarIndex};
-use noah_algebra::bls12_381::BLSScalar;
+use noah_algebra::bls12_381::BLSFr;
 use noah_algebra::ops::Neg;
 use noah_algebra::{One, Zero};
 use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, AnemoiVLHTrace, JiveTrace};
 
-impl TurboCS<BLSScalar> {
+impl TurboCS<BLSFr> {
     /// Create constraints for the Anemoi permutation.
     fn anemoi_permutation_round(
         &mut self,
         input_var: &([VarIndex; 2], [VarIndex; 2]),
         output_var: &([Option<VarIndex>; 2], [Option<VarIndex>; 2]),
-        intermediate_val: &([[BLSScalar; 2]; 12], [[BLSScalar; 2]; 12]),
-        checksum: Option<BLSScalar>,
-        salt: Option<BLSScalar>,
+        intermediate_val: &([[BLSFr; 2]; 12], [[BLSFr; 2]; 12]),
+        checksum: Option<BLSFr>,
+        salt: Option<BLSFr>,
     ) -> Option<VarIndex> {
-        let zero = BLSScalar::zero();
-        let one = BLSScalar::one();
+        let zero = BLSFr::zero();
+        let one = BLSFr::one();
         let zero_var = self.zero_var();
 
         // Allocate the intermediate values
@@ -192,7 +192,7 @@ impl TurboCS<BLSScalar> {
     /// Create constraints for the Anemoi variable length hash function.
     pub fn anemoi_variable_length_hash(
         &mut self,
-        trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
+        trace: &AnemoiVLHTrace<BLSFr, 2, 12>,
         input_var: &[VarIndex],
         output_var: VarIndex,
     ) {
@@ -309,12 +309,12 @@ impl TurboCS<BLSScalar> {
     /// Create constraints for the Jive CRH.
     pub fn jive_crh(
         &mut self,
-        trace: &JiveTrace<BLSScalar, 2, 12>,
+        trace: &JiveTrace<BLSFr, 2, 12>,
         input_var: &[VarIndex; 3],
-        salt: BLSScalar,
+        salt: BLSFr,
     ) -> VarIndex {
-        let one = BLSScalar::one();
-        let zero = BLSScalar::zero();
+        let one = BLSFr::one();
+        let zero = BLSFr::zero();
 
         let x_var = [input_var[0], input_var[1]];
         let y_var = [input_var[2], self.new_variable(salt)];
@@ -363,7 +363,7 @@ impl TurboCS<BLSScalar> {
 #[cfg(test)]
 mod test {
     use crate::plonk::constraint_system::TurboCS;
-    use noah_algebra::bls12_381::BLSScalar;
+    use noah_algebra::bls12_381::BLSFr;
     use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS};
 
     #[test]
@@ -371,16 +371,16 @@ mod test {
         let salt = ANEMOI_JIVE_381_SALTS[10];
 
         let trace = AnemoiJive381::eval_jive_with_trace(
-            &[BLSScalar::from(1u64), BLSScalar::from(2u64)],
-            &[BLSScalar::from(3u64), salt],
+            &[BLSFr::from(1u64), BLSFr::from(2u64)],
+            &[BLSFr::from(3u64), salt],
         );
 
         let mut cs = TurboCS::new();
         cs.load_anemoi_jive_parameters::<AnemoiJive381>();
 
-        let one = cs.new_variable(BLSScalar::from(1u64));
-        let two = cs.new_variable(BLSScalar::from(2u64));
-        let three = cs.new_variable(BLSScalar::from(3u64));
+        let one = cs.new_variable(BLSFr::from(1u64));
+        let two = cs.new_variable(BLSFr::from(2u64));
+        let three = cs.new_variable(BLSFr::from(3u64));
 
         let _ = cs.jive_crh(&trace, &[one, two, three], salt);
 
@@ -391,19 +391,19 @@ mod test {
     #[test]
     fn test_anemoi_variable_length_hash_constraint_system() {
         let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
-            BLSScalar::from(1u64),
-            BLSScalar::from(2u64),
-            BLSScalar::from(3u64),
-            BLSScalar::from(4u64),
+            BLSFr::from(1u64),
+            BLSFr::from(2u64),
+            BLSFr::from(3u64),
+            BLSFr::from(4u64),
         ]);
 
         let mut cs = TurboCS::new();
         cs.load_anemoi_jive_parameters::<AnemoiJive381>();
 
-        let one = cs.new_variable(BLSScalar::from(1u64));
-        let two = cs.new_variable(BLSScalar::from(2u64));
-        let three = cs.new_variable(BLSScalar::from(3u64));
-        let four = cs.new_variable(BLSScalar::from(4u64));
+        let one = cs.new_variable(BLSFr::from(1u64));
+        let two = cs.new_variable(BLSFr::from(2u64));
+        let three = cs.new_variable(BLSFr::from(3u64));
+        let four = cs.new_variable(BLSFr::from(4u64));
 
         let output_var = cs.new_variable(trace.output);
 
@@ -423,7 +423,7 @@ mod kzg_test {
     use crate::poly_commit::kzg_poly_com::KZGCommitmentScheme;
     use crate::poly_commit::pcs::PolyComScheme;
     use merlin::Transcript;
-    use noah_algebra::{bls12_381::BLSScalar, prelude::*};
+    use noah_algebra::{bls12_381::BLSFr, prelude::*};
     use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS};
 
     #[test]
@@ -435,26 +435,26 @@ mod kzg_test {
     }
 
     fn test_turbo_plonk_anemoi_variable_length_hash<
-        PCS: PolyComScheme<Field = BLSScalar>,
+        PCS: PolyComScheme<Field = BLSFr>,
         R: CryptoRng + RngCore,
     >(
         pcs: &PCS,
         prng: &mut R,
     ) {
         let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
-            BLSScalar::from(1u64),
-            BLSScalar::from(2u64),
-            BLSScalar::from(3u64),
-            BLSScalar::from(4u64),
+            BLSFr::from(1u64),
+            BLSFr::from(2u64),
+            BLSFr::from(3u64),
+            BLSFr::from(4u64),
         ]);
 
         let mut cs = TurboCS::new();
         cs.load_anemoi_jive_parameters::<AnemoiJive381>();
 
-        let one = cs.new_variable(BLSScalar::from(1u64));
-        let two = cs.new_variable(BLSScalar::from(2u64));
-        let three = cs.new_variable(BLSScalar::from(3u64));
-        let four = cs.new_variable(BLSScalar::from(4u64));
+        let one = cs.new_variable(BLSFr::from(1u64));
+        let two = cs.new_variable(BLSFr::from(2u64));
+        let three = cs.new_variable(BLSFr::from(3u64));
+        let four = cs.new_variable(BLSFr::from(4u64));
 
         let output_var = cs.new_variable(trace.output);
 
@@ -466,23 +466,23 @@ mod kzg_test {
         check_turbo_plonk_proof(pcs, prng, &cs, &witness[..], &[]);
     }
 
-    fn test_turbo_plonk_jive_crh<PCS: PolyComScheme<Field = BLSScalar>, R: CryptoRng + RngCore>(
+    fn test_turbo_plonk_jive_crh<PCS: PolyComScheme<Field = BLSFr>, R: CryptoRng + RngCore>(
         pcs: &PCS,
         prng: &mut R,
     ) {
         let salt = ANEMOI_JIVE_381_SALTS[10];
 
         let trace = AnemoiJive381::eval_jive_with_trace(
-            &[BLSScalar::from(1u64), BLSScalar::from(2u64)],
-            &[BLSScalar::from(3u64), salt],
+            &[BLSFr::from(1u64), BLSFr::from(2u64)],
+            &[BLSFr::from(3u64), salt],
         );
 
         let mut cs = TurboCS::new();
         cs.load_anemoi_jive_parameters::<AnemoiJive381>();
 
-        let one = cs.new_variable(BLSScalar::from(1u64));
-        let two = cs.new_variable(BLSScalar::from(2u64));
-        let three = cs.new_variable(BLSScalar::from(3u64));
+        let one = cs.new_variable(BLSFr::from(1u64));
+        let two = cs.new_variable(BLSFr::from(2u64));
+        let three = cs.new_variable(BLSFr::from(3u64));
 
         let _ = cs.jive_crh(&trace, &[one, two, three], salt);
         cs.pad();

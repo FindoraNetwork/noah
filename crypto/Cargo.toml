@@ -70,7 +70,7 @@ git = "https://github.com/FindoraNetwork/ark-bulletproofs"
 tag = "v2.0.0-f"
 package = "ark-bulletproofs-secq256k1"
 default-features = false
-features = ["yoloproofs"]
+features = ['yoloproofs']
 
 [dev-dependencies]
 bit-array = '0.4.3'
