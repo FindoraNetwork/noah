@@ -1,6 +1,6 @@
 use crate::anon_xfr::address_folding::{
-    create_address_folding, prepare_verifier_input, prove_address_folding_in_cs,
-    verify_address_folding, AXfrAddressFoldingWitness,
+    create_address_folding, prove_address_folding_in_cs, verify_address_folding,
+    AXfrAddressFoldingWitness,
 };
 use crate::anon_xfr::{
     abar_to_abar::add_payers_witnesses,
@@ -197,10 +197,8 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
     }
 
     let mut transcript = Transcript::new(ABAR_TO_AR_FOLDING_PROOF_TRANSCRIPT);
-    let (beta, lambda) = verify_address_folding(hash, &mut transcript, &note.folding_instance)?;
-
     let address_folding_public_input =
-        prepare_verifier_input(&note.folding_instance, &beta, &lambda);
+        verify_address_folding(hash, &mut transcript, &note.folding_instance)?;
 
     let payer_amount = note.body.output.amount.get_amount().unwrap();
     let payer_asset_type = note.body.output.asset_type.get_asset_type().unwrap();
@@ -258,11 +256,8 @@ pub fn batch_verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default + Sync
         .zip(hashes)
         .map(|((note, merkle_root), hash)| {
             let mut transcript = Transcript::new(ABAR_TO_AR_FOLDING_PROOF_TRANSCRIPT);
-            let (beta, lambda) =
-                verify_address_folding(hash, &mut transcript, &note.folding_instance)?;
-
             let address_folding_public_input =
-                prepare_verifier_input(&note.folding_instance, &beta, &lambda);
+                verify_address_folding(hash, &mut transcript, &note.folding_instance)?;
 
             let payer_amount = note.body.output.amount.get_amount().unwrap();
             let payer_asset_type = note.body.output.asset_type.get_asset_type().unwrap();

@@ -21,7 +21,9 @@ pub const AXFR_PUBLIC_KEY_LENGTH: usize = 33; // keytype (+positive) + Bytes
 /// The spending key.
 #[derive(Debug)]
 pub enum AXfrSecretKey {
+    /// Ed25519 for axfr secret key
     Ed25519(Ed25519SecretKey),
+    /// Secp256k1 for axfr secret key
     Secp256k1(SECP256K1Scalar),
 }
 
@@ -109,9 +111,12 @@ impl NoahFromToBytes for AXfrSecretKey {
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
 pub struct AXfrPubKey(pub(crate) AXfrPubKeyInner);
 
+/// The public key for anon transfer.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum AXfrPubKeyInner {
+    /// Ed25519 for axfr public key
     Ed25519(Ed25519PublicKey),
+    /// Secp256k1 for axfr public key
     Secp256k1(SECP256K1G1),
 }
 
@@ -286,7 +291,10 @@ impl AXfrPubKey {
     /// Return the BLS12-381 scalar representation of the public key.
     pub fn get_public_key_scalars(&self) -> Result<[BLSScalar; 3]> {
         let bytes = match self.inner() {
-            AXfrPubKeyInner::Ed25519(pk) => pk.to_bytes().to_vec(),
+            AXfrPubKeyInner::Ed25519(_pk) => {
+                unimplemented!();
+                //pk.to_bytes().to_vec()
+            }
             AXfrPubKeyInner::Secp256k1(pk) => pk
                 .get_x()
                 .to_bytes()
@@ -337,7 +345,7 @@ impl AXfrPubKey {
                     res.unwrap()
                 };
 
-                let ctext = {
+                let mut ctext = {
                     let res = gcm.encrypt(nonce, msg);
 
                     if res.is_err() {

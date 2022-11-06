@@ -1,6 +1,6 @@
 use crate::anon_xfr::address_folding::{
-    create_address_folding, prepare_verifier_input, prove_address_folding_in_cs,
-    verify_address_folding, AXfrAddressFoldingInstance, AXfrAddressFoldingWitness,
+    create_address_folding, prove_address_folding_in_cs, verify_address_folding,
+    AXfrAddressFoldingInstance, AXfrAddressFoldingWitness,
 };
 use crate::anon_xfr::{
     add_merkle_path_variables, check_asset_amount, check_inputs, check_roots, commit, commit_in_cs,
@@ -263,10 +263,8 @@ pub fn verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default>(
     };
 
     let mut transcript = Transcript::new(ANON_XFR_FOLDING_PROOF_TRANSCRIPT);
-    let (beta, lambda) = verify_address_folding(hash, &mut transcript, &note.folding_instance)?;
-
     let address_folding_public_input =
-        prepare_verifier_input(&note.folding_instance, &beta, &lambda);
+        verify_address_folding(hash, &mut transcript, &note.folding_instance)?;
 
     verify_xfr(
         params,
@@ -314,11 +312,8 @@ pub fn batch_verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default + Sync +
             };
 
             let mut transcript = Transcript::new(ANON_XFR_FOLDING_PROOF_TRANSCRIPT);
-            let (beta, lambda) =
-                verify_address_folding(hash, &mut transcript, &note.folding_instance)?;
-
             let address_folding_public_input =
-                prepare_verifier_input(&note.folding_instance, &beta, &lambda);
+                verify_address_folding(hash, &mut transcript, &note.folding_instance)?;
 
             verify_xfr(
                 *param,
@@ -900,9 +895,7 @@ mod tests {
     use crate::anon_xfr::abar_to_abar::{
         finish_anon_xfr_note, init_anon_xfr_note, AXfrNote, ANON_XFR_FOLDING_PROOF_TRANSCRIPT,
     };
-    use crate::anon_xfr::address_folding::{
-        create_address_folding, prepare_verifier_input, verify_address_folding,
-    };
+    use crate::anon_xfr::address_folding::{create_address_folding, verify_address_folding};
     use crate::anon_xfr::{
         abar_to_abar::{
             asset_mixing, build_multi_xfr_cs, verify_anon_xfr_note, AXfrPubInputs, AXfrWitness,
@@ -2413,10 +2406,8 @@ mod tests {
         let witness = cs.get_and_clear_witness();
 
         let mut transcript = Transcript::new(ANON_XFR_FOLDING_PROOF_TRANSCRIPT);
-        let (beta, lambda) =
-            verify_address_folding(test_hash, &mut transcript, &folding_instance).unwrap();
         let address_folding_public_input =
-            prepare_verifier_input(&folding_instance, &beta, &lambda);
+            verify_address_folding(test_hash, &mut transcript, &folding_instance).unwrap();
 
         let mut online_inputs = pub_inputs.to_vec();
         online_inputs.extend_from_slice(&address_folding_public_input);
