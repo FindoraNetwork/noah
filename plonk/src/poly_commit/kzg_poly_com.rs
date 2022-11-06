@@ -4,7 +4,7 @@ use crate::poly_commit::{
     pcs::{HomomorphicPolyComElem, PolyComScheme, ToBytes},
 };
 use merlin::Transcript;
-use noah_algebra::bls12_381::pairing::BLSPairingEngine;
+use noah_algebra::bls12_381::BLSPairingEngine;
 use noah_algebra::{
     bls12_381::{BLSFr, BLSG1},
     prelude::*,
@@ -389,7 +389,7 @@ mod tests_kzg_impl {
         kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS},
         pcs::{HomomorphicPolyComElem, PolyComScheme},
     };
-    use noah_algebra::bls12_381::pairing::BLSPairingEngine;
+    use noah_algebra::bls12_381::BLSPairingEngine;
     use noah_algebra::{
         bls12_381::{BLSFr, BLSG1},
         prelude::*,

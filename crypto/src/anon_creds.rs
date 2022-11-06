@@ -523,7 +523,7 @@ pub(crate) fn verify_pok<P: Pairing>(
 pub(crate) mod credentials_tests {
     use super::*;
     use crate::anon_creds::Attribute::{Hidden, Revealed};
-    use noah_algebra::bls12_381::pairing::BLSPairingEngine;
+    use noah_algebra::bls12_381::BLSPairingEngine;
 
     fn check_signatures<P: Pairing>(n: usize) {
         let mut prng = test_rng();

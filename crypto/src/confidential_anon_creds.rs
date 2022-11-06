@@ -518,7 +518,7 @@ pub(crate) mod test_helper {
 #[cfg(test)]
 mod test_bls12_381 {
     use crate::confidential_anon_creds::test_helper::test_confidential_ac_reveal;
-    use noah_algebra::bls12_381::pairing::BLSPairingEngine;
+    use noah_algebra::bls12_381::BLSPairingEngine;
 
     #[test]
     fn confidential_reveal_one_attr_hidden() {

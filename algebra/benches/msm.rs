@@ -1,5 +1,5 @@
 use ark_std::time::Instant;
-use noah_algebra::bls12_381::g1::BLSG1;
+use noah_algebra::bls12_381::BLSG1;
 use noah_algebra::{bls12_381::BLSFr, prelude::*};
 
 fn main() {

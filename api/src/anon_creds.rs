@@ -1,5 +1,5 @@
-use noah_algebra::bls12_381::g2::BLSG2;
-use noah_algebra::bls12_381::pairing::BLSPairingEngine;
+use noah_algebra::bls12_381::BLSPairingEngine;
+use noah_algebra::bls12_381::BLSG2;
 use noah_algebra::{
     bls12_381::{BLSFr, BLSG1},
     prelude::*,
