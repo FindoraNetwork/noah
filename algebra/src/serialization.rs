@@ -12,7 +12,7 @@ use crate::{
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::io::Cursor;
 use bulletproofs::RangeProof;
-use serde::{Serialize, Serializer};
+use serde::Serializer;
 
 macro_rules! to_from_bytes_scalar {
     ($t:ident) => {
