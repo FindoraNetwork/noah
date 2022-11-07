@@ -4,7 +4,7 @@ use noah::{
     xfr::{
         asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
         gen_xfr_note,
-        sig::{XfrKeyPair, XfrPublicKey},
+        sig::{PublicKey, XfrKeyPair},
         structs::{
             AssetRecord, AssetRecordTemplate, AssetTracerKeyPair, AssetType, BlindAssetRecord,
             IdentityRevealPolicy, OwnerMemo, TracingPolicies, TracingPolicy, ASSET_TYPE_LENGTH,
@@ -21,7 +21,7 @@ const ASSET2_TYPE: AssetType = AssetType([1u8; ASSET_TYPE_LENGTH]);
 const ASSET3_TYPE: AssetType = AssetType([2u8; ASSET_TYPE_LENGTH]);
 
 fn conf_blind_asset_record_from_ledger(
-    key: &XfrPublicKey,
+    key: &PublicKey,
     amount: u64,
     asset_type: AssetType,
 ) -> (BlindAssetRecord, OwnerMemo) {
@@ -48,7 +48,7 @@ fn check_record_data(
     expected_amount: u64,
     expected_asset_type: AssetType,
     expected_ids: Vec<Attr>,
-    expected_pk: &XfrPublicKey,
+    expected_pk: &PublicKey,
 ) {
     assert_eq!(record_data.0, expected_amount);
     assert_eq!(record_data.1, expected_asset_type);

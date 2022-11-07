@@ -5,7 +5,7 @@ mod smoke_xfr {
         xfr::{
             asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
             gen_xfr_note,
-            sig::{XfrKeyPair, XfrPublicKey},
+            sig::{PublicKey, XfrKeyPair},
             structs::{
                 AssetRecord, AssetRecordTemplate, AssetType, BlindAssetRecord, OwnerMemo,
                 XfrAmount, XfrAssetType, ASSET_TYPE_LENGTH,
@@ -23,7 +23,7 @@ mod smoke_xfr {
 
     // Simulate getting a BlindAssetRecord from Ledger
     fn non_conf_blind_asset_record_from_ledger(
-        key: &XfrPublicKey,
+        key: &PublicKey,
         amount: u64,
         asset_type: AssetType,
     ) -> BlindAssetRecord {
@@ -36,7 +36,7 @@ mod smoke_xfr {
 
     // Simulate getting a BlindAssetRecord from Ledger
     fn conf_blind_asset_record_from_ledger(
-        key: &XfrPublicKey,
+        key: &PublicKey,
         amount: u64,
         asset_type: AssetType,
     ) -> (BlindAssetRecord, OwnerMemo) {

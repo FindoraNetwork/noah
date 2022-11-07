@@ -1,16 +1,13 @@
 use crate::anon_xfr::{
     commit, commit_in_cs,
-    keys::AXfrPubKey,
     structs::{
         AnonAssetRecord, AxfrOwnerMemo, OpenAnonAssetRecordBuilder, PayeeWitness, PayeeWitnessVars,
     },
     AXfrPlonkPf, TurboPlonkCS,
 };
+use crate::keys::{KeyPair, PublicKey, Signature};
 use crate::setup::{ProverParams, VerifierParams};
-use crate::xfr::{
-    sig::{XfrKeyPair, XfrSignature},
-    structs::{BlindAssetRecord, OpenAssetRecord},
-};
+use crate::xfr::structs::{BlindAssetRecord, OpenAssetRecord};
 use merlin::Transcript;
 use noah_algebra::{bls12_381::BLSScalar, errors::NoahError, prelude::*};
 use noah_crypto::basic::anemoi_jive::{AnemoiJive381, AnemoiVLHTrace};
@@ -29,7 +26,7 @@ pub struct ArToAbarNote {
     /// The transparent-to-anonymous body.
     pub body: ArToAbarBody,
     /// Signature of the sender.
-    pub signature: XfrSignature,
+    pub signature: Signature,
 }
 
 /// The transparent-to-anonymous body.
@@ -50,8 +47,8 @@ pub fn gen_ar_to_abar_note<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &ProverParams,
     record: &OpenAssetRecord,
-    bar_keypair: &XfrKeyPair,
-    abar_pubkey: &AXfrPubKey,
+    bar_keypair: &KeyPair,
+    abar_pubkey: &PublicKey,
 ) -> Result<ArToAbarNote> {
     // generate body
     let body = gen_ar_to_abar_body(prng, params, record, &abar_pubkey).c(d!())?;
@@ -109,7 +106,7 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &ProverParams,
     obar: &OpenAssetRecord,
-    abar_pubkey: &AXfrPubKey,
+    abar_pubkey: &PublicKey,
 ) -> Result<ArToAbarBody> {
     let oabar_amount = obar.amount;
 
@@ -203,7 +200,7 @@ pub fn build_ar_to_abar_cs(
 
     let blind = cs.new_variable(payee_data.blind);
 
-    let public_key_scalars = payee_data.public_key.get_public_key_scalars().unwrap();
+    let public_key_scalars = payee_data.public_key.to_bls_scalars().unwrap();
     let public_key_scalars_vars = [
         cs.new_variable(public_key_scalars[0]),
         cs.new_variable(public_key_scalars[1]),

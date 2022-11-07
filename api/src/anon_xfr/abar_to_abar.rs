@@ -4,9 +4,7 @@ use crate::anon_xfr::address_folding::{
 };
 use crate::anon_xfr::{
     add_merkle_path_variables, check_asset_amount, check_inputs, check_roots, commit, commit_in_cs,
-    compute_merkle_root_variables,
-    keys::{AXfrKeyPair, AXfrPubKey, AXfrSecretKey},
-    nullify, nullify_in_cs,
+    compute_merkle_root_variables, nullify, nullify_in_cs,
     structs::{
         AccElemVars, AnonAssetRecord, AxfrOwnerMemo, Commitment, MTNode, MTPath, Nullifier,
         OpenAnonAssetRecord, PayeeWitness, PayeeWitnessVars, PayerWitness, PayerWitnessVars,
@@ -14,6 +12,7 @@ use crate::anon_xfr::{
     AXfrPlonkPf, TurboPlonkCS, AMOUNT_LEN, FEE_TYPE,
 };
 use crate::errors::NoahError;
+use crate::keys::{KeyPair, PublicKey, SecretKey};
 use crate::setup::{ProverParams, VerifierParams};
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
@@ -63,7 +62,7 @@ pub struct AXfrPreNote {
     /// The traces of the nullifiers.
     pub nullifiers_traces: Vec<AnemoiVLHTrace<BLSScalar, 2, 12>>,
     /// Input key pair.
-    pub input_keypair: AXfrKeyPair,
+    pub input_keypair: KeyPair,
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
@@ -88,7 +87,7 @@ pub fn init_anon_xfr_note(
     inputs: &[OpenAnonAssetRecord],
     outputs: &[OpenAnonAssetRecord],
     fee: u32,
-    input_keypair: &AXfrKeyPair,
+    input_keypair: &KeyPair,
 ) -> Result<AXfrPreNote> {
     // 1. check input correctness
     if inputs.is_empty() || outputs.is_empty() {
@@ -118,7 +117,7 @@ pub fn init_anon_xfr_note(
         nullifiers_traces.push(nullifier_trace);
 
         let (_, commitment_trace) = commit(
-            &input_keypair.get_public_key(),
+            &input_keypair.get_pk(),
             input.blind,
             input.amount,
             input.asset_type.as_scalar(),
@@ -134,7 +133,7 @@ pub fn init_anon_xfr_note(
         .map(|input| {
             let mt_leaf_info = input.mt_leaf_info.as_ref().unwrap();
             PayerWitness {
-                secret_key: input_keypair.get_secret_key(),
+                secret_key: input_keypair.get_sk(),
                 uid: mt_leaf_info.uid,
                 amount: input.amount,
                 asset_type: input.asset_type.as_scalar(),
@@ -427,7 +426,7 @@ impl AXfrWitness {
             is_right_child: 0,
         };
         let payer_witness = PayerWitness {
-            secret_key: AXfrSecretKey::default(),
+            secret_key: SecretKey::default(),
             uid: 0,
             amount: 0,
             asset_type: bls_zero,
@@ -438,7 +437,7 @@ impl AXfrWitness {
             amount: 0,
             blind: bls_zero,
             asset_type: bls_zero,
-            public_key: AXfrPubKey::default(),
+            public_key: PublicKey::default(),
         };
 
         AXfrWitness {
@@ -483,7 +482,7 @@ impl AXfrPubInputs {
             .payers_witnesses
             .iter()
             .map(|sec| {
-                let keypair = AXfrKeyPair::from_secret_key(sec.secret_key.clone());
+                let keypair = sec.secret_key.clone().into_keypair();
                 let (hash, _) = nullify(&keypair, sec.amount, sec.asset_type, sec.uid).unwrap();
 
                 hash
@@ -495,7 +494,7 @@ impl AXfrPubInputs {
             .payees_witnesses
             .iter()
             .map(|sec| {
-                let public_key_scalars = sec.public_key.get_public_key_scalars().unwrap();
+                let public_key_scalars = sec.public_key.to_bls_scalars().unwrap();
                 AnemoiJive381::eval_variable_length_hash(&[
                     zero, /* protocol version number */
                     sec.blind,
@@ -550,8 +549,8 @@ pub(crate) fn build_multi_xfr_cs(
     let payees_secrets = add_payees_witnesses(&mut cs, &witness.payees_witnesses);
 
     let keypair = folding_witness.keypair.clone();
-    let public_key_scalars = keypair.get_public_key().get_public_key_scalars().unwrap();
-    let secret_key_scalars = keypair.get_secret_key().get_secret_key_scalars().unwrap();
+    let public_key_scalars = keypair.get_pk().to_bls_scalars().unwrap();
+    let secret_key_scalars = keypair.get_sk().to_bls_scalars().unwrap();
 
     let public_key_scalars_vars = [
         cs.new_variable(public_key_scalars[0]),
@@ -616,7 +615,7 @@ pub(crate) fn build_multi_xfr_cs(
         };
         let mut path_traces = Vec::new();
         let (commitment, _) = commit(
-            &keypair.get_public_key(),
+            &keypair.get_pk(),
             payer_witness.blind,
             payer_witness.amount,
             payer_witness.asset_type,
@@ -873,7 +872,7 @@ pub(crate) fn add_payees_witnesses(
             let blind = cs.new_variable(secret.blind);
             let asset_type = cs.new_variable(secret.asset_type);
 
-            let public_key_scalars = secret.public_key.get_public_key_scalars().unwrap();
+            let public_key_scalars = secret.public_key.to_bls_scalars().unwrap();
             let public_key_scalars_vars = [
                 cs.new_variable(public_key_scalars[0]),
                 cs.new_variable(public_key_scalars[1]),
@@ -901,15 +900,14 @@ mod tests {
             asset_mixing, build_multi_xfr_cs, verify_anon_xfr_note, AXfrPubInputs, AXfrWitness,
         },
         add_merkle_path_variables, check_merkle_tree_validity, commit, commit_in_cs,
-        compute_merkle_root_variables,
-        keys::AXfrKeyPair,
-        nullify, nullify_in_cs,
+        compute_merkle_root_variables, nullify, nullify_in_cs,
         structs::{
             AccElemVars, AnonAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonAssetRecord,
             OpenAnonAssetRecordBuilder, PayeeWitness, PayerWitness,
         },
         FEE_TYPE,
     };
+    use crate::keys::KeyPair;
     use crate::setup::{ProverParams, VerifierParams};
     use crate::xfr::structs::AssetType;
     use digest::{consts::U64, Digest};
@@ -921,20 +919,20 @@ mod tests {
     use noah_plonk::plonk::constraint_system::{TurboCS, VarIndex};
     use sha2::Sha512;
 
-    fn gen_keys<R: CryptoRng + RngCore>(prng: &mut R, n: usize) -> Vec<AXfrKeyPair> {
-        (0..n).map(|_| AXfrKeyPair::generate(prng)).collect()
+    fn gen_keys<R: CryptoRng + RngCore>(prng: &mut R, n: usize) -> Vec<KeyPair> {
+        (0..n).map(|_| KeyPair::generate(prng)).collect()
     }
 
     fn gen_oabar_with_key<R: CryptoRng + RngCore>(
         prng: &mut R,
         amount: u64,
         asset_type: AssetType,
-        keypair: &AXfrKeyPair,
+        keypair: &KeyPair,
     ) -> OpenAnonAssetRecord {
         let oabar = OpenAnonAssetRecordBuilder::new()
             .amount(amount)
             .asset_type(asset_type)
-            .pub_key(&keypair.get_public_key())
+            .pub_key(&keypair.get_pk())
             .finalize(prng)
             .unwrap()
             .build()
@@ -949,7 +947,7 @@ mod tests {
         inputs: &[OpenAnonAssetRecord],
         outputs: &[OpenAnonAssetRecord],
         fee: u32,
-        input_keypair: &AXfrKeyPair,
+        input_keypair: &KeyPair,
         hash: D,
     ) -> Result<AXfrNote> {
         let pre_note = init_anon_xfr_note(inputs, outputs, fee, input_keypair)?;
@@ -961,13 +959,13 @@ mod tests {
         inputs: Vec<(u64, BLSScalar)>,
         outputs: Vec<(u64, BLSScalar)>,
         fee: u32,
-    ) -> (AXfrWitness, AXfrKeyPair) {
+    ) -> (AXfrWitness, KeyPair) {
         let n_payers = inputs.len();
         assert!(n_payers <= 3);
         let mut prng = test_rng();
         let zero = BLSScalar::zero();
 
-        let input_keypair = AXfrKeyPair::generate(&mut prng);
+        let input_keypair = KeyPair::generate(&mut prng);
 
         let mut payers_secrets: Vec<PayerWitness> = inputs
             .iter()
@@ -981,7 +979,7 @@ mod tests {
                 let blind = BLSScalar::random(&mut prng);
 
                 let (commitment, _) =
-                    commit(&input_keypair.get_public_key(), blind, amount, asset_type).unwrap();
+                    commit(&input_keypair.get_pk(), blind, amount, asset_type).unwrap();
 
                 let mut left = zero;
                 let mut mid = zero;
@@ -1004,7 +1002,7 @@ mod tests {
                     is_right_child,
                 };
                 PayerWitness {
-                    secret_key: input_keypair.get_secret_key(),
+                    secret_key: input_keypair.get_sk(),
                     uid: i as u64,
                     amount,
                     asset_type,
@@ -1014,7 +1012,7 @@ mod tests {
             })
             .collect();
 
-        let public_key = input_keypair.get_public_key();
+        let public_key = input_keypair.get_pk();
 
         // compute the merkle leaves and update the merkle paths if there are more than 1 payers.
         if n_payers > 1 {
@@ -1053,7 +1051,7 @@ mod tests {
                 amount,
                 blind: BLSScalar::random(&mut prng),
                 asset_type,
-                public_key: AXfrKeyPair::generate(&mut prng).get_public_key(),
+                public_key: KeyPair::generate(&mut prng).get_pk(),
             })
             .collect();
 
@@ -1081,12 +1079,12 @@ mod tests {
         let output_amount = 1 + prng.next_u64() % 100;
         let input_amount = output_amount + fee_amount as u64;
 
-        let keypair = AXfrKeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate(&mut prng);
 
         // sample an input anonymous asset record for testing.
         let oabar = gen_oabar_with_key(&mut prng, input_amount, asset_type, &keypair);
         let abar = AnonAssetRecord::from_oabar(&oabar);
-        assert_eq!(keypair.get_public_key(), *oabar.pub_key_ref());
+        assert_eq!(keypair.get_pk(), *oabar.pub_key_ref());
 
         let leaf = AnemoiJive381::eval_variable_length_hash(&[/*uid=*/ two, abar.commitment]);
 
@@ -1113,7 +1111,7 @@ mod tests {
         };
 
         // sample output keys for testing.
-        let keypair_out = AXfrKeyPair::generate(&mut prng);
+        let keypair_out = KeyPair::generate(&mut prng);
 
         let test_hash = {
             let mut hasher = Sha512::new();
@@ -1133,12 +1131,12 @@ mod tests {
                 .unwrap();
             assert_eq!(input_amount, oabar_in.get_amount());
             assert_eq!(asset_type, oabar_in.get_asset_type());
-            assert_eq!(keypair.get_public_key(), oabar_in.pub_key);
+            assert_eq!(keypair.get_pk(), oabar_in.pub_key);
 
             let oabar_out = OpenAnonAssetRecordBuilder::new()
                 .amount(output_amount)
                 .asset_type(asset_type)
-                .pub_key(&keypair_out.get_public_key())
+                .pub_key(&keypair_out.get_pk())
                 .finalize(&mut prng)
                 .unwrap()
                 .build()
@@ -1199,7 +1197,7 @@ mod tests {
             AssetType::from_identical_byte(1),
         ];
         let mut in_abars = vec![];
-        let in_keypair = AXfrKeyPair::generate(&mut prng);
+        let in_keypair = KeyPair::generate(&mut prng);
         let mut in_owner_memos = vec![];
         for i in 0..n_payers {
             let oabar =
@@ -1267,7 +1265,7 @@ mod tests {
                 OpenAnonAssetRecordBuilder::new()
                     .amount(amounts_out[i])
                     .asset_type(asset_types_out[i])
-                    .pub_key(&keypairs_out[i].get_public_key())
+                    .pub_key(&keypairs_out[i].get_pk())
                     .finalize(&mut prng)
                     .unwrap()
                     .build()
@@ -1307,7 +1305,7 @@ mod tests {
                     OpenAnonAssetRecordBuilder::new()
                         .amount(amounts_out[i])
                         .asset_type(asset_types_out[i])
-                        .pub_key(&keypairs_out[i].get_public_key())
+                        .pub_key(&keypairs_out[i].get_pk())
                         .finalize(&mut prng)
                         .unwrap()
                         .build()
@@ -2003,9 +2001,9 @@ mod tests {
         let mut prng = test_rng();
         let blind = BLSScalar::random(&mut prng);
 
-        let keypair = AXfrKeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate(&mut prng);
 
-        let public_key_scalars = keypair.pub_key.get_public_key_scalars().unwrap();
+        let public_key_scalars = keypair.pub_key.to_bls_scalars().unwrap();
         let public_key_scalars_vars = [
             cs.new_variable(public_key_scalars[0]),
             cs.new_variable(public_key_scalars[1]),
@@ -2013,7 +2011,7 @@ mod tests {
         ];
 
         let (commitment, input_commitment_trace) =
-            commit(&keypair.get_public_key(), blind, 7, asset_type).unwrap();
+            commit(&keypair.get_pk(), blind, 7, asset_type).unwrap();
 
         let amount_var = cs.new_variable(amount);
         let asset_var = cs.new_variable(asset_type);
@@ -2051,16 +2049,16 @@ mod tests {
         let uid_amount = BLSScalar::from_bytes(&bytes[..]).unwrap(); // safe unwrap
         let asset_type = one;
 
-        let keypair = AXfrKeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate(&mut prng);
 
-        let public_key_scalars = keypair.pub_key.get_public_key_scalars().unwrap();
+        let public_key_scalars = keypair.pub_key.to_bls_scalars().unwrap();
         let public_key_scalars_vars = [
             cs.new_variable(public_key_scalars[0]),
             cs.new_variable(public_key_scalars[1]),
             cs.new_variable(public_key_scalars[2]),
         ];
 
-        let secret_key_scalars = keypair.secret_key.get_secret_key_scalars().unwrap();
+        let secret_key_scalars = keypair.sec_key.to_bls_scalars().unwrap();
         let secret_key_scalars_vars = [
             cs.new_variable(secret_key_scalars[0]),
             cs.new_variable(secret_key_scalars[1]),
@@ -2364,7 +2362,7 @@ mod tests {
         let mut input_commitments_traces = Vec::<AnemoiVLHTrace<BLSScalar, 2, 12>>::new();
         for payer_witness in secret_inputs.payers_witnesses.iter() {
             let (_, nullifier_trace) = nullify(
-                &AXfrKeyPair::from_secret_key(payer_witness.secret_key.clone()),
+                &payer_witness.secret_key.clone().into_keypair(),
                 payer_witness.amount,
                 payer_witness.asset_type,
                 payer_witness.uid,
@@ -2373,7 +2371,7 @@ mod tests {
             nullifiers_traces.push(nullifier_trace);
 
             let (_, input_commitment_trace) = commit(
-                &AXfrKeyPair::from_secret_key(payer_witness.secret_key.clone()).get_public_key(),
+                &payer_witness.secret_key.clone().into_keypair().pub_key,
                 payer_witness.blind,
                 payer_witness.amount,
                 payer_witness.asset_type,

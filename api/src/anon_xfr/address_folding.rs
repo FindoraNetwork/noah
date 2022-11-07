@@ -1,5 +1,5 @@
-use crate::anon_xfr::keys::AXfrKeyPair;
 use crate::anon_xfr::TurboPlonkCS;
+use crate::keys::{KeyPair, PublicKey, PublicKeyInner, SecretKey};
 use crate::setup::BulletproofURS;
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
@@ -20,8 +20,6 @@ use noah_plonk::plonk::constraint_system::VarIndex;
 use num_bigint::BigUint;
 use rand_core::{CryptoRng, RngCore};
 
-use super::keys::{AXfrPubKey, AXfrPubKeyInner, AXfrSecretKey};
-
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
 /// The instance for address folding.
 pub struct AXfrAddressFoldingInstance {
@@ -38,7 +36,7 @@ pub struct AXfrAddressFoldingInstance {
 /// The witness for address folding.
 pub struct AXfrAddressFoldingWitness {
     /// The key pair
-    pub keypair: AXfrKeyPair,
+    pub keypair: KeyPair,
     /// Blinding factors of the commitments
     pub blinding_factors: Vec<SECQ256K1Scalar>,
     /// The inspector's proof.
@@ -55,7 +53,7 @@ pub struct AXfrAddressFoldingWitness {
 
 impl Default for AXfrAddressFoldingWitness {
     fn default() -> Self {
-        let keypair = AXfrKeyPair::default();
+        let keypair = KeyPair::default();
         let blinding_factors = vec![SECQ256K1Scalar::default(); 3];
 
         let delegated_schnorr_proof =
@@ -99,13 +97,14 @@ pub fn create_address_folding<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
     prng: &mut R,
     hash: D,
     transcript: &mut Transcript,
-    keypair: &AXfrKeyPair,
+    keypair: &KeyPair,
 ) -> Result<(AXfrAddressFoldingInstance, AXfrAddressFoldingWitness)> {
-    match (&keypair.secret_key, &keypair.pub_key) {
-        (AXfrSecretKey::Ed25519(_sk), AXfrPubKey(AXfrPubKeyInner::Ed25519(_pk))) => {
+    match (&keypair.sec_key, &keypair.pub_key) {
+        (SecretKey::Ed25519(_sk), PublicKey(PublicKeyInner::Ed25519(_pk))) => {
             unimplemented!()
         }
-        (AXfrSecretKey::Secp256k1(sk), AXfrPubKey(AXfrPubKeyInner::Secp256k1(pk))) => {
+        (SecretKey::Secp256k1(_), PublicKey(PublicKeyInner::Secp256k1(_))) => {
+            let (sk, pk) = keypair.to_secp256k1()?;
             let pc_gens = PedersenCommitmentSecq256k1::default();
             let bp_gens = ark_bulletproofs::BulletproofGens::load().unwrap();
 
@@ -113,7 +112,7 @@ pub fn create_address_folding<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
             transcript.append_message(b"hash", hash.finalize().as_slice());
 
             let (scalar_mul_proof, scalar_mul_commitments, blinding_factors) =
-                { ScalarMulProof::prove(prng, &bp_gens, transcript, pk, sk)? };
+                { ScalarMulProof::prove(prng, &bp_gens, transcript, &pk, &sk)? };
 
             let (delegated_schnorr_proof, delegated_schnorr_inspection, beta, lambda) = {
                 let secret_key_in_fq = SECQ256K1Scalar::from_bytes(&sk.to_bytes())?;
@@ -149,7 +148,7 @@ pub fn create_address_folding<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
 
             Ok((instance, witness))
         }
-        _ => Err(eg!("Invalid AXfrKeyPair")),
+        _ => Err(eg!("Invalid KeyPair")),
     }
 }
 
@@ -160,11 +159,12 @@ pub fn prove_address_folding_in_cs(
     secret_key_scalars_vars: &[VarIndex; 2],
     witness: &AXfrAddressFoldingWitness,
 ) -> Result<()> {
-    match (&witness.keypair.secret_key, &witness.keypair.pub_key) {
-        (AXfrSecretKey::Ed25519(_sk), AXfrPubKey(AXfrPubKeyInner::Ed25519(_pk))) => {
+    match (&witness.keypair.sec_key, &witness.keypair.pub_key) {
+        (SecretKey::Ed25519(_sk), PublicKey(PublicKeyInner::Ed25519(_pk))) => {
             unimplemented!()
         }
-        (AXfrSecretKey::Secp256k1(sk), AXfrPubKey(AXfrPubKeyInner::Secp256k1(pk))) => {
+        (SecretKey::Secp256k1(_), PublicKey(PublicKeyInner::Secp256k1(_))) => {
+            let (sk, pk) = witness.keypair.to_secp256k1()?;
             // 1. decompose the scalar inputs.
             let mut public_key_bits_vars = cs.range_check(public_key_scalars_vars[0], 248);
             public_key_bits_vars
@@ -330,7 +330,7 @@ pub fn prove_address_folding_in_cs(
             let (y_sim_fr_var, y_sim_bits_vars) = SimFrVar::alloc_witness(cs, &y_sim_fr);
 
             // we can do so only because the secp256k1's order is smaller than its base field modulus.
-            let s_sim_fr = SimFr::<SimFrParamsSecq256k1>::from(&((*sk).into()));
+            let s_sim_fr = SimFr::<SimFrParamsSecq256k1>::from(&(sk.into()));
             let (s_sim_fr_var, s_sim_bits_vars) = SimFrVar::alloc_witness(cs, &s_sim_fr);
 
             // 4. check that the bit representations are the same as the one provided through scalars.
@@ -551,7 +551,7 @@ pub fn prove_address_folding_in_cs(
                 cs.prepare_pi_variable(combined_response_scalar_var.var[i]);
             }
         }
-        _ => return Err(eg!("Invalid AXfrKeyPair")),
+        _ => return Err(eg!("Invalid KeyPair")),
     }
 
     Ok(())

@@ -14,8 +14,6 @@ pub mod asset_record;
 pub mod asset_tracer;
 /// Module for zero-knowledge proofs.
 pub mod proofs;
-/// Module for signatures.
-pub mod sig;
 /// Module for shared structures.
 pub mod structs;
 
@@ -23,6 +21,7 @@ pub mod structs;
 pub(crate) mod tests;
 
 use crate::anon_creds::{ACCommitment, Attr};
+use crate::keys::{KeyPair, MultiSig, PublicKey};
 use crate::setup::BulletproofParams;
 
 use self::{
@@ -33,7 +32,6 @@ use self::{
         asset_amount_tracing_proofs, asset_proof, batch_verify_confidential_amount,
         batch_verify_confidential_asset, batch_verify_tracer_tracing_proof, gen_range_proof,
     },
-    sig::{XfrKeyPair, XfrMultiSig, XfrPublicKey},
     structs::*,
 };
 
@@ -118,7 +116,7 @@ impl XfrType {
 /// # Example
 /// ```
 /// use rand_chacha::ChaChaRng;
-/// use noah::xfr::sig::XfrKeyPair;
+/// use noah::xfr::sig::KeyPair;
 /// use noah::xfr::structs::{AssetRecordTemplate, AssetRecord, AssetType};
 /// use noah::xfr::asset_record::AssetRecordType;
 /// use noah::xfr::{gen_xfr_note, verify_xfr_note, XfrNotePolicies};
@@ -146,7 +144,7 @@ impl XfrType {
 /// let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
 ///
 /// for x in inputs_amounts.iter() {
-///   let keypair = XfrKeyPair::generate(&mut prng);
+///   let keypair = KeyPair::generate(&mut prng);
 ///   let asset_record = AssetRecordTemplate::with_no_asset_tracing( x.0,
 ///                                        x.1,
 ///                                        asset_record_type,
@@ -159,7 +157,7 @@ impl XfrType {
 /// }
 ///
 /// for x in outputs_amounts.iter() {
-///     let keypair = XfrKeyPair::generate(&mut prng);
+///     let keypair = KeyPair::generate(&mut prng);
 ///
 ///     let ar = AssetRecordTemplate::with_no_asset_tracing(x.0, x.1, asset_record_type, keypair.pub_key.clone());
 ///     let output = AssetRecord::from_template_no_identity_tracing(&mut prng, &ar).unwrap();
@@ -178,7 +176,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
     prng: &mut R,
     inputs: &[AssetRecord],
     outputs: &[AssetRecord],
-    input_key_pairs: &[&XfrKeyPair],
+    input_key_pairs: &[&KeyPair],
 ) -> Result<XfrNote> {
     if inputs.is_empty() {
         return Err(eg!(NoahError::ParameterError));
@@ -198,7 +196,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
 /// use rand_chacha::ChaChaRng;
 /// use ruc::{*, err::*};
 /// use rand_core::SeedableRng;
-/// use noah::xfr::sig::XfrKeyPair;
+/// use noah::xfr::sig::KeyPair;
 /// use noah::xfr::structs::{AssetRecordTemplate, AssetRecord, AssetType};
 /// use noah::xfr::asset_record::AssetRecordType;
 /// use noah::xfr::{gen_xfr_body, verify_xfr_body, XfrNotePolicies, XfrNotePoliciesRef};
@@ -221,7 +219,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
 /// let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
 ///
 /// for x in inputs_amounts.iter() {
-///   let keypair = XfrKeyPair::generate(&mut prng);
+///   let keypair = KeyPair::generate(&mut prng);
 ///   let ar = AssetRecordTemplate::with_no_asset_tracing( x.0,
 ///                                        x.1,
 ///                                        asset_record_type,
@@ -231,7 +229,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
 ///   inputs.push(AssetRecord::from_template_no_identity_tracing(&mut prng, &ar).unwrap());
 /// }
 /// for x in outputs_amounts.iter() {
-///     let keypair = XfrKeyPair::generate(&mut prng);
+///     let keypair = KeyPair::generate(&mut prng);
 ///
 ///     let ar = AssetRecordTemplate::with_no_asset_tracing(x.0, x.1, asset_record_type, keypair.pub_key);
 ///     outputs.push(AssetRecord::from_template_no_identity_tracing(&mut prng, &ar).unwrap());
@@ -324,7 +322,7 @@ pub fn gen_xfr_body<R: CryptoRng + RngCore>(
     })
 }
 
-fn check_keys(inputs: &[AssetRecord], input_key_pairs: &[&XfrKeyPair]) -> Result<()> {
+fn check_keys(inputs: &[AssetRecord], input_key_pairs: &[&KeyPair]) -> Result<()> {
     if inputs.len() != input_key_pairs.len() {
         return Err(eg!(NoahError::ParameterError));
     }
@@ -444,14 +442,11 @@ fn check_asset_amount(inputs: &[AssetRecord], outputs: &[AssetRecord]) -> Result
 }
 
 /// Compute a multisignature over the body.
-pub(crate) fn compute_transfer_multisig(
-    body: &XfrBody,
-    keys: &[&XfrKeyPair],
-) -> Result<XfrMultiSig> {
+pub(crate) fn compute_transfer_multisig(body: &XfrBody, keys: &[&KeyPair]) -> Result<MultiSig> {
     let mut bytes = vec![];
     body.serialize(&mut rmp_serde::Serializer::new(&mut bytes))
         .c(d!(NoahError::SerializationError))?;
-    Ok(XfrMultiSig::sign(&keys, &bytes)?)
+    Ok(MultiSig::sign(&keys, &bytes)?)
 }
 
 /// Verify the multisignature over the body.
@@ -886,7 +881,7 @@ pub fn find_tracing_memos<'a>(
 }
 
 /// The asset tracing result.
-pub type RecordData = (u64, AssetType, Vec<Attr>, XfrPublicKey);
+pub type RecordData = (u64, AssetType, Vec<Attr>, PublicKey);
 
 /// Find and extract tracing information from confidential-transfer body.
 pub fn trace_assets(

@@ -5,7 +5,7 @@ mod smoke_xfr_tracing {
         xfr::{
             asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
             gen_xfr_note,
-            sig::{XfrKeyPair, XfrPublicKey},
+            sig::{PublicKey, XfrKeyPair},
             structs::{
                 AssetRecord, AssetRecordTemplate, AssetTracerKeyPair, AssetType, BlindAssetRecord,
                 OwnerMemo, TracingPolicies, TracingPolicy, ASSET_TYPE_LENGTH,
@@ -20,7 +20,7 @@ mod smoke_xfr_tracing {
 
     /// Simulate getting a BlindAssetRecord from Ledger
     fn conf_blind_asset_record_from_ledger(
-        key: &XfrPublicKey,
+        key: &PublicKey,
         amount: u64,
         asset_type: AssetType,
     ) -> (BlindAssetRecord, OwnerMemo) {
@@ -46,7 +46,7 @@ mod smoke_xfr_tracing {
         record_data: &RecordData,
         expected_amount: u64,
         expected_asset_type: AssetType,
-        expected_pk: &XfrPublicKey,
+        expected_pk: &PublicKey,
     ) {
         assert_eq!(record_data.0, expected_amount);
         assert_eq!(record_data.1, expected_asset_type);

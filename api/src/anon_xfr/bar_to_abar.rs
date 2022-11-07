@@ -1,13 +1,12 @@
 use crate::anon_xfr::{
     commit, commit_in_cs,
-    keys::AXfrPubKey,
     structs::{AnonAssetRecord, AxfrOwnerMemo, OpenAnonAssetRecord, OpenAnonAssetRecordBuilder},
     AXfrPlonkPf, TurboPlonkCS, TWO_POW_32,
 };
+use crate::keys::{KeyPair, PublicKey, Signature};
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::{
     asset_record::AssetRecordType,
-    sig::{XfrKeyPair, XfrPublicKey, XfrSignature},
     structs::{BlindAssetRecord, OpenAssetRecord, XfrAmount, XfrAssetType},
 };
 use merlin::Transcript;
@@ -42,7 +41,7 @@ pub struct BarToAbarNote {
     /// The confidential-to-anonymous body.
     pub body: BarToAbarBody,
     /// The signature.
-    pub signature: XfrSignature,
+    pub signature: Signature,
 }
 
 /// A confidential-to-anonymous body.
@@ -66,8 +65,8 @@ pub fn gen_bar_to_abar_note<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &ProverParams,
     record: &OpenAssetRecord,
-    bar_keypair: &XfrKeyPair,
-    abar_pubkey: &AXfrPubKey,
+    bar_keypair: &KeyPair,
+    abar_pubkey: &PublicKey,
 ) -> Result<BarToAbarNote> {
     // Reject confidential-to-anonymous note that actually has transparent input.
     // Should direct to ArToAbar.
@@ -97,7 +96,7 @@ pub fn gen_bar_to_abar_note<R: CryptoRng + RngCore>(
 pub fn verify_bar_to_abar_note(
     params: &VerifierParams,
     note: &BarToAbarNote,
-    bar_pub_key: &XfrPublicKey,
+    bar_pub_key: &PublicKey,
 ) -> Result<()> {
     verify_bar_to_abar(
         params,
@@ -116,7 +115,7 @@ pub fn verify_bar_to_abar_note(
 pub fn batch_verify_bar_to_abar_note(
     params: &VerifierParams,
     notes: &[&BarToAbarNote],
-    bar_pub_keys: &[&XfrPublicKey],
+    bar_pub_keys: &[&PublicKey],
 ) -> Result<()> {
     let is_ok = notes
         .par_iter()
@@ -146,7 +145,7 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &ProverParams,
     obar: &OpenAssetRecord,
-    abar_pubkey: &AXfrPubKey,
+    abar_pubkey: &PublicKey,
 ) -> Result<(
     OpenAnonAssetRecord,
     DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
@@ -295,7 +294,7 @@ pub(crate) fn prove_bar_to_abar_cs<R: CryptoRng + RngCore>(
     amount: BLSScalar,
     asset_type: BLSScalar,
     blind_hash: BLSScalar,
-    pubkey: &AXfrPubKey,
+    pubkey: &PublicKey,
     delegated_schnorr_proof: &DelegatedSchnorrProof<
         RistrettoScalar,
         RistrettoPoint,
@@ -380,7 +379,7 @@ pub(crate) fn build_bar_to_abar_cs(
     amount: BLSScalar,
     asset_type: BLSScalar,
     blind: BLSScalar,
-    pubkey: &AXfrPubKey,
+    pubkey: &PublicKey,
     proof: &DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     non_zk_state: &DelegatedSchnorrInspection<
         RistrettoScalar,
@@ -409,7 +408,7 @@ pub(crate) fn build_bar_to_abar_cs(
     let at_var = cs.new_variable(asset_type);
     let blind_var = cs.new_variable(blind);
 
-    let public_key_scalars = pubkey.get_public_key_scalars().unwrap();
+    let public_key_scalars = pubkey.to_bls_scalars().unwrap();
     let public_key_scalars_vars = [
         cs.new_variable(public_key_scalars[0]),
         cs.new_variable(public_key_scalars[1]),
@@ -640,9 +639,8 @@ pub(crate) fn build_bar_to_abar_cs(
 
 #[cfg(test)]
 mod test {
-    use crate::anon_xfr::{
-        bar_to_abar::BAR_TO_ABAR_PLONK_PROOF_TRANSCRIPT, commit, keys::AXfrKeyPair,
-    };
+    use crate::anon_xfr::{bar_to_abar::BAR_TO_ABAR_PLONK_PROOF_TRANSCRIPT, commit};
+    use crate::keys::KeyPair;
     use crate::xfr::structs::AssetType;
     use merlin::Transcript;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::RistrettoScalar};
@@ -678,8 +676,8 @@ mod test {
         let point_q = pc_gens.commit(y, delta);
 
         let z_randomizer = BLSScalar::random(&mut prng);
-        let keypair = AXfrKeyPair::generate(&mut prng);
-        let pubkey = keypair.get_public_key();
+        let keypair = KeyPair::generate(&mut prng);
+        let pubkey = keypair.get_pk();
 
         let (z, output_commitment_trace) =
             commit(&pubkey, z_randomizer, 71u64, asset_type.as_scalar()).unwrap();

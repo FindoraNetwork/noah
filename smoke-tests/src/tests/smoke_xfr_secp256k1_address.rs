@@ -5,7 +5,7 @@ mod smoke_xfr_secp256k1_address {
         xfr::{
             asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
             gen_xfr_note,
-            sig::{XfrKeyPair, XfrPublicKey, XfrPublicKeyInner, XfrSecretKey},
+            sig::{PublicKey, PublicKeyInner, XfrKeyPair, XfrSecretKey},
             structs::{
                 AssetRecord, AssetRecordTemplate, AssetType, BlindAssetRecord, OwnerMemo,
                 XfrAmount, XfrAssetType, ASSET_TYPE_LENGTH,
@@ -22,7 +22,7 @@ mod smoke_xfr_secp256k1_address {
 
     // Simulate getting a BlindAssetRecord from Ledger
     fn non_conf_blind_asset_record_from_ledger(
-        key: &XfrPublicKey,
+        key: &PublicKey,
         amount: u64,
         asset_type: AssetType,
     ) -> BlindAssetRecord {
@@ -35,7 +35,7 @@ mod smoke_xfr_secp256k1_address {
 
     // Simulate getting a BlindAssetRecord from Ledger
     fn conf_blind_asset_record_from_ledger(
-        key: &XfrPublicKey,
+        key: &PublicKey,
         amount: u64,
         asset_type: AssetType,
     ) -> (BlindAssetRecord, OwnerMemo) {
@@ -67,7 +67,7 @@ mod smoke_xfr_secp256k1_address {
         let xs = XfrSecretKey::from_secp256k1_with_address(&hex::decode(sk).unwrap()).unwrap();
         let sender = xs.into_keypair();
         match sender.pub_key.inner() {
-            XfrPublicKeyInner::Address(hash) => {
+            PublicKeyInner::Address(hash) => {
                 assert_eq!(hash.to_vec(), hex::decode(address).unwrap())
             }
             _ => panic!("not secp256k1 address"),

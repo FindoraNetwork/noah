@@ -33,6 +33,8 @@ extern crate lazy_static;
 pub mod anon_creds;
 /// Module for anonymous transfer.
 pub mod anon_xfr;
+/// module for anonymous and confidential keys
+pub mod keys;
 /// The wrapper of the parameters.
 pub mod parameters;
 /// Module for serialization.

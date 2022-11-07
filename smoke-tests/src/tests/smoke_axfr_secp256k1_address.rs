@@ -8,7 +8,7 @@ mod smoke_axfr_secp256k1_address {
             abar_to_bar::*,
             ar_to_abar::*,
             bar_to_abar::*,
-            keys::AXfrKeyPair,
+            keys::KeyPair,
             structs::{
                 AnonAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonAssetRecord,
                 OpenAnonAssetRecordBuilder,
@@ -18,7 +18,7 @@ mod smoke_axfr_secp256k1_address {
         setup::{ProverParams, VerifierParams},
         xfr::{
             asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
-            sig::{XfrKeyPair, XfrPublicKey},
+            sig::{PublicKey, XfrKeyPair},
             structs::{
                 AssetRecordTemplate, AssetType, BlindAssetRecord, OwnerMemo, ASSET_TYPE_LENGTH,
             },
@@ -40,7 +40,7 @@ mod smoke_axfr_secp256k1_address {
     const ASSET: AssetType = AssetType([1u8; ASSET_TYPE_LENGTH]);
 
     fn build_bar<R: RngCore + CryptoRng>(
-        pubkey: &XfrPublicKey,
+        pubkey: &PublicKey,
         prng: &mut R,
         pc_gens: &PedersenCommitmentRistretto,
         amt: u64,
@@ -56,12 +56,12 @@ mod smoke_axfr_secp256k1_address {
         prng: &mut R,
         amount: u64,
         asset_type: AssetType,
-        keypair: &AXfrKeyPair,
+        keypair: &KeyPair,
     ) -> OpenAnonAssetRecord {
         OpenAnonAssetRecordBuilder::new()
             .amount(amount)
             .asset_type(asset_type)
-            .pub_key(&keypair.get_public_key())
+            .pub_key(&keypair.get_pk())
             .finalize(prng)
             .unwrap()
             .build()
@@ -110,7 +110,7 @@ mod smoke_axfr_secp256k1_address {
         let verify_params = VerifierParams::bar_to_abar_params().unwrap();
 
         let sender = XfrKeyPair::generate_secp256k1(&mut prng);
-        let receiver = AXfrKeyPair::generate(&mut prng);
+        let receiver = KeyPair::generate(&mut prng);
 
         let (bar, memo) = build_bar(
             &sender.pub_key,
@@ -122,14 +122,8 @@ mod smoke_axfr_secp256k1_address {
         );
         let obar = open_blind_asset_record(&bar, &memo, &sender).unwrap();
 
-        let note = gen_bar_to_abar_note(
-            &mut prng,
-            &params,
-            &obar,
-            &sender,
-            &receiver.get_public_key(),
-        )
-        .unwrap();
+        let note =
+            gen_bar_to_abar_note(&mut prng, &params, &obar, &sender, &receiver.get_pk()).unwrap();
         assert!(verify_bar_to_abar_note(&verify_params, &note, &sender.pub_key).is_ok());
         let mut note = note;
         let message = b"error_message";
@@ -155,7 +149,7 @@ mod smoke_axfr_secp256k1_address {
         let verify_params = VerifierParams::ar_to_abar_params().unwrap();
 
         let sender = XfrKeyPair::generate_address(&mut prng);
-        let receiver = AXfrKeyPair::generate(&mut prng);
+        let receiver = KeyPair::generate(&mut prng);
 
         let (bar, memo) = build_bar(
             &sender.pub_key,
@@ -167,14 +161,8 @@ mod smoke_axfr_secp256k1_address {
         );
         let obar = open_blind_asset_record(&bar, &memo, &sender).unwrap();
 
-        let note = gen_ar_to_abar_note(
-            &mut prng,
-            &params,
-            &obar,
-            &sender,
-            &receiver.get_public_key(),
-        )
-        .unwrap();
+        let note =
+            gen_ar_to_abar_note(&mut prng, &params, &obar, &sender, &receiver.get_pk()).unwrap();
         verify_ar_to_abar_note(&verify_params, &note).unwrap();
 
         // check open abar
@@ -193,7 +181,7 @@ mod smoke_axfr_secp256k1_address {
         let params = ProverParams::abar_to_ar_params(TREE_DEPTH).unwrap();
         let verify_params = VerifierParams::abar_to_ar_params().unwrap();
 
-        let sender = AXfrKeyPair::generate(&mut prng);
+        let sender = KeyPair::generate(&mut prng);
         let receiver = XfrKeyPair::generate_address(&mut prng);
 
         let fdb = MemoryDB::new();
@@ -240,7 +228,7 @@ mod smoke_axfr_secp256k1_address {
         let params = ProverParams::abar_to_bar_params(TREE_DEPTH).unwrap();
         let verify_params = VerifierParams::abar_to_bar_params().unwrap();
 
-        let sender = AXfrKeyPair::generate(&mut prng);
+        let sender = KeyPair::generate(&mut prng);
         let receiver = XfrKeyPair::generate_secp256k1(&mut prng);
 
         let fdb = MemoryDB::new();

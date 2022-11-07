@@ -1,8 +1,5 @@
-use crate::anon_xfr::keys::AXfrSecretKey;
-use crate::anon_xfr::{
-    commit, decrypt_memo,
-    keys::{AXfrKeyPair, AXfrPubKey},
-};
+use crate::anon_xfr::{commit, decrypt_memo};
+use crate::keys::{KeyPair, PublicKey, SecretKey};
 use crate::xfr::structs::AssetType;
 use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 use noah_plonk::plonk::constraint_system::VarIndex;
@@ -87,7 +84,7 @@ pub struct OpenAnonAssetRecord {
     pub(crate) amount: u64,
     pub(crate) asset_type: AssetType,
     pub(crate) blind: BLSScalar,
-    pub(crate) pub_key: AXfrPubKey,
+    pub(crate) pub_key: PublicKey,
     pub(crate) owner_memo: Option<AxfrOwnerMemo>,
     pub(crate) mt_leaf_info: Option<MTLeafInfo>,
 }
@@ -111,7 +108,7 @@ impl OpenAnonAssetRecord {
     }
 
     /// Get record public_key
-    pub fn pub_key_ref(&self) -> &AXfrPubKey {
+    pub fn pub_key_ref(&self) -> &PublicKey {
         &self.pub_key
     }
 
@@ -153,7 +150,7 @@ impl OpenAnonAssetRecordBuilder {
     }
 
     /// Specify public_key
-    pub fn pub_key(mut self, pub_key: &AXfrPubKey) -> Self {
+    pub fn pub_key(mut self, pub_key: &PublicKey) -> Self {
         self.oabar.pub_key = pub_key.clone();
         self
     }
@@ -196,11 +193,11 @@ impl OpenAnonAssetRecordBuilder {
     pub fn from_abar(
         record: &AnonAssetRecord,
         owner_memo: AxfrOwnerMemo,
-        key_pair: &AXfrKeyPair,
+        key_pair: &KeyPair,
     ) -> Result<Self> {
         let (amount, asset_type, blind) = decrypt_memo(&owner_memo, key_pair, record).c(d!())?;
         let mut builder = OpenAnonAssetRecordBuilder::new()
-            .pub_key(&key_pair.get_public_key())
+            .pub_key(&key_pair.get_pk())
             .amount(amount)
             .asset_type(asset_type);
 
@@ -211,7 +208,7 @@ impl OpenAnonAssetRecordBuilder {
 
     fn sanity_check(&self) -> Result<()> {
         // 1. check public key is non-default
-        if self.oabar.pub_key == AXfrPubKey::default() {
+        if self.oabar.pub_key == PublicKey::default() {
             return Err(eg!(NoahError::InconsistentStructureError));
         }
 
@@ -286,7 +283,7 @@ pub struct AccElemVars {
 /// The witness for the payer.
 pub struct PayerWitness {
     /// The secret key.
-    pub secret_key: AXfrSecretKey,
+    pub secret_key: SecretKey,
     /// The amount.
     pub amount: u64,
     /// The asset type.
@@ -309,7 +306,7 @@ pub struct PayeeWitness {
     /// The asset type.
     pub asset_type: BLSScalar,
     /// The public key.
-    pub public_key: AXfrPubKey,
+    pub public_key: PublicKey,
 }
 
 /// Information directed to secret key holder of a BlindAssetRecord
@@ -320,48 +317,48 @@ impl AxfrOwnerMemo {
     /// Crate an encrypted memo using the public key.
     pub fn new<R: CryptoRng + RngCore>(
         prng: &mut R,
-        pub_key: &AXfrPubKey,
+        pub_key: &PublicKey,
         msg: &[u8],
     ) -> Result<Self> {
-        let ctext = pub_key.encrypt(prng, msg)?;
+        let ctext = pub_key.hybrid_encrypt(prng, msg)?;
         Ok(Self(ctext))
     }
 
     /// Decrypt a memo using the viewing key.
-    pub fn decrypt(&self, secret_key: &AXfrSecretKey) -> Result<Vec<u8>> {
-        secret_key.decrypt(&self.0)
+    pub fn decrypt(&self, secret_key: &SecretKey) -> Result<Vec<u8>> {
+        secret_key.hybrid_decrypt(&self.0)
     }
 }
 
 #[cfg(test)]
 mod test {
-    use crate::anon_xfr::keys::AXfrKeyPair;
-    use crate::anon_xfr::structs::AXfrPubKey;
+    use crate::anon_xfr::structs::PublicKey;
+    use crate::keys::KeyPair;
     use noah_algebra::prelude::*;
 
     #[test]
     fn test_axfr_pub_key_serialization() {
         let mut prng = test_rng();
-        let keypair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
+        let keypair: KeyPair = KeyPair::generate(&mut prng);
 
-        let pub_key: AXfrPubKey = keypair.get_public_key();
+        let pub_key: PublicKey = keypair.get_pk();
 
         let bytes = pub_key.noah_to_bytes();
         assert_ne!(bytes.len(), 0);
 
-        let reformed_pub_key = AXfrPubKey::noah_from_bytes(bytes.as_slice()).unwrap();
+        let reformed_pub_key = PublicKey::noah_from_bytes(bytes.as_slice()).unwrap();
         assert_eq!(pub_key, reformed_pub_key);
     }
 
     #[test]
     fn test_axfr_key_pair_serialization() {
         let mut prng = test_rng();
-        let keypair: AXfrKeyPair = AXfrKeyPair::generate(&mut prng);
+        let keypair: KeyPair = KeyPair::generate(&mut prng);
 
         let bytes: Vec<u8> = keypair.noah_to_bytes();
         assert_ne!(bytes.len(), 0);
 
-        let reformed_key_pair = AXfrKeyPair::noah_from_bytes(bytes.as_slice()).unwrap();
+        let reformed_key_pair = KeyPair::noah_from_bytes(bytes.as_slice()).unwrap();
         assert_eq!(keypair, reformed_key_pair);
     }
 }
