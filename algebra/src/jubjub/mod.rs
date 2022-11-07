@@ -17,9 +17,6 @@ pub const JUBJUB_SCALAR_LEN: usize = 32;
 mod fr;
 pub use fr::*;
 
-mod fq;
-pub use fq::*;
-
 /// The wrapped struct for `ark_ed_on_bls12_381::EdwardsProjective`
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct JubjubPoint(pub EdwardsProjective);
