@@ -17,9 +17,9 @@ use wasm_bindgen::prelude::*;
 /// The wrapped struct for `ark_bls12_381::Fr`
 #[wasm_bindgen]
 #[derive(Copy, Clone, PartialEq, Eq, Default, PartialOrd, Ord, Hash)]
-pub struct BLSFr(pub(crate) Fr);
+pub struct BLSScalar(pub(crate) Fr);
 
-impl Debug for BLSFr {
+impl Debug for BLSScalar {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         <BigUint as Debug>::fmt(
             &<BigInteger256 as Into<BigUint>>::into(self.0.into_repr()),
@@ -28,7 +28,7 @@ impl Debug for BLSFr {
     }
 }
 
-impl FromStr for BLSFr {
+impl FromStr for BLSScalar {
     type Err = AlgebraError;
 
     fn from_str(string: &str) -> StdResult<Self, AlgebraError> {
@@ -42,11 +42,11 @@ impl FromStr for BLSFr {
     }
 }
 
-impl BLSFr {
+impl BLSScalar {
     /// Create a new scalar element from the arkworks-rs representation.
     pub const fn new(is_positive: bool, limbs: &[u64]) -> Self {
         type Params = <Fr as PrimeField>::Params;
-        BLSFr(Fr::const_from_str(
+        BLSScalar(Fr::const_from_str(
             &limbs,
             is_positive,
             Params::R2,
@@ -56,28 +56,28 @@ impl BLSFr {
     }
 }
 
-impl Into<BigUint> for BLSFr {
+impl Into<BigUint> for BLSScalar {
     #[inline]
     fn into(self) -> BigUint {
         self.0.into_repr().into()
     }
 }
 
-impl<'a> From<&'a BigUint> for BLSFr {
+impl<'a> From<&'a BigUint> for BLSScalar {
     #[inline]
     fn from(src: &BigUint) -> Self {
         Self(Fr::from(src.clone()))
     }
 }
 
-impl One for BLSFr {
+impl One for BLSScalar {
     #[inline]
     fn one() -> Self {
-        BLSFr(Fr::one())
+        BLSScalar(Fr::one())
     }
 }
 
-impl Zero for BLSFr {
+impl Zero for BLSScalar {
     #[inline]
     fn zero() -> Self {
         Self(Fr::zero())
@@ -89,8 +89,8 @@ impl Zero for BLSFr {
     }
 }
 
-impl Add for BLSFr {
-    type Output = BLSFr;
+impl Add for BLSScalar {
+    type Output = BLSScalar;
 
     #[inline]
     fn add(self, rhs: Self) -> Self::Output {
@@ -98,8 +98,8 @@ impl Add for BLSFr {
     }
 }
 
-impl Mul for BLSFr {
-    type Output = BLSFr;
+impl Mul for BLSScalar {
+    type Output = BLSScalar;
 
     #[inline]
     fn mul(self, rhs: Self) -> Self::Output {
@@ -107,15 +107,15 @@ impl Mul for BLSFr {
     }
 }
 
-impl Sum<BLSFr> for BLSFr {
+impl Sum<BLSScalar> for BLSScalar {
     #[inline]
-    fn sum<I: Iterator<Item = BLSFr>>(iter: I) -> Self {
+    fn sum<I: Iterator<Item = BLSScalar>>(iter: I) -> Self {
         iter.fold(Self::zero(), Add::add)
     }
 }
 
-impl<'a> Add<&'a BLSFr> for BLSFr {
-    type Output = BLSFr;
+impl<'a> Add<&'a BLSScalar> for BLSScalar {
+    type Output = BLSScalar;
 
     #[inline]
     fn add(self, rhs: &Self) -> Self::Output {
@@ -123,15 +123,15 @@ impl<'a> Add<&'a BLSFr> for BLSFr {
     }
 }
 
-impl<'a> AddAssign<&'a BLSFr> for BLSFr {
+impl<'a> AddAssign<&'a BLSScalar> for BLSScalar {
     #[inline]
     fn add_assign(&mut self, rhs: &Self) {
         (self.0).add_assign(&rhs.0);
     }
 }
 
-impl<'a> Sub<&'a BLSFr> for BLSFr {
-    type Output = BLSFr;
+impl<'a> Sub<&'a BLSScalar> for BLSScalar {
+    type Output = BLSScalar;
 
     #[inline]
     fn sub(self, rhs: &Self) -> Self::Output {
@@ -139,15 +139,15 @@ impl<'a> Sub<&'a BLSFr> for BLSFr {
     }
 }
 
-impl<'a> SubAssign<&'a BLSFr> for BLSFr {
+impl<'a> SubAssign<&'a BLSScalar> for BLSScalar {
     #[inline]
     fn sub_assign(&mut self, rhs: &Self) {
         (self.0).sub_assign(&rhs.0);
     }
 }
 
-impl<'a> Mul<&'a BLSFr> for BLSFr {
-    type Output = BLSFr;
+impl<'a> Mul<&'a BLSScalar> for BLSScalar {
+    type Output = BLSScalar;
 
     #[inline]
     fn mul(self, rhs: &Self) -> Self::Output {
@@ -155,22 +155,22 @@ impl<'a> Mul<&'a BLSFr> for BLSFr {
     }
 }
 
-impl<'a> MulAssign<&'a BLSFr> for BLSFr {
+impl<'a> MulAssign<&'a BLSScalar> for BLSScalar {
     #[inline]
     fn mul_assign(&mut self, rhs: &Self) {
         (self.0).mul_assign(&rhs.0);
     }
 }
 
-impl<'a> Sum<&'a BLSFr> for BLSFr {
+impl<'a> Sum<&'a BLSScalar> for BLSScalar {
     #[inline]
-    fn sum<I: Iterator<Item = &'a BLSFr>>(iter: I) -> Self {
+    fn sum<I: Iterator<Item = &'a BLSScalar>>(iter: I) -> Self {
         iter.fold(Self::zero(), Add::add)
     }
 }
 
-impl Neg for BLSFr {
-    type Output = BLSFr;
+impl Neg for BLSScalar {
+    type Output = BLSScalar;
 
     #[inline]
     fn neg(self) -> Self {
@@ -178,21 +178,21 @@ impl Neg for BLSFr {
     }
 }
 
-impl From<u32> for BLSFr {
+impl From<u32> for BLSScalar {
     #[inline]
     fn from(value: u32) -> Self {
         Self::from(value as u64)
     }
 }
 
-impl From<u64> for BLSFr {
+impl From<u64> for BLSScalar {
     #[inline]
     fn from(value: u64) -> Self {
         Self(Fr::from(value))
     }
 }
 
-impl Scalar for BLSFr {
+impl Scalar for BLSScalar {
     #[inline]
     fn random<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
         Self(Fr::rand(rng))
@@ -288,7 +288,7 @@ impl Scalar for BLSFr {
     }
 }
 
-impl Domain for BLSFr {
+impl Domain for BLSScalar {
     type Field = Fr;
 
     #[inline]

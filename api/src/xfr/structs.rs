@@ -42,7 +42,7 @@ impl AssetType {
 
     /// Convert AssetType into a Scalar.
     pub fn as_scalar<S: Scalar>(&self) -> S {
-        // Scalar representation length for JubjubScalar, RistrettoScalar, and BLSFr
+        // Scalar representation length for JubjubScalar, RistrettoScalar, and BLSScalar
         const MIN_SCALAR_LENGTH: usize = 32;
 
         /// Asset type representation length. must be less than MIN_SCALAR_LEN

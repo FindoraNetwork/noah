@@ -22,7 +22,7 @@ use ark_serialize::CanonicalDeserialize;
 use bulletproofs::BulletproofGens;
 use noah_algebra::ristretto::RistrettoPoint;
 use noah_algebra::{
-    bls12_381::{BLSFr, BLSG1},
+    bls12_381::{BLSScalar, BLSG1},
     prelude::*,
     ristretto::RistrettoScalar,
 };
@@ -240,7 +240,7 @@ impl ProverParams {
 
     /// Obtain the parameters for confidential to anonymous.
     pub fn bar_to_abar_params() -> Result<ProverParams> {
-        let zero = BLSFr::zero();
+        let zero = BLSScalar::zero();
 
         let proof = DelegatedSchnorrProof::<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto> {
             inspection_comm: Default::default(),
@@ -258,7 +258,7 @@ impl ProverParams {
                     );
                     3
                 ],
-                r: BLSFr::default(),
+                r: BLSScalar::default(),
                 params_phantom: Default::default(),
                 group_phantom: Default::default(),
             };
@@ -303,7 +303,7 @@ impl ProverParams {
 
     /// Obtain the parameters for anonymous to confidential.
     pub fn abar_to_bar_params(tree_depth: usize) -> Result<ProverParams> {
-        let bls_zero = BLSFr::zero();
+        let bls_zero = BLSScalar::zero();
 
         let proof = DelegatedSchnorrProof::<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto> {
             inspection_comm: Default::default(),
@@ -321,7 +321,7 @@ impl ProverParams {
                     );
                     3
                 ],
-                r: BLSFr::default(),
+                r: BLSScalar::default(),
                 params_phantom: Default::default(),
                 group_phantom: Default::default(),
             };
@@ -400,7 +400,7 @@ impl ProverParams {
 
     /// Obtain the parameters for transparent to anonymous.
     pub fn ar_to_abar_params() -> Result<ProverParams> {
-        let bls_zero = BLSFr::zero();
+        let bls_zero = BLSScalar::zero();
 
         // It's okay to choose a fixed seed to build CS.
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
@@ -440,7 +440,7 @@ impl ProverParams {
 
     /// Obtain the parameters for anonymous to transparent.
     pub fn abar_to_ar_params(tree_depth: usize) -> Result<ProverParams> {
-        let bls_zero = BLSFr::zero();
+        let bls_zero = BLSScalar::zero();
 
         // It's okay to choose a fixed seed to build CS.
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
@@ -726,7 +726,7 @@ mod test {
     use crate::anon_xfr::TREE_DEPTH;
     use crate::setup::{ProverParams, VerifierParams};
     use noah_algebra::{
-        bls12_381::{BLSFr, BLSG1},
+        bls12_381::{BLSScalar, BLSG1},
         prelude::*,
     };
     use noah_plonk::poly_commit::{field_polynomial::FpPolynomial, pcs::PolyComScheme};
@@ -757,7 +757,7 @@ mod test {
     fn test_crs_commit() {
         let pcs = load_srs_params(16).unwrap();
 
-        let one = BLSFr::one();
+        let one = BLSScalar::one();
         let two = one.add(&one);
         let three = two.add(&one);
         let six = three.add(&three);

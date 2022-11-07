@@ -1,4 +1,4 @@
-use crate::bls12_381::BLSFr;
+use crate::bls12_381::BLSScalar;
 use crate::errors::AlgebraError;
 use crate::prelude::{derive_prng_from_hash, *};
 use ark_bls12_381::{G2Affine, G2Projective};
@@ -21,7 +21,7 @@ impl Debug for BLSG2 {
 }
 
 impl Group for BLSG2 {
-    type ScalarType = BLSFr;
+    type ScalarType = BLSScalar;
     const COMPRESSED_LEN: usize = 96;
 
     #[inline]
@@ -41,7 +41,7 @@ impl Group for BLSG2 {
 
     #[inline]
     fn random<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
-        Self::get_base().mul(&BLSFr::random(prng))
+        Self::get_base().mul(&BLSScalar::random(prng))
     }
 
     #[inline]
@@ -129,11 +129,11 @@ impl<'a> Sub<&'a BLSG2> for BLSG2 {
     }
 }
 
-impl<'a> Mul<&'a BLSFr> for BLSG2 {
+impl<'a> Mul<&'a BLSScalar> for BLSG2 {
     type Output = BLSG2;
 
     #[inline]
-    fn mul(self, rhs: &'a BLSFr) -> Self::Output {
+    fn mul(self, rhs: &'a BLSScalar) -> Self::Output {
         Self(self.0.mul(&rhs.0.into_repr()))
     }
 }

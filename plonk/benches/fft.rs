@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use noah_algebra::{bls12_381::BLSFr, prelude::*};
+use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
 
 fn bench_fft(c: &mut Criterion) {
@@ -8,11 +8,11 @@ fn bench_fft(c: &mut Criterion) {
 
     let mut coefs = Vec::with_capacity(n);
     for _ in 0..n {
-        coefs.push(BLSFr::random(&mut prng));
+        coefs.push(BLSScalar::random(&mut prng));
     }
     let polynomial = FpPolynomial::from_coefs(coefs);
 
-    let domain = FpPolynomial::<BLSFr>::evaluation_domain(n).unwrap();
+    let domain = FpPolynomial::<BLSScalar>::evaluation_domain(n).unwrap();
     let fft = polynomial.fft_with_domain(&domain);
     assert_eq!(polynomial, FpPolynomial::ifft_with_domain(&domain, &fft));
 

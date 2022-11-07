@@ -2,7 +2,7 @@ use crate::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
 use crate::basic::pedersen_comm::PedersenCommitment;
 use crate::field_simulation::{SimFr, SimFrParams};
 use merlin::Transcript;
-use noah_algebra::{bls12_381::BLSFr, prelude::*};
+use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 use num_bigint::BigUint;
 use rand_chacha::ChaChaRng;
 use serde::Deserialize;
@@ -12,7 +12,7 @@ use std::marker::PhantomData;
 /// The non-interactive proof provided to the verifier.
 pub struct DelegatedSchnorrProof<S, G, P> {
     /// The commitment of the non-ZK verifier's state.
-    pub inspection_comm: BLSFr,
+    pub inspection_comm: BLSScalar,
     /// The randomizer points
     pub randomizers: Vec<G>,
     /// The response scalars (two per pair)
@@ -27,7 +27,7 @@ pub struct DelegatedSchnorrInspection<S, G, P> {
     /// The committed value and their corresponding randomizer
     pub committed_data_and_randomizer: Vec<(S, S)>,
     /// The randomizer used to make the hash function a commitment scheme.
-    pub r: BLSFr,
+    pub r: BLSScalar,
     /// PhantomData for the parameters.
     pub params_phantom: PhantomData<P>,
     /// PhantomData for the group.
@@ -40,7 +40,7 @@ impl<S: Scalar, G: Group<ScalarType = S>, P: SimFrParams> DelegatedSchnorrInspec
         Self {
             committed_data_and_randomizer: vec![],
             params_phantom: PhantomData,
-            r: BLSFr::default(),
+            r: BLSScalar::default(),
             group_phantom: PhantomData,
         }
     }
@@ -50,7 +50,7 @@ impl<S: Scalar, G: Group<ScalarType = S>, P: SimFrParams> DelegatedSchnorrProof<
     /// Create a dummy new one.
     pub fn new() -> Self {
         Self {
-            inspection_comm: BLSFr::default(),
+            inspection_comm: BLSScalar::default(),
             randomizers: vec![],
             response_scalars: vec![],
             params_phantom: PhantomData,
@@ -58,7 +58,7 @@ impl<S: Scalar, G: Group<ScalarType = S>, P: SimFrParams> DelegatedSchnorrProof<
     }
 
     /// Represent the information needed by zk-SNARKs in its format.
-    pub fn to_verifier_input(&self) -> Vec<BLSFr> {
+    pub fn to_verifier_input(&self) -> Vec<BLSScalar> {
         let response_scalars_sim_fr_limbs = self
             .response_scalars
             .iter()
@@ -73,7 +73,7 @@ impl<S: Scalar, G: Group<ScalarType = S>, P: SimFrParams> DelegatedSchnorrProof<
                 v.extend_from_slice(&second_sim_fr.limbs);
                 v
             })
-            .collect::<Vec<BLSFr>>();
+            .collect::<Vec<BLSScalar>>();
 
         let mut res = Vec::with_capacity(1 + P::NUM_OF_LIMBS * response_scalars_sim_fr_limbs.len());
         res.push(self.inspection_comm);
@@ -112,7 +112,7 @@ pub fn prove_delegated_schnorr<
     for _ in 0..len {
         randomizer_scalars.push((S::random(rng), S::random(rng)));
     }
-    let r = BLSFr::random(rng);
+    let r = BLSScalar::random(rng);
 
     // 2. convert the first part of each entry in the committed data into biguint and sim_fr; these are in the inspector's state.
     let committed_data_biguint = committed_data
@@ -144,17 +144,17 @@ pub fn prove_delegated_schnorr<
         .for_each(|v| all_limbs.extend_from_slice(&v.limbs));
 
     // 4. compress these limbs for public input.
-    let num_limbs_compressed = BLSFr::capacity() / P::BIT_PER_LIMB;
+    let num_limbs_compressed = BLSScalar::capacity() / P::BIT_PER_LIMB;
     let mut compressed_limbs = Vec::new();
     for limbs in all_limbs.chunks(num_limbs_compressed) {
         let mut sum = BigUint::zero();
         for (i, limb) in limbs.iter().enumerate() {
             sum.add_assign(
-                <BLSFr as Into<BigUint>>::into(limb.clone())
+                <BLSScalar as Into<BigUint>>::into(limb.clone())
                     .mul(&BigUint::from(1u32).shl(P::BIT_PER_LIMB * i)),
             );
         }
-        compressed_limbs.push(BLSFr::from(&sum));
+        compressed_limbs.push(BLSScalar::from(&sum));
     }
 
     // 5. compute comm, which is the commitment of the non-ZK verifier's state

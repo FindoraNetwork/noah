@@ -1,6 +1,6 @@
 use crate::bls12_381::g2::BLSG2;
 use crate::bls12_381::gt::BLSGt;
-use crate::bls12_381::{BLSFr, BLSG1};
+use crate::bls12_381::{BLSScalar, BLSG1};
 use crate::traits::Pairing;
 use ark_bls12_381::Bls12_381 as Bls12381pairing;
 use ark_ec::PairingEngine;
@@ -9,7 +9,7 @@ use ark_ec::PairingEngine;
 pub struct BLSPairingEngine;
 
 impl Pairing for BLSPairingEngine {
-    type ScalarField = BLSFr;
+    type ScalarField = BLSScalar;
     type G1 = BLSG1;
     type G2 = BLSG2;
     type Gt = BLSGt;
