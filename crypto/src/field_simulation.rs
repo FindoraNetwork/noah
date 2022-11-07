@@ -1,4 +1,4 @@
-use noah_algebra::bls12_381::BLSFr;
+use noah_algebra::bls12_381::BLSScalar;
 use noah_algebra::prelude::*;
 use noah_algebra::str::FromStr;
 use num_bigint::BigUint;
@@ -22,13 +22,13 @@ pub trait SimFrParams: Clone + Default {
     fn scalar_field_in_biguint() -> BigUint;
 
     /// This is the limbs of the scalar field modulus.
-    fn scalar_field_in_limbs() -> Vec<BLSFr>;
+    fn scalar_field_in_limbs() -> Vec<BLSScalar>;
 
     /// This is the limbs of the scalar field modulus being adjusted
     /// so that each limb is more than 2^{BIT_PER_LIMB} (except the last one, 2^{BIT_IN_TOP_LIMB}).
     ///
     /// We use it in subtraction, and we call it sub pad.
-    fn scalar_field_sub_pad_in_limbs() -> Vec<BLSFr>;
+    fn scalar_field_sub_pad_in_limbs() -> Vec<BLSScalar>;
 
     /// This is the `BigUint` representation of the sub pad.
     fn scalar_field_sub_pad_in_biguint() -> BigUint;
@@ -51,26 +51,26 @@ impl SimFrParams for SimFrParamsRistretto {
         .unwrap()
     }
 
-    fn scalar_field_in_limbs() -> Vec<BLSFr> {
+    fn scalar_field_in_limbs() -> Vec<BLSScalar> {
         [
-            BLSFr::from_str("3411763647469").unwrap(),
-            BLSFr::from_str("7643343815244").unwrap(),
-            BLSFr::from_str("358561053323").unwrap(),
-            BLSFr::from_str("0").unwrap(),
-            BLSFr::from_str("0").unwrap(),
-            BLSFr::from_str("137438953472").unwrap(),
+            BLSScalar::from_str("3411763647469").unwrap(),
+            BLSScalar::from_str("7643343815244").unwrap(),
+            BLSScalar::from_str("358561053323").unwrap(),
+            BLSScalar::from_str("0").unwrap(),
+            BLSScalar::from_str("0").unwrap(),
+            BLSScalar::from_str("137438953472").unwrap(),
         ]
         .to_vec()
     }
 
-    fn scalar_field_sub_pad_in_limbs() -> Vec<BLSFr> {
+    fn scalar_field_sub_pad_in_limbs() -> Vec<BLSScalar> {
         [
-            BLSFr::from_str("10235290942407").unwrap(),
-            BLSFr::from_str("14133938423524").unwrap(),
-            BLSFr::from_str("9871776182178").unwrap(),
-            BLSFr::from_str("17592186044415").unwrap(),
-            BLSFr::from_str("17592186044414").unwrap(),
-            BLSFr::from_str("412316860414").unwrap(),
+            BLSScalar::from_str("10235290942407").unwrap(),
+            BLSScalar::from_str("14133938423524").unwrap(),
+            BLSScalar::from_str("9871776182178").unwrap(),
+            BLSScalar::from_str("17592186044415").unwrap(),
+            BLSScalar::from_str("17592186044414").unwrap(),
+            BLSScalar::from_str("412316860414").unwrap(),
         ]
         .to_vec()
     }
@@ -100,26 +100,26 @@ impl SimFrParams for SimFrParamsSecq256k1 {
         .unwrap()
     }
 
-    fn scalar_field_in_limbs() -> Vec<BLSFr> {
+    fn scalar_field_in_limbs() -> Vec<BLSScalar> {
         [
-            BLSFr::from_str("17587891076143").unwrap(),
-            BLSFr::from_str("17592186044415").unwrap(),
-            BLSFr::from_str("17592186044415").unwrap(),
-            BLSFr::from_str("17592186044415").unwrap(),
-            BLSFr::from_str("17592186044415").unwrap(),
-            BLSFr::from_str("68719476735").unwrap(),
+            BLSScalar::from_str("17587891076143").unwrap(),
+            BLSScalar::from_str("17592186044415").unwrap(),
+            BLSScalar::from_str("17592186044415").unwrap(),
+            BLSScalar::from_str("17592186044415").unwrap(),
+            BLSScalar::from_str("17592186044415").unwrap(),
+            BLSScalar::from_str("68719476735").unwrap(),
         ]
         .to_vec()
     }
 
-    fn scalar_field_sub_pad_in_limbs() -> Vec<BLSFr> {
+    fn scalar_field_sub_pad_in_limbs() -> Vec<BLSScalar> {
         [
-            BLSFr::from_str("35175782152286").unwrap(),
-            BLSFr::from_str("35184372088830").unwrap(),
-            BLSFr::from_str("35184372088830").unwrap(),
-            BLSFr::from_str("35184372088830").unwrap(),
-            BLSFr::from_str("35184372088830").unwrap(),
-            BLSFr::from_str("137438953470").unwrap(),
+            BLSScalar::from_str("35175782152286").unwrap(),
+            BLSScalar::from_str("35184372088830").unwrap(),
+            BLSScalar::from_str("35184372088830").unwrap(),
+            BLSScalar::from_str("35184372088830").unwrap(),
+            BLSScalar::from_str("35184372088830").unwrap(),
+            BLSScalar::from_str("137438953470").unwrap(),
         ]
         .to_vec()
     }
@@ -149,26 +149,26 @@ impl SimFrParams for SimFrParamsZorro {
         .unwrap()
     }
 
-    fn scalar_field_in_limbs() -> Vec<BLSFr> {
+    fn scalar_field_in_limbs() -> Vec<BLSScalar> {
         [
-            BLSFr::from_str("17592186044397").unwrap(),
-            BLSFr::from_str("17592186044415").unwrap(),
-            BLSFr::from_str("17592186044415").unwrap(),
-            BLSFr::from_str("17592186044415").unwrap(),
-            BLSFr::from_str("17592186044415").unwrap(),
-            BLSFr::from_str("34359738367").unwrap(),
+            BLSScalar::from_str("17592186044397").unwrap(),
+            BLSScalar::from_str("17592186044415").unwrap(),
+            BLSScalar::from_str("17592186044415").unwrap(),
+            BLSScalar::from_str("17592186044415").unwrap(),
+            BLSScalar::from_str("17592186044415").unwrap(),
+            BLSScalar::from_str("34359738367").unwrap(),
         ]
         .to_vec()
     }
 
-    fn scalar_field_sub_pad_in_limbs() -> Vec<BLSFr> {
+    fn scalar_field_sub_pad_in_limbs() -> Vec<BLSScalar> {
         [
-            BLSFr::from_str("35184372088794").unwrap(),
-            BLSFr::from_str("35184372088830").unwrap(),
-            BLSFr::from_str("35184372088830").unwrap(),
-            BLSFr::from_str("35184372088830").unwrap(),
-            BLSFr::from_str("35184372088830").unwrap(),
-            BLSFr::from_str("68719476734").unwrap(),
+            BLSScalar::from_str("35184372088794").unwrap(),
+            BLSScalar::from_str("35184372088830").unwrap(),
+            BLSScalar::from_str("35184372088830").unwrap(),
+            BLSScalar::from_str("35184372088830").unwrap(),
+            BLSScalar::from_str("35184372088830").unwrap(),
+            BLSScalar::from_str("68719476734").unwrap(),
         ]
         .to_vec()
     }
@@ -207,7 +207,7 @@ impl<'a> From<&'a SimReducibility> for BigUint {
 #[derive(Clone)]
 pub struct SimFr<P: SimFrParams> {
     /// The limbs of a simulated field element.
-    pub limbs: Vec<BLSFr>,
+    pub limbs: Vec<BLSScalar>,
     /// The actual value of the simulated field element.
     pub val: BigUint,
     /// The reducibility of this simulated field element.
@@ -219,7 +219,7 @@ pub struct SimFr<P: SimFrParams> {
 impl<P: SimFrParams> Default for SimFr<P> {
     fn default() -> Self {
         Self {
-            limbs: vec![BLSFr::zero(); P::NUM_OF_LIMBS],
+            limbs: vec![BLSScalar::zero(); P::NUM_OF_LIMBS],
             val: BigUint::zero(),
             num_of_additions_over_normal_form: SimReducibility::StrictlyNotReducible,
             params_phantom: PhantomData::default(),
@@ -287,7 +287,7 @@ impl<P: SimFrParams> From<&BigUint> for SimFr<P> {
         for i in 0..P::NUM_OF_LIMBS {
             let (new_rem, limb) = rem.div_rem(&step);
             rem = new_rem;
-            res.limbs[i] = BLSFr::from(&limb);
+            res.limbs[i] = BLSScalar::from(&limb);
         }
         res.num_of_additions_over_normal_form = SimReducibility::StrictlyNotReducible;
 
@@ -327,7 +327,7 @@ impl<P: SimFrParams> SimFr<P> {
 #[derive(Clone)]
 pub struct SimFrMul<P: SimFrParams> {
     /// The limbs of this intermediate representation.
-    pub limbs: Vec<BLSFr>,
+    pub limbs: Vec<BLSScalar>,
     /// The actual value of this intermediate representation.
     pub val: BigUint,
     /// The product of the num of additions over two original field elements.
@@ -339,7 +339,7 @@ pub struct SimFrMul<P: SimFrParams> {
 impl<P: SimFrParams> Default for SimFrMul<P> {
     fn default() -> Self {
         Self {
-            limbs: vec![BLSFr::zero(); P::NUM_OF_LIMBS_MUL],
+            limbs: vec![BLSScalar::zero(); P::NUM_OF_LIMBS_MUL],
             val: BigUint::zero(),
             prod_of_num_of_additions: BigUint::zero(),
             params_phantom: PhantomData::default(),
@@ -441,7 +441,7 @@ impl<P: SimFrParams> SimFrMul<P> {
         let r_limbs = P::scalar_field_in_limbs().to_vec();
         let k_limbs = SimFr::<P>::from(&k).limbs.to_vec();
 
-        let mut rk_limbs = vec![BLSFr::zero(); P::NUM_OF_LIMBS_MUL];
+        let mut rk_limbs = vec![BLSScalar::zero(); P::NUM_OF_LIMBS_MUL];
         for i in 0..P::NUM_OF_LIMBS {
             for j in 0..P::NUM_OF_LIMBS {
                 rk_limbs[i + j] = rk_limbs[i + j].add(&r_limbs[i].mul(&k_limbs[j]));
@@ -454,7 +454,7 @@ impl<P: SimFrParams> SimFrMul<P> {
         let mut right_group = Vec::with_capacity(P::NUM_OF_GROUPS);
         let mut num_limbs_in_group = Vec::with_capacity(P::NUM_OF_GROUPS);
 
-        let step = BLSFr::from(&BigUint::from(1u32).shl(P::BIT_PER_LIMB));
+        let step = BLSScalar::from(&BigUint::from(1u32).shl(P::BIT_PER_LIMB));
         for chunk in self.limbs.chunks(2) {
             if chunk.len() == 2 {
                 left_group.push(chunk[0].add(&chunk[1].mul(&step)));
@@ -475,7 +475,7 @@ impl<P: SimFrParams> SimFrMul<P> {
         //      left_group_limb + pad_limb + carry_in - right_group_limb
         //   =  carry shift by (BIT_PER_LIMB * num_limb_in_group) + remainder
 
-        let mut carry_in = BLSFr::zero();
+        let mut carry_in = BLSScalar::zero();
         let mut accumulated_extra = BigUint::zero();
         for (group_id, ((left_group_limb, right_group_limb), num_limbs_in_this_group)) in left_group
             .iter()
@@ -486,8 +486,8 @@ impl<P: SimFrParams> SimFrMul<P> {
             let pad = BigUint::from(1u32).shl(
                 (num_limbs_in_this_group + 1) * P::BIT_PER_LIMB + num_limbs_in_this_group + surfeit,
             );
-            let pad_limb = BLSFr::from(&pad);
-            assert!(pad > <BLSFr as Into<BigUint>>::into(right_group_limb.clone()));
+            let pad_limb = BLSScalar::from(&pad);
+            assert!(pad > <BLSScalar as Into<BigUint>>::into(right_group_limb.clone()));
 
             // Compute the carry number for the next cycle
             let mut carry = left_group_limb
@@ -495,12 +495,12 @@ impl<P: SimFrParams> SimFrMul<P> {
                 .add(&pad_limb)
                 .sub(&right_group_limb);
             let carry_biguint: BigUint = carry.into();
-            carry = BLSFr::from(&carry_biguint.shr(num_limbs_in_this_group * P::BIT_PER_LIMB));
+            carry = BLSScalar::from(&carry_biguint.shr(num_limbs_in_this_group * P::BIT_PER_LIMB));
             accumulated_extra += BigUint::from_bytes_le(&pad_limb.to_bytes());
 
             let (new_accumulated_extra, remainder_biguint) = accumulated_extra
                 .div_rem(&BigUint::from(1u64).shl(P::BIT_PER_LIMB * num_limbs_in_this_group));
-            let remainder = BLSFr::from(&remainder_biguint);
+            let remainder = BLSScalar::from(&remainder_biguint);
 
             let eqn_left = left_group_limb
                 .add(&pad_limb)

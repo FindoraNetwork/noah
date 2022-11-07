@@ -26,7 +26,7 @@ mod smoke_axfr {
         },
     };
     use noah_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
-    use noah_algebra::{bls12_381::BLSFr, prelude::*};
+    use noah_algebra::{bls12_381::BLSScalar, prelude::*};
     use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
     use noah_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
     use parking_lot::RwLock;
@@ -73,8 +73,8 @@ mod smoke_axfr {
             .unwrap()
     }
 
-    fn hash_abar(uid: u64, abar: &AnonAssetRecord) -> BLSFr {
-        AnemoiJive381::eval_variable_length_hash(&[BLSFr::from(uid), abar.commitment])
+    fn hash_abar(uid: u64, abar: &AnonAssetRecord) -> BLSScalar {
+        AnemoiJive381::eval_variable_length_hash(&[BLSScalar::from(uid), abar.commitment])
     }
 
     fn build_mt_leaf_info_from_proof(proof: Proof, uid: u64) -> MTLeafInfo {
@@ -240,7 +240,7 @@ mod smoke_axfr {
         let note = finish_abar_to_ar_note(&mut prng, &params, pre_note, hash.clone()).unwrap();
         verify_abar_to_ar_note(&verify_params, &note, &proof.root, hash.clone()).unwrap();
 
-        let err_root = BLSFr::random(&mut prng);
+        let err_root = BLSScalar::random(&mut prng);
         assert!(verify_abar_to_ar_note(&verify_params, &note, &err_root, hash.clone()).is_err());
 
         let err_hash = random_hasher(&mut prng);
@@ -249,7 +249,7 @@ mod smoke_axfr {
         );
 
         let mut err_nullifier = note.clone();
-        err_nullifier.body.input = BLSFr::random(&mut prng);
+        err_nullifier.body.input = BLSScalar::random(&mut prng);
         assert!(
             verify_abar_to_ar_note(&verify_params, &err_nullifier, &proof.root, hash.clone())
                 .is_err()
@@ -342,7 +342,7 @@ mod smoke_axfr {
         let note = finish_abar_to_bar_note(&mut prng, &params, pre_note, hash.clone()).unwrap();
         verify_abar_to_bar_note(&verify_params, &note, &proof.root, hash.clone()).unwrap();
 
-        let err_root = BLSFr::random(&mut prng);
+        let err_root = BLSScalar::random(&mut prng);
         assert!(verify_abar_to_bar_note(&verify_params, &note, &err_root, hash.clone()).is_err());
 
         let err_hash = random_hasher(&mut prng);
@@ -351,7 +351,7 @@ mod smoke_axfr {
         );
 
         let mut err_nullifier = note.clone();
-        err_nullifier.body.input = BLSFr::random(&mut prng);
+        err_nullifier.body.input = BLSScalar::random(&mut prng);
         assert!(
             verify_abar_to_bar_note(&verify_params, &err_nullifier, &proof.root, hash.clone())
                 .is_err()

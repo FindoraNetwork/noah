@@ -3,7 +3,7 @@ use crate::bls12_381::BLSG2;
 use crate::secp256k1::{SECP256K1Scalar, SECP256K1G1};
 use crate::secq256k1::SECQ256K1G1;
 use crate::{
-    bls12_381::{BLSFq, BLSFr, BLSG1},
+    bls12_381::{BLSFq, BLSScalar, BLSG1},
     jubjub::{JubjubPoint, JubjubScalar},
     prelude::*,
     ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar},
@@ -31,7 +31,7 @@ macro_rules! to_from_bytes_scalar {
 }
 
 to_from_bytes_scalar!(RistrettoScalar);
-to_from_bytes_scalar!(BLSFr);
+to_from_bytes_scalar!(BLSScalar);
 to_from_bytes_scalar!(BLSFq);
 to_from_bytes_scalar!(JubjubScalar);
 to_from_bytes_scalar!(SECQ256K1Scalar);
@@ -66,7 +66,7 @@ impl NoahFromToBytes for CompressedEdwardsY {
 serialize_deserialize!(CompressedRistretto);
 serialize_deserialize!(CompressedEdwardsY);
 serialize_deserialize!(RistrettoScalar);
-serialize_deserialize!(BLSFr);
+serialize_deserialize!(BLSScalar);
 serialize_deserialize!(BLSFq);
 serialize_deserialize!(JubjubScalar);
 serialize_deserialize!(SECQ256K1Scalar);

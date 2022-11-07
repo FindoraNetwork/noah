@@ -24,7 +24,7 @@ pub use pairing::*;
 macro_rules! new_bls12_381 {
     ($c0:expr) => {{
         let (is_positive, limbs) = ark_ff::ark_ff_macros::to_sign_and_limbs!($c0);
-        BLSFr::new(is_positive, &limbs)
+        BLSScalar::new(is_positive, &limbs)
     }};
 }
 
@@ -34,7 +34,7 @@ mod bls12_381_groups_test {
     use crate::bls12_381::BLSG2;
     use crate::bls12_381::{BLSFq, BLSGt};
     use crate::{
-        bls12_381::{BLSFr, BLSG1},
+        bls12_381::{BLSScalar, BLSG1},
         prelude::*,
         traits::{
             group_tests::{test_scalar_operations, test_scalar_serialization},
@@ -46,19 +46,19 @@ mod bls12_381_groups_test {
 
     #[test]
     fn test_scalar_ops() {
-        test_scalar_operations::<BLSFr>();
+        test_scalar_operations::<BLSScalar>();
         test_scalar_operations::<BLSFq>();
     }
 
     #[test]
     fn scalar_deser() {
-        test_scalar_serialization::<BLSFr>();
+        test_scalar_serialization::<BLSScalar>();
         test_scalar_serialization::<BLSFq>();
     }
 
     #[test]
     fn scalar_from_to_bytes() {
-        let small_value = BLSFr::from(165747u32);
+        let small_value = BLSScalar::from(165747u32);
         let small_value_bytes = small_value.to_bytes();
         let expected_small_value_bytes: [u8; 32] = [
             115, 135, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -66,7 +66,7 @@ mod bls12_381_groups_test {
         ];
         assert_eq!(small_value_bytes, expected_small_value_bytes);
 
-        let small_value_from_bytes = BLSFr::from_bytes(&small_value_bytes).unwrap();
+        let small_value_from_bytes = BLSScalar::from_bytes(&small_value_bytes).unwrap();
         assert_eq!(small_value_from_bytes, small_value);
     }
 
@@ -87,8 +87,8 @@ mod bls12_381_groups_test {
 
         let mut prng = test_rng();
 
-        let s1 = BLSFr::from(50 + prng.next_u32() % 50);
-        let s2 = BLSFr::from(50 + prng.next_u32() % 50);
+        let s1 = BLSScalar::from(50 + prng.next_u32() % 50);
+        let s2 = BLSScalar::from(50 + prng.next_u32() % 50);
 
         let base_g1 = BLSG1::get_base();
         let base_g2 = BLSG2::get_base();
@@ -120,7 +120,7 @@ mod bls12_381_groups_test {
         let mut prng = test_rng();
 
         let g1 = BLSG1::get_base();
-        let s1 = BLSFr::from(50 + prng.next_u32() % 50);
+        let s1 = BLSScalar::from(50 + prng.next_u32() % 50);
 
         let g1 = g1.mul(&s1);
 
@@ -149,7 +149,7 @@ mod bls12_381_groups_test {
         let mut prng = test_rng();
 
         let g1 = BLSG2::get_base();
-        let s1 = BLSFr::from(50 + prng.next_u32() % 50);
+        let s1 = BLSScalar::from(50 + prng.next_u32() % 50);
 
         let g1 = g1.mul(&s1);
 

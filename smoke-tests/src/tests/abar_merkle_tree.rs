@@ -5,7 +5,7 @@ use noah::anon_xfr::{
     structs::{AnonAssetRecord, MTNode, MTPath, OpenAnonAssetRecord},
 };
 use noah_accumulators::merkle_tree::{PersistentMerkleTree, TreePath};
-use noah_algebra::{bls12_381::BLSFr, prelude::*};
+use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS};
 use noah_plonk::plonk::constraint_system::TurboCS;
 use parking_lot::RwLock;
@@ -25,7 +25,7 @@ fn test_persistent_merkle_tree() {
     let store = PrefixedStore::new("mystore", &mut state);
     let mut mt = PersistentMerkleTree::new(store).unwrap();
 
-    assert_eq!(mt.get_root().unwrap(), BLSFr::zero(),);
+    assert_eq!(mt.get_root().unwrap(), BLSScalar::zero(),);
 
     let abar = AnonAssetRecord::from_oabar(&OpenAnonAssetRecord::default());
     assert!(mt
@@ -35,8 +35,8 @@ fn test_persistent_merkle_tree() {
     assert_ne!(
         mt.get_root().unwrap(),
         AnemoiJive381::eval_jive(
-            &[BLSFr::zero(), BLSFr::zero()],
-            &[BLSFr::zero(), ANEMOI_JIVE_381_SALTS[0]]
+            &[BLSScalar::zero(), BLSScalar::zero()],
+            &[BLSScalar::zero(), ANEMOI_JIVE_381_SALTS[0]]
         )
     );
 
@@ -68,7 +68,7 @@ fn test_persistent_merkle_tree_proof_commitment() {
     let mut prng = test_rng();
 
     let abar = AnonAssetRecord {
-        commitment: BLSFr::random(&mut prng),
+        commitment: BLSScalar::random(&mut prng),
     };
     assert!(mt
         .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
@@ -79,7 +79,7 @@ fn test_persistent_merkle_tree_proof_commitment() {
     let mut cs = TurboCS::new();
     cs.load_anemoi_jive_parameters::<AnemoiJive381>();
 
-    let uid_var = cs.new_variable(BLSFr::from(0u32));
+    let uid_var = cs.new_variable(BLSScalar::from(0u32));
     let comm_var = cs.new_variable(abar.commitment);
     let elem = AccElemVars {
         uid: uid_var,
@@ -105,8 +105,10 @@ fn test_persistent_merkle_tree_proof_commitment() {
     );
 
     let mut path_traces = Vec::new();
-    let leaf_trace =
-        AnemoiJive381::eval_variable_length_hash_with_trace(&[BLSFr::from(0u32), abar.commitment]);
+    let leaf_trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
+        BLSScalar::from(0u32),
+        abar.commitment,
+    ]);
     for (i, mt_node) in proof.nodes.iter().enumerate() {
         let trace = AnemoiJive381::eval_jive_with_trace(
             &[mt_node.left, mt_node.mid],
@@ -143,7 +145,7 @@ fn test_persistent_merkle_tree_recovery() {
     let mut prng = test_rng();
 
     let mut abar = AnonAssetRecord {
-        commitment: BLSFr::random(&mut prng),
+        commitment: BLSScalar::random(&mut prng),
     };
     assert!(mt
         .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
@@ -151,7 +153,7 @@ fn test_persistent_merkle_tree_recovery() {
     mt.commit().unwrap();
 
     abar = AnonAssetRecord {
-        commitment: BLSFr::random(&mut prng),
+        commitment: BLSScalar::random(&mut prng),
     };
     assert!(mt
         .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
@@ -159,7 +161,7 @@ fn test_persistent_merkle_tree_recovery() {
     mt.commit().unwrap();
 
     abar = AnonAssetRecord {
-        commitment: BLSFr::random(&mut prng),
+        commitment: BLSScalar::random(&mut prng),
     };
     assert!(mt
         .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
@@ -167,7 +169,7 @@ fn test_persistent_merkle_tree_recovery() {
     mt.commit().unwrap();
 
     abar = AnonAssetRecord {
-        commitment: BLSFr::random(&mut prng),
+        commitment: BLSScalar::random(&mut prng),
     };
     assert!(mt
         .add_commitment_hash(hash_abar(mt.entry_count(), &abar))
@@ -212,13 +214,13 @@ pub fn test_merkle_proofs() {
 
     let mut prng = test_rng();
     let abar0 = AnonAssetRecord {
-        commitment: BLSFr::random(&mut prng),
+        commitment: BLSScalar::random(&mut prng),
     };
     let abar1 = AnonAssetRecord {
-        commitment: BLSFr::random(&mut prng),
+        commitment: BLSScalar::random(&mut prng),
     };
     let abar2 = AnonAssetRecord {
-        commitment: BLSFr::random(&mut prng),
+        commitment: BLSScalar::random(&mut prng),
     };
 
     pmt.add_commitment_hash(hash_abar(pmt.entry_count(), &abar0))
@@ -248,6 +250,6 @@ pub fn test_merkle_proofs() {
     pmt.commit().unwrap();
 }
 
-fn hash_abar(uid: u64, abar: &AnonAssetRecord) -> BLSFr {
-    AnemoiJive381::eval_variable_length_hash(&[BLSFr::from(uid), abar.commitment])
+fn hash_abar(uid: u64, abar: &AnonAssetRecord) -> BLSScalar {
+    AnemoiJive381::eval_variable_length_hash(&[BLSScalar::from(uid), abar.commitment])
 }

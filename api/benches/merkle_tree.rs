@@ -5,7 +5,7 @@ use merlin::Transcript;
 use noah::anon_xfr::add_merkle_path_variables;
 use noah::anon_xfr::structs::{AccElemVars, MTLeafInfo, MTNode, MTPath, MerklePathVars};
 use noah_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
-use noah_algebra::bls12_381::BLSFr;
+use noah_algebra::bls12_381::BLSScalar;
 use noah_crypto::basic::anemoi_jive::{
     AnemoiJive, AnemoiJive381, AnemoiVLHTrace, JiveTrace, ANEMOI_JIVE_381_SALTS,
 };
@@ -32,8 +32,8 @@ fn merkle_tree_proof_bench(c: &mut Criterion) {
     let mut mt = PersistentMerkleTree::new(store).unwrap();
     let uid = mt
         .add_commitment_hash(AnemoiJive381::eval_variable_length_hash(&[
-            BLSFr::from(mt.entry_count()),
-            BLSFr::one(),
+            BLSScalar::from(mt.entry_count()),
+            BLSScalar::one(),
         ]))
         .unwrap();
     mt.commit().unwrap();
@@ -43,15 +43,17 @@ fn merkle_tree_proof_bench(c: &mut Criterion) {
     let mut cs = TurboCS::new();
     cs.load_anemoi_jive_parameters::<AnemoiJive381>();
 
-    let uid_var = cs.new_variable(BLSFr::from(uid));
-    let commitment_var = cs.new_variable(BLSFr::one());
+    let uid_var = cs.new_variable(BLSScalar::from(uid));
+    let commitment_var = cs.new_variable(BLSScalar::one());
 
     // Merkle path authentication.
 
     let mut path_traces = Vec::new();
 
-    let leaf_trace =
-        AnemoiJive381::eval_variable_length_hash_with_trace(&[BLSFr::from(uid), BLSFr::one()]);
+    let leaf_trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
+        BLSScalar::from(uid),
+        BLSScalar::one(),
+    ]);
     for (i, mt_node) in proof.nodes.iter().enumerate() {
         let trace = AnemoiJive381::eval_jive_with_trace(
             &[mt_node.left, mt_node.mid],
@@ -128,8 +130,8 @@ pub fn compute_merkle_root_variables_2_20(
     cs: &mut TurboPlonkCS,
     elem: AccElemVars,
     path_vars: &MerklePathVars,
-    leaf_trace: &AnemoiVLHTrace<BLSFr, 2, 12>,
-    traces: &Vec<JiveTrace<BLSFr, 2, 12>>,
+    leaf_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
+    traces: &Vec<JiveTrace<BLSScalar, 2, 12>>,
 ) -> VarIndex {
     let (uid, commitment) = (elem.uid, elem.commitment);
 
@@ -155,7 +157,7 @@ pub fn compute_merkle_root_variables_2_20(
     node_var
 }
 
-pub(crate) type TurboPlonkCS = TurboCS<BLSFr>;
+pub(crate) type TurboPlonkCS = TurboCS<BLSScalar>;
 
 fn parse_merkle_tree_path(
     cs: &mut TurboPlonkCS,
@@ -168,7 +170,7 @@ fn parse_merkle_tree_path(
     let left = cs.select(sib1, node, is_left_child);
     let right = cs.select(sib2, node, is_right_child);
     let sum_left_right = cs.add(left, right);
-    let one = BLSFr::one();
+    let one = BLSScalar::one();
     let mid = cs.linear_combine(
         &[node, sib1, sib2, sum_left_right],
         one,
