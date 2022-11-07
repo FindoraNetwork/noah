@@ -116,7 +116,7 @@ impl XfrType {
 /// # Example
 /// ```
 /// use rand_chacha::ChaChaRng;
-/// use noah::xfr::sig::KeyPair;
+/// use noah::keys::KeyPair;
 /// use noah::xfr::structs::{AssetRecordTemplate, AssetRecord, AssetType};
 /// use noah::xfr::asset_record::AssetRecordType;
 /// use noah::xfr::{gen_xfr_note, verify_xfr_note, XfrNotePolicies};
@@ -148,7 +148,7 @@ impl XfrType {
 ///   let asset_record = AssetRecordTemplate::with_no_asset_tracing( x.0,
 ///                                        x.1,
 ///                                        asset_record_type,
-///                                        keypair.pub_key.clone());
+///                                        keypair.get_pk().clone());
 ///
 ///   inputs.push(AssetRecord::from_template_no_identity_tracing(&mut prng, &asset_record).unwrap());
 ///
@@ -159,7 +159,7 @@ impl XfrType {
 /// for x in outputs_amounts.iter() {
 ///     let keypair = KeyPair::generate(&mut prng);
 ///
-///     let ar = AssetRecordTemplate::with_no_asset_tracing(x.0, x.1, asset_record_type, keypair.pub_key.clone());
+///     let ar = AssetRecordTemplate::with_no_asset_tracing(x.0, x.1, asset_record_type, keypair.get_pk().clone());
 ///     let output = AssetRecord::from_template_no_identity_tracing(&mut prng, &ar).unwrap();
 ///     outputs.push(output);
 /// }
@@ -196,7 +196,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
 /// use rand_chacha::ChaChaRng;
 /// use ruc::{*, err::*};
 /// use rand_core::SeedableRng;
-/// use noah::xfr::sig::KeyPair;
+/// use noah::keys::KeyPair;
 /// use noah::xfr::structs::{AssetRecordTemplate, AssetRecord, AssetType};
 /// use noah::xfr::asset_record::AssetRecordType;
 /// use noah::xfr::{gen_xfr_body, verify_xfr_body, XfrNotePolicies, XfrNotePoliciesRef};
@@ -223,7 +223,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
 ///   let ar = AssetRecordTemplate::with_no_asset_tracing( x.0,
 ///                                        x.1,
 ///                                        asset_record_type,
-///                                        keypair.pub_key.clone(),
+///                                        keypair.get_pk().clone(),
 ///                                        );
 ///
 ///   inputs.push(AssetRecord::from_template_no_identity_tracing(&mut prng, &ar).unwrap());
@@ -231,7 +231,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
 /// for x in outputs_amounts.iter() {
 ///     let keypair = KeyPair::generate(&mut prng);
 ///
-///     let ar = AssetRecordTemplate::with_no_asset_tracing(x.0, x.1, asset_record_type, keypair.pub_key);
+///     let ar = AssetRecordTemplate::with_no_asset_tracing(x.0, x.1, asset_record_type, keypair.get_pk());
 ///     outputs.push(AssetRecord::from_template_no_identity_tracing(&mut prng, &ar).unwrap());
 /// }
 /// let body = gen_xfr_body(&mut prng, &inputs, &outputs).unwrap();

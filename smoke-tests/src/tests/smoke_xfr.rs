@@ -1,11 +1,11 @@
 #[cfg(test)]
 mod smoke_xfr {
     use noah::{
+        keys::{KeyPair, PublicKey},
         setup::BulletproofParams,
         xfr::{
             asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
             gen_xfr_note,
-            sig::{PublicKey, XfrKeyPair},
             structs::{
                 AssetRecord, AssetRecordTemplate, AssetType, BlindAssetRecord, OwnerMemo,
                 XfrAmount, XfrAssetType, ASSET_TYPE_LENGTH,
@@ -63,11 +63,11 @@ mod smoke_xfr {
         let mut prng = test_rng();
         let mut params = BulletproofParams::default();
 
-        let sender = XfrKeyPair::generate(&mut prng);
-        let receiver = XfrKeyPair::generate(&mut prng);
+        let sender = KeyPair::generate(&mut prng);
+        let receiver = KeyPair::generate(&mut prng);
 
         // fake and build blind_asset_record from ledger
-        let bar = non_conf_blind_asset_record_from_ledger(&sender.pub_key, AMOUNT, ASSET1_TYPE);
+        let bar = non_conf_blind_asset_record_from_ledger(&sender.get_pk(), AMOUNT, ASSET1_TYPE);
         let oar = open_blind_asset_record(&bar, &None, &sender).unwrap();
         let ar = AssetRecord::from_open_asset_record_no_asset_tracing(oar);
 
@@ -76,7 +76,7 @@ mod smoke_xfr {
             AMOUNT,
             ASSET1_TYPE,
             AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
-            receiver.pub_key,
+            receiver.get_pk(),
         );
         let recv_ar = AssetRecord::from_template_no_identity_tracing(&mut prng, &template).unwrap();
 
@@ -94,7 +94,7 @@ mod smoke_xfr {
         let recv_oar = open_blind_asset_record(recv_bar, recv_memo, &receiver).unwrap();
         assert_eq!(recv_oar.asset_type, ASSET1_TYPE);
         assert_eq!(recv_oar.amount, AMOUNT);
-        assert_eq!(recv_oar.blind_asset_record.public_key, receiver.pub_key);
+        assert_eq!(recv_oar.blind_asset_record.public_key, receiver.get_pk());
     }
 
     #[test]
@@ -102,11 +102,11 @@ mod smoke_xfr {
         let mut prng = test_rng();
         let mut params = BulletproofParams::default();
 
-        let sender = XfrKeyPair::generate(&mut prng);
-        let receiver = XfrKeyPair::generate(&mut prng);
+        let sender = KeyPair::generate(&mut prng);
+        let receiver = KeyPair::generate(&mut prng);
 
         // fake and build blind_asset_record from ledger
-        let bar = non_conf_blind_asset_record_from_ledger(&sender.pub_key, AMOUNT, ASSET1_TYPE);
+        let bar = non_conf_blind_asset_record_from_ledger(&sender.get_pk(), AMOUNT, ASSET1_TYPE);
         let oar = open_blind_asset_record(&bar, &None, &sender).unwrap();
         let ar = AssetRecord::from_open_asset_record_no_asset_tracing(oar);
 
@@ -115,7 +115,7 @@ mod smoke_xfr {
             AMOUNT,
             ASSET1_TYPE,
             AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
-            receiver.pub_key,
+            receiver.get_pk(),
         );
         let recv_ar = AssetRecord::from_template_no_identity_tracing(&mut prng, &template).unwrap();
 
@@ -135,7 +135,7 @@ mod smoke_xfr {
         assert!(recv_bar.amount.is_confidential());
         assert_eq!(recv_oar.asset_type, ASSET1_TYPE);
         assert_eq!(recv_oar.amount, AMOUNT);
-        assert_eq!(recv_oar.blind_asset_record.public_key, receiver.pub_key);
+        assert_eq!(recv_oar.blind_asset_record.public_key, receiver.get_pk());
     }
 
     #[test]
@@ -151,21 +151,21 @@ mod smoke_xfr {
         let amount_out3 = 50u64;
         let amount_out4 = 20u64;
 
-        let sender1 = XfrKeyPair::generate(&mut prng);
-        let sender2 = XfrKeyPair::generate(&mut prng);
-        let sender3 = XfrKeyPair::generate(&mut prng);
-        let receiver1 = XfrKeyPair::generate(&mut prng);
-        let receiver2 = XfrKeyPair::generate(&mut prng);
-        let receiver3 = XfrKeyPair::generate(&mut prng);
-        let receiver4 = XfrKeyPair::generate(&mut prng);
+        let sender1 = KeyPair::generate(&mut prng);
+        let sender2 = KeyPair::generate(&mut prng);
+        let sender3 = KeyPair::generate(&mut prng);
+        let receiver1 = KeyPair::generate(&mut prng);
+        let receiver2 = KeyPair::generate(&mut prng);
+        let receiver3 = KeyPair::generate(&mut prng);
+        let receiver4 = KeyPair::generate(&mut prng);
 
         // fake and build blind_asset_record
         let (bar_in1, memo1) =
-            conf_blind_asset_record_from_ledger(&sender1.pub_key, amount_in1, ASSET1_TYPE);
+            conf_blind_asset_record_from_ledger(&sender1.get_pk(), amount_in1, ASSET1_TYPE);
         let (bar_in2, memo2) =
-            conf_blind_asset_record_from_ledger(&sender2.pub_key, amount_in2, ASSET2_TYPE);
+            conf_blind_asset_record_from_ledger(&sender2.get_pk(), amount_in2, ASSET2_TYPE);
         let (bar_in3, memo3) =
-            conf_blind_asset_record_from_ledger(&sender3.pub_key, amount_in3, ASSET3_TYPE);
+            conf_blind_asset_record_from_ledger(&sender3.get_pk(), amount_in3, ASSET3_TYPE);
 
         let oar_in1 = open_blind_asset_record(&bar_in1, &Some(memo1), &sender1).unwrap();
         let oar_in2 = open_blind_asset_record(&bar_in2, &Some(memo2), &sender2).unwrap();
@@ -180,25 +180,25 @@ mod smoke_xfr {
             amount_out1,
             ASSET1_TYPE,
             AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-            receiver1.pub_key,
+            receiver1.get_pk(),
         );
         let temp2 = AssetRecordTemplate::with_no_asset_tracing(
             amount_out2,
             ASSET1_TYPE,
             AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
-            receiver2.pub_key,
+            receiver2.get_pk(),
         );
         let temp3 = AssetRecordTemplate::with_no_asset_tracing(
             amount_out3,
             ASSET2_TYPE,
             AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-            receiver3.pub_key,
+            receiver3.get_pk(),
         );
         let temp4 = AssetRecordTemplate::with_no_asset_tracing(
             amount_out4,
             ASSET3_TYPE,
             AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
-            receiver4.pub_key,
+            receiver4.get_pk(),
         );
 
         let ar_out1 = AssetRecord::from_template_no_identity_tracing(&mut prng, &temp1).unwrap();
@@ -229,7 +229,10 @@ mod smoke_xfr {
         assert!(recv_bar1.asset_type.is_confidential());
         assert_eq!(recv_oar1.asset_type, ASSET1_TYPE);
         assert_eq!(recv_oar1.amount, amount_out1);
-        assert_eq!(&recv_oar1.blind_asset_record.public_key, &receiver1.pub_key);
+        assert_eq!(
+            &recv_oar1.blind_asset_record.public_key,
+            &receiver1.get_pk()
+        );
 
         let recv_bar2 = &xfr_note.body.outputs[1];
         let recv_memo2 = &xfr_note.body.owners_memos[1];
@@ -239,7 +242,7 @@ mod smoke_xfr {
         assert!(!recv_bar2.asset_type.is_confidential());
         assert_eq!(recv_oar2.asset_type, ASSET1_TYPE);
         assert_eq!(recv_oar2.amount, amount_out2);
-        assert_eq!(recv_oar2.blind_asset_record.public_key, receiver2.pub_key);
+        assert_eq!(recv_oar2.blind_asset_record.public_key, receiver2.get_pk());
 
         let recv_bar3 = &xfr_note.body.outputs[2];
         let recv_memo3 = &xfr_note.body.owners_memos[2];
@@ -249,7 +252,7 @@ mod smoke_xfr {
         assert!(recv_bar3.asset_type.is_confidential());
         assert_eq!(recv_oar3.asset_type, ASSET2_TYPE);
         assert_eq!(recv_oar3.amount, amount_out3);
-        assert_eq!(recv_oar3.blind_asset_record.public_key, receiver3.pub_key);
+        assert_eq!(recv_oar3.blind_asset_record.public_key, receiver3.get_pk());
 
         let recv_bar4 = &xfr_note.body.outputs[3];
         let recv_memo4 = &xfr_note.body.owners_memos[3];
@@ -259,6 +262,6 @@ mod smoke_xfr {
         assert!(!recv_bar4.asset_type.is_confidential());
         assert_eq!(recv_oar4.asset_type, ASSET3_TYPE);
         assert_eq!(recv_oar4.amount, amount_out4);
-        assert_eq!(recv_oar4.blind_asset_record.public_key, receiver4.pub_key);
+        assert_eq!(recv_oar4.blind_asset_record.public_key, receiver4.get_pk());
     }
 }
