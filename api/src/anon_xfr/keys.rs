@@ -16,7 +16,7 @@ use wasm_bindgen::prelude::*;
 /// The length of the secret key for anonymous transfer.
 pub const AXFR_SECRET_KEY_LENGTH: usize = 33; // keytype + Bytes
 /// The length of the public key for anonymous transfer.
-pub const AXFR_PUBLIC_KEY_LENGTH: usize = 33; // keytype (+positive) + Bytes
+pub const AXFR_PUBLIC_KEY_LENGTH: usize = 34; // keytype + Bytes
 
 /// The spending key.
 #[derive(Debug)]
@@ -74,15 +74,16 @@ impl Hash for AXfrSecretKey {
 
 impl NoahFromToBytes for AXfrSecretKey {
     fn noah_to_bytes(&self) -> Vec<u8> {
-        let mut bytes = Vec::with_capacity(AXFR_SECRET_KEY_LENGTH);
+        let mut bytes = vec![0u8; AXFR_SECRET_KEY_LENGTH];
         match self {
             AXfrSecretKey::Ed25519(p) => {
                 bytes[0] = 0;
+                bytes[1..AXFR_SECRET_KEY_LENGTH].copy_from_slice(p.as_bytes());
                 bytes.extend(p.as_bytes());
             }
             AXfrSecretKey::Secp256k1(p) => {
                 bytes[0] = 1;
-                bytes.append(&mut p.noah_to_bytes());
+                bytes[1..AXFR_SECRET_KEY_LENGTH].copy_from_slice(&p.noah_to_bytes());
             }
         }
         bytes
@@ -141,14 +142,15 @@ impl Hash for AXfrPubKeyInner {
 
 impl NoahFromToBytes for AXfrPubKey {
     fn noah_to_bytes(&self) -> Vec<u8> {
-        let mut bytes = Vec::with_capacity(AXFR_PUBLIC_KEY_LENGTH);
+        let mut bytes = vec![0u8; AXFR_PUBLIC_KEY_LENGTH];
         match self.inner() {
             AXfrPubKeyInner::Ed25519(p) => {
-                bytes[0] = u8::MAX;
-                bytes.extend(p.as_bytes()); // 32
+                bytes[0] = 0;
+                bytes[1..33].copy_from_slice(p.as_bytes());
             }
             AXfrPubKeyInner::Secp256k1(p) => {
-                bytes.extend(p.to_compressed_bytes()); // 33
+                bytes[0] = 1;
+                bytes[1..34].copy_from_slice(&p.to_compressed_bytes());
             }
         }
         bytes
@@ -159,11 +161,11 @@ impl NoahFromToBytes for AXfrPubKey {
             Err(eg!(NoahError::DeserializationError))
         } else {
             match bytes[0] {
-                u8::MAX => match Ed25519PublicKey::from_bytes(&bytes[1..]) {
+                0 => match Ed25519PublicKey::from_bytes(&bytes[1..]) {
                     Ok(g) => Ok(AXfrPubKey(AXfrPubKeyInner::Ed25519(g))),
                     _ => Err(eg!(NoahError::ParameterError)),
                 },
-                _ => match SECP256K1G1::from_compressed_bytes(bytes) {
+                _ => match SECP256K1G1::from_compressed_bytes(&bytes[1..]) {
                     Ok(g) => Ok(AXfrPubKey(AXfrPubKeyInner::Secp256k1(g))),
                     _ => Err(eg!(NoahError::ParameterError)),
                 },
