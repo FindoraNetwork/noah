@@ -1,7 +1,7 @@
 use noah_algebra::bls12_381::BLSPairingEngine;
 use noah_algebra::bls12_381::BLSG2;
 use noah_algebra::{
-    bls12_381::{BLSFr, BLSG1},
+    bls12_381::{BLSScalar, BLSG1},
     prelude::*,
     traits::Pairing,
 };
@@ -12,7 +12,7 @@ use noah_crypto::{
 
 type G1 = BLSG1;
 type G2 = BLSG2;
-type S = BLSFr;
+type S = BLSScalar;
 
 /// The isssuer's public key.
 pub type ACIssuerPublicKey = noah_crypto::anon_creds::CredentialIssuerPK<G1, G2>;
@@ -80,7 +80,7 @@ pub fn ac_keygen_user<R: CryptoRng + RngCore>(
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
 /// use noah::anon_creds::{ac_keygen_issuer,ac_keygen_user, ac_sign};
-/// use noah_algebra::bls12_381::BLSFr;
+/// use noah_algebra::bls12_381::BLSScalar;
 /// use noah_algebra::traits::Scalar;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 2;
@@ -95,7 +95,7 @@ pub fn ac_sign<R: CryptoRng + RngCore>(
     user_pk: &ACUserPublicKey,
     attrs: &[Attr],
 ) -> Result<ACSignature> {
-    let attrs_scalar: Vec<BLSFr> = attrs.iter().map(|x| BLSFr::from(*x)).collect();
+    let attrs_scalar: Vec<BLSScalar> = attrs.iter().map(|x| BLSScalar::from(*x)).collect();
     noah_crypto::anon_creds::grant_credential::<_, BLSPairingEngine>(
         prng,
         issuer_sk,
@@ -124,7 +124,7 @@ pub fn ac_keygen_commitment<R: CryptoRng + RngCore>(prng: &mut R) -> ACCommitmen
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
 /// use noah::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_commit, Credential};
-/// use noah_algebra::bls12_381::BLSFr;
+/// use noah_algebra::bls12_381::BLSScalar;
 /// use noah_algebra::traits::Scalar;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 2;
@@ -158,7 +158,7 @@ pub fn ac_commit<R: CryptoRng + RngCore>(
         attrs: credential
             .attrs
             .iter()
-            .map(|x| BLSFr::from(*x))
+            .map(|x| BLSScalar::from(*x))
             .collect_vec(),
         ipk: credential.ipk.clone(),
     };
@@ -174,7 +174,7 @@ pub fn ac_commit<R: CryptoRng + RngCore>(
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
 /// use noah::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_commit, ac_keygen_commitment, ac_commit_with_key, Credential};
-/// use noah_algebra::bls12_381::BLSFr;
+/// use noah_algebra::bls12_381::BLSScalar;
 /// use noah_algebra::traits::Scalar;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 2;
@@ -209,7 +209,7 @@ pub fn ac_commit_with_key<R: CryptoRng + RngCore>(
         attrs: credential
             .attrs
             .iter()
-            .map(|x| BLSFr::from(*x))
+            .map(|x| BLSScalar::from(*x))
             .collect_vec(),
         ipk: credential.ipk.clone(),
     };
@@ -266,7 +266,7 @@ pub fn ac_open_commitment<R: CryptoRng + RngCore>(
         attrs: credential
             .attrs
             .iter()
-            .map(|a| BLSFr::from(*a))
+            .map(|a| BLSScalar::from(*a))
             .collect_vec(),
         ipk: credential.ipk.clone(),
     };
@@ -289,7 +289,7 @@ pub fn ac_reveal<R: CryptoRng + RngCore>(
         attrs: credential
             .attrs
             .iter()
-            .map(|a| BLSFr::from(*a))
+            .map(|a| BLSScalar::from(*a))
             .collect_vec(),
         ipk: credential.ipk.clone(),
     };
@@ -307,7 +307,7 @@ pub fn ac_reveal<R: CryptoRng + RngCore>(
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
 /// use noah_algebra::traits::Scalar;
-/// use noah_algebra::bls12_381::BLSFr;
+/// use noah_algebra::bls12_381::BLSScalar;
 /// use noah::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_open_commitment, ac_verify, ac_reveal, Credential};
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 2;
@@ -338,7 +338,7 @@ pub fn ac_verify(
     let attrs_scalar: Vec<Attribute<S>> = attrs
         .iter()
         .map(|attr| match attr {
-            Some(x) => Attribute::Revealed(BLSFr::from(*x)),
+            Some(x) => Attribute::Revealed(BLSScalar::from(*x)),
             None => Attribute::Hidden(None),
         })
         .collect();
@@ -369,7 +369,7 @@ pub type ConfidentialAC = noah_crypto::confidential_anon_creds::ConfidentialAC<G
 /// use noah::anon_creds::{ac_confidential_open_commitment, ac_confidential_verify, ac_confidential_gen_encryption_keys};
 /// use rand_chacha::ChaChaRng;
 /// use rand_core::SeedableRng;
-/// use noah_algebra::bls12_381::{BLSFr };
+/// use noah_algebra::bls12_381::{BLSScalar };
 /// use noah_algebra::traits::Group;
 /// use noah::anon_creds::Credential;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
@@ -400,7 +400,7 @@ pub fn ac_confidential_open_commitment<R: CryptoRng + RngCore>(
     let attrs_scalar = credential
         .attrs
         .iter()
-        .map(|x| BLSFr::from(*x))
+        .map(|x| BLSScalar::from(*x))
         .collect_vec();
     let c = noah_crypto::anon_creds::Credential {
         sig: credential.sig.clone(),

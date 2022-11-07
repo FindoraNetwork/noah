@@ -11,7 +11,7 @@ use crate::{
     xfr::structs::{AssetType, ASSET_TYPE_LENGTH},
 };
 use noah_algebra::{
-    bls12_381::{BLSFr, BLS12_381_SCALAR_LEN},
+    bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN},
     collections::HashMap,
     prelude::*,
 };
@@ -50,7 +50,7 @@ pub const FEE_TYPE: AssetType = ASSET_TYPE_FRA;
 /// A constant 2^{32}.
 pub const TWO_POW_32: u64 = 1 << 32;
 
-pub(crate) type TurboPlonkCS = TurboCS<BLSFr>;
+pub(crate) type TurboPlonkCS = TurboCS<BLSScalar>;
 
 /// The Plonk proof type.
 pub(crate) type AXfrPlonkPf = PlonkPf<KZGCommitmentSchemeBLS>;
@@ -138,7 +138,7 @@ pub fn parse_memo(
     bytes: &[u8],
     key_pair: &AXfrKeyPair,
     abar: &AnonAssetRecord,
-) -> Result<(u64, AssetType, BLSFr)> {
+) -> Result<(u64, AssetType, BLSScalar)> {
     if bytes.len() != 8 + ASSET_TYPE_LENGTH + BLS12_381_SCALAR_LEN {
         return Err(eg!(NoahError::ParameterError));
     }
@@ -148,8 +148,8 @@ pub fn parse_memo(
     asset_type_array.copy_from_slice(&bytes[i..i + ASSET_TYPE_LENGTH]);
     let asset_type = AssetType(asset_type_array);
     i += ASSET_TYPE_LENGTH;
-    let blind =
-        BLSFr::from_bytes(&bytes[i..i + BLS12_381_SCALAR_LEN]).c(d!(NoahError::ParameterError))?;
+    let blind = BLSScalar::from_bytes(&bytes[i..i + BLS12_381_SCALAR_LEN])
+        .c(d!(NoahError::ParameterError))?;
 
     let (expected_commitment, _) = commit(
         &key_pair.get_public_key(),
@@ -174,7 +174,7 @@ pub fn decrypt_memo(
     memo: &AxfrOwnerMemo,
     key_pair: &AXfrKeyPair,
     abar: &AnonAssetRecord,
-) -> Result<(u64, AssetType, BLSFr)> {
+) -> Result<(u64, AssetType, BLSScalar)> {
     let plaintext = memo.decrypt(&key_pair.get_secret_key())?;
     parse_memo(&plaintext, key_pair, abar)
 }
@@ -183,19 +183,19 @@ pub fn decrypt_memo(
 pub fn nullify(
     key_pair: &AXfrKeyPair,
     amount: u64,
-    asset_type_scalar: BLSFr,
+    asset_type_scalar: BLSScalar,
     uid: u64,
-) -> Result<(BLSFr, AnemoiVLHTrace<BLSFr, 2, 12>)> {
+) -> Result<(BLSScalar, AnemoiVLHTrace<BLSScalar, 2, 12>)> {
     let pub_key = key_pair.get_public_key();
 
-    let pow_2_64 = BLSFr::from(u64::MAX).add(&BLSFr::from(1u32));
-    let uid_shifted = BLSFr::from(uid).mul(&pow_2_64);
-    let uid_amount = uid_shifted.add(&BLSFr::from(amount));
+    let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::from(1u32));
+    let uid_shifted = BLSScalar::from(uid).mul(&pow_2_64);
+    let uid_amount = uid_shifted.add(&BLSScalar::from(amount));
 
     let public_key_scalars = pub_key.get_public_key_scalars()?;
     let secret_key_scalars = key_pair.get_secret_key().get_secret_key_scalars()?;
 
-    let zero = BLSFr::zero();
+    let zero = BLSScalar::zero();
 
     let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
         zero,                  /* protocol version number */
@@ -226,7 +226,7 @@ pub fn commit_in_cs(
     amount_var: VarIndex,
     asset_var: VarIndex,
     public_key_scalars: &[VarIndex; 3],
-    trace: &AnemoiVLHTrace<BLSFr, 2, 12>,
+    trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
 ) -> VarIndex {
     let output_var = cs.new_variable(trace.output);
     let zero_var = cs.zero_var();
@@ -251,17 +251,17 @@ pub fn commit_in_cs(
 /// Compute the record's amount||asset type||pub key commitment
 pub fn commit(
     public_key: &AXfrPubKey,
-    blind: BLSFr,
+    blind: BLSScalar,
     amount: u64,
-    asset_type_scalar: BLSFr,
-) -> Result<(Commitment, AnemoiVLHTrace<BLSFr, 2, 12>)> {
-    let zero = BLSFr::zero();
+    asset_type_scalar: BLSScalar,
+) -> Result<(Commitment, AnemoiVLHTrace<BLSScalar, 2, 12>)> {
+    let zero = BLSScalar::zero();
     let public_key_scalars = public_key.get_public_key_scalars()?;
 
     let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
         zero, /* protocol version number */
         blind,
-        BLSFr::from(amount),
+        BLSScalar::from(amount),
         asset_type_scalar,
         zero,                  /* address format number */
         public_key_scalars[0], /* public key */
@@ -279,7 +279,7 @@ pub(crate) fn nullify_in_cs(
     uid_amount: VarIndex,
     asset_type: VarIndex,
     public_key_scalars: &[VarIndex; 3],
-    trace: &AnemoiVLHTrace<BLSFr, 2, 12>,
+    trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
 ) -> VarIndex {
     let output_var = cs.new_variable(trace.output);
     let zero_var = cs.zero_var();
@@ -311,15 +311,15 @@ pub fn add_merkle_path_variables(cs: &mut TurboPlonkCS, path: MTPath) -> MerkleP
             left: cs.new_variable(node.left),
             mid: cs.new_variable(node.mid),
             right: cs.new_variable(node.right),
-            is_left_child: cs.new_variable(BLSFr::from(node.is_left_child as u32)),
-            is_mid_child: cs.new_variable(BLSFr::from(node.is_mid_child as u32)),
-            is_right_child: cs.new_variable(BLSFr::from(node.is_right_child as u32)),
+            is_left_child: cs.new_variable(BLSScalar::from(node.is_left_child as u32)),
+            is_mid_child: cs.new_variable(BLSScalar::from(node.is_mid_child as u32)),
+            is_right_child: cs.new_variable(BLSScalar::from(node.is_right_child as u32)),
         })
         .collect();
     // Boolean-constrain `is_left_child` and `is_right_child`
     for node_var in path_vars.iter() {
-        let zero = BLSFr::zero();
-        let one = BLSFr::one();
+        let zero = BLSScalar::zero();
+        let one = BLSScalar::one();
         cs.push_add_selectors(zero, one, one, one);
         cs.push_mul_selectors(zero, zero);
         cs.push_constant_selector(one.neg());
@@ -354,8 +354,8 @@ fn check_merkle_tree_validity(
     is_mid_child: VarIndex,
     is_right_child: VarIndex,
 ) {
-    let zero = BLSFr::zero();
-    let one = BLSFr::one();
+    let zero = BLSScalar::zero();
+    let one = BLSScalar::one();
 
     let sum = if cs.witness[is_right_child].is_one() {
         zero
@@ -403,8 +403,8 @@ pub fn compute_merkle_root_variables(
     cs: &mut TurboPlonkCS,
     elem: AccElemVars,
     path_vars: &MerklePathVars,
-    leaf_trace: &AnemoiVLHTrace<BLSFr, 2, 12>,
-    traces: &Vec<JiveTrace<BLSFr, 2, 12>>,
+    leaf_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
+    traces: &Vec<JiveTrace<BLSScalar, 2, 12>>,
 ) -> VarIndex {
     let (uid, commitment) = (elem.uid, elem.commitment);
 

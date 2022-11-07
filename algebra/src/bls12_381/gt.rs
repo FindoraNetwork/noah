@@ -1,4 +1,4 @@
-use crate::bls12_381::{BLSFr, BLSPairingEngine, BLSG1, BLSG2};
+use crate::bls12_381::{BLSPairingEngine, BLSScalar, BLSG1, BLSG2};
 use crate::errors::AlgebraError;
 use crate::prelude::{derive_prng_from_hash, *};
 use crate::traits::Pairing;
@@ -47,10 +47,10 @@ impl<'a> Sub<&'a BLSGt> for BLSGt {
     }
 }
 
-impl<'a> Mul<&'a BLSFr> for BLSGt {
+impl<'a> Mul<&'a BLSScalar> for BLSGt {
     type Output = BLSGt;
 
-    fn mul(self, rhs: &'a BLSFr) -> Self::Output {
+    fn mul(self, rhs: &'a BLSScalar) -> Self::Output {
         let mut acc = Self::get_identity();
 
         // This is a simple double-and-add implementation of group element
@@ -96,7 +96,7 @@ impl<'a> SubAssign<&'a BLSGt> for BLSGt {
 }
 
 impl Group for BLSGt {
-    type ScalarType = BLSFr;
+    type ScalarType = BLSScalar;
 
     const COMPRESSED_LEN: usize = 576;
 
@@ -117,7 +117,7 @@ impl Group for BLSGt {
 
     #[inline]
     fn random<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
-        Self::get_base().mul(&BLSFr::random(prng))
+        Self::get_base().mul(&BLSScalar::random(prng))
     }
 
     #[inline]

@@ -34,14 +34,14 @@ use noah_algebra::prelude::*;
 /// use noah_plonk::poly_commit::kzg_poly_com::KZGCommitmentScheme;
 /// use merlin::Transcript;
 /// use rand_chacha::ChaChaRng;
-/// use noah_algebra::{prelude::*, bls12_381::BLSFr};
+/// use noah_algebra::{prelude::*, bls12_381::BLSScalar};
 ///
 /// let mut prng = ChaChaRng::from_seed([0u8; 32]);
 /// let pcs = KZGCommitmentScheme::new(20, &mut prng);
 /// let mut cs = TurboCS::new();
 ///
 /// // circuit (x_0 + x_1);
-/// let one = BLSFr::one();
+/// let one = BLSScalar::one();
 /// let two = one.add(&one);
 /// let three = two.add(&one);
 /// let var_one = cs.new_variable(one);

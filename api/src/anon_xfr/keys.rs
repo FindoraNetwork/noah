@@ -3,7 +3,7 @@ use core::hash::{Hash, Hasher};
 use digest::{generic_array::GenericArray, Digest};
 use ed25519_dalek::{PublicKey as Ed25519PublicKey, SecretKey as Ed25519SecretKey};
 use noah_algebra::{
-    bls12_381::BLSFr,
+    bls12_381::BLSScalar,
     cmp::Ordering,
     prelude::*,
     secp256k1::{SECP256K1Scalar, SECP256K1G1},
@@ -219,14 +219,14 @@ impl AXfrKeyPair {
 
 impl AXfrSecretKey {
     /// Return the BLS12-381 scalar representation of the secret key.
-    pub fn get_secret_key_scalars(&self) -> Result<[BLSFr; 2]> {
+    pub fn get_secret_key_scalars(&self) -> Result<[BLSScalar; 2]> {
         let bytes = match self {
             AXfrSecretKey::Ed25519(sk) => sk.as_bytes().to_vec(),
             AXfrSecretKey::Secp256k1(sk) => sk.to_bytes(),
         };
 
-        let first = BLSFr::from_bytes(&bytes[0..31])?;
-        let second = BLSFr::from_bytes(&bytes[31..])?;
+        let first = BLSScalar::from_bytes(&bytes[0..31])?;
+        let second = BLSScalar::from_bytes(&bytes[31..])?;
 
         Ok([first, second])
     }
@@ -291,7 +291,7 @@ impl AXfrPubKey {
     }
 
     /// Return the BLS12-381 scalar representation of the public key.
-    pub fn get_public_key_scalars(&self) -> Result<[BLSFr; 3]> {
+    pub fn get_public_key_scalars(&self) -> Result<[BLSScalar; 3]> {
         let bytes = match self.inner() {
             AXfrPubKeyInner::Ed25519(_pk) => {
                 unimplemented!();
@@ -306,9 +306,9 @@ impl AXfrPubKey {
                 .collect::<Vec<u8>>(),
         };
 
-        let first = BLSFr::from_bytes(&bytes[0..31])?;
-        let second = BLSFr::from_bytes(&bytes[31..62])?;
-        let third = BLSFr::from_bytes(&bytes[62..])?;
+        let first = BLSScalar::from_bytes(&bytes[0..31])?;
+        let second = BLSScalar::from_bytes(&bytes[31..62])?;
+        let third = BLSScalar::from_bytes(&bytes[62..])?;
 
         Ok([first, second, third])
     }
