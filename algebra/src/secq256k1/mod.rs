@@ -1,6 +1,3 @@
-/// The number of bytes for a scalar value over secp256k1
-pub const SECP256K1_SCALAR_LEN: usize = 32;
-
 mod fr;
 pub use fr::*;
 
@@ -10,29 +7,32 @@ pub use fq::*;
 mod g1;
 pub use g1::*;
 
+/// The number of bytes for a scalar value over the secq256k1 curve
+pub const SECQ256K1_SCALAR_LEN: usize = 32;
+
 #[cfg(test)]
-mod secp256k1_groups_test {
+mod secq256k1_groups_test {
     use crate::{
         prelude::*,
-        secp256k1::{SECP256K1Scalar, SECP256K1G1},
+        secq256k1::{SECQ256K1Scalar, SECQ256K1G1},
         traits::group_tests::{test_scalar_operations, test_scalar_serialization},
     };
-    use ark_bulletproofs::curve::secp256k1::G1Affine;
+    use ark_bulletproofs::curve::secq256k1::G1Affine;
     use ark_ec::ProjectiveCurve;
 
     #[test]
     fn test_scalar_ops() {
-        test_scalar_operations::<SECP256K1Scalar>();
+        test_scalar_operations::<SECQ256K1Scalar>();
     }
 
     #[test]
     fn scalar_deser() {
-        test_scalar_serialization::<SECP256K1Scalar>();
+        test_scalar_serialization::<SECQ256K1Scalar>();
     }
 
     #[test]
     fn scalar_from_to_bytes() {
-        let small_value = SECP256K1Scalar::from(165747u32);
+        let small_value = SECQ256K1Scalar::from(165747u32);
         let small_value_bytes = small_value.to_bytes();
         let expected_small_value_bytes: [u8; 32] = [
             115, 135, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -40,7 +40,7 @@ mod secp256k1_groups_test {
         ];
         assert_eq!(small_value_bytes, expected_small_value_bytes);
 
-        let small_value_from_bytes = SECP256K1Scalar::from_bytes(&small_value_bytes).unwrap();
+        let small_value_from_bytes = SECQ256K1Scalar::from_bytes(&small_value_bytes).unwrap();
         assert_eq!(small_value_from_bytes, small_value);
     }
 
@@ -48,12 +48,12 @@ mod secp256k1_groups_test {
     fn curve_points_respresentation_of_g1() {
         let mut prng = test_rng();
 
-        let g1 = SECP256K1G1::get_base();
-        let s1 = SECP256K1Scalar::from(50 + prng.next_u32() % 50);
+        let g1 = SECQ256K1G1::get_base();
+        let s1 = SECQ256K1Scalar::from(50 + prng.next_u32() % 50);
 
         let g1 = g1.mul(&s1);
 
-        let g1_prime = SECP256K1G1::random(&mut prng);
+        let g1_prime = SECQ256K1G1::random(&mut prng);
 
         // This is the projective representation of g1
         let g1_projective = g1.0;
@@ -77,9 +77,9 @@ mod secp256k1_groups_test {
     fn test_serialization_of_points() {
         let mut prng = test_rng();
 
-        let g1 = SECP256K1G1::random(&mut prng);
+        let g1 = SECQ256K1G1::random(&mut prng);
         let g1_bytes = g1.to_compressed_bytes();
-        let g1_recovered = SECP256K1G1::from_compressed_bytes(&g1_bytes).unwrap();
+        let g1_recovered = SECQ256K1G1::from_compressed_bytes(&g1_bytes).unwrap();
         assert_eq!(g1, g1_recovered);
     }
 }
