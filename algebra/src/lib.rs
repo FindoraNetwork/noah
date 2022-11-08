@@ -31,6 +31,9 @@ pub mod secq256k1;
 /// Module for the secp256k1 curve
 pub mod secp256k1;
 
+/// Module for the Zorro curve
+pub mod zorro;
+
 /// Module for error handling
 pub mod errors;
 
