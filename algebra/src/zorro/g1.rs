@@ -1,21 +1,21 @@
 use crate::errors::AlgebraError;
 use crate::prelude::*;
-use crate::secq256k1::SECQ256K1Scalar;
-use ark_bulletproofs::curve::secq256k1::{FrParameters, G1Affine, G1Projective};
+use crate::zorro::ZorroScalar;
+use ark_bulletproofs::curve::zorro::{FrParameters, G1Affine, G1Projective};
 use ark_ec::{AffineCurve, ProjectiveCurve};
 use ark_ff::{FftParameters, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::fmt::{Debug, Formatter};
 use digest::consts::U64;
 use digest::Digest;
-use wasm_bindgen::prelude::*;
+use wasm_bindgen::prelude::wasm_bindgen;
 
-/// The wrapped struct for `ark_bulletproofs::curve::secq256k1::G1Projective`
+/// The wrapped struct for `ark_bulletproofs::curve::zorro::G1Projective`
 #[wasm_bindgen]
 #[derive(Copy, Default, Clone, PartialEq, Eq)]
-pub struct SECQ256K1G1(pub(crate) G1Projective);
+pub struct ZorroG1(pub(crate) G1Projective);
 
-impl Neg for SECQ256K1G1 {
+impl Neg for ZorroG1 {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
@@ -23,14 +23,74 @@ impl Neg for SECQ256K1G1 {
     }
 }
 
-impl Debug for SECQ256K1G1 {
+impl Debug for ZorroG1 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         Debug::fmt(&self.0.into_affine(), f)
     }
 }
 
-impl Group for SECQ256K1G1 {
-    type ScalarType = SECQ256K1Scalar;
+impl ZorroG1 {
+    /// Get the raw data.
+    pub fn get_raw(&self) -> G1Affine {
+        self.0.into_affine()
+    }
+
+    /// From the raw data.
+    pub fn from_raw(raw: G1Affine) -> Self {
+        Self(raw.into_projective())
+    }
+}
+
+impl<'a> Add<&'a ZorroG1> for ZorroG1 {
+    type Output = ZorroG1;
+
+    #[inline]
+    fn add(self, rhs: &Self) -> Self::Output {
+        Self(self.0.add(&rhs.0))
+    }
+}
+
+impl<'a> Sub<&'a ZorroG1> for ZorroG1 {
+    type Output = ZorroG1;
+
+    #[inline]
+    fn sub(self, rhs: &Self) -> Self::Output {
+        Self(self.0.sub(&rhs.0))
+    }
+}
+
+impl<'a> Mul<&'a ZorroScalar> for ZorroG1 {
+    type Output = ZorroG1;
+
+    #[inline]
+    fn mul(self, rhs: &ZorroScalar) -> Self::Output {
+        Self(self.0.mul(&rhs.0.into_repr()))
+    }
+}
+
+impl<'a> AddAssign<&'a ZorroG1> for ZorroG1 {
+    #[inline]
+    fn add_assign(&mut self, rhs: &'a ZorroG1) {
+        self.0.add_assign(&rhs.0)
+    }
+}
+
+impl<'a> SubAssign<&'a ZorroG1> for ZorroG1 {
+    #[inline]
+    fn sub_assign(&mut self, rhs: &'a ZorroG1) {
+        self.0.sub_assign(&rhs.0)
+    }
+}
+
+impl<'a> MulAssign<&'a ZorroScalar> for ZorroG1 {
+    #[inline]
+    fn mul_assign(&mut self, rhs: &'a ZorroScalar) {
+        self.0.mul_assign(rhs.0.clone())
+    }
+}
+
+impl Group for ZorroG1 {
+    type ScalarType = ZorroScalar;
     const COMPRESSED_LEN: usize = 33;
 
     #[inline]
@@ -50,7 +110,7 @@ impl Group for SECQ256K1G1 {
 
     #[inline]
     fn random<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
-        Self::get_base().mul(&SECQ256K1Scalar::random(prng))
+        Self::get_base().mul(&ZorroScalar::random(prng))
     }
 
     #[inline]
@@ -123,65 +183,5 @@ impl Group for SECQ256K1G1 {
         );
 
         Self(ark_ec::msm::VariableBase::msm(&points_raw, &scalars_raw))
-    }
-}
-
-impl SECQ256K1G1 {
-    /// Get the raw data.
-    pub fn get_raw(&self) -> G1Affine {
-        self.0.into_affine()
-    }
-
-    /// From the raw data.
-    pub fn from_raw(raw: G1Affine) -> Self {
-        Self(raw.into_projective())
-    }
-}
-
-impl<'a> Add<&'a SECQ256K1G1> for SECQ256K1G1 {
-    type Output = SECQ256K1G1;
-
-    #[inline]
-    fn add(self, rhs: &Self) -> Self::Output {
-        Self(self.0.add(&rhs.0))
-    }
-}
-
-impl<'a> Sub<&'a SECQ256K1G1> for SECQ256K1G1 {
-    type Output = SECQ256K1G1;
-
-    #[inline]
-    fn sub(self, rhs: &Self) -> Self::Output {
-        Self(self.0.sub(&rhs.0))
-    }
-}
-
-impl<'a> Mul<&'a SECQ256K1Scalar> for SECQ256K1G1 {
-    type Output = SECQ256K1G1;
-
-    #[inline]
-    fn mul(self, rhs: &SECQ256K1Scalar) -> Self::Output {
-        Self(self.0.mul(&rhs.0.into_repr()))
-    }
-}
-
-impl<'a> AddAssign<&'a SECQ256K1G1> for SECQ256K1G1 {
-    #[inline]
-    fn add_assign(&mut self, rhs: &'a SECQ256K1G1) {
-        self.0.add_assign(&rhs.0)
-    }
-}
-
-impl<'a> SubAssign<&'a SECQ256K1G1> for SECQ256K1G1 {
-    #[inline]
-    fn sub_assign(&mut self, rhs: &'a SECQ256K1G1) {
-        self.0.sub_assign(&rhs.0)
-    }
-}
-
-impl<'a> MulAssign<&'a SECQ256K1Scalar> for SECQ256K1G1 {
-    #[inline]
-    fn mul_assign(&mut self, rhs: &'a SECQ256K1Scalar) {
-        self.0.mul_assign(rhs.0.clone())
     }
 }

@@ -1,38 +1,39 @@
-use crate::jubjub::JUBJUB_SCALAR_LEN;
-use crate::{errors::AlgebraError, hash::Hash, prelude::*};
-use ark_ed_on_bls12_381::Fr;
+use crate::errors::AlgebraError;
+use crate::prelude::*;
+use ark_bulletproofs::curve::zorro::Fq;
 use ark_ff::{BigInteger, FftField, Field, FpParameters, PrimeField};
-use digest::{generic_array::typenum::U64, Digest};
+use digest::consts::U64;
+use digest::Digest;
 use num_bigint::BigUint;
 use num_traits::Num;
-use wasm_bindgen::prelude::wasm_bindgen;
+use wasm_bindgen::prelude::*;
 
-/// The wrapped struct for `ark_ed_on_bls12_381::Fr`
+/// The wrapped struct for `ark_bulletproofs::curve::zorro::Fq`
 #[wasm_bindgen]
 #[derive(Copy, Clone, PartialEq, Eq, Default, PartialOrd, Ord, Debug, Hash)]
-pub struct JubjubScalar(pub(crate) Fr);
+pub struct ZorroFq(pub(crate) Fq);
 
-impl One for JubjubScalar {
+impl One for ZorroFq {
     #[inline]
     fn one() -> Self {
-        Self(Fr::one())
+        Self(Fq::one())
     }
 }
 
-impl Zero for JubjubScalar {
+impl Zero for ZorroFq {
     #[inline]
     fn zero() -> Self {
-        Self(Fr::zero())
+        Self(Fq::zero())
     }
 
     #[inline]
     fn is_zero(&self) -> bool {
-        self.0.eq(&Fr::zero())
+        self.0.eq(&Fq::zero())
     }
 }
 
-impl Add for JubjubScalar {
-    type Output = JubjubScalar;
+impl Add for ZorroFq {
+    type Output = ZorroFq;
 
     #[inline]
     fn add(self, rhs: Self) -> Self::Output {
@@ -40,8 +41,8 @@ impl Add for JubjubScalar {
     }
 }
 
-impl Mul for JubjubScalar {
-    type Output = JubjubScalar;
+impl Mul for ZorroFq {
+    type Output = ZorroFq;
 
     #[inline]
     fn mul(self, rhs: Self) -> Self::Output {
@@ -49,15 +50,15 @@ impl Mul for JubjubScalar {
     }
 }
 
-impl Sum<JubjubScalar> for JubjubScalar {
+impl Sum<ZorroFq> for ZorroFq {
     #[inline]
-    fn sum<I: Iterator<Item = JubjubScalar>>(iter: I) -> Self {
+    fn sum<I: Iterator<Item = ZorroFq>>(iter: I) -> Self {
         iter.fold(Self::zero(), Add::add)
     }
 }
 
-impl<'a> Add<&'a JubjubScalar> for JubjubScalar {
-    type Output = JubjubScalar;
+impl<'a> Add<&'a ZorroFq> for ZorroFq {
+    type Output = ZorroFq;
 
     #[inline]
     fn add(self, rhs: &Self) -> Self::Output {
@@ -65,15 +66,15 @@ impl<'a> Add<&'a JubjubScalar> for JubjubScalar {
     }
 }
 
-impl<'a> AddAssign<&'a JubjubScalar> for JubjubScalar {
+impl<'a> AddAssign<&'a ZorroFq> for ZorroFq {
     #[inline]
     fn add_assign(&mut self, rhs: &Self) {
         (self.0).add_assign(&rhs.0);
     }
 }
 
-impl<'a> Mul<&'a JubjubScalar> for JubjubScalar {
-    type Output = JubjubScalar;
+impl<'a> Mul<&'a ZorroFq> for ZorroFq {
+    type Output = ZorroFq;
 
     #[inline]
     fn mul(self, rhs: &Self) -> Self::Output {
@@ -81,15 +82,15 @@ impl<'a> Mul<&'a JubjubScalar> for JubjubScalar {
     }
 }
 
-impl<'a> MulAssign<&'a JubjubScalar> for JubjubScalar {
+impl<'a> MulAssign<&'a ZorroFq> for ZorroFq {
     #[inline]
     fn mul_assign(&mut self, rhs: &Self) {
         (self.0).mul_assign(&rhs.0);
     }
 }
 
-impl<'a> Sub<&'a JubjubScalar> for JubjubScalar {
-    type Output = JubjubScalar;
+impl<'a> Sub<&'a ZorroFq> for ZorroFq {
+    type Output = ZorroFq;
 
     #[inline]
     fn sub(self, rhs: &Self) -> Self::Output {
@@ -97,22 +98,22 @@ impl<'a> Sub<&'a JubjubScalar> for JubjubScalar {
     }
 }
 
-impl<'a> SubAssign<&'a JubjubScalar> for JubjubScalar {
+impl<'a> SubAssign<&'a ZorroFq> for ZorroFq {
     #[inline]
     fn sub_assign(&mut self, rhs: &Self) {
         (self.0).sub_assign(&rhs.0);
     }
 }
 
-impl<'a> Sum<&'a JubjubScalar> for JubjubScalar {
+impl<'a> Sum<&'a ZorroFq> for ZorroFq {
     #[inline]
-    fn sum<I: Iterator<Item = &'a JubjubScalar>>(iter: I) -> Self {
+    fn sum<I: Iterator<Item = &'a ZorroFq>>(iter: I) -> Self {
         iter.fold(Self::zero(), Add::add)
     }
 }
 
-impl Neg for JubjubScalar {
-    type Output = JubjubScalar;
+impl Neg for ZorroFq {
+    type Output = ZorroFq;
 
     #[inline]
     fn neg(self) -> Self::Output {
@@ -120,38 +121,38 @@ impl Neg for JubjubScalar {
     }
 }
 
-impl From<u32> for JubjubScalar {
+impl From<u32> for ZorroFq {
     #[inline]
     fn from(value: u32) -> Self {
         Self::from(value as u64)
     }
 }
 
-impl From<u64> for JubjubScalar {
+impl From<u64> for ZorroFq {
     #[inline]
     fn from(value: u64) -> Self {
-        Self(Fr::from(value))
+        Self(Fq::from(value))
     }
 }
 
-impl Into<BigUint> for JubjubScalar {
+impl Into<BigUint> for ZorroFq {
     #[inline]
     fn into(self) -> BigUint {
         self.0.into_repr().into()
     }
 }
 
-impl<'a> From<&'a BigUint> for JubjubScalar {
+impl<'a> From<&'a BigUint> for ZorroFq {
     #[inline]
     fn from(src: &BigUint) -> Self {
-        Self(Fr::from(src.clone()))
+        Self(Fq::from(src.clone()))
     }
 }
 
-impl Scalar for JubjubScalar {
+impl Scalar for ZorroFq {
     #[inline]
     fn random<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
-        Self(Fr::rand(rng))
+        Self(Fq::rand(rng))
     }
 
     #[inline]
@@ -164,20 +165,21 @@ impl Scalar for JubjubScalar {
     }
 
     #[inline]
-    fn capacity() -> usize {
-        ark_ed_on_bls12_381::FrParameters::CAPACITY as usize
+    fn multiplicative_generator() -> Self {
+        Self(Fq::multiplicative_generator())
     }
 
     #[inline]
-    fn multiplicative_generator() -> Self {
-        Self(Fr::multiplicative_generator())
+    fn capacity() -> usize {
+        ark_bulletproofs::curve::zorro::FrParameters::CAPACITY as usize
     }
 
     #[inline]
     fn get_field_size_le_bytes() -> Vec<u8> {
         [
-            183, 44, 247, 214, 94, 14, 151, 208, 130, 16, 200, 204, 147, 32, 104, 166, 0, 59, 52,
-            1, 1, 59, 103, 6, 169, 175, 51, 101, 234, 180, 125, 14,
+            0xcb, 0xfe, 0x50, 0xea, 0x26, 0x8b, 0xbf, 0x51, 0xaa, 0x20, 0xc7, 0x20, 0xf0, 0x0d,
+            0x89, 0x36, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x01,
         ]
         .to_vec()
     }
@@ -185,7 +187,7 @@ impl Scalar for JubjubScalar {
     #[inline]
     fn get_field_size_biguint() -> BigUint {
         BigUint::from_str_radix(
-            "6554484396890773809930967563523245729705921265872317281365359162392183254199",
+            "115792089237316195423570985008687907853682756971699735333147980285963064639179",
             10,
         )
         .unwrap()
@@ -197,18 +199,19 @@ impl Scalar for JubjubScalar {
         let a1 = u8_le_slice_to_u64(&a[0..8]);
         let a2 = u8_le_slice_to_u64(&a[8..16]);
         let a3 = u8_le_slice_to_u64(&a[16..24]);
-        let a4 = u8_le_slice_to_u64(&a[24..]);
-        vec![a1, a2, a3, a4]
+        let a4 = u8_le_slice_to_u64(&a[24..32]);
+        let a5 = u8_le_slice_to_u64(&a[32..]);
+        vec![a1, a2, a3, a4, a5]
     }
 
     #[inline]
     fn bytes_len() -> usize {
-        JUBJUB_SCALAR_LEN
+        33
     }
 
     #[inline]
     fn to_bytes(&self) -> Vec<u8> {
-        (self.0).into_repr().to_bytes_le()
+        (self.0).into_repr().to_bytes_le()[..33].to_vec()
     }
 
     #[inline]
@@ -219,7 +222,7 @@ impl Scalar for JubjubScalar {
         let mut array = vec![0u8; Self::bytes_len()];
         array[0..bytes.len()].copy_from_slice(bytes);
 
-        Ok(Self(Fr::from_le_bytes_mod_order(bytes)))
+        Ok(Self(Fq::from_le_bytes_mod_order(bytes)))
     }
 
     #[inline]

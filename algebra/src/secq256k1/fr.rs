@@ -1,13 +1,9 @@
 use crate::errors::AlgebraError;
 use crate::prelude::*;
-use crate::prelude::{
-    derive_prng_from_hash, u8_le_slice_to_u64, CryptoRng, Group, RngCore, Scalar,
-};
-use crate::secq256k1::{SECQ256K1G1, SECQ256K1_SCALAR_LEN};
-use ark_bulletproofs::curve::secq256k1::{Fr, FrParameters, G1Affine, G1Projective};
-use ark_ec::ProjectiveCurve;
-use ark_ff::{BigInteger, BigInteger320, FftField, FftParameters, Field, FpParameters, PrimeField};
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use crate::prelude::{derive_prng_from_hash, u8_le_slice_to_u64, CryptoRng, RngCore, Scalar};
+use crate::secq256k1::SECQ256K1_SCALAR_LEN;
+use ark_bulletproofs::curve::secq256k1::Fr;
+use ark_ff::{BigInteger, BigInteger320, FftField, Field, FpParameters, PrimeField};
 use ark_std::fmt::{Debug, Formatter};
 use ark_std::iter::Sum;
 use ark_std::result::Result as StdResult;
@@ -274,111 +270,6 @@ impl SECQ256K1Scalar {
     /// From the raw data.
     pub fn from_raw(raw: Fr) -> Self {
         Self(raw)
-    }
-}
-
-impl Neg for SECQ256K1G1 {
-    type Output = Self;
-
-    fn neg(self) -> Self::Output {
-        Self(self.0.neg())
-    }
-}
-
-impl Group for SECQ256K1G1 {
-    type ScalarType = SECQ256K1Scalar;
-    const COMPRESSED_LEN: usize = 33;
-
-    #[inline]
-    fn double(&self) -> Self {
-        Self(ProjectiveCurve::double(&self.0))
-    }
-
-    #[inline]
-    fn get_identity() -> Self {
-        Self(G1Projective::zero())
-    }
-
-    #[inline]
-    fn get_base() -> Self {
-        Self(G1Projective::prime_subgroup_generator())
-    }
-
-    #[inline]
-    fn random<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
-        Self::get_base().mul(&SECQ256K1Scalar::random(prng))
-    }
-
-    #[inline]
-    fn to_compressed_bytes(&self) -> Vec<u8> {
-        let affine = G1Affine::from(self.0);
-        let mut buf = Vec::new();
-        affine.serialize(&mut buf).unwrap();
-
-        buf
-    }
-
-    #[inline]
-    fn to_unchecked_bytes(&self) -> Vec<u8> {
-        let affine = G1Affine::from(self.0);
-        let mut buf = Vec::new();
-        affine.serialize_unchecked(&mut buf).unwrap();
-
-        buf
-    }
-
-    #[inline]
-    fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
-        let mut reader = ark_std::io::BufReader::new(bytes);
-
-        let affine = G1Affine::deserialize(&mut reader);
-
-        if affine.is_ok() {
-            Ok(Self(G1Projective::from(affine.unwrap()))) // safe unwrap
-        } else {
-            Err(eg!(AlgebraError::DeserializationError))
-        }
-    }
-
-    #[inline]
-    fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
-        let mut reader = ark_std::io::BufReader::new(bytes);
-
-        let affine = G1Affine::deserialize_unchecked(&mut reader);
-
-        if affine.is_ok() {
-            Ok(Self(G1Projective::from(affine.unwrap()))) // safe unwrap
-        } else {
-            Err(eg!(AlgebraError::DeserializationError))
-        }
-    }
-
-    #[inline]
-    fn unchecked_size() -> usize {
-        let g = G1Affine::from(Self::get_base().0);
-        g.uncompressed_size()
-    }
-
-    #[inline]
-    fn from_hash<D>(hash: D) -> Self
-    where
-        D: Digest<OutputSize = U64> + Default,
-    {
-        let mut prng = derive_prng_from_hash::<D>(hash);
-        Self(G1Projective::rand(&mut prng))
-    }
-
-    #[inline]
-    fn multi_exp(scalars: &[&Self::ScalarType], points: &[&Self]) -> Self {
-        let scalars_raw = scalars
-            .iter()
-            .map(|r| r.0.into_repr())
-            .collect::<Vec<<FrParameters as FftParameters>::BigInt>>();
-        let points_raw = G1Projective::batch_normalization_into_affine(
-            &points.iter().map(|r| r.0).collect::<Vec<G1Projective>>(),
-        );
-
-        Self(ark_ec::msm::VariableBase::msm(&points_raw, &scalars_raw))
     }
 }
 
