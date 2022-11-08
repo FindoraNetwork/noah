@@ -1,24 +1,22 @@
 use crate::errors::AlgebraError;
 use crate::prelude::*;
+use crate::prelude::{
+    derive_prng_from_hash, u8_le_slice_to_u64, CryptoRng, Group, RngCore, Scalar,
+};
+use crate::secq256k1::{SECQ256K1G1, SECQ256K1_SCALAR_LEN};
 use ark_bulletproofs::curve::secq256k1::{Fr, FrParameters, G1Affine, G1Projective};
-use ark_ec::{AffineCurve, ProjectiveCurve};
+use ark_ec::ProjectiveCurve;
 use ark_ff::{BigInteger, BigInteger320, FftField, FftParameters, Field, FpParameters, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
-use ark_std::{
-    fmt::{Debug, Formatter},
-    ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign},
-    result::Result as StdResult,
-    str::FromStr,
-    One, UniformRand, Zero,
-};
-use digest::{generic_array::typenum::U64, Digest};
+use ark_std::fmt::{Debug, Formatter};
+use ark_std::iter::Sum;
+use ark_std::result::Result as StdResult;
+use ark_std::str::FromStr;
+use digest::consts::U64;
+use digest::Digest;
 use num_bigint::BigUint;
 use num_traits::Num;
-use ruc::eg;
 use wasm_bindgen::prelude::*;
-
-/// The number of bytes for a scalar value over the secq256k1 curve
-pub const SECQ256K1_SCALAR_LEN: usize = 32;
 
 /// The wrapped struct for `ark_bulletproofs::curve::secq256k1::Fr`
 #[wasm_bindgen]
@@ -33,18 +31,6 @@ impl Debug for SECQ256K1Scalar {
         )
     }
 }
-
-/// The wrapped struct for `ark_bulletproofs::curve::secq256k1::G1Projective`
-#[wasm_bindgen]
-#[derive(Copy, Default, Clone, PartialEq, Eq)]
-pub struct SECQ256K1G1(pub(crate) G1Projective);
-
-impl Debug for SECQ256K1G1 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        Debug::fmt(&self.0.into_affine(), f)
-    }
-}
-
 impl FromStr for SECQ256K1Scalar {
     type Err = AlgebraError;
 
@@ -408,139 +394,5 @@ impl<'a> From<&'a BigUint> for SECQ256K1Scalar {
     #[inline]
     fn from(value: &'a BigUint) -> Self {
         Self(Fr::from(value.clone()))
-    }
-}
-
-impl SECQ256K1G1 {
-    /// Get the raw data.
-    pub fn get_raw(&self) -> G1Affine {
-        self.0.into_affine()
-    }
-
-    /// From the raw data.
-    pub fn from_raw(raw: G1Affine) -> Self {
-        Self(raw.into_projective())
-    }
-}
-
-impl<'a> Add<&'a SECQ256K1G1> for SECQ256K1G1 {
-    type Output = SECQ256K1G1;
-
-    #[inline]
-    fn add(self, rhs: &Self) -> Self::Output {
-        Self(self.0.add(&rhs.0))
-    }
-}
-
-impl<'a> Sub<&'a SECQ256K1G1> for SECQ256K1G1 {
-    type Output = SECQ256K1G1;
-
-    #[inline]
-    fn sub(self, rhs: &Self) -> Self::Output {
-        Self(self.0.sub(&rhs.0))
-    }
-}
-
-impl<'a> Mul<&'a SECQ256K1Scalar> for SECQ256K1G1 {
-    type Output = SECQ256K1G1;
-
-    #[inline]
-    fn mul(self, rhs: &SECQ256K1Scalar) -> Self::Output {
-        Self(self.0.mul(&rhs.0.into_repr()))
-    }
-}
-
-impl<'a> AddAssign<&'a SECQ256K1G1> for SECQ256K1G1 {
-    #[inline]
-    fn add_assign(&mut self, rhs: &'a SECQ256K1G1) {
-        self.0.add_assign(&rhs.0)
-    }
-}
-
-impl<'a> SubAssign<&'a SECQ256K1G1> for SECQ256K1G1 {
-    #[inline]
-    fn sub_assign(&mut self, rhs: &'a SECQ256K1G1) {
-        self.0.sub_assign(&rhs.0)
-    }
-}
-
-impl<'a> MulAssign<&'a SECQ256K1Scalar> for SECQ256K1G1 {
-    #[inline]
-    fn mul_assign(&mut self, rhs: &'a SECQ256K1Scalar) {
-        self.0.mul_assign(rhs.0.clone())
-    }
-}
-
-#[cfg(test)]
-mod secq256k1_groups_test {
-    use crate::{
-        prelude::*,
-        secq256k1::{SECQ256K1Scalar, SECQ256K1G1},
-        traits::group_tests::{test_scalar_operations, test_scalar_serialization},
-    };
-    use ark_bulletproofs::curve::secq256k1::G1Affine;
-    use ark_ec::ProjectiveCurve;
-
-    #[test]
-    fn test_scalar_ops() {
-        test_scalar_operations::<SECQ256K1Scalar>();
-    }
-
-    #[test]
-    fn scalar_deser() {
-        test_scalar_serialization::<SECQ256K1Scalar>();
-    }
-
-    #[test]
-    fn scalar_from_to_bytes() {
-        let small_value = SECQ256K1Scalar::from(165747u32);
-        let small_value_bytes = small_value.to_bytes();
-        let expected_small_value_bytes: [u8; 32] = [
-            115, 135, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-            0, 0, 0, 0,
-        ];
-        assert_eq!(small_value_bytes, expected_small_value_bytes);
-
-        let small_value_from_bytes = SECQ256K1Scalar::from_bytes(&small_value_bytes).unwrap();
-        assert_eq!(small_value_from_bytes, small_value);
-    }
-
-    #[test]
-    fn curve_points_respresentation_of_g1() {
-        let mut prng = test_rng();
-
-        let g1 = SECQ256K1G1::get_base();
-        let s1 = SECQ256K1Scalar::from(50 + prng.next_u32() % 50);
-
-        let g1 = g1.mul(&s1);
-
-        let g1_prime = SECQ256K1G1::random(&mut prng);
-
-        // This is the projective representation of g1
-        let g1_projective = g1.0;
-        let g1_prime_projective = g1_prime.0;
-
-        // This is the affine representation of g1_prime
-        let g1_prime_affine = G1Affine::from(g1_prime_projective);
-
-        let g1_pr_plus_g1_prime_pr = g1_projective.add(&g1_prime_projective);
-
-        // These two operations correspond to summation of points,
-        // one in projective form and the other in affine form
-        let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_affine);
-        assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
-
-        let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_projective.into_affine());
-        assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
-    }
-
-    #[test]
-    fn test_serialization_of_points() {
-        let mut prng = test_rng();
-
-        let g1 = SECQ256K1G1::random(&mut prng);
-        let g1_bytes = g1.to_compressed_bytes();
-        let g1_recovered = SECQ256K1G1::from_compressed_bytes(&g1_bytes).unwrap();
-        assert_eq!(g1, g1_recovered);
     }
 }
