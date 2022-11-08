@@ -11,6 +11,7 @@ use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use digest::consts::U64;
 use digest::Digest;
+use crate::bls12_381::BLSScalar;
 
 /// The wrapped struct for `ark_ed_on_bls12_381::EdwardsProjective`
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -186,5 +187,21 @@ impl Neg for JubjubPoint {
 
     fn neg(self) -> Self::Output {
         Self(self.0.neg())
+    }
+}
+
+
+impl JubjubPoint {
+    /// Get the x-coordinate of the Jubjub affine point.
+    #[inline]
+    pub fn get_x(&self) -> BLSScalar {
+        let affine_point = AffinePoint::from(self.0);
+        BLSScalar(affine_point.x)
+    }
+    /// Get the y-coordinate of the Jubjub affine point.
+    #[inline]
+    pub fn get_y(&self) -> BLSScalar {
+        let affine_point = AffinePoint::from(self.0);
+        BLSScalar(affine_point.y)
     }
 }
