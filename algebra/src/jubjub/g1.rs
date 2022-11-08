@@ -1,3 +1,4 @@
+use crate::bls12_381::BLSScalar;
 use crate::errors::AlgebraError;
 use crate::jubjub::JubjubScalar;
 use crate::prelude::*;
@@ -11,7 +12,6 @@ use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use digest::consts::U64;
 use digest::Digest;
-use crate::bls12_381::BLSScalar;
 
 /// The wrapped struct for `ark_ed_on_bls12_381::EdwardsProjective`
 #[derive(Clone, PartialEq, Debug, Copy)]
@@ -189,7 +189,6 @@ impl Neg for JubjubPoint {
         Self(self.0.neg())
     }
 }
-
 
 impl JubjubPoint {
     /// Get the x-coordinate of the Jubjub affine point.
