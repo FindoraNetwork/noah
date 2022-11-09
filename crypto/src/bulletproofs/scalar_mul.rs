@@ -1,17 +1,19 @@
 //! Module for the Bulletproof scalar mul proof scheme
 //!
-use ark_bulletproofs::{BulletproofGens, PedersenGens};
+use ark_bulletproofs::curve::secq256k1;
 use ark_bulletproofs::{
     curve::secp256k1::{Fq, FrParameters, G1Affine},
     curve::secq256k1::G1Affine as G1AffineBig,
     r1cs::{LinearCombination, Prover, RandomizableConstraintSystem, Variable, Verifier},
 };
-use ark_bulletproofs::curve::secq256k1;
+use ark_bulletproofs::{BulletproofGens, PedersenGens};
 use ark_ec::{AffineCurve, ProjectiveCurve};
 use ark_ff::{BigInteger, Field, FpParameters, PrimeField};
 use digest::Digest;
 use merlin::Transcript;
-use noah_algebra::secq256k1::{PedersenCommitmentSecq256k1, Secq256k1BulletproofGens, SECQ256K1Proof, SECQ256K1Scalar};
+use noah_algebra::secq256k1::{
+    PedersenCommitmentSecq256k1, SECQ256K1Proof, SECQ256K1Scalar, Secq256k1BulletproofGens,
+};
 use noah_algebra::{
     prelude::*,
     secp256k1::{SECP256K1Scalar, SECP256K1G1},
