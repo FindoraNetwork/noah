@@ -12,7 +12,9 @@ use bulletproofs::RangeProof;
 use digest::Digest;
 use noah_algebra::{
     prelude::*,
-    ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoScalar, PedersenCommitmentRistretto},
+    ristretto::{
+        CompressedEdwardsY, CompressedRistretto, PedersenCommitmentRistretto, RistrettoScalar,
+    },
     secp256k1::{SECP256K1Scalar, SECP256K1G1},
     traits::PedersenCommitment,
 };

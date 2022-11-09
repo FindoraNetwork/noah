@@ -22,8 +22,8 @@ use merlin::Transcript;
 use noah_algebra::{
     bls12_381::BLSScalar,
     prelude::*,
+    ristretto::{PedersenCommitmentRistretto, RistrettoPoint, RistrettoScalar},
     traits::PedersenCommitment,
-    ristretto::{RistrettoPoint, RistrettoScalar, PedersenCommitmentRistretto},
 };
 use noah_crypto::basic::anemoi_jive::{
     AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS,

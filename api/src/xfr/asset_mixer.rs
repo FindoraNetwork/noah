@@ -278,8 +278,8 @@ mod test {
     use crate::xfr::asset_mixer::AssetMixingInstance;
     use noah_algebra::{
         prelude::*,
+        ristretto::{CompressedRistretto, PedersenCommitmentRistretto, RistrettoScalar},
         traits::PedersenCommitment,
-        ristretto::{CompressedRistretto, RistrettoScalar, PedersenCommitmentRistretto},
     };
 
     #[test]

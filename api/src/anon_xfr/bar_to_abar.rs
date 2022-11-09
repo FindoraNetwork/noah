@@ -14,8 +14,8 @@ use merlin::Transcript;
 use noah_algebra::{
     bls12_381::BLSScalar,
     prelude::*,
+    ristretto::{PedersenCommitmentRistretto, RistrettoPoint, RistrettoScalar},
     traits::PedersenCommitment,
-    ristretto::{RistrettoPoint, RistrettoScalar, PedersenCommitmentRistretto},
 };
 use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, AnemoiVLHTrace};
 use noah_crypto::{
@@ -645,7 +645,12 @@ mod test {
     };
     use crate::xfr::structs::AssetType;
     use merlin::Transcript;
-    use noah_algebra::{bls12_381::BLSScalar, prelude::*, traits::PedersenCommitment, ristretto::{RistrettoScalar, PedersenCommitmentRistretto}};
+    use noah_algebra::{
+        bls12_381::BLSScalar,
+        prelude::*,
+        ristretto::{PedersenCommitmentRistretto, RistrettoScalar},
+        traits::PedersenCommitment,
+    };
     use noah_crypto::{
         delegated_schnorr::prove_delegated_schnorr,
         field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto},

@@ -6,7 +6,7 @@ use merlin::Transcript;
 use noah_algebra::bls12_381::BLSScalar;
 use noah_algebra::prelude::*;
 use noah_algebra::secp256k1::SECP256K1Scalar;
-use noah_algebra::secq256k1::{SECQ256K1Scalar, SECQ256K1G1, PedersenCommitmentSecq256k1};
+use noah_algebra::secq256k1::{PedersenCommitmentSecq256k1, SECQ256K1Scalar, SECQ256K1G1};
 use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
 use noah_crypto::bulletproofs::scalar_mul::ScalarMulProof;
 use noah_crypto::delegated_schnorr::{

@@ -1,8 +1,6 @@
-use ark_bulletproofs::curve::secq256k1::G1Affine;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Read, SerializationError, Write};
 use crate::prelude::*;
 use crate::traits::PedersenCommitment;
-use serde::{Serialize, Deserialize};
+use ark_bulletproofs::curve::secq256k1::G1Affine;
 
 mod fr;
 pub use fr::*;
@@ -15,10 +13,7 @@ pub use g1::*;
 
 /// The wrapped struct for
 /// `ark_bulletproofs::r1cs::R1CSProof<ark_bulletproofs::curve::secq256k1::G1Affine>`
-#[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
-pub struct SECQ256K1Proof(
-    pub ark_bulletproofs::r1cs::R1CSProof<G1Affine>,
-);
+pub type SECQ256K1Proof = ark_bulletproofs::r1cs::R1CSProof<G1Affine>;
 
 #[allow(non_snake_case)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

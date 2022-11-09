@@ -54,7 +54,7 @@ pub struct ScalarMulProof(#[serde(with = "noah_obj_serde")] pub(crate) SECQ256K1
 
 impl PartialEq for ScalarMulProof {
     fn eq(&self, other: &ScalarMulProof) -> bool {
-        self.0 .0.to_bytes() == other.0 .0.to_bytes()
+        self.0.to_bytes() == other.0.to_bytes()
     }
 }
 
@@ -300,7 +300,7 @@ impl ScalarMulProof {
             .c(d!(NoahError::R1CSProofError))?;
 
         Ok((
-            ScalarMulProof(SECQ256K1Proof(proof)),
+            ScalarMulProof(proof),
             vec![
                 SECQ256K1G1::from_raw(x_comm.clone()),
                 SECQ256K1G1::from_raw(y_comm.clone()),
@@ -352,7 +352,7 @@ impl ScalarMulProof {
 
         let pc_gens_for_verifier = ark_bulletproofs::PedersenGens::from(&pc_gens);
         verifier
-            .verify(&self.0 .0, &pc_gens_for_verifier, &bp_gens)
+            .verify(&self.0, &pc_gens_for_verifier, &bp_gens)
             .c(d!(NoahError::R1CSProofError))?;
         Ok(())
     }

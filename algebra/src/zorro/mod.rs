@@ -1,5 +1,3 @@
-use ark_serialize::{CanonicalSerialize, CanonicalDeserialize, SerializationError, Read, Write};
-
 /// The number of bytes for a scalar value over Zorro
 pub const ZORRO_SCALAR_LEN: usize = 32;
 
@@ -14,10 +12,7 @@ pub use g1::*;
 
 /// The wrapped struct for
 /// `ark_bulletproofs::r1cs::R1CSProof<ark_bulletproofs::curve::zorro::G1Affine>`
-#[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
-pub struct ZorroProof(
-    pub ark_bulletproofs::r1cs::R1CSProof<ark_bulletproofs::curve::zorro::G1Affine>,
-);
+pub type ZorroProof = ark_bulletproofs::r1cs::R1CSProof<ark_bulletproofs::curve::zorro::G1Affine>;
 
 #[cfg(test)]
 mod zorro_groups_test {

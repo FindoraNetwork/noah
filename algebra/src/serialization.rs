@@ -8,7 +8,7 @@ use crate::{
     ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar},
     secp256k1::{SECP256K1Scalar, SECP256K1G1},
     secq256k1::{SECQ256K1Scalar, SECQ256K1G1},
-    zorro::{ZorroProof, ZorroFq, ZorroG1, ZorroScalar},
+    zorro::{ZorroFq, ZorroG1, ZorroProof, ZorroScalar},
 };
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::io::Cursor;
@@ -149,10 +149,8 @@ impl NoahFromToBytes for SECQ256K1Proof {
         cursor.into_inner()
     }
     fn noah_from_bytes(bytes: &[u8]) -> Result<SECQ256K1Proof> {
-        Ok(SECQ256K1Proof(
-            ark_bulletproofs::r1cs::R1CSProof::deserialize(bytes)
-                .map_err(|_| eg!(NoahError::DeserializationError))?,
-        ))
+        ark_bulletproofs::r1cs::R1CSProof::deserialize(bytes)
+            .map_err(|_| eg!(NoahError::DeserializationError))
     }
 }
 
@@ -163,10 +161,8 @@ impl NoahFromToBytes for ZorroProof {
         cursor.into_inner()
     }
     fn noah_from_bytes(bytes: &[u8]) -> Result<ZorroProof> {
-        Ok(ZorroProof(
-            ark_bulletproofs::r1cs::R1CSProof::deserialize(bytes)
-                .map_err(|_| eg!(NoahError::DeserializationError))?,
-        ))
+        ark_bulletproofs::r1cs::R1CSProof::deserialize(bytes)
+            .map_err(|_| eg!(NoahError::DeserializationError))
     }
 }
 

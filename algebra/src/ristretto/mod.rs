@@ -1,18 +1,17 @@
 use crate::fmt::{Debug, Formatter};
+use crate::traits::PedersenCommitment;
 use crate::{errors::AlgebraError, prelude::*};
 use byteorder::ByteOrder;
+use curve25519_dalek::traits::MultiscalarMul;
 use curve25519_dalek::{
     constants::{ED25519_BASEPOINT_POINT, RISTRETTO_BASEPOINT_POINT},
     edwards::{CompressedEdwardsY as CEY, EdwardsPoint},
     ristretto::{CompressedRistretto as CR, RistrettoPoint as RPoint},
     traits::Identity,
 };
-use curve25519_dalek::traits::MultiscalarMul;
 use digest::{generic_array::typenum::U64, Digest};
 use num_bigint::BigUint;
 use num_traits::Num;
-use serde::{Deserialize, Serialize};
-use crate::traits::PedersenCommitment;
 
 /// The number of bytes for a scalar value over BLS12-381
 pub const RISTRETTO_SCALAR_LEN: usize = 32;

@@ -20,6 +20,7 @@ use crate::parameters::{
 use ark_serialize::CanonicalDeserialize;
 use bulletproofs::BulletproofGens;
 use noah_algebra::ristretto::RistrettoPoint;
+use noah_algebra::secq256k1::Secq256k1BulletproofGens;
 use noah_algebra::{
     bls12_381::{BLSScalar, BLSG1},
     prelude::*,
@@ -36,7 +37,6 @@ use noah_plonk::{
 };
 use rand_chacha::ChaChaRng;
 use serde::Deserialize;
-use noah_algebra::secq256k1::Secq256k1BulletproofGens;
 
 /// The trait for Bulletproofs that can be used in Bulletproofs generators.
 pub trait BulletproofURS {

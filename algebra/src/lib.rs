@@ -22,6 +22,9 @@
     clippy::upper_case_acronyms
 )]
 
+#[macro_use]
+extern crate serde_derive;
+
 /// Module for the BLS12-381 curve
 pub mod bls12_381;
 

@@ -13,7 +13,11 @@ use crate::xfr::{
     verify_xfr_body, verify_xfr_note, XfrNotePolicies,
 };
 use merlin::Transcript;
-use noah_algebra::{prelude::*, traits::PedersenCommitment, ristretto::{RistrettoScalar, PedersenCommitmentRistretto}};
+use noah_algebra::{
+    prelude::*,
+    ristretto::{PedersenCommitmentRistretto, RistrettoScalar},
+    traits::PedersenCommitment,
+};
 use noah_crypto::basic::{
     elgamal::{elgamal_encrypt, elgamal_key_gen},
     pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof},
@@ -816,8 +820,8 @@ mod asset_tracing {
     };
     use noah_algebra::{
         bls12_381::BLSScalar,
+        ristretto::{PedersenCommitmentRistretto, RistrettoPoint, RistrettoScalar},
         traits::PedersenCommitment,
-        ristretto::{RistrettoPoint, RistrettoScalar, PedersenCommitmentRistretto},
     };
     use noah_crypto::basic::elgamal::ElGamalCiphertext;
 

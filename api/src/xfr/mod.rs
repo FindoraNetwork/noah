@@ -1,8 +1,8 @@
 use noah_algebra::{
     collections::HashMap,
     prelude::*,
+    ristretto::{CompressedRistretto, PedersenCommitmentRistretto, RistrettoScalar},
     traits::PedersenCommitment,
-    ristretto::{CompressedRistretto, RistrettoScalar, PedersenCommitmentRistretto},
 };
 use serde::ser::Serialize;
 
