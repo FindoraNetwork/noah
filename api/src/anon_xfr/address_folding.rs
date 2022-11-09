@@ -6,7 +6,7 @@ use merlin::Transcript;
 use noah_algebra::bls12_381::BLSScalar;
 use noah_algebra::prelude::*;
 use noah_algebra::secp256k1::SECP256K1Scalar;
-use noah_algebra::secq256k1::{PedersenCommitmentSecq256k1, SECQ256K1Scalar, SECQ256K1G1};
+use noah_algebra::secq256k1::{PedersenCommitmentSecq256k1, SECQ256K1Scalar, SECQ256K1G1, Secq256k1BulletproofGens};
 use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
 use noah_crypto::bulletproofs::scalar_mul::ScalarMulProof;
 use noah_crypto::delegated_schnorr::{
@@ -17,6 +17,7 @@ use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsSecq256k1};
 use noah_plonk::plonk::constraint_system::field_simulation::SimFrVar;
 use noah_plonk::plonk::constraint_system::VarIndex;
 use num_bigint::BigUint;
+use rand_chacha::ChaChaRng;
 use rand_core::{CryptoRng, RngCore};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
@@ -99,7 +100,7 @@ pub fn create_address_folding<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
     keypair: &AXfrKeyPair,
 ) -> Result<(AXfrAddressFoldingInstance, AXfrAddressFoldingWitness)> {
     let pc_gens = PedersenCommitmentSecq256k1::default();
-    let bp_gens = ark_bulletproofs::BulletproofGens::load().unwrap();
+    let bp_gens = Secq256k1BulletproofGens::load().unwrap();
 
     let public_key = keypair.get_public_key();
     let secret_key = keypair.get_secret_key();
@@ -152,7 +153,7 @@ pub fn verify_address_folding<D: Digest<OutputSize = U64> + Default>(
     instance: &AXfrAddressFoldingInstance,
 ) -> Result<(SECQ256K1Scalar, SECQ256K1Scalar)> {
     let pc_gens = PedersenCommitmentSecq256k1::default();
-    let bp_gens = ark_bulletproofs::BulletproofGens::load().unwrap();
+    let bp_gens = Secq256k1BulletproofGens::load().unwrap();
 
     // important: address folding relies significantly on the Fiat-Shamir transform.
     transcript.append_message(b"hash", hash.finalize().as_slice());

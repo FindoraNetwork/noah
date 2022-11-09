@@ -1,16 +1,17 @@
 //! Module for the Bulletproof scalar mul proof scheme
 //!
-use ark_bulletproofs::BulletproofGens;
+use ark_bulletproofs::{BulletproofGens, PedersenGens};
 use ark_bulletproofs::{
     curve::secp256k1::{Fq, FrParameters, G1Affine},
     curve::secq256k1::G1Affine as G1AffineBig,
     r1cs::{LinearCombination, Prover, RandomizableConstraintSystem, Variable, Verifier},
 };
+use ark_bulletproofs::curve::secq256k1;
 use ark_ec::{AffineCurve, ProjectiveCurve};
 use ark_ff::{BigInteger, Field, FpParameters, PrimeField};
 use digest::Digest;
 use merlin::Transcript;
-use noah_algebra::secq256k1::{PedersenCommitmentSecq256k1, SECQ256K1Proof, SECQ256K1Scalar};
+use noah_algebra::secq256k1::{PedersenCommitmentSecq256k1, Secq256k1BulletproofGens, SECQ256K1Proof, SECQ256K1Scalar};
 use noah_algebra::{
     prelude::*,
     secp256k1::{SECP256K1Scalar, SECP256K1G1},
@@ -260,13 +261,13 @@ impl ScalarMulProof {
         let base = SECP256K1G1::get_base();
 
         // 1. Sanity-check if the statement is valid.
-        assert_eq!(base.get_raw().mul(secret_key.into_repr()), public_key,);
+        assert_eq!(base.get_raw().mul(secret_key.into_repr()), public_key);
 
         // 2. Apply a domain separator to the transcript.
         transcript.append_message(b"dom-sep", b"ScalarMulProof");
 
         // 3. Initialize the prover.
-        let pc_gens_for_prover = ark_bulletproofs::PedersenGens::from(&pc_gens);
+        let pc_gens_for_prover = PedersenGens::<G1AffineBig>::from(&pc_gens);
         let mut prover = Prover::new(&pc_gens_for_prover, transcript);
 
         // 4. Allocate `public_key`.
@@ -350,7 +351,7 @@ impl ScalarMulProof {
         )
         .c(d!(NoahError::R1CSProofError))?;
 
-        let pc_gens_for_verifier = ark_bulletproofs::PedersenGens::from(&pc_gens);
+        let pc_gens_for_verifier = PedersenGens::<G1AffineBig>::from(&pc_gens);
         verifier
             .verify(&self.0, &pc_gens_for_verifier, &bp_gens)
             .c(d!(NoahError::R1CSProofError))?;
