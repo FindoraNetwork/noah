@@ -133,14 +133,14 @@ pub struct AssetMixingInstance<'a> {
 /// Batch-verify asset mixing.
 /// # Example
 /// ```
-/// use noah_algebra::ristretto::{RistrettoScalar, CompressedRistretto};
+/// use noah_algebra::ristretto::{RistrettoScalar, CompressedRistretto, PedersenCommitmentRistretto};
 /// use noah_algebra::prelude::*;
 /// use noah::xfr::asset_mixer::{prove_asset_mixing, AssetMixingInstance, batch_verify_asset_mixing};
 /// use bulletproofs::PedersenGens;
 /// use rand::thread_rng;
 /// use ruc::err::*;
 /// use noah::setup::BulletproofParams;
-/// use noah_crypto::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
+/// use noah_algebra::traits::PedersenCommitment;
 /// let input = [
 ///            (60u64, RistrettoScalar::from(0u32), RistrettoScalar::from(10000u32), RistrettoScalar::from(200000u32)),
 ///            (100u64, RistrettoScalar::from(2u32), RistrettoScalar::from(10001u32), RistrettoScalar::from(200001u32)),

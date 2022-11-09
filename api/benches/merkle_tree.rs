@@ -1,3 +1,4 @@
+use ark_std::sync::Arc;
 use ark_std::test_rng;
 use criterion::{criterion_group, criterion_main, Criterion};
 use mem_db::MemoryDB;
@@ -6,6 +7,7 @@ use noah::anon_xfr::add_merkle_path_variables;
 use noah::anon_xfr::structs::{AccElemVars, MTLeafInfo, MTNode, MTPath, MerklePathVars};
 use noah_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
 use noah_algebra::bls12_381::BLSScalar;
+use noah_algebra::prelude::*;
 use noah_crypto::basic::anemoi_jive::{
     AnemoiJive, AnemoiJive381, AnemoiVLHTrace, JiveTrace, ANEMOI_JIVE_381_SALTS,
 };
@@ -15,8 +17,6 @@ use noah_plonk::plonk::prover::prover;
 use noah_plonk::poly_commit::kzg_poly_com::KZGCommitmentScheme;
 use num_traits::One;
 use parking_lot::RwLock;
-use std::ops::Neg;
-use std::sync::Arc;
 use storage::state::{ChainState, State};
 use storage::store::PrefixedStore;
 
