@@ -19,7 +19,6 @@ use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsSecq256k1};
 use noah_plonk::plonk::constraint_system::field_simulation::SimFrVar;
 use noah_plonk::plonk::constraint_system::VarIndex;
 use num_bigint::BigUint;
-use rand_chacha::ChaChaRng;
 use rand_core::{CryptoRng, RngCore};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
