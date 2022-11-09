@@ -14,10 +14,12 @@ use linear_map::LinearMap;
 use merlin::Transcript;
 use noah_algebra::{
     prelude::*,
-    ristretto::{CompressedRistretto, RistrettoPoint, RistrettoScalar},
+    ristretto::{
+        CompressedRistretto, PedersenCommitmentRistretto, RistrettoPoint, RistrettoScalar,
+    },
+    traits::PedersenCommitment,
     utils::{min_greater_equal_power_of_two, u64_to_u32_pair},
 };
-use noah_crypto::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
 use noah_crypto::{
     basic::{
         chaum_pedersen::{

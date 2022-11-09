@@ -1,11 +1,14 @@
+use crate::curve25519::Curve25519Point;
+use crate::secq256k1::SECQ256K1Proof;
 use crate::{
     bls12_381::{BLSFq, BLSGt, BLSScalar, BLSG1, BLSG2},
+    curve25519::Curve25519Scalar,
     jubjub::{JubjubPoint, JubjubScalar},
     prelude::*,
     ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar},
     secp256k1::{SECP256K1Scalar, SECP256K1G1},
     secq256k1::{SECQ256K1Scalar, SECQ256K1G1},
-    zorro::{ZorroFq, ZorroG1, ZorroScalar},
+    zorro::{ZorroFq, ZorroG1, ZorroProof, ZorroScalar},
 };
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
 use ark_std::io::Cursor;
@@ -36,6 +39,7 @@ to_from_bytes_scalar!(SECQ256K1Scalar);
 to_from_bytes_scalar!(SECP256K1Scalar);
 to_from_bytes_scalar!(ZorroScalar);
 to_from_bytes_scalar!(ZorroFq);
+to_from_bytes_scalar!(Curve25519Scalar);
 
 impl NoahFromToBytes for CompressedRistretto {
     #[inline]
@@ -73,6 +77,7 @@ serialize_deserialize!(SECQ256K1Scalar);
 serialize_deserialize!(SECP256K1Scalar);
 serialize_deserialize!(ZorroScalar);
 serialize_deserialize!(ZorroFq);
+serialize_deserialize!(Curve25519Scalar);
 
 macro_rules! to_from_bytes_group {
     ($g:ident) => {
@@ -96,6 +101,7 @@ to_from_bytes_group!(JubjubPoint);
 to_from_bytes_group!(SECQ256K1G1);
 to_from_bytes_group!(SECP256K1G1);
 to_from_bytes_group!(ZorroG1);
+to_from_bytes_group!(Curve25519Point);
 
 serialize_deserialize!(RistrettoPoint);
 serialize_deserialize!(BLSG1);
@@ -105,6 +111,7 @@ serialize_deserialize!(JubjubPoint);
 serialize_deserialize!(SECQ256K1G1);
 serialize_deserialize!(SECP256K1G1);
 serialize_deserialize!(ZorroG1);
+serialize_deserialize!(Curve25519Point);
 
 /// Helper trait to serialize Noah's and foreign objects that implement from/to bytes/bits
 pub trait NoahFromToBytes: Sized {
@@ -135,13 +142,25 @@ impl NoahFromToBytes for bulletproofs::r1cs::R1CSProof {
     }
 }
 
-impl NoahFromToBytes for ark_bulletproofs::r1cs::R1CSProof {
+impl NoahFromToBytes for SECQ256K1Proof {
     fn noah_to_bytes(&self) -> Vec<u8> {
         let mut cursor = Cursor::new(Vec::new());
         self.serialize(&mut cursor).unwrap();
         cursor.into_inner()
     }
-    fn noah_from_bytes(bytes: &[u8]) -> Result<ark_bulletproofs::r1cs::R1CSProof> {
+    fn noah_from_bytes(bytes: &[u8]) -> Result<SECQ256K1Proof> {
+        ark_bulletproofs::r1cs::R1CSProof::deserialize(bytes)
+            .map_err(|_| eg!(NoahError::DeserializationError))
+    }
+}
+
+impl NoahFromToBytes for ZorroProof {
+    fn noah_to_bytes(&self) -> Vec<u8> {
+        let mut cursor = Cursor::new(Vec::new());
+        self.serialize(&mut cursor).unwrap();
+        cursor.into_inner()
+    }
+    fn noah_from_bytes(bytes: &[u8]) -> Result<ZorroProof> {
         ark_bulletproofs::r1cs::R1CSProof::deserialize(bytes)
             .map_err(|_| eg!(NoahError::DeserializationError))
     }

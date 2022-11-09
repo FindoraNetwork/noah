@@ -9,12 +9,10 @@ use noah::setup::{BulletproofParams, BulletproofURS};
 use noah::xfr::asset_mixer::{prove_asset_mixing, AssetMixingInstance};
 use noah_algebra::{
     prelude::*,
-    ristretto::{CompressedRistretto, RistrettoScalar},
+    ristretto::{CompressedRistretto, PedersenCommitmentRistretto, RistrettoScalar},
+    traits::PedersenCommitment,
 };
-use noah_crypto::{
-    basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto},
-    bulletproofs::mix::{self, MixCommitment, MixVariable},
-};
+use noah_crypto::bulletproofs::mix::{self, MixCommitment, MixVariable};
 
 fn main() {
     // Measurement of the verification time and batch verification time of Mix Bulletproofs

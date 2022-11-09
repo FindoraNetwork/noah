@@ -12,8 +12,7 @@ use noah::{
         trace_assets, verify_xfr_note, RecordData, XfrNotePoliciesRef,
     },
 };
-use noah_algebra::prelude::*;
-use noah_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
+use noah_algebra::{prelude::*, ristretto::PedersenCommitmentRistretto};
 use wasm_bindgen::__rt::std::collections::HashMap;
 
 const ASSET1_TYPE: AssetType = AssetType([0u8; ASSET_TYPE_LENGTH]);

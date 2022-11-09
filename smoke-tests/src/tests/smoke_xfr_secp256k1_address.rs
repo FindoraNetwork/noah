@@ -13,8 +13,7 @@ mod smoke_xfr_secp256k1_address {
             verify_xfr_note, XfrNotePolicies,
         },
     };
-    use noah_algebra::prelude::*;
-    use noah_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
+    use noah_algebra::{prelude::*, ristretto::PedersenCommitmentRistretto};
 
     const AMOUNT: u64 = 10u64;
     const ASSET1_TYPE: AssetType = AssetType([0u8; ASSET_TYPE_LENGTH]);

@@ -13,8 +13,8 @@ use noah::setup::{
     MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER,
     MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER, MAX_ANONYMOUS_RECORD_NUMBER_STANDARD,
 };
+use noah_algebra::secq256k1::{PedersenCommitmentSecq256k1, Secq256k1BulletproofGens};
 use noah_algebra::utils::save_to_file;
-use noah_crypto::basic::pedersen_comm::PedersenCommitmentSecq256k1;
 use noah_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS;
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
@@ -279,7 +279,7 @@ fn gen_bulletproof_curve25519_urs(mut path: PathBuf) {
 fn gen_bulletproof_secq256k1_urs(mut path: PathBuf) {
     println!("Generating Bulletproof(over the Secq256k1 curve) uniform reference string ...");
 
-    let bp_gens = BulletproofGensOverSecq256k1::new(ANON_XFR_BP_GENS_LEN, 1);
+    let bp_gens = Secq256k1BulletproofGens::new(ANON_XFR_BP_GENS_LEN, 1);
     let mut bytes = Vec::new();
     bp_gens.serialize_unchecked(&mut bytes).unwrap();
     path.push("bulletproof-secq256k1-urs.bin");
@@ -287,7 +287,7 @@ fn gen_bulletproof_secq256k1_urs(mut path: PathBuf) {
 
     let start = std::time::Instant::now();
     let reader = ark_std::io::BufReader::new(bytes.as_slice());
-    let _bp_gens = BulletproofGensOverSecq256k1::deserialize_unchecked(reader).unwrap();
+    let _bp_gens = Secq256k1BulletproofGens::deserialize_unchecked(reader).unwrap();
     println!("Deserialize time: {:.2?}", start.elapsed());
 }
 

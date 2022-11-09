@@ -1,19 +1,16 @@
 //! Module for the Bulletproof scalar mul proof scheme
-
-use crate::basic::pedersen_comm::PedersenCommitmentSecq256k1;
-use ark_bulletproofs::BulletproofGens;
+//!
 use ark_bulletproofs::{
     curve::secp256k1::{Fq, FrParameters, G1Affine},
     curve::secq256k1::G1Affine as G1AffineBig,
-    r1cs::{
-        LinearCombination, Prover, R1CSProof, RandomizableConstraintSystem, Variable, Verifier,
-    },
+    r1cs::{LinearCombination, Prover, RandomizableConstraintSystem, Variable, Verifier},
 };
+use ark_bulletproofs::{BulletproofGens, PedersenGens};
 use ark_ec::{AffineCurve, ProjectiveCurve};
 use ark_ff::{BigInteger, Field, FpParameters, PrimeField};
 use digest::Digest;
 use merlin::Transcript;
-use noah_algebra::secq256k1::SECQ256K1Scalar;
+use noah_algebra::secq256k1::{PedersenCommitmentSecq256k1, SECQ256K1Proof, SECQ256K1Scalar};
 use noah_algebra::{
     prelude::*,
     secp256k1::{SECP256K1Scalar, SECP256K1G1},
@@ -24,22 +21,22 @@ use rand_core::{CryptoRng, RngCore, SeedableRng};
 use sha3::Sha3_512;
 
 /// A scalar variable.
-pub struct ScalarVar(Variable);
+pub struct ScalarVar(Variable<Fq>);
 
 /// A point variable.
 pub struct PointVar {
-    x_var: Variable,
-    y_var: Variable,
+    x_var: Variable<Fq>,
+    y_var: Variable<Fq>,
 }
 
 impl PointVar {
     /// Create a new point variable from field variables.
-    pub fn new(x_var: Variable, y_var: Variable) -> Self {
+    pub fn new(x_var: Variable<Fq>, y_var: Variable<Fq>) -> Self {
         Self { x_var, y_var }
     }
 
     /// Allocate a point in Bulletproofs.
-    pub fn allocate<CS: RandomizableConstraintSystem>(
+    pub fn allocate<CS: RandomizableConstraintSystem<Fq>>(
         cs: &mut CS,
         x: &Option<Fq>,
         y: &Option<Fq>,
@@ -53,7 +50,7 @@ impl PointVar {
 
 /// A proof of scalar multiplication.
 #[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ScalarMulProof(#[serde(with = "noah_obj_serde")] pub(crate) R1CSProof);
+pub struct ScalarMulProof(#[serde(with = "noah_obj_serde")] pub(crate) SECQ256K1Proof);
 
 impl PartialEq for ScalarMulProof {
     fn eq(&self, other: &ScalarMulProof) -> bool {
@@ -64,7 +61,7 @@ impl PartialEq for ScalarMulProof {
 impl Eq for ScalarMulProof {}
 
 impl ScalarMulProof {
-    fn gadget<CS: RandomizableConstraintSystem>(
+    fn gadget<CS: RandomizableConstraintSystem<Fq>>(
         cs: &mut CS,
         public_key_var: &PointVar,
         secret_key_var: &ScalarVar,
@@ -181,7 +178,7 @@ impl ScalarMulProof {
         Ok(())
     }
 
-    fn point_add_constant<CS: RandomizableConstraintSystem>(
+    fn point_add_constant<CS: RandomizableConstraintSystem<Fq>>(
         cs: &mut CS,
         left_var: &PointVar,
         left: &Option<G1Affine>,
@@ -206,17 +203,17 @@ impl ScalarMulProof {
         };
 
         let (_, _, s_squared_var) = cs.multiply(s_var.into(), s_var.into());
-        let (_, _, s_delta_x_var) = cs.multiply(s_var.into(), right.x - res_var.x_var);
+        let (_, _, s_delta_x_var) = cs.multiply(s_var.into(), res_var.x_var.neg() + right.x);
 
-        cs.constrain(s_squared_var - left_var.x_var - right.x - res_var.x_var);
+        cs.constrain(s_squared_var - left_var.x_var - res_var.x_var - right.x);
         cs.constrain(s_delta_x_var - right.y - res_var.y_var);
 
         Ok((res, res_var))
     }
 
-    fn point_select<CS: RandomizableConstraintSystem>(
+    fn point_select<CS: RandomizableConstraintSystem<Fq>>(
         cs: &mut CS,
-        bit_var: &Variable,
+        bit_var: &Variable<Fq>,
         bit: &Option<bool>,
         yes_var: &PointVar,
         yes: &Option<G1Affine>,
@@ -250,7 +247,7 @@ impl ScalarMulProof {
     /// Returns a tuple `(proof, x_comm || y_comm || scalar_fq_comm )`.
     pub fn prove<'a, 'b, R: CryptoRng + RngCore>(
         prng: &mut R,
-        bp_gens: &'b BulletproofGens,
+        bp_gens: &'b BulletproofGens<G1AffineBig>,
         transcript: &'a mut Transcript,
         public_key: &SECP256K1G1,
         secret_key: &SECP256K1Scalar,
@@ -263,13 +260,13 @@ impl ScalarMulProof {
         let base = SECP256K1G1::get_base();
 
         // 1. Sanity-check if the statement is valid.
-        assert_eq!(base.get_raw().mul(secret_key.into_repr()), public_key,);
+        assert_eq!(base.get_raw().mul(secret_key.into_repr()), public_key);
 
         // 2. Apply a domain separator to the transcript.
         transcript.append_message(b"dom-sep", b"ScalarMulProof");
 
         // 3. Initialize the prover.
-        let pc_gens_for_prover = ark_bulletproofs::PedersenGens::from(&pc_gens);
+        let pc_gens_for_prover = PedersenGens::<G1AffineBig>::from(&pc_gens);
         let mut prover = Prover::new(&pc_gens_for_prover, transcript);
 
         // 4. Allocate `public_key`.
@@ -322,7 +319,7 @@ impl ScalarMulProof {
     /// Attempt to verify a `ScalarMulProof`.
     pub fn verify<'a, 'b>(
         &self,
-        bp_gens: &'b BulletproofGens,
+        bp_gens: &'b BulletproofGens<G1AffineBig>,
         transcript: &'a mut Transcript,
         commitments: &Vec<SECQ256K1G1>,
     ) -> Result<()> {
@@ -353,7 +350,7 @@ impl ScalarMulProof {
         )
         .c(d!(NoahError::R1CSProofError))?;
 
-        let pc_gens_for_verifier = ark_bulletproofs::PedersenGens::from(&pc_gens);
+        let pc_gens_for_verifier = PedersenGens::<G1AffineBig>::from(&pc_gens);
         verifier
             .verify(&self.0, &pc_gens_for_verifier, &bp_gens)
             .c(d!(NoahError::R1CSProofError))?;

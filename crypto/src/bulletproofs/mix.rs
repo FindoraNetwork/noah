@@ -30,7 +30,6 @@
 //!
 //! Details of the cryptographic protocol will follow.
 
-use crate::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
 use bulletproofs::r1cs::{
     ConstraintSystem, LinearCombination, Prover, R1CSError, RandomizableConstraintSystem,
     RandomizedConstraintSystem, Variable, Verifier,
@@ -38,7 +37,8 @@ use bulletproofs::r1cs::{
 use merlin::Transcript;
 use noah_algebra::{
     prelude::*,
-    ristretto::{CompressedRistretto, RistrettoScalar},
+    ristretto::{CompressedRistretto, PedersenCommitmentRistretto, RistrettoScalar},
+    traits::PedersenCommitment,
 };
 
 /// Represent AssetRecord amount and asset type

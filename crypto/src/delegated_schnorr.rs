@@ -1,7 +1,7 @@
 use crate::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
-use crate::basic::pedersen_comm::PedersenCommitment;
 use crate::field_simulation::{SimFr, SimFrParams};
 use merlin::Transcript;
+use noah_algebra::traits::PedersenCommitment;
 use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 use num_bigint::BigUint;
 use rand_chacha::ChaChaRng;
@@ -311,12 +311,15 @@ pub fn verify_delegated_schnorr<
 }
 
 #[cfg(test)]
-mod test {
-    use crate::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
+mod test_ristretto {
     use crate::delegated_schnorr::{prove_delegated_schnorr, verify_delegated_schnorr};
     use crate::field_simulation::SimFrParamsRistretto;
     use merlin::Transcript;
-    use noah_algebra::{prelude::*, ristretto::RistrettoScalar};
+    use noah_algebra::traits::PedersenCommitment;
+    use noah_algebra::{
+        prelude::*,
+        ristretto::{PedersenCommitmentRistretto, RistrettoScalar},
+    };
 
     #[test]
     fn test_correctness() {
@@ -336,6 +339,56 @@ mod test {
             let mut transcript = Transcript::new(b"Test");
 
             let (proof, _, _, _) = prove_delegated_schnorr::<_, _, _, SimFrParamsRistretto, _>(
+                &mut prng,
+                &vec![(x, gamma), (y, delta)],
+                &pc_gens,
+                &vec![point_p, point_q],
+                &mut transcript,
+            )
+            .unwrap();
+
+            let mut transcript = Transcript::new(b"Test");
+
+            let _ = verify_delegated_schnorr(
+                &pc_gens,
+                &vec![point_p, point_q],
+                &proof,
+                &mut transcript,
+            )
+            .unwrap();
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_secq256k1 {
+    use crate::delegated_schnorr::{prove_delegated_schnorr, verify_delegated_schnorr};
+    use crate::field_simulation::SimFrParamsSecq256k1;
+    use merlin::Transcript;
+    use noah_algebra::traits::PedersenCommitment;
+    use noah_algebra::{
+        prelude::*,
+        secq256k1::{PedersenCommitmentSecq256k1, SECQ256K1Scalar},
+    };
+
+    #[test]
+    fn test_correctness() {
+        let mut prng = test_rng();
+
+        for _ in 0..10 {
+            let x = SECQ256K1Scalar::random(&mut prng);
+            let gamma = SECQ256K1Scalar::random(&mut prng);
+            let y = SECQ256K1Scalar::random(&mut prng);
+            let delta = SECQ256K1Scalar::random(&mut prng);
+
+            let pc_gens = PedersenCommitmentSecq256k1::default();
+
+            let point_p = pc_gens.commit(x, gamma);
+            let point_q = pc_gens.commit(y, delta);
+
+            let mut transcript = Transcript::new(b"Test");
+
+            let (proof, _, _, _) = prove_delegated_schnorr::<_, _, _, SimFrParamsSecq256k1, _>(
                 &mut prng,
                 &vec![(x, gamma), (y, delta)],
                 &pc_gens,

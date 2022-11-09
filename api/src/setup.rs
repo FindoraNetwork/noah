@@ -17,10 +17,10 @@ use crate::parameters::{
     BAR_TO_ABAR_VERIFIER_PARAMS, BULLETPROOF_CURVE25519_URS, BULLETPROOF_SECQ256K1_URS,
     LAGRANGE_BASES, SRS, VERIFIER_COMMON_PARAMS, VERIFIER_SPECIFIC_PARAMS,
 };
-use ark_bulletproofs::BulletproofGens as BulletproofGensOverSecq256k1;
 use ark_serialize::CanonicalDeserialize;
 use bulletproofs::BulletproofGens;
 use noah_algebra::ristretto::RistrettoPoint;
+use noah_algebra::secq256k1::Secq256k1BulletproofGens;
 use noah_algebra::{
     bls12_381::{BLSScalar, BLSG1},
     prelude::*,
@@ -144,12 +144,12 @@ impl Default for BulletproofParams {
     }
 }
 
-impl BulletproofURS for BulletproofGensOverSecq256k1 {
+impl BulletproofURS for Secq256k1BulletproofGens {
     fn load() -> Result<Self> {
         let urs = BULLETPROOF_SECQ256K1_URS.c(d!(NoahError::MissingSRSError))?;
 
         let reader = ark_std::io::BufReader::new(urs);
-        let bp_gens = BulletproofGensOverSecq256k1::deserialize_unchecked(reader)
+        let bp_gens = Secq256k1BulletproofGens::deserialize_unchecked(reader)
             .c(d!(NoahError::DeserializationError))
             .unwrap();
         Ok(bp_gens)

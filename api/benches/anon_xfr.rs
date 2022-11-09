@@ -23,9 +23,9 @@ use noah::{
     },
 };
 use noah_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
+use noah_algebra::ristretto::PedersenCommitmentRistretto;
 use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
-use noah_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
 use parking_lot::RwLock;
 use sha2::Sha512;
 use std::sync::Arc;

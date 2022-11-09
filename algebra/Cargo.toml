@@ -21,6 +21,7 @@ digest = '0.10'
 itertools = '0.10.0'
 ruc = '1.0'
 serde = '1.0'
+serde_derive = '1.0'
 x25519-dalek = { git = "https://github.com/FindoraNetwork/x25519-dalek", tag = "v1.2.2-f" }
 rayon = { version = "1", optional = true }
 
@@ -79,8 +80,7 @@ version = "0.1"
 
 [dependencies.ark-bulletproofs]
 git = "https://github.com/FindoraNetwork/ark-bulletproofs"
-tag = "v2.0.0-f"
-package = "ark-bulletproofs-secq256k1"
+tag = "v2.0.3-f"
 default-features = false
 features = ['yoloproofs']
 

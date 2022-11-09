@@ -1,5 +1,5 @@
-/// The number of bytes for a scalar value over Zorro
-pub const ZORRO_SCALAR_LEN: usize = 32;
+/// The number of bytes for a scalar value over the curve25519 curve
+pub const CURVE25519_SCALAR_LEN: usize = 32;
 
 mod fr;
 pub use fr::*;
@@ -10,35 +10,29 @@ pub use fq::*;
 mod g1;
 pub use g1::*;
 
-/// The wrapped struct for
-/// `ark_bulletproofs::r1cs::R1CSProof<ark_bulletproofs::curve::zorro::G1Affine>`
-pub type ZorroProof = ark_bulletproofs::r1cs::R1CSProof<ark_bulletproofs::curve::zorro::G1Affine>;
-
 #[cfg(test)]
-mod zorro_groups_test {
+mod curve25519_groups_test {
     use crate::{
+        curve25519::{Curve25519Point, Curve25519Scalar},
         prelude::*,
         traits::group_tests::{test_scalar_operations, test_scalar_serialization},
-        zorro::{ZorroFq, ZorroG1, ZorroScalar},
     };
-    use ark_bulletproofs::curve::zorro::G1Affine;
+    use ark_bulletproofs::curve::curve25519::G1Affine;
     use ark_ec::ProjectiveCurve;
 
     #[test]
     fn test_scalar_ops() {
-        test_scalar_operations::<ZorroScalar>();
-        test_scalar_operations::<ZorroFq>();
+        test_scalar_operations::<Curve25519Scalar>();
     }
 
     #[test]
     fn scalar_deser() {
-        test_scalar_serialization::<ZorroScalar>();
-        test_scalar_serialization::<ZorroFq>();
+        test_scalar_serialization::<Curve25519Scalar>();
     }
 
     #[test]
     fn scalar_from_to_bytes() {
-        let small_value = ZorroScalar::from(165747u32);
+        let small_value = Curve25519Scalar::from(165747u32);
         let small_value_bytes = small_value.to_bytes();
         let expected_small_value_bytes: [u8; 32] = [
             115, 135, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -46,7 +40,7 @@ mod zorro_groups_test {
         ];
         assert_eq!(small_value_bytes, expected_small_value_bytes);
 
-        let small_value_from_bytes = ZorroScalar::from_bytes(&small_value_bytes).unwrap();
+        let small_value_from_bytes = Curve25519Scalar::from_bytes(&small_value_bytes).unwrap();
         assert_eq!(small_value_from_bytes, small_value);
     }
 
@@ -54,12 +48,12 @@ mod zorro_groups_test {
     fn curve_points_respresentation_of_g1() {
         let mut prng = test_rng();
 
-        let g1 = ZorroG1::get_base();
-        let s1 = ZorroScalar::from(50 + prng.next_u32() % 50);
+        let g1 = Curve25519Point::get_base();
+        let s1 = Curve25519Scalar::from(50 + prng.next_u32() % 50);
 
         let g1 = g1.mul(&s1);
 
-        let g1_prime = ZorroG1::random(&mut prng);
+        let g1_prime = Curve25519Point::random(&mut prng);
 
         // This is the projective representation of g1
         let g1_projective = g1.0;
@@ -83,9 +77,9 @@ mod zorro_groups_test {
     fn test_serialization_of_points() {
         let mut prng = test_rng();
 
-        let g1 = ZorroG1::random(&mut prng);
+        let g1 = Curve25519Point::random(&mut prng);
         let g1_bytes = g1.to_compressed_bytes();
-        let g1_recovered = ZorroG1::from_compressed_bytes(&g1_bytes).unwrap();
+        let g1_recovered = Curve25519Point::from_compressed_bytes(&g1_bytes).unwrap();
         assert_eq!(g1, g1_recovered);
     }
 }

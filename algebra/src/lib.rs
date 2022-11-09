@@ -22,6 +22,9 @@
     clippy::upper_case_acronyms
 )]
 
+#[macro_use]
+extern crate serde_derive;
+
 /// Module for the BLS12-381 curve
 pub mod bls12_381;
 
@@ -36,6 +39,9 @@ pub mod zorro;
 
 /// Module for error handling
 pub mod errors;
+
+/// Module for the curve25519 curve used to work with the Zorro curve in address folding
+pub mod curve25519;
 
 /// Module for traits
 pub mod traits;

@@ -189,6 +189,16 @@ pub trait Group:
     }
 }
 
+/// Trait for Pedersen commitment.
+pub trait PedersenCommitment<G: Group>: Default {
+    /// Return the generator for the value part.
+    fn generator(&self) -> G;
+    /// Return the generator for the blinding part.
+    fn blinding_generator(&self) -> G;
+    /// Compute the Pedersen commitment over the Ristretto group.
+    fn commit(&self, value: G::ScalarType, blinding: G::ScalarType) -> G;
+}
+
 /// The trait for a pair of groups for pairing
 pub trait Pairing {
     /// The scalar type
