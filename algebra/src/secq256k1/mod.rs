@@ -1,3 +1,9 @@
+use ark_bulletproofs::curve::secq256k1::G1Affine;
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Read, SerializationError, Write};
+use crate::prelude::*;
+use crate::traits::PedersenCommitment;
+use serde::{Serialize, Deserialize};
+
 mod fr;
 pub use fr::*;
 
@@ -6,6 +12,59 @@ pub use fq::*;
 
 mod g1;
 pub use g1::*;
+
+/// The wrapped struct for
+/// `ark_bulletproofs::r1cs::R1CSProof<ark_bulletproofs::curve::secq256k1::G1Affine>`
+#[derive(Clone, Debug, CanonicalSerialize, CanonicalDeserialize)]
+pub struct SECQ256K1Proof(
+    pub ark_bulletproofs::r1cs::R1CSProof<G1Affine>,
+);
+
+#[allow(non_snake_case)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// The Pedersen commitment implementation for the secq256k1 group.
+pub struct PedersenCommitmentSecq256k1 {
+    /// The generator for the value part.
+    pub B: SECQ256K1G1,
+    /// The generator for the blinding part.
+    pub B_blinding: SECQ256K1G1,
+}
+
+impl Default for PedersenCommitmentSecq256k1 {
+    fn default() -> Self {
+        let pc_gens = ark_bulletproofs::PedersenGens::default();
+        Self {
+            B: SECQ256K1G1::from_raw(pc_gens.B),
+            B_blinding: SECQ256K1G1::from_raw(pc_gens.B_blinding),
+        }
+    }
+}
+
+impl PedersenCommitment<SECQ256K1G1> for PedersenCommitmentSecq256k1 {
+    fn generator(&self) -> SECQ256K1G1 {
+        self.B
+    }
+
+    fn blinding_generator(&self) -> SECQ256K1G1 {
+        self.B_blinding
+    }
+
+    fn commit(&self, value: SECQ256K1Scalar, blinding: SECQ256K1Scalar) -> SECQ256K1G1 {
+        self.B.mul(&value).add(&self.B_blinding.mul(&blinding))
+    }
+}
+
+impl From<&PedersenCommitmentSecq256k1> for ark_bulletproofs::PedersenGens<G1Affine> {
+    fn from(rp: &PedersenCommitmentSecq256k1) -> Self {
+        ark_bulletproofs::PedersenGens {
+            B: rp.B.get_raw(),
+            B_blinding: rp.B_blinding.get_raw(),
+        }
+    }
+}
+
+/// The wrapper struct for the Bulletproof generators.
+pub type Secq256k1BulletproofGens = ark_bulletproofs::BulletproofGens<G1Affine>;
 
 /// The number of bytes for a scalar value over the secq256k1 curve
 pub const SECQ256K1_SCALAR_LEN: usize = 32;

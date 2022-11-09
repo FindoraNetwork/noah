@@ -1,9 +1,9 @@
 use noah_algebra::{
     collections::HashMap,
     prelude::*,
-    ristretto::{CompressedRistretto, RistrettoScalar},
+    traits::PedersenCommitment,
+    ristretto::{CompressedRistretto, RistrettoScalar, PedersenCommitmentRistretto},
 };
-use noah_crypto::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
 use serde::ser::Serialize;
 
 /// Module for asset mixing.

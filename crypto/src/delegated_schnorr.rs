@@ -1,7 +1,7 @@
 use crate::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
-use crate::basic::pedersen_comm::PedersenCommitment;
 use crate::field_simulation::{SimFr, SimFrParams};
 use merlin::Transcript;
+use noah_algebra::traits::PedersenCommitment;
 use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 use num_bigint::BigUint;
 use rand_chacha::ChaChaRng;
@@ -312,11 +312,14 @@ pub fn verify_delegated_schnorr<
 
 #[cfg(test)]
 mod test {
-    use crate::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
     use crate::delegated_schnorr::{prove_delegated_schnorr, verify_delegated_schnorr};
     use crate::field_simulation::SimFrParamsRistretto;
     use merlin::Transcript;
-    use noah_algebra::{prelude::*, ristretto::RistrettoScalar};
+    use noah_algebra::traits::PedersenCommitment;
+    use noah_algebra::{
+        prelude::*,
+        ristretto::{PedersenCommitmentRistretto, RistrettoScalar},
+    };
 
     #[test]
     fn test_correctness() {

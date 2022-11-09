@@ -7,9 +7,12 @@ use curve25519_dalek::{
     ristretto::{CompressedRistretto as CR, RistrettoPoint as RPoint},
     traits::Identity,
 };
+use curve25519_dalek::traits::MultiscalarMul;
 use digest::{generic_array::typenum::U64, Digest};
 use num_bigint::BigUint;
 use num_traits::Num;
+use serde::{Deserialize, Serialize};
+use crate::traits::PedersenCommitment;
 
 /// The number of bytes for a scalar value over BLS12-381
 pub const RISTRETTO_SCALAR_LEN: usize = 32;
@@ -455,6 +458,53 @@ impl<'a> SubAssign<&'a RistrettoPoint> for RistrettoPoint {
     #[inline]
     fn sub_assign(&mut self, rhs: &'a RistrettoPoint) {
         self.0.sub_assign(&rhs.0)
+    }
+}
+
+#[allow(non_snake_case)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// The Pedersen commitment implementation for the Ristretto group.
+pub struct PedersenCommitmentRistretto {
+    /// The generator for the value part.
+    pub B: RistrettoPoint,
+    /// The generator for the blinding part.
+    pub B_blinding: RistrettoPoint,
+}
+
+impl Default for PedersenCommitmentRistretto {
+    fn default() -> Self {
+        let pc_gens = bulletproofs::PedersenGens::default();
+        Self {
+            B: RistrettoPoint(pc_gens.B),
+            B_blinding: RistrettoPoint(pc_gens.B_blinding),
+        }
+    }
+}
+impl PedersenCommitment<RistrettoPoint> for PedersenCommitmentRistretto {
+    fn generator(&self) -> RistrettoPoint {
+        self.B
+    }
+
+    fn blinding_generator(&self) -> RistrettoPoint {
+        self.B_blinding
+    }
+
+    fn commit(&self, value: RistrettoScalar, blinding: RistrettoScalar) -> RistrettoPoint {
+        RistrettoPoint(
+            curve25519_dalek::ristretto::RistrettoPoint::multiscalar_mul(
+                &[value.0, blinding.0],
+                &[self.B.0, self.B_blinding.0],
+            ),
+        )
+    }
+}
+
+impl From<&PedersenCommitmentRistretto> for bulletproofs::PedersenGens {
+    fn from(rp: &PedersenCommitmentRistretto) -> Self {
+        bulletproofs::PedersenGens {
+            B: rp.B.0,
+            B_blinding: rp.B_blinding.0,
+        }
     }
 }
 

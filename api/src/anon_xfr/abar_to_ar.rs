@@ -21,11 +21,10 @@ use crate::xfr::{
 };
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
-use noah_algebra::{bls12_381::BLSScalar, prelude::*};
+use noah_algebra::{bls12_381::BLSScalar, ristretto::PedersenCommitmentRistretto, prelude::*};
 use noah_crypto::basic::anemoi_jive::{
     AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS,
 };
-use noah_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
 use noah_plonk::plonk::{
     constraint_system::{TurboCS, VarIndex},
     prover::prover_with_lagrange,

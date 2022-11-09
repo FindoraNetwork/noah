@@ -12,15 +12,14 @@ use bulletproofs::RangeProof;
 use digest::Digest;
 use noah_algebra::{
     prelude::*,
-    ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoScalar},
+    ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoScalar, PedersenCommitmentRistretto},
     secp256k1::{SECP256K1Scalar, SECP256K1G1},
+    traits::PedersenCommitment,
 };
-use noah_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
 use noah_crypto::basic::{
     chaum_pedersen::ChaumPedersenProofX,
     elgamal::elgamal_key_gen,
     hybrid_encryption::{NoahHybridCiphertext, XPublicKey, XSecretKey},
-    pedersen_comm::PedersenCommitment,
     pedersen_elgamal::PedersenElGamalEqProof,
 };
 use sha2::Sha512;

@@ -1,9 +1,9 @@
 use crate::basic::elgamal::{ElGamalCiphertext, ElGamalEncKey};
 use crate::basic::matrix_sigma::{sigma_prove, sigma_verify_scalars, SigmaProof, SigmaTranscript};
-use crate::basic::pedersen_comm::PedersenCommitmentRistretto;
 use curve25519_dalek::traits::{Identity, MultiscalarMul};
 use merlin::Transcript;
 use noah_algebra::prelude::*;
+use noah_algebra::ristretto::PedersenCommitmentRistretto;
 use noah_algebra::ristretto::RistrettoPoint;
 use noah_algebra::ristretto::RistrettoScalar;
 
@@ -351,14 +351,14 @@ mod test {
     use crate::basic::elgamal::{
         elgamal_encrypt, elgamal_key_gen, ElGamalCiphertext, ElGamalEncKey,
     };
-    use crate::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
     use crate::basic::pedersen_elgamal::{
         pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_aggregate_eq_verify,
         pedersen_elgamal_batch_verify, PedersenElGamalProofInstance,
     };
     use merlin::Transcript;
     use noah_algebra::prelude::*;
-    use noah_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
+    use noah_algebra::ristretto::{PedersenCommitmentRistretto, RistrettoPoint, RistrettoScalar};
+    use noah_algebra::traits::PedersenCommitment;
 
     #[test]
     fn good_proof_verify() {

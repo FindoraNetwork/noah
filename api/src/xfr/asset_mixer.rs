@@ -278,9 +278,9 @@ mod test {
     use crate::xfr::asset_mixer::AssetMixingInstance;
     use noah_algebra::{
         prelude::*,
-        ristretto::{CompressedRistretto, RistrettoScalar},
+        traits::PedersenCommitment,
+        ristretto::{CompressedRistretto, RistrettoScalar, PedersenCommitmentRistretto},
     };
-    use noah_crypto::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
 
     #[test]
     fn test_asset_mixer() {
