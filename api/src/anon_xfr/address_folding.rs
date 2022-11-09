@@ -10,7 +10,7 @@ use noah_algebra::secq256k1::{
     PedersenCommitmentSecq256k1, SECQ256K1Scalar, Secq256k1BulletproofGens, SECQ256K1G1,
 };
 use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
-use noah_crypto::bulletproofs::scalar_mul::ScalarMulProof;
+use noah_crypto::bulletproofs::scalar_mul_for_secp256k1::ScalarMulProof;
 use noah_crypto::delegated_schnorr::{
     prove_delegated_schnorr, verify_delegated_schnorr, DelegatedSchnorrInspection,
     DelegatedSchnorrProof,
