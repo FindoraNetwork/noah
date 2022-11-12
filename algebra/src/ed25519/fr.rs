@@ -53,7 +53,7 @@ impl Mul for Ed25519Scalar {
 
 impl Sum<Ed25519Scalar> for Ed25519Scalar {
     #[inline]
-    fn sum<I: Iterator<Item =Ed25519Scalar>>(iter: I) -> Self {
+    fn sum<I: Iterator<Item = Ed25519Scalar>>(iter: I) -> Self {
         iter.fold(Self::zero(), Add::add)
     }
 }
