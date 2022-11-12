@@ -75,7 +75,7 @@ impl Group for SECP256K1G1 {
 
     #[inline]
     fn random<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
-        Self::get_base().mul(&SECP256K1Scalar::random(prng))
+        Self(G1Projective::rand(prng))
     }
 
     #[inline]

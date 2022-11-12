@@ -193,16 +193,34 @@ impl Neg for Curve25519Point {
 }
 
 impl Curve25519Point {
-    /// Get the x-coordinate of the Jubjub affine point.
+    /// Get the x-coordinate of the curve25519 affine point.
     #[inline]
     pub fn get_x(&self) -> ZorroScalar {
         let affine_point = G1Affine::from(self.0);
         ZorroScalar(affine_point.x)
     }
-    /// Get the y-coordinate of the Jubjub affine point.
+    /// Get the y-coordinate of the curve25519 affine point.
     #[inline]
     pub fn get_y(&self) -> ZorroScalar {
         let affine_point = G1Affine::from(self.0);
         ZorroScalar(affine_point.y)
+    }
+
+    /// Obtain a point using the x coordinate (which would be ZorroScalar).
+    pub fn get_point_from_x(x: &ZorroScalar) -> Result<Self> {
+        let point = G1Affine::get_point_from_x_old(x.0.clone(), false)
+            .ok_or(eg!(NoahError::DeserializationError))?
+            .into_projective();
+        Ok(Self(point))
+    }
+
+    /// Get the raw data.
+    pub fn get_raw(&self) -> G1Affine {
+        self.0.into_affine()
+    }
+
+    /// From the raw data.
+    pub fn from_raw(raw: G1Affine) -> Self {
+        Self(raw.into_projective())
     }
 }

@@ -21,22 +21,22 @@ use rand_core::{CryptoRng, RngCore, SeedableRng};
 use sha3::Sha3_512;
 
 /// A scalar variable.
-pub struct ScalarVar(Variable<Fq>);
+struct ScalarVar(Variable<Fq>);
 
 /// A point variable.
-pub struct PointVar {
+struct PointVar {
     x_var: Variable<Fq>,
     y_var: Variable<Fq>,
 }
 
 impl PointVar {
     /// Create a new point variable from field variables.
-    pub fn new(x_var: Variable<Fq>, y_var: Variable<Fq>) -> Self {
+    pub(crate) fn new(x_var: Variable<Fq>, y_var: Variable<Fq>) -> Self {
         Self { x_var, y_var }
     }
 
     /// Allocate a point in Bulletproofs.
-    pub fn allocate<CS: RandomizableConstraintSystem<Fq>>(
+    pub(crate) fn allocate<CS: RandomizableConstraintSystem<Fq>>(
         cs: &mut CS,
         x: &Option<Fq>,
         y: &Option<Fq>,
