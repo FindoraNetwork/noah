@@ -110,7 +110,7 @@ impl Group for ZorroG1 {
 
     #[inline]
     fn random<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
-        Self::get_base().mul(&ZorroScalar::random(prng))
+        Self(G1Projective::rand(prng))
     }
 
     #[inline]

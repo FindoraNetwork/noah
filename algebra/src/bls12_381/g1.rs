@@ -41,7 +41,7 @@ impl Group for BLSG1 {
 
     #[inline]
     fn random<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
-        Self::get_base().mul(&BLSScalar::random(prng))
+        Self(G1Projective::rand(prng))
     }
 
     #[inline]

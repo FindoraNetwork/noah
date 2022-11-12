@@ -239,3 +239,15 @@ impl Scalar for Curve25519Scalar {
         Self(self.0.square())
     }
 }
+
+impl Curve25519Scalar {
+    /// Get the raw data.
+    pub fn get_raw(&self) -> Fr {
+        self.0.clone()
+    }
+
+    /// From the raw data.
+    pub fn from_raw(raw: Fr) -> Self {
+        Self(raw)
+    }
+}

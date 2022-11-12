@@ -360,7 +360,7 @@ impl Group for RistrettoPoint {
 
     #[inline]
     fn random<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
-        Self(RISTRETTO_BASEPOINT_POINT * curve25519_dalek::scalar::Scalar::random(rng))
+        Self(RPoint::random(rng))
     }
 
     #[inline]
