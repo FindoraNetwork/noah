@@ -80,7 +80,7 @@ version = "0.1"
 
 [dependencies.ark-bulletproofs]
 git = "https://github.com/FindoraNetwork/ark-bulletproofs"
-tag = "v2.0.3-f"
+tag = "v2.0.4-f"
 default-features = false
 features = ['yoloproofs']
 

@@ -1,4 +1,4 @@
-use crate::curve25519::Curve25519Scalar;
+use crate::ed25519::Ed25519Scalar;
 use crate::errors::AlgebraError;
 use crate::prelude::*;
 use crate::zorro::ZorroScalar;
@@ -6,7 +6,7 @@ use crate::{
     cmp::Ordering,
     hash::{Hash, Hasher},
 };
-use ark_bulletproofs::curve::curve25519::{G1Affine, G1Projective};
+use ark_bulletproofs::curve::ed25519::{G1Affine, G1Projective};
 use ark_ec::{AffineCurve, ProjectiveCurve};
 use ark_ff::PrimeField;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
@@ -14,26 +14,26 @@ use digest::consts::U64;
 use digest::Digest;
 use wasm_bindgen::prelude::*;
 
-/// The wrapped struct for `ark_ed_on_bls12_381::EdwardsProjective`
+/// The wrapped struct for `ark_bulletproofs::curve::ed25519::EdwardsProjective`
 #[wasm_bindgen]
 #[derive(Clone, PartialEq, Debug, Copy)]
-pub struct Curve25519Point(pub(crate) G1Projective);
+pub struct Ed25519Point(pub(crate) G1Projective);
 
-impl Hash for Curve25519Point {
+impl Hash for Ed25519Point {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.to_string().as_bytes().hash(state)
     }
 }
 
-impl Default for Curve25519Point {
+impl Default for Ed25519Point {
     #[inline]
     fn default() -> Self {
         Self(G1Projective::default())
     }
 }
 
-impl Ord for Curve25519Point {
+impl Ord for Ed25519Point {
     #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
         self.0
@@ -43,16 +43,16 @@ impl Ord for Curve25519Point {
     }
 }
 
-impl PartialOrd for Curve25519Point {
+impl PartialOrd for Ed25519Point {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Eq for Curve25519Point {}
+impl Eq for Ed25519Point {}
 
-impl Curve25519Point {
+impl Ed25519Point {
     /// Multiply the point by the cofactor
     #[inline]
     pub fn mul_by_cofactor(&self) -> Self {
@@ -60,8 +60,8 @@ impl Curve25519Point {
     }
 }
 
-impl Group for Curve25519Point {
-    type ScalarType = Curve25519Scalar;
+impl Group for Ed25519Point {
+    type ScalarType = Ed25519Scalar;
     const COMPRESSED_LEN: usize = 32;
 
     #[inline]
@@ -143,8 +143,8 @@ impl Group for Curve25519Point {
     }
 }
 
-impl<'a> Add<&'a Curve25519Point> for Curve25519Point {
-    type Output = Curve25519Point;
+impl<'a> Add<&'a Ed25519Point> for Ed25519Point {
+    type Output = Ed25519Point;
 
     #[inline]
     fn add(self, rhs: &Self) -> Self::Output {
@@ -152,8 +152,8 @@ impl<'a> Add<&'a Curve25519Point> for Curve25519Point {
     }
 }
 
-impl<'a> Sub<&'a Curve25519Point> for Curve25519Point {
-    type Output = Curve25519Point;
+impl<'a> Sub<&'a Ed25519Point> for Ed25519Point {
+    type Output = Ed25519Point;
 
     #[inline]
     fn sub(self, rhs: &Self) -> Self::Output {
@@ -161,30 +161,30 @@ impl<'a> Sub<&'a Curve25519Point> for Curve25519Point {
     }
 }
 
-impl<'a> Mul<&'a Curve25519Scalar> for Curve25519Point {
-    type Output = Curve25519Point;
+impl<'a> Mul<&'a Ed25519Scalar> for Ed25519Point {
+    type Output = Ed25519Point;
 
     #[inline]
-    fn mul(self, rhs: &Curve25519Scalar) -> Self::Output {
+    fn mul(self, rhs: &Ed25519Scalar) -> Self::Output {
         Self(self.0.mul(&rhs.0.into_repr()))
     }
 }
 
-impl<'a> AddAssign<&'a Curve25519Point> for Curve25519Point {
+impl<'a> AddAssign<&'a Ed25519Point> for Ed25519Point {
     #[inline]
-    fn add_assign(&mut self, rhs: &Curve25519Point) {
+    fn add_assign(&mut self, rhs: &Ed25519Point) {
         self.0.add_assign(&rhs.0)
     }
 }
 
-impl<'a> SubAssign<&'a Curve25519Point> for Curve25519Point {
+impl<'a> SubAssign<&'a Ed25519Point> for Ed25519Point {
     #[inline]
-    fn sub_assign(&mut self, rhs: &'a Curve25519Point) {
+    fn sub_assign(&mut self, rhs: &'a Ed25519Point) {
         self.0.sub_assign(&rhs.0)
     }
 }
 
-impl Neg for Curve25519Point {
+impl Neg for Ed25519Point {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
@@ -192,14 +192,14 @@ impl Neg for Curve25519Point {
     }
 }
 
-impl Curve25519Point {
-    /// Get the x-coordinate of the curve25519 affine point.
+impl Ed25519Point {
+    /// Get the x-coordinate of the ed25519 affine point.
     #[inline]
     pub fn get_x(&self) -> ZorroScalar {
         let affine_point = G1Affine::from(self.0);
         ZorroScalar(affine_point.x)
     }
-    /// Get the y-coordinate of the curve25519 affine point.
+    /// Get the y-coordinate of the ed25519 affine point.
     #[inline]
     pub fn get_y(&self) -> ZorroScalar {
         let affine_point = G1Affine::from(self.0);
