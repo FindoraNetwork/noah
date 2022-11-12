@@ -12,16 +12,16 @@ use wasm_bindgen::prelude::*;
 /// The wrapped struct for `ark_bulletproofs::curve::curve25519::Fr`
 #[wasm_bindgen]
 #[derive(Copy, Clone, PartialEq, Eq, Default, PartialOrd, Ord, Debug, Hash)]
-pub struct Curve25519Scalar(pub(crate) Fr);
+pub struct Ed25519Scalar(pub(crate) Fr);
 
-impl One for Curve25519Scalar {
+impl One for Ed25519Scalar {
     #[inline]
     fn one() -> Self {
         Self(Fr::one())
     }
 }
 
-impl Zero for Curve25519Scalar {
+impl Zero for Ed25519Scalar {
     #[inline]
     fn zero() -> Self {
         Self(Fr::zero())
@@ -33,8 +33,8 @@ impl Zero for Curve25519Scalar {
     }
 }
 
-impl Add for Curve25519Scalar {
-    type Output = Curve25519Scalar;
+impl Add for Ed25519Scalar {
+    type Output = Ed25519Scalar;
 
     #[inline]
     fn add(self, rhs: Self) -> Self::Output {
@@ -42,8 +42,8 @@ impl Add for Curve25519Scalar {
     }
 }
 
-impl Mul for Curve25519Scalar {
-    type Output = Curve25519Scalar;
+impl Mul for Ed25519Scalar {
+    type Output = Ed25519Scalar;
 
     #[inline]
     fn mul(self, rhs: Self) -> Self::Output {
@@ -51,15 +51,15 @@ impl Mul for Curve25519Scalar {
     }
 }
 
-impl Sum<Curve25519Scalar> for Curve25519Scalar {
+impl Sum<Ed25519Scalar> for Ed25519Scalar {
     #[inline]
-    fn sum<I: Iterator<Item = Curve25519Scalar>>(iter: I) -> Self {
+    fn sum<I: Iterator<Item =Ed25519Scalar>>(iter: I) -> Self {
         iter.fold(Self::zero(), Add::add)
     }
 }
 
-impl<'a> Add<&'a Curve25519Scalar> for Curve25519Scalar {
-    type Output = Curve25519Scalar;
+impl<'a> Add<&'a Ed25519Scalar> for Ed25519Scalar {
+    type Output = Ed25519Scalar;
 
     #[inline]
     fn add(self, rhs: &Self) -> Self::Output {
@@ -67,15 +67,15 @@ impl<'a> Add<&'a Curve25519Scalar> for Curve25519Scalar {
     }
 }
 
-impl<'a> AddAssign<&'a Curve25519Scalar> for Curve25519Scalar {
+impl<'a> AddAssign<&'a Ed25519Scalar> for Ed25519Scalar {
     #[inline]
     fn add_assign(&mut self, rhs: &Self) {
         (self.0).add_assign(&rhs.0);
     }
 }
 
-impl<'a> Mul<&'a Curve25519Scalar> for Curve25519Scalar {
-    type Output = Curve25519Scalar;
+impl<'a> Mul<&'a Ed25519Scalar> for Ed25519Scalar {
+    type Output = Ed25519Scalar;
 
     #[inline]
     fn mul(self, rhs: &Self) -> Self::Output {
@@ -83,15 +83,15 @@ impl<'a> Mul<&'a Curve25519Scalar> for Curve25519Scalar {
     }
 }
 
-impl<'a> MulAssign<&'a Curve25519Scalar> for Curve25519Scalar {
+impl<'a> MulAssign<&'a Ed25519Scalar> for Ed25519Scalar {
     #[inline]
     fn mul_assign(&mut self, rhs: &Self) {
         (self.0).mul_assign(&rhs.0);
     }
 }
 
-impl<'a> Sub<&'a Curve25519Scalar> for Curve25519Scalar {
-    type Output = Curve25519Scalar;
+impl<'a> Sub<&'a Ed25519Scalar> for Ed25519Scalar {
+    type Output = Ed25519Scalar;
 
     #[inline]
     fn sub(self, rhs: &Self) -> Self::Output {
@@ -99,22 +99,22 @@ impl<'a> Sub<&'a Curve25519Scalar> for Curve25519Scalar {
     }
 }
 
-impl<'a> SubAssign<&'a Curve25519Scalar> for Curve25519Scalar {
+impl<'a> SubAssign<&'a Ed25519Scalar> for Ed25519Scalar {
     #[inline]
     fn sub_assign(&mut self, rhs: &Self) {
         (self.0).sub_assign(&rhs.0);
     }
 }
 
-impl<'a> Sum<&'a Curve25519Scalar> for Curve25519Scalar {
+impl<'a> Sum<&'a Ed25519Scalar> for Ed25519Scalar {
     #[inline]
-    fn sum<I: Iterator<Item = &'a Curve25519Scalar>>(iter: I) -> Self {
+    fn sum<I: Iterator<Item = &'a Ed25519Scalar>>(iter: I) -> Self {
         iter.fold(Self::zero(), Add::add)
     }
 }
 
-impl Neg for Curve25519Scalar {
-    type Output = Curve25519Scalar;
+impl Neg for Ed25519Scalar {
+    type Output = Ed25519Scalar;
 
     #[inline]
     fn neg(self) -> Self::Output {
@@ -122,35 +122,35 @@ impl Neg for Curve25519Scalar {
     }
 }
 
-impl From<u32> for Curve25519Scalar {
+impl From<u32> for Ed25519Scalar {
     #[inline]
     fn from(value: u32) -> Self {
         Self::from(value as u64)
     }
 }
 
-impl From<u64> for Curve25519Scalar {
+impl From<u64> for Ed25519Scalar {
     #[inline]
     fn from(value: u64) -> Self {
         Self(Fr::from(value))
     }
 }
 
-impl Into<BigUint> for Curve25519Scalar {
+impl Into<BigUint> for Ed25519Scalar {
     #[inline]
     fn into(self) -> BigUint {
         self.0.into_repr().into()
     }
 }
 
-impl<'a> From<&'a BigUint> for Curve25519Scalar {
+impl<'a> From<&'a BigUint> for Ed25519Scalar {
     #[inline]
     fn from(src: &BigUint) -> Self {
         Self(Fr::from(src.clone()))
     }
 }
 
-impl Scalar for Curve25519Scalar {
+impl Scalar for Ed25519Scalar {
     #[inline]
     fn random<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
         Self(Fr::rand(rng))
@@ -240,7 +240,7 @@ impl Scalar for Curve25519Scalar {
     }
 }
 
-impl Curve25519Scalar {
+impl Ed25519Scalar {
     /// Get the raw data.
     pub fn get_raw(&self) -> Fr {
         self.0.clone()

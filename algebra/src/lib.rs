@@ -40,8 +40,8 @@ pub mod zorro;
 /// Module for error handling
 pub mod errors;
 
-/// Module for the curve25519 curve used to work with the Zorro curve in address folding
-pub mod curve25519;
+/// Module for the ed25519 curve used to work with the Zorro curve in address folding
+pub mod ed25519;
 
 /// Module for traits
 pub mod traits;
