@@ -17,7 +17,7 @@ mod ed25519_groups_test {
         prelude::*,
         traits::group_tests::{test_scalar_operations, test_scalar_serialization},
     };
-    use ark_bulletproofs::curve::curve25519::G1Affine;
+    use ark_bulletproofs::curve::ed25519::G1Affine;
     use ark_ec::ProjectiveCurve;
 
     #[test]

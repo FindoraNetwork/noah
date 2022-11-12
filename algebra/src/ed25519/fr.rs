@@ -1,7 +1,7 @@
-use crate::curve25519::CURVE25519_SCALAR_LEN;
+use crate::ed25519::ED25519_SCALAR_LEN;
 use crate::errors::AlgebraError;
 use crate::prelude::*;
-use ark_bulletproofs::curve::curve25519::Fr;
+use ark_bulletproofs::curve::ed25519::Fr;
 use ark_ff::{BigInteger, FftField, Field, FpParameters, PrimeField};
 use digest::consts::U64;
 use digest::Digest;
@@ -9,7 +9,7 @@ use num_bigint::BigUint;
 use num_traits::Num;
 use wasm_bindgen::prelude::*;
 
-/// The wrapped struct for `ark_bulletproofs::curve::curve25519::Fr`
+/// The wrapped struct for `ark_bulletproofs::curve::ed25519::Fr`
 #[wasm_bindgen]
 #[derive(Copy, Clone, PartialEq, Eq, Default, PartialOrd, Ord, Debug, Hash)]
 pub struct Ed25519Scalar(pub(crate) Fr);
@@ -206,7 +206,7 @@ impl Scalar for Ed25519Scalar {
 
     #[inline]
     fn bytes_len() -> usize {
-        CURVE25519_SCALAR_LEN
+        ED25519_SCALAR_LEN
     }
 
     #[inline]
