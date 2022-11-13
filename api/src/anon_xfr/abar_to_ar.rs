@@ -1,10 +1,10 @@
-use crate::anon_xfr::address_folding::{
+use crate::anon_xfr::address_folding_secp256k1::{
     create_address_folding, prepare_verifier_input, prove_address_folding_in_cs,
     verify_address_folding, AXfrAddressFoldingWitness,
 };
 use crate::anon_xfr::{
     abar_to_abar::add_payers_witnesses,
-    address_folding::AXfrAddressFoldingInstance,
+    address_folding_secp256k1::AXfrAddressFoldingInstance,
     commit, commit_in_cs, compute_merkle_root_variables,
     keys::AXfrKeyPair,
     nullify, nullify_in_cs,

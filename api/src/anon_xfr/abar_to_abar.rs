@@ -1,4 +1,4 @@
-use crate::anon_xfr::address_folding::{
+use crate::anon_xfr::address_folding_secp256k1::{
     create_address_folding, prepare_verifier_input, prove_address_folding_in_cs,
     verify_address_folding, AXfrAddressFoldingInstance, AXfrAddressFoldingWitness,
 };
@@ -900,7 +900,7 @@ mod tests {
     use crate::anon_xfr::abar_to_abar::{
         finish_anon_xfr_note, init_anon_xfr_note, AXfrNote, ANON_XFR_FOLDING_PROOF_TRANSCRIPT,
     };
-    use crate::anon_xfr::address_folding::{
+    use crate::anon_xfr::address_folding_secp256k1::{
         create_address_folding, prepare_verifier_input, verify_address_folding,
     };
     use crate::anon_xfr::{
