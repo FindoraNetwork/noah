@@ -1,6 +1,7 @@
 use crate::anon_xfr::address_folding_secp256k1::{
-    create_address_folding, prepare_verifier_input, prove_address_folding_in_cs,
-    verify_address_folding, AXfrAddressFoldingInstance, AXfrAddressFoldingWitness,
+    create_address_folding_secp256k1, prepare_verifier_input_secp256k1,
+    prove_address_folding_in_cs_secp256k1, verify_address_folding_secp256k1,
+    AXfrAddressFoldingInstanceSecp256k1, AXfrAddressFoldingWitnessSecp256k1,
 };
 use crate::anon_xfr::{
     add_merkle_path_variables, check_asset_amount, check_inputs, check_roots, commit, commit_in_cs,
@@ -46,7 +47,7 @@ pub struct AXfrNote {
     /// The Plonk proof (assuming non-malleability).
     pub proof: AXfrPlonkPf,
     /// The address folding instance.
-    pub folding_instance: AXfrAddressFoldingInstance,
+    pub folding_instance: AXfrAddressFoldingInstanceSecp256k1,
 }
 
 /// Anonymous transfer pre-note without proofs and signatures.
@@ -220,7 +221,7 @@ pub fn finish_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> 
 
     let mut transcript = Transcript::new(ANON_XFR_FOLDING_PROOF_TRANSCRIPT);
     let (folding_instance, folding_witness) =
-        create_address_folding(prng, hash, &mut transcript, &input_keypair)?;
+        create_address_folding_secp256k1(prng, hash, &mut transcript, &input_keypair)?;
     let proof = prove_xfr(
         prng,
         params,
@@ -263,10 +264,11 @@ pub fn verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default>(
     };
 
     let mut transcript = Transcript::new(ANON_XFR_FOLDING_PROOF_TRANSCRIPT);
-    let (beta, lambda) = verify_address_folding(hash, &mut transcript, &note.folding_instance)?;
+    let (beta, lambda) =
+        verify_address_folding_secp256k1(hash, &mut transcript, &note.folding_instance)?;
 
     let address_folding_public_input =
-        prepare_verifier_input(&note.folding_instance, &beta, &lambda);
+        prepare_verifier_input_secp256k1(&note.folding_instance, &beta, &lambda);
 
     verify_xfr(
         params,
@@ -315,10 +317,10 @@ pub fn batch_verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default + Sync +
 
             let mut transcript = Transcript::new(ANON_XFR_FOLDING_PROOF_TRANSCRIPT);
             let (beta, lambda) =
-                verify_address_folding(hash, &mut transcript, &note.folding_instance)?;
+                verify_address_folding_secp256k1(hash, &mut transcript, &note.folding_instance)?;
 
             let address_folding_public_input =
-                prepare_verifier_input(&note.folding_instance, &beta, &lambda);
+                prepare_verifier_input_secp256k1(&note.folding_instance, &beta, &lambda);
 
             verify_xfr(
                 *param,
@@ -344,7 +346,7 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     nullifiers_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
     input_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
     output_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
-    folding_witness: &AXfrAddressFoldingWitness,
+    folding_witness: &AXfrAddressFoldingWitnessSecp256k1,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(ANON_XFR_PLONK_PROOF_TRANSCRIPT);
     transcript.append_u64(
@@ -541,7 +543,7 @@ pub(crate) fn build_multi_xfr_cs(
     nullifiers_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
     input_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
     output_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
-    folding_witness: &AXfrAddressFoldingWitness,
+    folding_witness: &AXfrAddressFoldingWitnessSecp256k1,
 ) -> (TurboPlonkCS, usize) {
     assert_ne!(witness.payers_witnesses.len(), 0);
     assert_ne!(witness.payees_witnesses.len(), 0);
@@ -694,7 +696,7 @@ pub(crate) fn build_multi_xfr_cs(
     let fee_var = cs.new_variable(BLSScalar::from(witness.fee));
     cs.prepare_pi_variable(fee_var);
 
-    prove_address_folding_in_cs(
+    prove_address_folding_in_cs_secp256k1(
         &mut cs,
         &public_key_scalars_vars,
         &secret_key_scalars_vars,
@@ -901,7 +903,8 @@ mod tests {
         finish_anon_xfr_note, init_anon_xfr_note, AXfrNote, ANON_XFR_FOLDING_PROOF_TRANSCRIPT,
     };
     use crate::anon_xfr::address_folding_secp256k1::{
-        create_address_folding, prepare_verifier_input, verify_address_folding,
+        create_address_folding_secp256k1, prepare_verifier_input_secp256k1,
+        verify_address_folding_secp256k1,
     };
     use crate::anon_xfr::{
         abar_to_abar::{
@@ -2363,9 +2366,13 @@ mod tests {
         };
 
         let mut transcript = Transcript::new(ANON_XFR_FOLDING_PROOF_TRANSCRIPT);
-        let (folding_instance, folding_witness) =
-            create_address_folding(&mut prng, test_hash.clone(), &mut transcript, &keypair)
-                .unwrap();
+        let (folding_instance, folding_witness) = create_address_folding_secp256k1(
+            &mut prng,
+            test_hash.clone(),
+            &mut transcript,
+            &keypair,
+        )
+        .unwrap();
 
         let mut nullifiers_traces = Vec::<AnemoiVLHTrace<BLSScalar, 2, 12>>::new();
         let mut input_commitments_traces = Vec::<AnemoiVLHTrace<BLSScalar, 2, 12>>::new();
@@ -2414,9 +2421,10 @@ mod tests {
 
         let mut transcript = Transcript::new(ANON_XFR_FOLDING_PROOF_TRANSCRIPT);
         let (beta, lambda) =
-            verify_address_folding(test_hash, &mut transcript, &folding_instance).unwrap();
+            verify_address_folding_secp256k1(test_hash, &mut transcript, &folding_instance)
+                .unwrap();
         let address_folding_public_input =
-            prepare_verifier_input(&folding_instance, &beta, &lambda);
+            prepare_verifier_input_secp256k1(&folding_instance, &beta, &lambda);
 
         let mut online_inputs = pub_inputs.to_vec();
         online_inputs.extend_from_slice(&address_folding_public_input);
