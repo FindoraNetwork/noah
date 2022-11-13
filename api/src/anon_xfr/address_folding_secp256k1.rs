@@ -23,7 +23,7 @@ use rand_core::{CryptoRng, RngCore};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
 /// The instance for address folding.
-pub struct AXfrAddressFoldingInstance {
+pub struct AXfrAddressFoldingInstanceSecp256k1 {
     /// The inspector's proof.
     pub delegated_schnorr_proof:
         DelegatedSchnorrProof<SECQ256K1Scalar, SECQ256K1G1, SimFrParamsSecq256k1>,
@@ -35,7 +35,7 @@ pub struct AXfrAddressFoldingInstance {
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
 /// The witness for address folding.
-pub struct AXfrAddressFoldingWitness {
+pub struct AXfrAddressFoldingWitnessSecp256k1 {
     /// The key pair
     pub keypair: AXfrKeyPair,
     /// Blinding factors of the commitments
@@ -52,7 +52,7 @@ pub struct AXfrAddressFoldingWitness {
     pub lambda: SECQ256K1Scalar,
 }
 
-impl Default for AXfrAddressFoldingWitness {
+impl Default for AXfrAddressFoldingWitnessSecp256k1 {
     fn default() -> Self {
         let keypair = AXfrKeyPair::default();
         let blinding_factors = vec![SECQ256K1Scalar::default(); 3];
@@ -94,12 +94,18 @@ impl Default for AXfrAddressFoldingWitness {
 }
 
 /// Create the folding instance and witness of address folding.
-pub fn create_address_folding<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> + Default>(
+pub fn create_address_folding_secp256k1<
+    R: CryptoRng + RngCore,
+    D: Digest<OutputSize = U64> + Default,
+>(
     prng: &mut R,
     hash: D,
     transcript: &mut Transcript,
     keypair: &AXfrKeyPair,
-) -> Result<(AXfrAddressFoldingInstance, AXfrAddressFoldingWitness)> {
+) -> Result<(
+    AXfrAddressFoldingInstanceSecp256k1,
+    AXfrAddressFoldingWitnessSecp256k1,
+)> {
     let pc_gens = PedersenCommitmentSecq256k1::default();
     let bp_gens = Secq256k1BulletproofGens::load().unwrap();
 
@@ -129,13 +135,13 @@ pub fn create_address_folding<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
         .c(d!())?
     };
 
-    let instance = AXfrAddressFoldingInstance {
+    let instance = AXfrAddressFoldingInstanceSecp256k1 {
         delegated_schnorr_proof: delegated_schnorr_proof.clone(),
         scalar_mul_commitments,
         scalar_mul_proof,
     };
 
-    let witness = AXfrAddressFoldingWitness {
+    let witness = AXfrAddressFoldingWitnessSecp256k1 {
         keypair: keypair.clone(),
         blinding_factors,
         delegated_schnorr_proof,
@@ -148,10 +154,10 @@ pub fn create_address_folding<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
 }
 
 /// Verify an address folding proof.
-pub fn verify_address_folding<D: Digest<OutputSize = U64> + Default>(
+pub fn verify_address_folding_secp256k1<D: Digest<OutputSize = U64> + Default>(
     hash: D,
     transcript: &mut Transcript,
-    instance: &AXfrAddressFoldingInstance,
+    instance: &AXfrAddressFoldingInstanceSecp256k1,
 ) -> Result<(SECQ256K1Scalar, SECQ256K1Scalar)> {
     let pc_gens = PedersenCommitmentSecq256k1::default();
     let bp_gens = Secq256k1BulletproofGens::load().unwrap();
@@ -174,11 +180,11 @@ pub fn verify_address_folding<D: Digest<OutputSize = U64> + Default>(
 }
 
 /// Generate the constraints used in the Plonk proof for address folding.
-pub fn prove_address_folding_in_cs(
+pub fn prove_address_folding_in_cs_secp256k1(
     cs: &mut TurboPlonkCS,
     public_key_scalars_vars: &[VarIndex; 3],
     secret_key_scalars_vars: &[VarIndex; 2],
-    witness: &AXfrAddressFoldingWitness,
+    witness: &AXfrAddressFoldingWitnessSecp256k1,
 ) -> Result<()> {
     // 1. decompose the scalar inputs.
     let mut public_key_bits_vars = cs.range_check(public_key_scalars_vars[0], 248);
@@ -561,8 +567,8 @@ pub fn prove_address_folding_in_cs(
 }
 
 /// Convert the instance into input to the Plonk verifier.
-pub fn prepare_verifier_input(
-    instance: &AXfrAddressFoldingInstance,
+pub fn prepare_verifier_input_secp256k1(
+    instance: &AXfrAddressFoldingInstanceSecp256k1,
     beta: &SECQ256K1Scalar,
     lambda: &SECQ256K1Scalar,
 ) -> Vec<BLSScalar> {

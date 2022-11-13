@@ -1,6 +1,6 @@
 // The Public Setup needed for Proofs
 use crate::anon_xfr::abar_to_abar::{build_multi_xfr_cs, AXfrWitness};
-use crate::anon_xfr::address_folding_secp256k1::AXfrAddressFoldingWitness;
+use crate::anon_xfr::address_folding_secp256k1::AXfrAddressFoldingWitnessSecp256k1;
 use crate::anon_xfr::keys::AXfrKeyPair;
 use crate::anon_xfr::structs::{PayeeWitness, PayerWitness};
 use crate::anon_xfr::{
@@ -167,7 +167,7 @@ impl ProverParams {
         n_payees: usize,
         tree_depth: Option<usize>,
     ) -> Result<ProverParams> {
-        let folding_witness = AXfrAddressFoldingWitness::default();
+        let folding_witness = AXfrAddressFoldingWitnessSecp256k1::default();
 
         let (fake_witness, depth) = match tree_depth {
             Some(depth) => (AXfrWitness::fake(n_payers, n_payees, depth, 0), depth),
@@ -350,7 +350,7 @@ impl ProverParams {
             blind: bls_zero,
         };
 
-        let folding_witness = AXfrAddressFoldingWitness::default();
+        let folding_witness = AXfrAddressFoldingWitnessSecp256k1::default();
 
         let (_, nullifier_trace) = nullify(
             &AXfrKeyPair::from_secret_key(payer_secret.secret_key.clone()),
@@ -463,7 +463,7 @@ impl ProverParams {
             blind: bls_zero,
         };
 
-        let folding_witness = AXfrAddressFoldingWitness::default();
+        let folding_witness = AXfrAddressFoldingWitnessSecp256k1::default();
 
         let (_, nullifier_trace) = nullify(
             &AXfrKeyPair::from_secret_key(payer_secret.secret_key.clone()),

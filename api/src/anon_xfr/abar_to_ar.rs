@@ -1,10 +1,11 @@
 use crate::anon_xfr::address_folding_secp256k1::{
-    create_address_folding, prepare_verifier_input, prove_address_folding_in_cs,
-    verify_address_folding, AXfrAddressFoldingWitness,
+    create_address_folding_secp256k1, prepare_verifier_input_secp256k1,
+    prove_address_folding_in_cs_secp256k1, verify_address_folding_secp256k1,
+    AXfrAddressFoldingWitnessSecp256k1,
 };
 use crate::anon_xfr::{
     abar_to_abar::add_payers_witnesses,
-    address_folding_secp256k1::AXfrAddressFoldingInstance,
+    address_folding_secp256k1::AXfrAddressFoldingInstanceSecp256k1,
     commit, commit_in_cs, compute_merkle_root_variables,
     keys::AXfrKeyPair,
     nullify, nullify_in_cs,
@@ -47,7 +48,7 @@ pub struct AbarToArNote {
     /// The Plonk proof (assuming non-malleability).
     pub proof: AXfrPlonkPf,
     /// The address folding instance.
-    pub folding_instance: AXfrAddressFoldingInstance,
+    pub folding_instance: AXfrAddressFoldingInstanceSecp256k1,
 }
 
 /// The anonymous-to-transparent note without proof.
@@ -164,7 +165,7 @@ pub fn finish_abar_to_ar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
 
     let mut transcript = Transcript::new(ABAR_TO_AR_FOLDING_PROOF_TRANSCRIPT);
     let (folding_instance, folding_witness) =
-        create_address_folding(prng, hash, &mut transcript, &input_keypair)?;
+        create_address_folding_secp256k1(prng, hash, &mut transcript, &input_keypair)?;
 
     let proof = prove_abar_to_ar(
         prng,
@@ -196,10 +197,11 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
     }
 
     let mut transcript = Transcript::new(ABAR_TO_AR_FOLDING_PROOF_TRANSCRIPT);
-    let (beta, lambda) = verify_address_folding(hash, &mut transcript, &note.folding_instance)?;
+    let (beta, lambda) =
+        verify_address_folding_secp256k1(hash, &mut transcript, &note.folding_instance)?;
 
     let address_folding_public_input =
-        prepare_verifier_input(&note.folding_instance, &beta, &lambda);
+        prepare_verifier_input_secp256k1(&note.folding_instance, &beta, &lambda);
 
     let payer_amount = note.body.output.amount.get_amount().unwrap();
     let payer_asset_type = note.body.output.asset_type.get_asset_type().unwrap();
@@ -258,10 +260,10 @@ pub fn batch_verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default + Sync
         .map(|((note, merkle_root), hash)| {
             let mut transcript = Transcript::new(ABAR_TO_AR_FOLDING_PROOF_TRANSCRIPT);
             let (beta, lambda) =
-                verify_address_folding(hash, &mut transcript, &note.folding_instance)?;
+                verify_address_folding_secp256k1(hash, &mut transcript, &note.folding_instance)?;
 
             let address_folding_public_input =
-                prepare_verifier_input(&note.folding_instance, &beta, &lambda);
+                prepare_verifier_input_secp256k1(&note.folding_instance, &beta, &lambda);
 
             let payer_amount = note.body.output.amount.get_amount().unwrap();
             let payer_asset_type = note.body.output.asset_type.get_asset_type().unwrap();
@@ -297,7 +299,7 @@ fn prove_abar_to_ar<R: CryptoRng + RngCore>(
     payers_witness: PayerWitness,
     nullifier_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
     input_commitment_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
-    folding_witness: &AXfrAddressFoldingWitness,
+    folding_witness: &AXfrAddressFoldingWitnessSecp256k1,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(ABAR_TO_AR_PLONK_PROOF_TRANSCRIPT);
 
@@ -326,7 +328,7 @@ pub fn build_abar_to_ar_cs(
     payer_witness: PayerWitness,
     nullifier_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
     input_commitment_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
-    folding_witness: &AXfrAddressFoldingWitness,
+    folding_witness: &AXfrAddressFoldingWitnessSecp256k1,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
 
@@ -435,7 +437,7 @@ pub fn build_abar_to_ar_cs(
     cs.prepare_pi_variable(payer_witness_var.amount);
     cs.prepare_pi_variable(payer_witness_var.asset_type);
 
-    prove_address_folding_in_cs(
+    prove_address_folding_in_cs_secp256k1(
         &mut cs,
         &public_key_scalars_vars,
         &secret_key_scalars_vars,
