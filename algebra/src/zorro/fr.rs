@@ -150,6 +150,18 @@ impl<'a> From<&'a BigUint> for ZorroScalar {
     }
 }
 
+impl ZorroScalar {
+    /// Get the raw data.
+    pub fn get_raw(&self) -> Fr {
+        self.0.clone()
+    }
+
+    /// From the raw data.
+    pub fn from_raw(raw: Fr) -> Self {
+        Self(raw)
+    }
+}
+
 impl Scalar for ZorroScalar {
     #[inline]
     fn random<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
