@@ -1,3 +1,7 @@
+use crate::prelude::*;
+use crate::traits::PedersenCommitment;
+use ark_bulletproofs::curve::zorro::G1Affine;
+
 /// The number of bytes for a scalar value over Zorro
 pub const ZORRO_SCALAR_LEN: usize = 32;
 
@@ -12,7 +16,53 @@ pub use g1::*;
 
 /// The wrapped struct for
 /// `ark_bulletproofs::r1cs::R1CSProof<ark_bulletproofs::curve::zorro::G1Affine>`
-pub type ZorroProof = ark_bulletproofs::r1cs::R1CSProof<ark_bulletproofs::curve::zorro::G1Affine>;
+pub type ZorroProof = ark_bulletproofs::r1cs::R1CSProof<G1Affine>;
+
+#[allow(non_snake_case)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// The Pedersen commitment implementation for the secq256k1 group.
+pub struct PedersenCommitmentZorro {
+    /// The generator for the value part.
+    pub B: ZorroG1,
+    /// The generator for the blinding part.
+    pub B_blinding: ZorroG1,
+}
+
+impl Default for PedersenCommitmentZorro {
+    fn default() -> Self {
+        let pc_gens = ark_bulletproofs::PedersenGens::default();
+        Self {
+            B: ZorroG1::from_raw(pc_gens.B),
+            B_blinding: ZorroG1::from_raw(pc_gens.B_blinding),
+        }
+    }
+}
+
+impl PedersenCommitment<ZorroG1> for PedersenCommitmentZorro {
+    fn generator(&self) -> ZorroG1 {
+        self.B
+    }
+
+    fn blinding_generator(&self) -> ZorroG1 {
+        self.B_blinding
+    }
+
+    fn commit(&self, value: ZorroScalar, blinding: ZorroScalar) -> ZorroG1 {
+        self.B.mul(&value).add(&self.B_blinding.mul(&blinding))
+    }
+}
+
+impl From<&PedersenCommitmentZorro> for ark_bulletproofs::PedersenGens<G1Affine> {
+    fn from(rp: &PedersenCommitmentZorro) -> Self {
+        ark_bulletproofs::PedersenGens {
+            B: rp.B.get_raw(),
+            B_blinding: rp.B_blinding.get_raw(),
+        }
+    }
+}
+
+/// The wrapper struct for the Bulletproof generators.
+pub type ZorroBulletproofGens = ark_bulletproofs::BulletproofGens<G1Affine>;
 
 #[cfg(test)]
 mod zorro_groups_test {

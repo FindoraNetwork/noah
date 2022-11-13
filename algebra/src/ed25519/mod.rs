@@ -1,3 +1,6 @@
+use ark_bulletproofs::curve::ed25519::Fq;
+use ark_ff::field_new;
+
 /// The number of bytes for a scalar value over the ed25519 curve
 pub const ED25519_SCALAR_LEN: usize = 32;
 
@@ -9,6 +12,14 @@ pub use fq::*;
 
 mod g1;
 pub use g1::*;
+
+/// Obtain the d parameter of the ed25519 curve
+pub const fn get_ed25519_d() -> Fq {
+    field_new!(
+        Fq,
+        "37095705934669439343138083508754565189542113879843219016388785533085940283555"
+    )
+}
 
 #[cfg(test)]
 mod ed25519_groups_test {
