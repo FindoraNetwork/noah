@@ -1,6 +1,6 @@
 // The Public Setup needed for Proofs
 use crate::anon_xfr::abar_to_abar::{build_multi_xfr_cs, AXfrWitness};
-use crate::anon_xfr::address_folding::AXfrAddressFoldingWitness;
+use crate::anon_xfr::address_folding_secp256k1::AXfrAddressFoldingWitness;
 use crate::anon_xfr::keys::AXfrKeyPair;
 use crate::anon_xfr::structs::{PayeeWitness, PayerWitness};
 use crate::anon_xfr::{
