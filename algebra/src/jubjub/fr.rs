@@ -1,7 +1,7 @@
 use crate::jubjub::JUBJUB_SCALAR_LEN;
 use crate::{errors::AlgebraError, hash::Hash, prelude::*};
 use ark_ed_on_bls12_381::Fr;
-use ark_ff::{BigInteger, Field, FpParameters, PrimeField};
+use ark_ff::{BigInteger, FftField, Field, FpParameters, PrimeField};
 use digest::{generic_array::typenum::U64, Digest};
 use num_bigint::BigUint;
 use num_traits::Num;
@@ -170,7 +170,7 @@ impl Scalar for JubjubScalar {
 
     #[inline]
     fn multiplicative_generator() -> Self {
-        Self::from(6u64)
+        Self(Fr::multiplicative_generator())
     }
 
     #[inline]

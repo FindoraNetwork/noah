@@ -1,6 +1,6 @@
 // The Public Setup needed for Proofs
 use crate::anon_xfr::abar_to_abar::{build_multi_xfr_cs, AXfrWitness};
-use crate::anon_xfr::address_folding::AXfrAddressFoldingWitness;
+use crate::anon_xfr::address_folding_secp256k1::AXfrAddressFoldingWitnessSecp256k1;
 use crate::anon_xfr::structs::{PayeeWitness, PayerWitness};
 use crate::anon_xfr::{
     abar_to_ar::build_abar_to_ar_cs,
@@ -15,12 +15,13 @@ use crate::keys::KeyPair;
 use crate::parameters::{
     ABAR_TO_AR_VERIFIER_PARAMS, ABAR_TO_BAR_VERIFIER_PARAMS, AR_TO_ABAR_VERIFIER_PARAMS,
     BAR_TO_ABAR_VERIFIER_PARAMS, BULLETPROOF_CURVE25519_URS, BULLETPROOF_SECQ256K1_URS,
-    LAGRANGE_BASES, SRS, VERIFIER_COMMON_PARAMS, VERIFIER_SPECIFIC_PARAMS,
+    BULLETPROOF_ZORRO_URS, LAGRANGE_BASES, SRS, VERIFIER_COMMON_PARAMS, VERIFIER_SPECIFIC_PARAMS,
 };
-use ark_bulletproofs::BulletproofGens as BulletproofGensOverSecq256k1;
 use ark_serialize::CanonicalDeserialize;
 use bulletproofs::BulletproofGens;
 use noah_algebra::ristretto::RistrettoPoint;
+use noah_algebra::secq256k1::Secq256k1BulletproofGens;
+use noah_algebra::zorro::ZorroBulletproofGens;
 use noah_algebra::{
     bls12_381::{BLSScalar, BLSG1},
     prelude::*,
@@ -144,12 +145,28 @@ impl Default for BulletproofParams {
     }
 }
 
-impl BulletproofURS for BulletproofGensOverSecq256k1 {
+impl BulletproofURS for Secq256k1BulletproofGens {
     fn load() -> Result<Self> {
         let urs = BULLETPROOF_SECQ256K1_URS.c(d!(NoahError::MissingSRSError))?;
 
         let reader = ark_std::io::BufReader::new(urs);
-        let bp_gens = BulletproofGensOverSecq256k1::deserialize_unchecked(reader)
+        let bp_gens = Secq256k1BulletproofGens::deserialize_unchecked(reader)
+            .c(d!(NoahError::DeserializationError))
+            .unwrap();
+        Ok(bp_gens)
+    }
+
+    fn increase_circuit_gens(&mut self, new_size: usize) {
+        self.increase_capacity(new_size.next_power_of_two());
+    }
+}
+
+impl BulletproofURS for ZorroBulletproofGens {
+    fn load() -> Result<Self> {
+        let urs = BULLETPROOF_ZORRO_URS.c(d!(NoahError::MissingSRSError))?;
+
+        let reader = ark_std::io::BufReader::new(urs);
+        let bp_gens = ZorroBulletproofGens::deserialize_unchecked(reader)
             .c(d!(NoahError::DeserializationError))
             .unwrap();
         Ok(bp_gens)
@@ -167,7 +184,7 @@ impl ProverParams {
         n_payees: usize,
         tree_depth: Option<usize>,
     ) -> Result<ProverParams> {
-        let folding_witness = AXfrAddressFoldingWitness::default();
+        let folding_witness = AXfrAddressFoldingWitnessSecp256k1::default();
 
         let (fake_witness, depth) = match tree_depth {
             Some(depth) => (AXfrWitness::fake(n_payers, n_payees, depth, 0), depth),
@@ -350,7 +367,7 @@ impl ProverParams {
             blind: bls_zero,
         };
 
-        let folding_witness = AXfrAddressFoldingWitness::default();
+        let folding_witness = AXfrAddressFoldingWitnessSecp256k1::default();
 
         let (_, nullifier_trace) = nullify(
             &payer_secret.secret_key.clone().into_keypair(),
@@ -463,7 +480,7 @@ impl ProverParams {
             blind: bls_zero,
         };
 
-        let folding_witness = AXfrAddressFoldingWitness::default();
+        let folding_witness = AXfrAddressFoldingWitnessSecp256k1::default();
 
         let (_, nullifier_trace) = nullify(
             &payer_secret.secret_key.clone().into_keypair(),

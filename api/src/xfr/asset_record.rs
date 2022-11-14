@@ -7,8 +7,10 @@ use crate::xfr::structs::{
     AssetRecord, AssetRecordTemplate, AssetType, BlindAssetRecord, OpenAssetRecord, OwnerMemo,
     TracerMemo, TracingPolicies, XfrAmount, XfrAssetType,
 };
-use noah_algebra::{prelude::*, ristretto::RistrettoScalar};
-use noah_crypto::basic::pedersen_comm::PedersenCommitmentRistretto;
+use noah_algebra::{
+    prelude::*,
+    ristretto::{PedersenCommitmentRistretto, RistrettoScalar},
+};
 
 /// AssetRecord confidentiality flags. Indicated if amount and/or asset type should be confidential.
 #[derive(Clone, Copy, Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -594,8 +596,11 @@ mod test {
         },
         tests::{create_xfr, gen_key_pair_vec},
     };
-    use noah_algebra::{prelude::*, ristretto::RistrettoScalar};
-    use noah_crypto::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
+    use noah_algebra::{
+        prelude::*,
+        ristretto::{PedersenCommitmentRistretto, RistrettoScalar},
+        traits::PedersenCommitment,
+    };
 
     fn do_test_build_open_asset_record(record_type: AssetRecordType, asset_tracing: bool) {
         let mut prng = test_rng();

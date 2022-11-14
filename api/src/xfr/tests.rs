@@ -13,10 +13,13 @@ use crate::xfr::{
     verify_xfr_body, verify_xfr_note, XfrNotePolicies,
 };
 use merlin::Transcript;
-use noah_algebra::{prelude::*, ristretto::RistrettoScalar};
+use noah_algebra::{
+    prelude::*,
+    ristretto::{PedersenCommitmentRistretto, RistrettoScalar},
+    traits::PedersenCommitment,
+};
 use noah_crypto::basic::{
     elgamal::{elgamal_encrypt, elgamal_key_gen},
-    pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto},
     pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof},
 };
 use rmp_serde::{Deserializer, Serializer};
@@ -814,10 +817,10 @@ mod asset_tracing {
     };
     use noah_algebra::{
         bls12_381::BLSScalar,
-        ristretto::{RistrettoPoint, RistrettoScalar},
+        ristretto::{PedersenCommitmentRistretto, RistrettoPoint, RistrettoScalar},
+        traits::PedersenCommitment,
     };
     use noah_crypto::basic::elgamal::ElGamalCiphertext;
-    use noah_crypto::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
 
     const GOLD_ASSET: AssetType = AssetType([0; ASSET_TYPE_LENGTH]);
     const BITCOIN_ASSET: AssetType = AssetType([1; ASSET_TYPE_LENGTH]);

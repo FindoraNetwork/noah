@@ -17,6 +17,15 @@ pub static BULLETPROOF_SECQ256K1_URS: Option<&'static [u8]> = Some(include_bytes
 ));
 
 #[cfg(feature = "no_urs")]
+/// The Bulletproofs(over the Zorro curve) URS.
+pub static BULLETPROOF_ZORRO_URS: Option<&'static [u8]> = None;
+
+#[cfg(not(feature = "no_urs"))]
+/// The Bulletproofs(over the Zorro curve) URS.
+pub static BULLETPROOF_ZORRO_URS: Option<&'static [u8]> =
+    Some(include_bytes!("../parameters/bulletproof-zorro-urs.bin"));
+
+#[cfg(feature = "no_urs")]
 /// The Bulletproofs(over the Secq256k1 curve) URS.
 pub static BULLETPROOF_SECQ256K1_URS: Option<&'static [u8]> = None;
 

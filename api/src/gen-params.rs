@@ -13,8 +13,8 @@ use noah::setup::{
     MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER,
     MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER, MAX_ANONYMOUS_RECORD_NUMBER_STANDARD,
 };
+use noah_algebra::secq256k1::{PedersenCommitmentSecq256k1, Secq256k1BulletproofGens};
 use noah_algebra::utils::save_to_file;
-use noah_crypto::basic::pedersen_comm::PedersenCommitmentSecq256k1;
 use noah_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS;
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
@@ -22,6 +22,7 @@ use std::{collections::HashMap, path::PathBuf};
 use structopt::StructOpt;
 
 use noah::anon_xfr::TREE_DEPTH;
+use noah_algebra::zorro::ZorroBulletproofGens;
 use rayon::prelude::*;
 
 #[derive(StructOpt, Debug)]
@@ -45,11 +46,14 @@ enum Actions {
     /// Generates the verifying key for ABAR to AR transform
     ABAR_TO_AR { directory: PathBuf },
 
-    /// Generates the uniform reference string for Bulletproof(over the Curve25519 curve).
+    /// Generates the uniform reference string for Bulletproof (over the Curve25519 curve).
     BULLETPROOF_OVER_CURVE25519 { directory: PathBuf },
 
-    /// Generates the uniform reference string for Bulletproof(over the Secq256k1 curve).
+    /// Generates the uniform reference string for Bulletproof (over the Secq256k1 curve).
     BULLETPROOF_OVER_SECQ256K1 { directory: PathBuf },
+
+    /// Generates the uniform reference string for Bulletproof (over the Zorro curve),
+    BULLETPROOF_OVER_ZORRO { directory: PathBuf },
 
     /// Generates all necessary parameters
     ALL { directory: PathBuf },
@@ -82,6 +86,8 @@ fn main() {
         BULLETPROOF_OVER_CURVE25519 { directory } => gen_bulletproof_curve25519_urs(directory),
 
         BULLETPROOF_OVER_SECQ256K1 { directory } => gen_bulletproof_secq256k1_urs(directory),
+
+        BULLETPROOF_OVER_ZORRO { directory } => gen_bulletproof_zorro_urs(directory),
 
         ALL { directory } => gen_all(directory),
     };
@@ -279,7 +285,7 @@ fn gen_bulletproof_curve25519_urs(mut path: PathBuf) {
 fn gen_bulletproof_secq256k1_urs(mut path: PathBuf) {
     println!("Generating Bulletproof(over the Secq256k1 curve) uniform reference string ...");
 
-    let bp_gens = BulletproofGensOverSecq256k1::new(ANON_XFR_BP_GENS_LEN, 1);
+    let bp_gens = Secq256k1BulletproofGens::new(ANON_XFR_BP_GENS_LEN, 1);
     let mut bytes = Vec::new();
     bp_gens.serialize_unchecked(&mut bytes).unwrap();
     path.push("bulletproof-secq256k1-urs.bin");
@@ -287,7 +293,23 @@ fn gen_bulletproof_secq256k1_urs(mut path: PathBuf) {
 
     let start = std::time::Instant::now();
     let reader = ark_std::io::BufReader::new(bytes.as_slice());
-    let _bp_gens = BulletproofGensOverSecq256k1::deserialize_unchecked(reader).unwrap();
+    let _bp_gens = Secq256k1BulletproofGens::deserialize_unchecked(reader).unwrap();
+    println!("Deserialize time: {:.2?}", start.elapsed());
+}
+
+// cargo run --release --features="gen no_urs no_srs no_vk" --bin gen-params bulletproof-over-zorro "./parameters"
+fn gen_bulletproof_zorro_urs(mut path: PathBuf) {
+    println!("Generating Bulletproof(over the Secq256k1 curve) uniform reference string ...");
+
+    let bp_gens = ZorroBulletproofGens::new(ANON_XFR_BP_GENS_LEN, 1);
+    let mut bytes = Vec::new();
+    bp_gens.serialize_unchecked(&mut bytes).unwrap();
+    path.push("bulletproof-zorro-urs.bin");
+    save_to_file(&bytes, path);
+
+    let start = std::time::Instant::now();
+    let reader = ark_std::io::BufReader::new(bytes.as_slice());
+    let _bp_gens = ZorroBulletproofGens::deserialize_unchecked(reader).unwrap();
     println!("Deserialize time: {:.2?}", start.elapsed());
 }
 
@@ -299,5 +321,6 @@ fn gen_all(directory: PathBuf) {
     gen_ar_to_abar_vk(directory.clone());
     gen_abar_to_ar_vk(directory.clone());
     gen_bulletproof_curve25519_urs(directory.clone());
-    gen_bulletproof_secq256k1_urs(directory);
+    gen_bulletproof_secq256k1_urs(directory.clone());
+    gen_bulletproof_zorro_urs(directory)
 }

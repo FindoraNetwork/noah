@@ -67,8 +67,7 @@ features = ['asm']
 
 [dependencies.ark-bulletproofs]
 git = "https://github.com/FindoraNetwork/ark-bulletproofs"
-tag = "v2.0.0-f"
-package = "ark-bulletproofs-secq256k1"
+tag = "v2.0.4-f"
 default-features = false
 features = ['yoloproofs']
 

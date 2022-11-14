@@ -1,6 +1,8 @@
 use crate::fmt::{Debug, Formatter};
+use crate::traits::PedersenCommitment;
 use crate::{errors::AlgebraError, prelude::*};
 use byteorder::ByteOrder;
+use curve25519_dalek::traits::MultiscalarMul;
 use curve25519_dalek::{
     constants::{ED25519_BASEPOINT_POINT, RISTRETTO_BASEPOINT_POINT},
     edwards::{CompressedEdwardsY as CEY, EdwardsPoint},
@@ -358,7 +360,7 @@ impl Group for RistrettoPoint {
 
     #[inline]
     fn random<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
-        Self(RISTRETTO_BASEPOINT_POINT * curve25519_dalek::scalar::Scalar::random(rng))
+        Self(RPoint::random(rng))
     }
 
     #[inline]
@@ -455,6 +457,53 @@ impl<'a> SubAssign<&'a RistrettoPoint> for RistrettoPoint {
     #[inline]
     fn sub_assign(&mut self, rhs: &'a RistrettoPoint) {
         self.0.sub_assign(&rhs.0)
+    }
+}
+
+#[allow(non_snake_case)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+/// The Pedersen commitment implementation for the Ristretto group.
+pub struct PedersenCommitmentRistretto {
+    /// The generator for the value part.
+    pub B: RistrettoPoint,
+    /// The generator for the blinding part.
+    pub B_blinding: RistrettoPoint,
+}
+
+impl Default for PedersenCommitmentRistretto {
+    fn default() -> Self {
+        let pc_gens = bulletproofs::PedersenGens::default();
+        Self {
+            B: RistrettoPoint(pc_gens.B),
+            B_blinding: RistrettoPoint(pc_gens.B_blinding),
+        }
+    }
+}
+impl PedersenCommitment<RistrettoPoint> for PedersenCommitmentRistretto {
+    fn generator(&self) -> RistrettoPoint {
+        self.B
+    }
+
+    fn blinding_generator(&self) -> RistrettoPoint {
+        self.B_blinding
+    }
+
+    fn commit(&self, value: RistrettoScalar, blinding: RistrettoScalar) -> RistrettoPoint {
+        RistrettoPoint(
+            curve25519_dalek::ristretto::RistrettoPoint::multiscalar_mul(
+                &[value.0, blinding.0],
+                &[self.B.0, self.B_blinding.0],
+            ),
+        )
+    }
+}
+
+impl From<&PedersenCommitmentRistretto> for bulletproofs::PedersenGens {
+    fn from(rp: &PedersenCommitmentRistretto) -> Self {
+        bulletproofs::PedersenGens {
+            B: rp.B.0,
+            B_blinding: rp.B_blinding.0,
+        }
     }
 }
 

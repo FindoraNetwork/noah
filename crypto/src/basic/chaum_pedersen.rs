@@ -1,10 +1,10 @@
 use crate::basic::matrix_sigma::{
     sigma_prove, sigma_verify, sigma_verify_scalars, SigmaProof, SigmaTranscript,
 };
-use crate::basic::pedersen_comm::PedersenCommitmentRistretto;
 use curve25519_dalek::traits::{Identity, VartimeMultiscalarMul};
 use merlin::Transcript;
 use noah_algebra::prelude::*;
+use noah_algebra::ristretto::PedersenCommitmentRistretto;
 use noah_algebra::ristretto::RistrettoPoint;
 use noah_algebra::ristretto::RistrettoScalar;
 
@@ -413,7 +413,7 @@ fn get_lc_scalars(transcript: &mut Transcript, n: usize) -> Vec<RistrettoScalar>
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::basic::pedersen_comm::{PedersenCommitment, PedersenCommitmentRistretto};
+    use noah_algebra::{ristretto::PedersenCommitmentRistretto, traits::PedersenCommitment};
 
     #[test]
     pub(crate) fn test_chaum_pedersen_equality_commitment() {
