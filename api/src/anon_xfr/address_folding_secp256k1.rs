@@ -54,7 +54,7 @@ pub struct AXfrAddressFoldingWitnessSecp256k1 {
 
 impl Default for AXfrAddressFoldingWitnessSecp256k1 {
     fn default() -> Self {
-        let keypair = KeyPair::default();
+        let keypair = KeyPair::default_secp256k1();
         let blinding_factors = vec![SECQ256K1Scalar::default(); 3];
 
         let delegated_schnorr_proof =

@@ -49,7 +49,7 @@ pub struct AXfrAddressFoldingWitnessEd25519 {
 
 impl Default for AXfrAddressFoldingWitnessEd25519 {
     fn default() -> Self {
-        let keypair = KeyPair::default(); // TODO ed25519 default keypair
+        let keypair = KeyPair::default_ed25519();
         let blinding_factors = vec![ZorroScalar::default(); 3];
 
         let delegated_schnorr_proof =
@@ -98,10 +98,10 @@ pub fn create_address_folding_ed25519<
     AXfrAddressFoldingInstanceEd25519,
     AXfrAddressFoldingWitnessEd25519,
 )> {
+    let (_sk, _pk) = keypair.to_zorro()?;
+
     let _pc_gens = PedersenCommitmentZorro::default();
     let _bp_gens = ZorroBulletproofGens::load().unwrap();
-
-    let (_sk, _pk) = keypair.to_ristretto()?;
 
     todo!();
 }
@@ -139,8 +139,8 @@ pub fn prove_address_folding_in_cs_secp256k1(
     secret_key_scalars_vars: &[VarIndex; 2],
     witness: &AXfrAddressFoldingWitnessEd25519,
 ) -> Result<()> {
-    //let (sk, pk) = witness.keypair.to_ristretto()?; // TODO change to to_ristretto
-    let (sk, pk) = witness.keypair.to_secp256k1()?;
+    //let (sk, pk) = witness.keypair.to_zorro()?; // TODO change to this
+    let (sk, pk) = witness.keypair.to_secp256k1()?; // TMP to fix get_x, get_y
 
     // 1. decompose the scalar inputs.
     let mut public_key_bits_vars = cs.range_check(public_key_scalars_vars[0], 248);

@@ -17,8 +17,8 @@ use noah_algebra::{
     cmp::Ordering,
     hash::{Hash, Hasher},
     prelude::*,
-    ristretto::{RistrettoPoint, RistrettoScalar},
     secp256k1::{SECP256K1Scalar, SECP256K1G1},
+    zorro::{ZorroG1, ZorroScalar},
 };
 use noah_crypto::basic::hybrid_encryption::{
     hybrid_decrypt_with_ed25519_secret_key, hybrid_encrypt_ed25519, NoahHybridCiphertext,
@@ -194,7 +194,7 @@ impl PublicKey {
     }
 
     /// Change to algebra Ristretto Point
-    pub fn to_ristretto(&self) -> Result<RistrettoPoint> {
+    pub fn to_zorro(&self) -> Result<ZorroG1> {
         match self.inner() {
             PublicKeyInner::Ed25519(_pk) => {
                 unimplemented!()
@@ -233,8 +233,9 @@ impl PublicKey {
     ) -> (KeyType, Vec<u8>, Vec<u8>) {
         match self.0 {
             PublicKeyInner::Ed25519(_) => {
-                let (s, p) = RistrettoScalar::random_scalar_with_compressed_point(prng);
-                (KeyType::Ed25519, s.to_bytes(), p.to_bytes().to_vec())
+                //let (s, p) = ZorroScalar::random_scalar_with_compressed_point(prng);
+                //(KeyType::Ed25519, s.to_bytes(), p.to_bytes().to_vec())
+                unimplemented!()
             }
             PublicKeyInner::Secp256k1(_) | PublicKeyInner::Address(_) => {
                 let (s, p) = SECP256K1Scalar::random_scalar_with_compressed_point(prng);
@@ -464,7 +465,7 @@ impl SecretKey {
     }
 
     /// Change to algebra Ristretto Point
-    pub fn to_ristretto(&self) -> Result<RistrettoScalar> {
+    pub fn to_zorro(&self) -> Result<ZorroScalar> {
         match self {
             SecretKey::Ed25519(_pk) => {
                 unimplemented!()
@@ -625,7 +626,7 @@ impl SecretKey {
     }
 }
 
-#[derive(Clone, Debug, Eq, PartialEq, Default)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[wasm_bindgen]
 /// The keypair for confidential transfer.
 pub struct KeyPair {
@@ -665,6 +666,19 @@ impl NoahFromToBytes for KeyPair {
 }
 
 impl KeyPair {
+    /// Default secp256k1 keypair
+    pub fn default_secp256k1() -> Self {
+        Self {
+            sec_key: SecretKey::default(),
+            pub_key: PublicKey::default(),
+        }
+    }
+
+    /// Default ed25519 keypair
+    pub fn default_ed25519() -> Self {
+        unimplemented!()
+    }
+
     /// Change to algebra Secp256k1 keypair
     pub fn to_secp256k1(&self) -> Result<(SECP256K1Scalar, SECP256K1G1)> {
         match (&self.sec_key, &self.pub_key) {
@@ -682,7 +696,7 @@ impl KeyPair {
     }
 
     /// Change to algebra Ristretto keypair
-    pub fn to_ristretto(&self) -> Result<(RistrettoScalar, RistrettoPoint)> {
+    pub fn to_zorro(&self) -> Result<(ZorroScalar, ZorroG1)> {
         match (&self.sec_key, &self.pub_key) {
             (SecretKey::Ed25519(_sk), PublicKey(PublicKeyInner::Ed25519(_pk))) => {
                 unimplemented!()
