@@ -205,25 +205,27 @@ impl PublicKey {
 
     /// Return the BLS12-381 scalar representation of the public key.
     pub fn to_bls_scalars(&self) -> Result<[BLSScalar; 3]> {
-        match self.inner() {
+        let bytes = match self.inner() {
             PublicKeyInner::Secp256k1(_) => {
                 let pk = self.to_secp256k1()?;
-                let bytes = pk
-                    .get_x()
+                pk.get_x()
                     .to_bytes()
                     .iter()
                     .chain(pk.get_y().to_bytes().iter())
                     .copied()
-                    .collect::<Vec<u8>>();
-
-                let first = BLSScalar::from_bytes(&bytes[0..31])?;
-                let second = BLSScalar::from_bytes(&bytes[31..62])?;
-                let third = BLSScalar::from_bytes(&bytes[62..])?;
-
-                Ok([first, second, third])
+                    .collect::<Vec<u8>>()
             }
-            _ => unimplemented!(),
-        }
+            PublicKeyInner::Ed25519(_) => {
+                unimplemented!()
+            }
+            _ => return Err(eg!(NoahError::ParameterError)),
+        };
+
+        let first = BLSScalar::from_bytes(&bytes[0..31])?;
+        let second = BLSScalar::from_bytes(&bytes[31..62])?;
+        let third = BLSScalar::from_bytes(&bytes[62..])?;
+
+        Ok([first, second, third])
     }
 
     /// random a scalar and the compressed point.
@@ -233,9 +235,8 @@ impl PublicKey {
     ) -> (KeyType, Vec<u8>, Vec<u8>) {
         match self.0 {
             PublicKeyInner::Ed25519(_) => {
-                //let (s, p) = ZorroScalar::random_scalar_with_compressed_point(prng);
-                //(KeyType::Ed25519, s.to_bytes(), p.to_bytes().to_vec())
-                unimplemented!()
+                let (s, p) = ZorroScalar::random_scalar_with_compressed_point(prng);
+                (KeyType::Ed25519, s.to_bytes(), p.to_compressed_bytes())
             }
             PublicKeyInner::Secp256k1(_) | PublicKeyInner::Address(_) => {
                 let (s, p) = SECP256K1Scalar::random_scalar_with_compressed_point(prng);
@@ -476,17 +477,22 @@ impl SecretKey {
 
     /// Return the BLS12-381 scalar representation of the secret key.
     pub fn to_bls_scalars(&self) -> Result<[BLSScalar; 2]> {
-        match self {
+        let bytes = match self {
             SecretKey::Secp256k1(_) => {
                 let sk = self.to_secp256k1()?;
-                let bytes = sk.to_bytes();
-                let first = BLSScalar::from_bytes(&bytes[0..31])?;
-                let second = BLSScalar::from_bytes(&bytes[31..])?;
-
-                Ok([first, second])
+                sk.to_bytes()
             }
-            _ => unimplemented!(),
-        }
+            SecretKey::Ed25519(_) => {
+                let sk = self.to_zorro()?;
+                sk.to_bytes()
+            }
+            _ => return Err(eg!(NoahError::ParameterError)),
+        };
+
+        let first = BLSScalar::from_bytes(&bytes[0..31])?;
+        let second = BLSScalar::from_bytes(&bytes[31..])?;
+
+        Ok([first, second])
     }
 
     #[inline(always)]
@@ -676,20 +682,18 @@ impl KeyPair {
 
     /// Default ed25519 keypair
     pub fn default_ed25519() -> Self {
-        unimplemented!()
+        let sk = Ed25519SecretKey::from_bytes(&[0u8; 32]).unwrap();
+        Self {
+            sec_key: SecretKey::Ed25519(sk),
+            pub_key: PublicKey(PublicKeyInner::Ed25519(Default::default())),
+        }
     }
 
     /// Change to algebra Secp256k1 keypair
     pub fn to_secp256k1(&self) -> Result<(SECP256K1Scalar, SECP256K1G1)> {
         match (&self.sec_key, &self.pub_key) {
-            (SecretKey::Secp256k1(sk), PublicKey(PublicKeyInner::Secp256k1(pk))) => {
-                let pk_bytes = convert_point_libsecp256k1_to_algebra(pk);
-                let pk = SECP256K1G1::from_compressed_bytes(&pk_bytes)?;
-
-                let s: LibSecp256k1Scalar = (*sk).into();
-                let bytes = convert_scalar_libsecp256k1_to_algebra(&s.0);
-                let sk = SECP256K1Scalar::from_bytes(&bytes)?;
-                Ok((sk, pk))
+            (SecretKey::Secp256k1(_), PublicKey(PublicKeyInner::Secp256k1(_))) => {
+                Ok((self.sec_key.to_secp256k1()?, self.pub_key.to_secp256k1()?))
             }
             _ => Err(eg!(NoahError::ParameterError)),
         }
@@ -698,8 +702,8 @@ impl KeyPair {
     /// Change to algebra Ristretto keypair
     pub fn to_zorro(&self) -> Result<(ZorroScalar, ZorroG1)> {
         match (&self.sec_key, &self.pub_key) {
-            (SecretKey::Ed25519(_sk), PublicKey(PublicKeyInner::Ed25519(_pk))) => {
-                unimplemented!()
+            (SecretKey::Ed25519(_), PublicKey(PublicKeyInner::Ed25519(_))) => {
+                Ok((self.sec_key.to_zorro()?, self.pub_key.to_zorro()?))
             }
             _ => Err(eg!(NoahError::ParameterError)),
         }

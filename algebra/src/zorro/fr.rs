@@ -1,6 +1,6 @@
 use crate::errors::AlgebraError;
 use crate::prelude::*;
-use crate::zorro::ZORRO_SCALAR_LEN;
+use crate::zorro::{ZorroG1, ZORRO_SCALAR_LEN};
 use ark_bulletproofs::curve::zorro::Fr;
 use ark_ff::{BigInteger, FftField, Field, FpParameters, PrimeField};
 use digest::consts::U64;
@@ -151,6 +151,17 @@ impl<'a> From<&'a BigUint> for ZorroScalar {
 }
 
 impl ZorroScalar {
+    /// Return a tuple of (r, g^r)
+    /// where r is a random `Scalar`, and g is the `BASEPOINT_POINT`
+    #[inline]
+    pub fn random_scalar_with_compressed_point<R: CryptoRng + RngCore>(
+        prng: &mut R,
+    ) -> (Self, ZorroG1) {
+        let r = Self::random(prng);
+        let p = ZorroG1::get_base().mul(&r);
+        (r, p)
+    }
+
     /// Get the raw data.
     pub fn get_raw(&self) -> Fr {
         self.0.clone()
