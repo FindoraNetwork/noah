@@ -1,5 +1,5 @@
-use crate::anon_xfr::keys::AXfrKeyPair;
 use crate::anon_xfr::TurboPlonkCS;
+use crate::keys::KeyPair;
 use crate::setup::BulletproofURS;
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
@@ -37,7 +37,7 @@ pub struct AXfrAddressFoldingInstanceSecp256k1 {
 /// The witness for address folding.
 pub struct AXfrAddressFoldingWitnessSecp256k1 {
     /// The key pair
-    pub keypair: AXfrKeyPair,
+    pub keypair: KeyPair,
     /// Blinding factors of the commitments
     pub blinding_factors: Vec<SECQ256K1Scalar>,
     /// The inspector's proof.
@@ -54,7 +54,7 @@ pub struct AXfrAddressFoldingWitnessSecp256k1 {
 
 impl Default for AXfrAddressFoldingWitnessSecp256k1 {
     fn default() -> Self {
-        let keypair = AXfrKeyPair::default();
+        let keypair = KeyPair::default_secp256k1();
         let blinding_factors = vec![SECQ256K1Scalar::default(); 3];
 
         let delegated_schnorr_proof =
@@ -101,31 +101,30 @@ pub fn create_address_folding_secp256k1<
     prng: &mut R,
     hash: D,
     transcript: &mut Transcript,
-    keypair: &AXfrKeyPair,
+    keypair: &KeyPair,
 ) -> Result<(
     AXfrAddressFoldingInstanceSecp256k1,
     AXfrAddressFoldingWitnessSecp256k1,
 )> {
+    let (sk, pk) = keypair.to_secp256k1()?;
+
     let pc_gens = PedersenCommitmentSecq256k1::default();
     let bp_gens = Secq256k1BulletproofGens::load().unwrap();
-
-    let public_key = keypair.get_public_key();
-    let secret_key = keypair.get_secret_key();
 
     // important: address folding relies significantly on the Fiat-Shamir transform.
     transcript.append_message(b"hash", hash.finalize().as_slice());
 
     let (scalar_mul_proof, scalar_mul_commitments, blinding_factors) =
-        { ScalarMulProof::prove(prng, &bp_gens, transcript, &public_key.0, &secret_key.0)? };
+        { ScalarMulProof::prove(prng, &bp_gens, transcript, &pk, &sk)? };
 
     let (delegated_schnorr_proof, delegated_schnorr_inspection, beta, lambda) = {
-        let secret_key_in_fq = SECQ256K1Scalar::from_bytes(&secret_key.0.to_bytes())?;
+        let secret_key_in_fq = SECQ256K1Scalar::from_bytes(&sk.to_bytes())?;
 
         prove_delegated_schnorr(
             prng,
             &vec![
-                (public_key.0.get_x(), blinding_factors[0]),
-                (public_key.0.get_y(), blinding_factors[1]),
+                (pk.get_x(), blinding_factors[0]),
+                (pk.get_y(), blinding_factors[1]),
                 (secret_key_in_fq, blinding_factors[2]),
             ],
             &pc_gens,
@@ -186,6 +185,8 @@ pub fn prove_address_folding_in_cs_secp256k1(
     secret_key_scalars_vars: &[VarIndex; 2],
     witness: &AXfrAddressFoldingWitnessSecp256k1,
 ) -> Result<()> {
+    let (sk, pk) = witness.keypair.to_secp256k1()?;
+
     // 1. decompose the scalar inputs.
     let mut public_key_bits_vars = cs.range_check(public_key_scalars_vars[0], 248);
     public_key_bits_vars.extend_from_slice(&cs.range_check(public_key_scalars_vars[1], 248));
@@ -207,10 +208,7 @@ pub fn prove_address_folding_in_cs_secp256k1(
         ]
     };
 
-    let secret_key_bits = witness
-        .keypair
-        .get_secret_key()
-        .0
+    let secret_key_bits = sk
         .to_bytes()
         .iter()
         .flat_map(bytes_to_bits)
@@ -342,15 +340,13 @@ pub fn prove_address_folding_in_cs_secp256k1(
     }
 
     // 3. allocate the simulated field elements and obtain their bit representations.
-    let x_sim_fr =
-        SimFr::<SimFrParamsSecq256k1>::from(&witness.keypair.get_public_key().0.get_x().into());
+    let x_sim_fr = SimFr::<SimFrParamsSecq256k1>::from(&pk.get_x().into());
     let (x_sim_fr_var, x_sim_bits_vars) = SimFrVar::alloc_witness(cs, &x_sim_fr);
-    let y_sim_fr =
-        SimFr::<SimFrParamsSecq256k1>::from(&witness.keypair.get_public_key().0.get_y().into());
+    let y_sim_fr = SimFr::<SimFrParamsSecq256k1>::from(&pk.get_y().into());
     let (y_sim_fr_var, y_sim_bits_vars) = SimFrVar::alloc_witness(cs, &y_sim_fr);
 
     // we can do so only because the secp256k1's order is smaller than its base field modulus.
-    let s_sim_fr = SimFr::<SimFrParamsSecq256k1>::from(&witness.keypair.get_secret_key().0.into());
+    let s_sim_fr = SimFr::<SimFrParamsSecq256k1>::from(&sk.into());
     let (s_sim_fr_var, s_sim_bits_vars) = SimFrVar::alloc_witness(cs, &s_sim_fr);
 
     // 4. check that the bit representations are the same as the one provided through scalars.

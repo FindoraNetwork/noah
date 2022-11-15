@@ -1,5 +1,5 @@
-use crate::anon_xfr::keys::AXfrKeyPair;
 use crate::anon_xfr::TurboPlonkCS;
+use crate::keys::KeyPair;
 use crate::setup::BulletproofURS;
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
@@ -33,7 +33,7 @@ pub struct AXfrAddressFoldingInstanceEd25519 {
 /// The witness for address folding.
 pub struct AXfrAddressFoldingWitnessEd25519 {
     /// The key pair
-    pub keypair: AXfrKeyPair,
+    pub keypair: KeyPair,
     /// Blinding factors of the commitments
     pub blinding_factors: Vec<ZorroScalar>,
     /// The inspector's proof.
@@ -49,7 +49,7 @@ pub struct AXfrAddressFoldingWitnessEd25519 {
 
 impl Default for AXfrAddressFoldingWitnessEd25519 {
     fn default() -> Self {
-        let keypair = AXfrKeyPair::default();
+        let keypair = KeyPair::default_ed25519();
         let blinding_factors = vec![ZorroScalar::default(); 3];
 
         let delegated_schnorr_proof =
@@ -93,16 +93,15 @@ pub fn create_address_folding_ed25519<
     _prng: &mut R,
     _hash: D,
     _transcript: &mut Transcript,
-    keypair: &AXfrKeyPair,
+    keypair: &KeyPair,
 ) -> Result<(
     AXfrAddressFoldingInstanceEd25519,
     AXfrAddressFoldingWitnessEd25519,
 )> {
+    let (_sk, _pk) = keypair.to_zorro()?;
+
     let _pc_gens = PedersenCommitmentZorro::default();
     let _bp_gens = ZorroBulletproofGens::load().unwrap();
-
-    let _public_key = keypair.get_public_key();
-    let _secret_key = keypair.get_secret_key();
 
     todo!();
 }
@@ -140,6 +139,9 @@ pub fn prove_address_folding_in_cs_secp256k1(
     secret_key_scalars_vars: &[VarIndex; 2],
     witness: &AXfrAddressFoldingWitnessEd25519,
 ) -> Result<()> {
+    //let (sk, pk) = witness.keypair.to_zorro()?; // TODO change to this
+    let (sk, pk) = witness.keypair.to_secp256k1()?; // TMP to fix get_x, get_y
+
     // 1. decompose the scalar inputs.
     let mut public_key_bits_vars = cs.range_check(public_key_scalars_vars[0], 248);
     public_key_bits_vars.extend_from_slice(&cs.range_check(public_key_scalars_vars[1], 248));
@@ -161,10 +163,7 @@ pub fn prove_address_folding_in_cs_secp256k1(
         ]
     };
 
-    let secret_key_bits = witness
-        .keypair
-        .get_secret_key()
-        .0
+    let secret_key_bits = sk
         .to_bytes()
         .iter()
         .flat_map(bytes_to_bits)
@@ -296,15 +295,13 @@ pub fn prove_address_folding_in_cs_secp256k1(
     }
 
     // 3. allocate the simulated field elements and obtain their bit representations.
-    let x_sim_fr =
-        SimFr::<SimFrParamsZorro>::from(&witness.keypair.get_public_key().0.get_x().into());
+    let x_sim_fr = SimFr::<SimFrParamsZorro>::from(&pk.get_x().into());
     let (x_sim_fr_var, x_sim_bits_vars) = SimFrVar::alloc_witness(cs, &x_sim_fr);
-    let y_sim_fr =
-        SimFr::<SimFrParamsZorro>::from(&witness.keypair.get_public_key().0.get_y().into());
+    let y_sim_fr = SimFr::<SimFrParamsZorro>::from(&pk.get_y().into());
     let (y_sim_fr_var, y_sim_bits_vars) = SimFrVar::alloc_witness(cs, &y_sim_fr);
 
     // we can do so only because the secp256k1's order is smaller than its base field modulus.
-    let s_sim_fr = SimFr::<SimFrParamsZorro>::from(&witness.keypair.get_secret_key().0.into());
+    let s_sim_fr = SimFr::<SimFrParamsZorro>::from(&sk.into());
     let (s_sim_fr_var, s_sim_bits_vars) = SimFrVar::alloc_witness(cs, &s_sim_fr);
 
     // 4. check that the bit representations are the same as the one provided through scalars.

@@ -1,12 +1,9 @@
-use crate::anon_xfr::keys::AXfrPubKey;
 use crate::anon_xfr::structs::Commitment;
+use crate::keys::{KeyPair, PublicKey};
 use crate::{
-    anon_xfr::{
-        keys::AXfrKeyPair,
-        structs::{
-            AccElemVars, AnonAssetRecord, AxfrOwnerMemo, MTPath, MerkleNodeVars, MerklePathVars,
-            OpenAnonAssetRecord,
-        },
+    anon_xfr::structs::{
+        AccElemVars, AnonAssetRecord, AxfrOwnerMemo, MTPath, MerkleNodeVars, MerklePathVars,
+        OpenAnonAssetRecord,
     },
     xfr::structs::{AssetType, ASSET_TYPE_LENGTH},
 };
@@ -40,8 +37,6 @@ pub mod address_folding_secp256k1;
 pub mod ar_to_abar;
 /// Module for converting confidential assets to anonymous assets.
 pub mod bar_to_abar;
-/// Module for the spending key and the public key.
-pub mod keys;
 /// Module for shared structures.
 pub mod structs;
 
@@ -58,9 +53,9 @@ pub(crate) type TurboPlonkCS = TurboCS<BLSScalar>;
 pub(crate) type AXfrPlonkPf = PlonkPf<KZGCommitmentSchemeBLS>;
 
 /// Check that inputs have Merkle tree witness and matching key pair.
-fn check_inputs(inputs: &[OpenAnonAssetRecord], keypair: &AXfrKeyPair) -> Result<()> {
+fn check_inputs(inputs: &[OpenAnonAssetRecord], keypair: &KeyPair) -> Result<()> {
     for input in inputs.iter() {
-        if input.mt_leaf_info.is_none() || keypair.get_public_key() != input.pub_key {
+        if input.mt_leaf_info.is_none() || keypair.get_pk() != input.pub_key {
             return Err(eg!(NoahError::ParameterError));
         }
     }
@@ -138,7 +133,7 @@ fn check_roots(inputs: &[OpenAnonAssetRecord]) -> Result<()> {
 /// Return Ok(amount, asset_type, blinding) otherwise.
 pub fn parse_memo(
     bytes: &[u8],
-    key_pair: &AXfrKeyPair,
+    key_pair: &KeyPair,
     abar: &AnonAssetRecord,
 ) -> Result<(u64, AssetType, BLSScalar)> {
     if bytes.len() != 8 + ASSET_TYPE_LENGTH + BLS12_381_SCALAR_LEN {
@@ -153,12 +148,8 @@ pub fn parse_memo(
     let blind = BLSScalar::from_bytes(&bytes[i..i + BLS12_381_SCALAR_LEN])
         .c(d!(NoahError::ParameterError))?;
 
-    let (expected_commitment, _) = commit(
-        &key_pair.get_public_key(),
-        blind,
-        amount,
-        asset_type.as_scalar(),
-    )?;
+    let (expected_commitment, _) =
+        commit(&key_pair.get_pk(), blind, amount, asset_type.as_scalar())?;
     if expected_commitment != abar.commitment {
         return Err(eg!(NoahError::CommitmentVerificationError));
     }
@@ -174,28 +165,28 @@ pub fn parse_memo(
 /// Return Ok(amount, asset_type, blinding) otherwise.
 pub fn decrypt_memo(
     memo: &AxfrOwnerMemo,
-    key_pair: &AXfrKeyPair,
+    key_pair: &KeyPair,
     abar: &AnonAssetRecord,
 ) -> Result<(u64, AssetType, BLSScalar)> {
-    let plaintext = memo.decrypt(&key_pair.get_secret_key())?;
+    let plaintext = memo.decrypt(&key_pair.get_sk())?;
     parse_memo(&plaintext, key_pair, abar)
 }
 
 /// Compute the nullifier.
 pub fn nullify(
-    key_pair: &AXfrKeyPair,
+    key_pair: &KeyPair,
     amount: u64,
     asset_type_scalar: BLSScalar,
     uid: u64,
 ) -> Result<(BLSScalar, AnemoiVLHTrace<BLSScalar, 2, 12>)> {
-    let pub_key = key_pair.get_public_key();
+    let pub_key = key_pair.get_pk();
 
     let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::from(1u32));
     let uid_shifted = BLSScalar::from(uid).mul(&pow_2_64);
     let uid_amount = uid_shifted.add(&BLSScalar::from(amount));
 
-    let public_key_scalars = pub_key.get_public_key_scalars()?;
-    let secret_key_scalars = key_pair.get_secret_key().get_secret_key_scalars()?;
+    let public_key_scalars = pub_key.to_bls_scalars()?;
+    let secret_key_scalars = key_pair.get_sk().to_bls_scalars()?;
 
     let zero = BLSScalar::zero();
 
@@ -252,13 +243,13 @@ pub fn commit_in_cs(
 
 /// Compute the record's amount||asset type||pub key commitment
 pub fn commit(
-    public_key: &AXfrPubKey,
+    public_key: &PublicKey,
     blind: BLSScalar,
     amount: u64,
     asset_type_scalar: BLSScalar,
 ) -> Result<(Commitment, AnemoiVLHTrace<BLSScalar, 2, 12>)> {
     let zero = BLSScalar::zero();
-    let public_key_scalars = public_key.get_public_key_scalars()?;
+    let public_key_scalars = public_key.to_bls_scalars()?;
 
     let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
         zero, /* protocol version number */

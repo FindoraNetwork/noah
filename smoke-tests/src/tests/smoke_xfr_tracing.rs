@@ -1,11 +1,11 @@
 #[cfg(test)]
 mod smoke_xfr_tracing {
     use noah::{
+        keys::{KeyPair, PublicKey},
         setup::BulletproofParams,
         xfr::{
             asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
             gen_xfr_note,
-            sig::{XfrKeyPair, XfrPublicKey},
             structs::{
                 AssetRecord, AssetRecordTemplate, AssetTracerKeyPair, AssetType, BlindAssetRecord,
                 OwnerMemo, TracingPolicies, TracingPolicy, ASSET_TYPE_LENGTH,
@@ -19,7 +19,7 @@ mod smoke_xfr_tracing {
 
     /// Simulate getting a BlindAssetRecord from Ledger
     fn conf_blind_asset_record_from_ledger(
-        key: &XfrPublicKey,
+        key: &PublicKey,
         amount: u64,
         asset_type: AssetType,
     ) -> (BlindAssetRecord, OwnerMemo) {
@@ -45,7 +45,7 @@ mod smoke_xfr_tracing {
         record_data: &RecordData,
         expected_amount: u64,
         expected_asset_type: AssetType,
-        expected_pk: &XfrPublicKey,
+        expected_pk: &PublicKey,
     ) {
         assert_eq!(record_data.0, expected_amount);
         assert_eq!(record_data.1, expected_asset_type);
@@ -62,10 +62,10 @@ mod smoke_xfr_tracing {
         let amount_out1 = 100u64;
         let amount_out2 = 25u64;
 
-        let sender1 = XfrKeyPair::generate(&mut prng);
-        let sender2 = XfrKeyPair::generate(&mut prng);
-        let receiver1 = XfrKeyPair::generate(&mut prng);
-        let receiver2 = XfrKeyPair::generate(&mut prng);
+        let sender1 = KeyPair::generate(&mut prng);
+        let sender2 = KeyPair::generate(&mut prng);
+        let receiver1 = KeyPair::generate(&mut prng);
+        let receiver2 = KeyPair::generate(&mut prng);
 
         // setup policy
         let tracer_keys = AssetTracerKeyPair::generate(&mut prng);
@@ -79,9 +79,9 @@ mod smoke_xfr_tracing {
 
         // fake and build input blind_asset_record with associated policy
         let (bar_in1, memo1) =
-            conf_blind_asset_record_from_ledger(&sender1.pub_key, amount_in1, ASSET1_TYPE);
+            conf_blind_asset_record_from_ledger(&sender1.get_pk(), amount_in1, ASSET1_TYPE);
         let (bar_in2, memo2) =
-            conf_blind_asset_record_from_ledger(&sender2.pub_key, amount_in2, ASSET1_TYPE);
+            conf_blind_asset_record_from_ledger(&sender2.get_pk(), amount_in2, ASSET1_TYPE);
 
         let oar_in1 = open_blind_asset_record(&bar_in1, &Some(memo1), &sender1).unwrap();
         let oar_in2 = open_blind_asset_record(&bar_in2, &Some(memo2), &sender2).unwrap();
@@ -104,13 +104,13 @@ mod smoke_xfr_tracing {
             amount_out1,
             ASSET1_TYPE,
             AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-            receiver1.pub_key,
+            receiver1.get_pk(),
         );
         let template_out2 = AssetRecordTemplate::with_no_asset_tracing(
             amount_out2,
             ASSET1_TYPE,
             AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-            receiver2.pub_key,
+            receiver2.get_pk(),
         );
 
         let ar_out1 =
@@ -145,7 +145,7 @@ mod smoke_xfr_tracing {
         assert!(recv_bar1.asset_type.is_confidential());
         assert_eq!(recv_oar1.asset_type, ASSET1_TYPE);
         assert_eq!(recv_oar1.amount, amount_out1);
-        assert_eq!(recv_oar1.blind_asset_record.public_key, receiver1.pub_key);
+        assert_eq!(recv_oar1.blind_asset_record.public_key, receiver1.get_pk());
 
         let recv_bar2 = &xfr_note.body.outputs[1];
         let recv_memo2 = &xfr_note.body.owners_memos[1];
@@ -155,7 +155,7 @@ mod smoke_xfr_tracing {
         assert!(recv_bar2.asset_type.is_confidential());
         assert_eq!(recv_oar2.asset_type, ASSET1_TYPE);
         assert_eq!(recv_oar2.amount, amount_out2);
-        assert_eq!(recv_oar2.blind_asset_record.public_key, receiver2.pub_key);
+        assert_eq!(recv_oar2.blind_asset_record.public_key, receiver2.get_pk());
 
         // check asset tracing
         assert_eq!(xfr_note.body.asset_tracing_memos.len(), 4);
@@ -165,8 +165,8 @@ mod smoke_xfr_tracing {
         assert_eq!(xfr_note.body.asset_tracing_memos[3].len(), 0);
 
         let records_data = trace_assets(&xfr_note.body, &tracer_keys).unwrap();
-        check_record_data(&records_data[0], amount_in1, ASSET1_TYPE, &sender1.pub_key);
-        check_record_data(&records_data[1], amount_in2, ASSET1_TYPE, &sender2.pub_key);
+        check_record_data(&records_data[0], amount_in1, ASSET1_TYPE, &sender1.get_pk());
+        check_record_data(&records_data[1], amount_in2, ASSET1_TYPE, &sender2.get_pk());
     }
 
     #[test]
@@ -178,9 +178,9 @@ mod smoke_xfr_tracing {
         let amount_out1 = 30u64;
         let amount_out2 = 20u64;
 
-        let sender1 = XfrKeyPair::generate(&mut prng);
-        let receiver1 = XfrKeyPair::generate(&mut prng);
-        let receiver2 = XfrKeyPair::generate(&mut prng);
+        let sender1 = KeyPair::generate(&mut prng);
+        let receiver1 = KeyPair::generate(&mut prng);
+        let receiver2 = KeyPair::generate(&mut prng);
 
         // instantiate issuer with public keys
         let asset_tracing_key_pair = AssetTracerKeyPair::generate(&mut prng);
@@ -194,7 +194,7 @@ mod smoke_xfr_tracing {
 
         // prepare input AssetRecord
         let (bar, memo) =
-            conf_blind_asset_record_from_ledger(&sender1.pub_key, amount_in1, ASSET1_TYPE);
+            conf_blind_asset_record_from_ledger(&sender1.get_pk(), amount_in1, ASSET1_TYPE);
         let oar = open_blind_asset_record(&bar, &Some(memo), &sender1).unwrap();
         let ar = AssetRecord::from_open_asset_record_no_asset_tracing(oar);
 
@@ -203,14 +203,14 @@ mod smoke_xfr_tracing {
             amount_out1,
             ASSET1_TYPE,
             AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
-            receiver1.pub_key,
+            receiver1.get_pk(),
             policies.clone(),
         );
         let template2 = AssetRecordTemplate::with_asset_tracing(
             amount_out2,
             ASSET1_TYPE,
             AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
-            receiver2.pub_key,
+            receiver2.get_pk(),
             policies.clone(),
         );
 
@@ -240,7 +240,7 @@ mod smoke_xfr_tracing {
         assert!(!recv_bar1.asset_type.is_confidential());
         assert_eq!(recv_oar1.asset_type, ASSET1_TYPE);
         assert_eq!(recv_oar1.amount, amount_out1);
-        assert_eq!(recv_oar1.blind_asset_record.public_key, receiver1.pub_key);
+        assert_eq!(recv_oar1.blind_asset_record.public_key, receiver1.get_pk());
 
         let recv_bar2 = &xfr_note.body.outputs[1];
         let recv_memo2 = &xfr_note.body.owners_memos[1];
@@ -250,7 +250,7 @@ mod smoke_xfr_tracing {
         assert!(!recv_bar2.asset_type.is_confidential());
         assert_eq!(recv_oar2.asset_type, ASSET1_TYPE);
         assert_eq!(recv_oar2.amount, amount_out2);
-        assert_eq!(recv_oar2.blind_asset_record.public_key, receiver2.pub_key);
+        assert_eq!(recv_oar2.blind_asset_record.public_key, receiver2.get_pk());
 
         // check asset tracing
         assert_eq!(xfr_note.body.asset_tracing_memos.len(), 3);
@@ -263,13 +263,13 @@ mod smoke_xfr_tracing {
             &records_data[0],
             amount_out1,
             ASSET1_TYPE,
-            &receiver1.pub_key,
+            &receiver1.get_pk(),
         );
         check_record_data(
             &records_data[1],
             amount_out2,
             ASSET1_TYPE,
-            &receiver2.pub_key,
+            &receiver2.get_pk(),
         );
     }
 }

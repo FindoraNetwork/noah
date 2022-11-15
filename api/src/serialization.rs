@@ -1,6 +1,6 @@
-use crate::xfr::{
-    sig::{XfrPublicKey, XfrSecretKey, XfrSignature},
-    structs::{AssetType, ASSET_TYPE_LENGTH},
+use crate::{
+    keys::{KeyPair, PublicKey, SecretKey, Signature},
+    xfr::structs::{AssetType, ASSET_TYPE_LENGTH},
 };
 use noah_algebra::prelude::*;
 use serde::Serializer;
@@ -21,50 +21,21 @@ impl NoahFromToBytes for AssetType {
     }
 }
 
-impl NoahFromToBytes for XfrPublicKey {
-    fn noah_to_bytes(&self) -> Vec<u8> {
-        self.to_bytes().to_vec()
-    }
+serialize_deserialize!(SecretKey);
 
-    fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
-        XfrPublicKey::from_bytes(bytes)
-    }
-}
-serialize_deserialize!(XfrPublicKey);
+serialize_deserialize!(PublicKey);
 
-impl NoahFromToBytes for XfrSecretKey {
-    fn noah_to_bytes(&self) -> Vec<u8> {
-        self.to_bytes().to_vec()
-    }
+serialize_deserialize!(KeyPair);
 
-    fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
-        XfrSecretKey::from_bytes(bytes)
-    }
-}
-
-serialize_deserialize!(XfrSecretKey);
-
-impl NoahFromToBytes for XfrSignature {
-    fn noah_to_bytes(&self) -> Vec<u8> {
-        self.to_bytes().to_vec()
-    }
-
-    fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
-        XfrSignature::from_bytes(bytes)
-    }
-}
-
-serialize_deserialize!(XfrSignature);
+serialize_deserialize!(Signature);
 
 #[cfg(test)]
 mod test {
-    use crate::anon_xfr::keys::{AXfrKeyPair, AXfrPubKey};
+    use crate::keys::{KeyPair, PublicKey, PublicKeyInner, SecretKey, Signature};
     use crate::ristretto::CompressedRistretto;
     use crate::serialization::NoahFromToBytes;
-    use crate::xfr::sig::XfrPublicKeyInner;
     use crate::xfr::{
         asset_tracer::RecordDataEncKey,
-        sig::{XfrKeyPair, XfrPublicKey, XfrSecretKey, XfrSignature},
         structs::{BlindAssetRecord, OpenAssetRecord, XfrAmount, XfrAssetType},
     };
     use noah_algebra::{prelude::*, ristretto::RistrettoPoint};
@@ -106,7 +77,7 @@ mod test {
             blind_asset_record: BlindAssetRecord {
                 amount: blind_amount,
                 asset_type: blind_type,
-                public_key: XfrPublicKey(XfrPublicKeyInner::Ed25519(Default::default())),
+                public_key: PublicKey(PublicKeyInner::Ed25519(Default::default())),
             },
             amount: amt,
             amount_blinds: (Default::default(), Default::default()),
@@ -139,19 +110,19 @@ mod test {
     #[test]
     fn anon_xfr_pub_key_serialization() {
         let mut prng = test_rng();
-        let keypair = AXfrKeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate(&mut prng);
 
         let mut pk_mp_vec = vec![];
         assert_eq!(
             true,
             keypair
-                .get_public_key()
+                .get_pk()
                 .serialize(&mut Serializer::new(&mut pk_mp_vec))
                 .is_ok()
         );
         let mut de = Deserializer::new(&pk_mp_vec[..]);
-        let pk2: AXfrPubKey = Deserialize::deserialize(&mut de).unwrap();
-        assert_eq!(keypair.get_public_key(), pk2);
+        let pk2: PublicKey = Deserialize::deserialize(&mut de).unwrap();
+        assert_eq!(keypair.get_pk(), pk2);
 
         let mut keypair_mp_vec = vec![];
         assert_eq!(
@@ -161,14 +132,14 @@ mod test {
                 .is_ok()
         );
         let mut de = Deserializer::new(&keypair_mp_vec[..]);
-        let keypair_2: AXfrKeyPair = Deserialize::deserialize(&mut de).unwrap();
+        let keypair_2: KeyPair = Deserialize::deserialize(&mut de).unwrap();
         assert_eq!(keypair, keypair_2);
     }
 
     #[test]
     fn public_key_message_pack_serialization() {
         let mut prng = test_rng();
-        let keypair = XfrKeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate(&mut prng);
 
         let mut pk_mp_vec = vec![];
         assert_eq!(
@@ -179,7 +150,7 @@ mod test {
                 .is_ok()
         );
         let mut de = Deserializer::new(&pk_mp_vec[..]);
-        let pk2: XfrPublicKey = Deserialize::deserialize(&mut de).unwrap();
+        let pk2: PublicKey = Deserialize::deserialize(&mut de).unwrap();
 
         assert_eq!(&keypair.pub_key, &pk2);
     }
@@ -204,7 +175,7 @@ mod test {
     #[test]
     fn signature_message_pack_serialization() {
         let mut prng = test_rng();
-        let keypair = XfrKeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate(&mut prng);
         let message = [10u8; 55];
 
         let signature = keypair.sign(&message).unwrap();
@@ -216,37 +187,37 @@ mod test {
         );
 
         let mut de = Deserializer::new(&vec[..]);
-        let signature2 = XfrSignature::deserialize(&mut de).unwrap();
+        let signature2 = Signature::deserialize(&mut de).unwrap();
 
         assert_eq!(signature, signature2);
     }
 
     #[derive(Serialize, Deserialize)]
     struct StructWithPubKey {
-        key: XfrPublicKey,
+        key: PublicKey,
     }
 
     #[derive(Serialize, Deserialize)]
     struct StructWithSecKey {
-        key: XfrSecretKey,
+        key: SecretKey,
     }
 
     #[test]
     fn serialize_and_deserialize_as_json() {
         let mut prng = test_rng();
-        let keypair = XfrKeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate(&mut prng);
         let test_struct = StructWithPubKey {
             key: keypair.pub_key,
         };
         let as_json = if let Ok(res) = serde_json::to_string(&test_struct) {
             res
         } else {
-            pnk!(Err(eg!("Failed to serialize XfrPublicKey to JSON")))
+            pnk!(Err(eg!("Failed to serialize PublicKey to JSON")))
         };
         if let Ok(restored) = serde_json::from_str::<StructWithPubKey>(&as_json) {
             assert_eq!(test_struct.key, restored.key);
         } else {
-            pnk!(Err(eg!("Failed to deserialize XfrPublicKey from JSON")));
+            pnk!(Err(eg!("Failed to deserialize PublicKey from JSON")));
         }
 
         let test_struct = StructWithSecKey {
@@ -255,7 +226,7 @@ mod test {
         let as_json = if let Ok(res) = serde_json::to_string(&test_struct) {
             res
         } else {
-            pnk!(Err(eg!("Failed to serialize XfrSecretKey to JSON")))
+            pnk!(Err(eg!("Failed to serialize SecretKey to JSON")))
         };
         if let Ok(restored) = serde_json::from_str::<StructWithSecKey>(&as_json) {
             assert_eq!(
@@ -263,7 +234,7 @@ mod test {
                 restored.key.noah_to_bytes()
             );
         } else {
-            pnk!(Err(eg!("Failed to deserialize XfrSecretKey from JSON")));
+            pnk!(Err(eg!("Failed to deserialize SecretKey from JSON")));
         }
     }
 
@@ -279,7 +250,7 @@ mod test {
         if let Ok(restored) = serde_json::from_str::<RecordDataEncKey>(&serialized) {
             assert_eq!(xfr_pub_key, restored);
         } else {
-            pnk!(Err(eg!("Failed to deserialize XfrPublicKey from JSON")));
+            pnk!(Err(eg!("Failed to deserialize PublicKey from JSON")));
         }
     }
 }

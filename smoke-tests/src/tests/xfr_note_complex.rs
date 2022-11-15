@@ -1,10 +1,10 @@
 use noah::{
     anon_creds::{self, ac_commit, ac_sign, ac_verify_commitment, Attr, Credential},
+    keys::{KeyPair, PublicKey},
     setup::BulletproofParams,
     xfr::{
         asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
         gen_xfr_note,
-        sig::{XfrKeyPair, XfrPublicKey},
         structs::{
             AssetRecord, AssetRecordTemplate, AssetTracerKeyPair, AssetType, BlindAssetRecord,
             IdentityRevealPolicy, OwnerMemo, TracingPolicies, TracingPolicy, ASSET_TYPE_LENGTH,
@@ -20,7 +20,7 @@ const ASSET2_TYPE: AssetType = AssetType([1u8; ASSET_TYPE_LENGTH]);
 const ASSET3_TYPE: AssetType = AssetType([2u8; ASSET_TYPE_LENGTH]);
 
 fn conf_blind_asset_record_from_ledger(
-    key: &XfrPublicKey,
+    key: &PublicKey,
     amount: u64,
     asset_type: AssetType,
 ) -> (BlindAssetRecord, OwnerMemo) {
@@ -47,7 +47,7 @@ fn check_record_data(
     expected_amount: u64,
     expected_asset_type: AssetType,
     expected_ids: Vec<Attr>,
-    expected_pk: &XfrPublicKey,
+    expected_pk: &PublicKey,
 ) {
     assert_eq!(record_data.0, expected_amount);
     assert_eq!(record_data.1, expected_asset_type);
@@ -90,15 +90,15 @@ fn complex_transaction() {
     let asset2_tracing_key = AssetTracerKeyPair::generate(&mut prng);
 
     // setup users keys
-    let user1_key_pair1 = XfrKeyPair::generate(&mut prng);
-    let user1_key_pair2 = XfrKeyPair::generate(&mut prng);
-    let user1_key_pair3 = XfrKeyPair::generate(&mut prng);
+    let user1_key_pair1 = KeyPair::generate(&mut prng);
+    let user1_key_pair2 = KeyPair::generate(&mut prng);
+    let user1_key_pair3 = KeyPair::generate(&mut prng);
     let (user1_ac_sk, user1_ac_pk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
-    let user2_key_pair1 = XfrKeyPair::generate(&mut prng);
+    let user2_key_pair1 = KeyPair::generate(&mut prng);
     let (user2_ac_sk, user2_ac_pk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
-    let user3_key_pair1 = XfrKeyPair::generate(&mut prng);
+    let user3_key_pair1 = KeyPair::generate(&mut prng);
     let (user3_ac_sk, user3_ac_pk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
-    let user4_key_pair1 = XfrKeyPair::generate(&mut prng);
+    let user4_key_pair1 = KeyPair::generate(&mut prng);
     let (user4_ac_sk, user4_ac_pk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
 
     // generate credential for each of the 4 users
@@ -156,18 +156,18 @@ fn complex_transaction() {
         &mut prng,
         &user1_ac_sk,
         &credential_user1,
-        &user1_key_pair1.pub_key.to_bytes(),
+        &user1_key_pair1.get_pk().noah_to_bytes(),
     )
     .unwrap();
     assert!(ac_verify_commitment(
         &cred_issuer_pk,
         &commitment_user1_addr1,
         &proof,
-        &user1_key_pair1.pub_key.to_bytes()
+        &user1_key_pair1.get_pk().noah_to_bytes()
     )
     .is_ok());
     AIR.insert(
-        user1_key_pair1.pub_key.to_bytes().to_vec(),
+        user1_key_pair1.get_pk().noah_to_bytes(),
         commitment_user1_addr1,
     );
 
@@ -175,18 +175,18 @@ fn complex_transaction() {
         &mut prng,
         &user2_ac_sk,
         &credential_user2,
-        &user2_key_pair1.pub_key.to_bytes(),
+        &user2_key_pair1.get_pk().noah_to_bytes(),
     )
     .unwrap();
     assert!(ac_verify_commitment(
         &cred_issuer_pk,
         &commitment_user2_addr1,
         &proof,
-        &user2_key_pair1.pub_key.to_bytes()
+        &user2_key_pair1.get_pk().noah_to_bytes()
     )
     .is_ok());
     AIR.insert(
-        user2_key_pair1.pub_key.to_bytes().to_vec(),
+        user2_key_pair1.get_pk().noah_to_bytes(),
         commitment_user2_addr1,
     );
 
@@ -194,18 +194,18 @@ fn complex_transaction() {
         &mut prng,
         &user3_ac_sk,
         &credential_user3,
-        &user3_key_pair1.pub_key.to_bytes(),
+        &user3_key_pair1.get_pk().noah_to_bytes(),
     )
     .unwrap();
     assert!(ac_verify_commitment(
         &cred_issuer_pk,
         &commitment_user3_addr1,
         &proof,
-        &user3_key_pair1.pub_key.to_bytes()
+        &user3_key_pair1.get_pk().noah_to_bytes()
     )
     .is_ok());
     AIR.insert(
-        user3_key_pair1.pub_key.to_bytes().to_vec(),
+        user3_key_pair1.get_pk().noah_to_bytes(),
         commitment_user3_addr1,
     );
 
@@ -213,18 +213,18 @@ fn complex_transaction() {
         &mut prng,
         &user4_ac_sk,
         &credential_user4,
-        &user4_key_pair1.pub_key.to_bytes(),
+        &user4_key_pair1.get_pk().noah_to_bytes(),
     )
     .unwrap();
     assert!(ac_verify_commitment(
         &cred_issuer_pk,
         &commitment_user4_addr1,
         &proof,
-        &user4_key_pair1.pub_key.to_bytes()
+        &user4_key_pair1.get_pk().noah_to_bytes()
     )
     .is_ok());
     AIR.insert(
-        user4_key_pair1.pub_key.to_bytes().to_vec(),
+        user4_key_pair1.get_pk().noah_to_bytes(),
         commitment_user4_addr1,
     );
 
@@ -254,17 +254,17 @@ fn complex_transaction() {
 
     // prepare inputs
     let (bar_user1_addr1, memo1) = conf_blind_asset_record_from_ledger(
-        &user1_key_pair1.pub_key,
+        &user1_key_pair1.get_pk(),
         amount_asset1_in1,
         ASSET1_TYPE,
     );
     let (bar_user1_addr2, memo2) = conf_blind_asset_record_from_ledger(
-        &user1_key_pair2.pub_key,
+        &user1_key_pair2.get_pk(),
         amount_asset2_in2,
         ASSET2_TYPE,
     );
     let (bar_user1_addr3, memo3) = conf_blind_asset_record_from_ledger(
-        &user1_key_pair3.pub_key,
+        &user1_key_pair3.get_pk(),
         amount_asset3_in3,
         ASSET3_TYPE,
     );
@@ -293,26 +293,26 @@ fn complex_transaction() {
         amount_asset1_out1,
         ASSET1_TYPE,
         AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
-        user1_key_pair1.pub_key,
+        user1_key_pair1.get_pk(),
     );
     let template2 = AssetRecordTemplate::with_no_asset_tracing(
         amount_asset1_out2,
         ASSET1_TYPE,
         AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
-        user2_key_pair1.pub_key,
+        user2_key_pair1.get_pk(),
     );
     let template3 = AssetRecordTemplate::with_asset_tracing(
         amount_asset2_out3,
         ASSET2_TYPE,
         AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
-        user3_key_pair1.pub_key,
+        user3_key_pair1.get_pk(),
         asset_tracing_policy_asset2_output.clone(),
     );
     let template4 = AssetRecordTemplate::with_no_asset_tracing(
         amount_asset3_out4,
         ASSET3_TYPE,
         AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
-        user4_key_pair1.pub_key,
+        user4_key_pair1.get_pk(),
     );
 
     let output_asset_record1 =
@@ -346,13 +346,11 @@ fn complex_transaction() {
 
     // verify
     let no_policy = TracingPolicies::new();
-    let input1_credential_commitment =
-        &AIR[&xfr_note.body.inputs[0].public_key.to_bytes().to_vec()];
+    let input1_credential_commitment = &AIR[&xfr_note.body.inputs[0].public_key.noah_to_bytes()];
     let input_policies = vec![&asset_tracing_policy_asset1_input, &no_policy, &no_policy];
     let inputs_sig_commitments = vec![Some(input1_credential_commitment), None, None];
 
-    let output3_credential_commitment =
-        &AIR[&xfr_note.body.outputs[2].public_key.to_bytes().to_vec()];
+    let output3_credential_commitment = &AIR[&xfr_note.body.outputs[2].public_key.noah_to_bytes()];
     let output_policies = vec![
         &no_policy,
         &no_policy,
@@ -377,7 +375,7 @@ fn complex_transaction() {
         amount_asset1_in1,
         ASSET1_TYPE,
         vec![1, 3], // expect second and last attribute
-        &user1_key_pair1.pub_key,
+        &user1_key_pair1.get_pk(),
     );
 
     let records_data = trace_assets(&xfr_note.body, &asset2_tracing_key).unwrap();
@@ -387,6 +385,6 @@ fn complex_transaction() {
         amount_asset2_out3,
         ASSET2_TYPE,
         vec![8u32, 9, 11], // expect first, second and last attribute of user 3
-        &user3_key_pair1.pub_key,
+        &user3_key_pair1.get_pk(),
     );
 }

@@ -8,7 +8,7 @@ use noah::{
         abar_to_bar::*,
         ar_to_abar::*,
         bar_to_abar::*,
-        keys::AXfrKeyPair,
+        keys::KeyPair,
         structs::{
             AnonAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonAssetRecord,
             OpenAnonAssetRecordBuilder,
@@ -18,7 +18,7 @@ use noah::{
     setup::{ProverParams, VerifierParams},
     xfr::{
         asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
-        sig::XfrKeyPair,
+        sig::Keypair,
         structs::{AssetRecordTemplate, AssetType, ASSET_TYPE_LENGTH},
     },
 };
@@ -86,9 +86,9 @@ fn abar_to_abar(
     let params = ProverParams::new(inputs.len(), outputs.len(), None).unwrap();
     let verifier_params = VerifierParams::load(inputs.len(), outputs.len()).unwrap();
 
-    let sender = AXfrKeyPair::generate(&mut prng);
-    let receivers: Vec<AXfrKeyPair> = (0..outputs.len())
-        .map(|_| AXfrKeyPair::generate(&mut prng))
+    let sender = KeyPair::generate(&mut prng);
+    let receivers: Vec<KeyPair> = (0..outputs.len())
+        .map(|_| KeyPair::generate(&mut prng))
         .collect();
 
     let mut oabars: Vec<OpenAnonAssetRecord> = inputs
@@ -163,7 +163,7 @@ fn abar_to_ar(c: &mut Criterion) {
     let params = ProverParams::abar_to_ar_params(TREE_DEPTH).unwrap();
     let verify_params = VerifierParams::abar_to_ar_params().unwrap();
 
-    let sender = AXfrKeyPair::generate(&mut prng);
+    let sender = KeyPair::generate(&mut prng);
     let receiver = XfrKeyPair::generate(&mut prng);
 
     let fdb = MemoryDB::new();
@@ -224,8 +224,8 @@ fn abar_to_bar(c: &mut Criterion) {
     let params = ProverParams::abar_to_bar_params(TREE_DEPTH).unwrap();
     let verify_params = VerifierParams::abar_to_bar_params().unwrap();
 
-    let sender = AXfrKeyPair::generate(&mut prng);
-    let receiver = XfrKeyPair::generate(&mut prng);
+    let sender = KeyPair::generate(&mut prng);
+    let receiver = KeyPair::generate(&mut prng);
 
     let fdb = MemoryDB::new();
     let cs = Arc::new(RwLock::new(ChainState::new(fdb, "abar_bar".to_owned(), 0)));
@@ -293,8 +293,8 @@ fn ar_to_abar(c: &mut Criterion) {
     let params = ProverParams::ar_to_abar_params().unwrap();
     let verify_params = VerifierParams::ar_to_abar_params().unwrap();
 
-    let sender = XfrKeyPair::generate(&mut prng);
-    let receiver = AXfrKeyPair::generate(&mut prng);
+    let sender = KeyPair::generate(&mut prng);
+    let receiver = KeyPair::generate(&mut prng);
 
     let (bar, memo) = {
         let ar = AssetRecordTemplate::with_no_asset_tracing(
@@ -309,14 +309,7 @@ fn ar_to_abar(c: &mut Criterion) {
 
     let obar = open_blind_asset_record(&bar, &memo, &sender).unwrap();
 
-    let note = gen_ar_to_abar_note(
-        &mut prng,
-        &params,
-        &obar,
-        &sender,
-        &receiver.get_public_key(),
-    )
-    .unwrap();
+    let note = gen_ar_to_abar_note(&mut prng, &params, &obar, &sender, &receiver.get_pk()).unwrap();
 
     let mut single_group = c.benchmark_group("ar_to_abar");
     single_group.sample_size(10);
@@ -346,8 +339,8 @@ fn bar_to_abar(c: &mut Criterion) {
     let params = ProverParams::bar_to_abar_params().unwrap();
     let verify_params = VerifierParams::bar_to_abar_params().unwrap();
 
-    let sender = XfrKeyPair::generate(&mut prng);
-    let receiver = AXfrKeyPair::generate(&mut prng);
+    let sender = KeyPair::generate(&mut prng);
+    let receiver = KeyPair::generate(&mut prng);
 
     let (bar, memo) = {
         let ar = AssetRecordTemplate::with_no_asset_tracing(
@@ -361,14 +354,8 @@ fn bar_to_abar(c: &mut Criterion) {
     };
     let obar = open_blind_asset_record(&bar, &memo, &sender).unwrap();
 
-    let note = gen_bar_to_abar_note(
-        &mut prng,
-        &params,
-        &obar,
-        &sender,
-        &receiver.get_public_key(),
-    )
-    .unwrap();
+    let note =
+        gen_bar_to_abar_note(&mut prng, &params, &obar, &sender, &receiver.get_pk()).unwrap();
     assert!(verify_bar_to_abar_note(&verify_params, &note, &sender.pub_key).is_ok());
 
     let mut single_group = c.benchmark_group("bar_to_abar");
@@ -402,12 +389,12 @@ fn build_oabar<R: CryptoRng + RngCore>(
     prng: &mut R,
     amount: u64,
     asset_type: AssetType,
-    keypair: &AXfrKeyPair,
+    keypair: &KeyPair,
 ) -> OpenAnonAssetRecord {
     OpenAnonAssetRecordBuilder::new()
         .amount(amount)
         .asset_type(asset_type)
-        .pub_key(&keypair.get_public_key())
+        .pub_key(&keypair.get_pk())
         .finalize(prng)
         .unwrap()
         .build()

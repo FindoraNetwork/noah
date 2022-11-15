@@ -1,10 +1,10 @@
 use crate::anon_creds::{self, ac_commit, ACCommitment, Credential};
+use crate::keys::KeyPair;
 use crate::setup::BulletproofParams;
 use crate::xfr::{
     asset_record::AssetRecordType,
     batch_verify_xfr_body_asset_records, batch_verify_xfr_notes, compute_transfer_multisig,
     gen_xfr_note,
-    sig::XfrKeyPair,
     structs::{
         AssetRecord, AssetRecordTemplate, AssetTracerEncKeys, AssetTracerKeyPair, AssetType,
         IdentityRevealPolicy, TracerMemo, TracingPolicy, XfrAmount, XfrAssetType, XfrBody, XfrNote,
@@ -29,7 +29,7 @@ pub(crate) fn create_xfr<R: CryptoRng + RngCore>(
     prng: &mut R,
     input_templates: &[AssetRecordTemplate],
     output_templates: &[AssetRecordTemplate],
-    inkeys: &[&XfrKeyPair],
+    inkeys: &[&KeyPair],
 ) -> (XfrNote, Vec<AssetRecord>, Vec<AssetRecord>) {
     let inputs = input_templates
         .iter()
@@ -45,13 +45,10 @@ pub(crate) fn create_xfr<R: CryptoRng + RngCore>(
     (xfr_note, inputs, outputs)
 }
 
-pub(crate) fn gen_key_pair_vec<R: CryptoRng + RngCore>(
-    size: usize,
-    prng: &mut R,
-) -> Vec<XfrKeyPair> {
+pub(crate) fn gen_key_pair_vec<R: CryptoRng + RngCore>(size: usize, prng: &mut R) -> Vec<KeyPair> {
     let mut keys = vec![];
     for _i in 0..size {
-        keys.push(XfrKeyPair::generate_secp256k1(prng));
+        keys.push(KeyPair::generate_secp256k1(prng));
     }
     keys
 }
@@ -632,7 +629,7 @@ mod keys {
         let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
 
         for x in amounts.iter() {
-            let keypair = XfrKeyPair::generate(&mut prng);
+            let keypair = KeyPair::generate(&mut prng);
             let asset_record = AssetRecordTemplate::with_no_asset_tracing(
                 x.0,
                 x.1,
@@ -649,7 +646,7 @@ mod keys {
         }
 
         for x in amounts.iter() {
-            let keypair = XfrKeyPair::generate(&mut prng);
+            let keypair = KeyPair::generate(&mut prng);
 
             let ar_template = AssetRecordTemplate::with_no_asset_tracing(
                 x.0,
@@ -671,8 +668,8 @@ mod keys {
         );
         msg_eq!(NoahError::ParameterError, xfr_note.unwrap_err());
 
-        let key1 = XfrKeyPair::generate(&mut prng);
-        let key2 = XfrKeyPair::generate(&mut prng);
+        let key1 = KeyPair::generate(&mut prng);
+        let key2 = KeyPair::generate(&mut prng);
         let xfr_note = gen_xfr_note(
             &mut prng,
             inputs.as_slice(),
@@ -727,7 +724,7 @@ mod identity_tracing {
             identity_tracing: Some(id_tracing_policy),
         });
 
-        let input_keypair = XfrKeyPair::generate(&mut prng);
+        let input_keypair = KeyPair::generate(&mut prng);
 
         let input_asset_record = AssetRecordTemplate::with_no_asset_tracing(
             10,
@@ -1059,7 +1056,7 @@ mod asset_tracing {
             identity_tracing: None,
         });
 
-        let input_keypair = XfrKeyPair::generate(&mut prng);
+        let input_keypair = KeyPair::generate(&mut prng);
         let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
         let input_asset_record = AssetRecordTemplate::with_asset_tracing(
             10,

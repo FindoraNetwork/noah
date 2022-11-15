@@ -2,11 +2,11 @@ use crate::anon_creds::{
     ACConfidentialRevealProof, ACIssuerPublicKey, AttributeCiphertext, AttributeDecKey,
     AttributeEncKey,
 };
+use crate::keys::{KeyPair, KeyType, MultiSig, PublicKey};
 use crate::xfr::{
     asset_mixer::AssetMixProof,
     asset_record::AssetRecordType,
     asset_tracer::{RecordDataCiphertext, RecordDataDecKey, RecordDataEncKey},
-    sig::{KeyType, XfrKeyPair, XfrMultiSig, XfrPublicKey},
 };
 use bulletproofs::RangeProof;
 use digest::Digest;
@@ -73,7 +73,7 @@ pub struct XfrNote {
     /// The confidential transfer body.
     pub body: XfrBody,
     /// The multisiganture of the senders
-    pub multisig: XfrMultiSig,
+    pub multisig: MultiSig,
 }
 
 /// A confidential transfer body.
@@ -100,7 +100,7 @@ pub struct BlindAssetRecord {
     /// The asset type.
     pub asset_type: XfrAssetType,
     /// The owner's address.
-    pub public_key: XfrPublicKey,
+    pub public_key: PublicKey,
 }
 
 impl BlindAssetRecord {
@@ -399,7 +399,7 @@ impl OwnerMemo {
     pub fn from_amount<R: CryptoRng + RngCore>(
         prng: &mut R,
         amount: u64,
-        pub_key: &XfrPublicKey,
+        pub_key: &PublicKey,
     ) -> Result<(Self, (RistrettoScalar, RistrettoScalar))> {
         let (key_type, r, blind_share_bytes) = pub_key.random_scalar_with_compressed_point(prng);
         let shared_point =
@@ -421,7 +421,7 @@ impl OwnerMemo {
     pub fn from_asset_type<R: CryptoRng + RngCore>(
         prng: &mut R,
         asset_type: &AssetType,
-        pub_key: &XfrPublicKey,
+        pub_key: &PublicKey,
     ) -> Result<(Self, RistrettoScalar)> {
         let (key_type, r, blind_share_bytes) = pub_key.random_scalar_with_compressed_point(prng);
         let shared_point =
@@ -444,7 +444,7 @@ impl OwnerMemo {
         prng: &mut R,
         amount: u64,
         asset_type: &AssetType,
-        pub_key: &XfrPublicKey,
+        pub_key: &PublicKey,
     ) -> Result<(Self, (RistrettoScalar, RistrettoScalar), RistrettoScalar)> {
         let (key_type, r, blind_share_bytes) = pub_key.random_scalar_with_compressed_point(prng);
         let shared_point =
@@ -469,7 +469,7 @@ impl OwnerMemo {
 
     /// Decrypt the `OwnerMemo.lock` which encrypts only the confidential amount
     /// returns error if the decrypted bytes length doesn't match.
-    pub fn decrypt_amount(&self, keypair: &XfrKeyPair) -> Result<u64> {
+    pub fn decrypt_amount(&self, keypair: &KeyPair) -> Result<u64> {
         let decrypted_bytes = self.decrypt(&keypair)?;
         // amount is u64, thus u64.to_be_bytes should be 8 bytes
         if decrypted_bytes.len() != 8 {
@@ -482,7 +482,7 @@ impl OwnerMemo {
 
     /// Decrypt the `OwnerMemo.lock` which encrypts only the confidential asset type
     /// returns error if the decrypted bytes length doesn't match.
-    pub fn decrypt_asset_type(&self, keypair: &XfrKeyPair) -> Result<AssetType> {
+    pub fn decrypt_asset_type(&self, keypair: &KeyPair) -> Result<AssetType> {
         let decrypted_bytes = self.decrypt(&keypair)?;
         if decrypted_bytes.len() != ASSET_TYPE_LENGTH {
             return Err(eg!(NoahError::InconsistentStructureError));
@@ -494,7 +494,7 @@ impl OwnerMemo {
 
     /// Decrypt the `OwnerMemo.lock` which encrypts "amount || asset type", both amount and asset type
     /// are confidential.
-    pub fn decrypt_amount_and_asset_type(&self, keypair: &XfrKeyPair) -> Result<(u64, AssetType)> {
+    pub fn decrypt_amount_and_asset_type(&self, keypair: &KeyPair) -> Result<(u64, AssetType)> {
         let decrypted_bytes = self.decrypt(&keypair)?;
         if decrypted_bytes.len() != ASSET_TYPE_LENGTH + 8 {
             return Err(eg!(NoahError::InconsistentStructureError));
@@ -513,7 +513,7 @@ impl OwnerMemo {
     /// Return the amount blind (blind_low, blind_high)
     pub fn derive_amount_blinds(
         &self,
-        keypair: &XfrKeyPair,
+        keypair: &KeyPair,
     ) -> Result<(RistrettoScalar, RistrettoScalar)> {
         let (key_type, s) = keypair.sec_key.as_scalar_bytes();
         let shared_point = OwnerMemo::derive_shared_point(&key_type, &s, &self.blind_share_bytes)?;
@@ -521,7 +521,7 @@ impl OwnerMemo {
     }
 
     /// Return the asset type blind
-    pub fn derive_asset_type_blind(&self, keypair: &XfrKeyPair) -> Result<RistrettoScalar> {
+    pub fn derive_asset_type_blind(&self, keypair: &KeyPair) -> Result<RistrettoScalar> {
         let (key_type, s) = keypair.sec_key.as_scalar_bytes();
         let shared_point = OwnerMemo::derive_shared_point(&key_type, &s, &self.blind_share_bytes)?;
         Ok(OwnerMemo::calc_asset_type_blind(&shared_point))
@@ -530,7 +530,7 @@ impl OwnerMemo {
 
 impl OwnerMemo {
     // Decrypt the lock.
-    fn decrypt(&self, keypair: &XfrKeyPair) -> Result<Vec<u8>> {
+    fn decrypt(&self, keypair: &KeyPair) -> Result<Vec<u8>> {
         keypair.hybrid_decrypt(&self.lock_bytes)
     }
 
@@ -605,7 +605,7 @@ impl OpenAssetRecord {
         &self.amount
     }
     /// Return the public key.
-    pub fn get_pub_key(&self) -> &XfrPublicKey {
+    pub fn get_pub_key(&self) -> &PublicKey {
         &self.blind_asset_record.public_key
     }
 }
@@ -635,7 +635,7 @@ pub struct AssetRecordTemplate {
     /// The asset type.
     pub asset_type: AssetType,
     /// The ownership's address.
-    pub public_key: XfrPublicKey,
+    pub public_key: PublicKey,
     /// The record type of this asset.
     pub asset_record_type: AssetRecordType,
     /// The tracing polices for this asset.

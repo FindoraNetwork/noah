@@ -2,11 +2,11 @@
 mod smoke_xfr_identity {
     use noah::{
         anon_creds::{self, ac_commit, ac_sign, ac_verify_commitment, Attr, Credential},
+        keys::{KeyPair, PublicKey},
         setup::BulletproofParams,
         xfr::{
             asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
             gen_xfr_note,
-            sig::{XfrKeyPair, XfrPublicKey},
             structs::{
                 AssetRecord, AssetRecordTemplate, AssetTracerKeyPair, AssetType, BlindAssetRecord,
                 IdentityRevealPolicy, OwnerMemo, TracingPolicies, TracingPolicy, ASSET_TYPE_LENGTH,
@@ -20,7 +20,7 @@ mod smoke_xfr_identity {
     const ASSET1_TYPE: AssetType = AssetType([0u8; ASSET_TYPE_LENGTH]);
 
     fn conf_blind_asset_record_from_ledger(
-        key: &XfrPublicKey,
+        key: &PublicKey,
         amount: u64,
         asset_type: AssetType,
     ) -> (BlindAssetRecord, OwnerMemo) {
@@ -47,7 +47,7 @@ mod smoke_xfr_identity {
         expected_amount: u64,
         expected_asset_type: AssetType,
         expected_ids: Vec<Attr>,
-        expected_pk: &XfrPublicKey,
+        expected_pk: &PublicKey,
     ) {
         assert_eq!(record_data.0, expected_amount);
         assert_eq!(record_data.1, expected_asset_type);
@@ -66,9 +66,9 @@ mod smoke_xfr_identity {
         let amount_in2 = 75u64;
         let amount_out1 = 125u64;
 
-        let sender1 = XfrKeyPair::generate(&mut prng);
-        let sender2 = XfrKeyPair::generate(&mut prng);
-        let receiver1 = XfrKeyPair::generate(&mut prng);
+        let sender1 = KeyPair::generate(&mut prng);
+        let sender2 = KeyPair::generate(&mut prng);
+        let receiver1 = KeyPair::generate(&mut prng);
 
         // create credential keys
         let (cred_issuer_sk, cred_issuer_pk) = anon_creds::ac_keygen_issuer(&mut prng, 4);
@@ -110,14 +110,14 @@ mod smoke_xfr_identity {
             &mut prng,
             &user1_ac_sk,
             &credential_user1,
-            &sender1.pub_key.to_bytes(),
+            &sender1.get_pk().noah_to_bytes(),
         )
         .unwrap();
         let (commitment_user2, proof_user2, commitment_key_user2) = ac_commit(
             &mut prng,
             &user2_ac_sk,
             &credential_user2,
-            &sender2.pub_key.to_bytes(),
+            &sender2.get_pk().noah_to_bytes(),
         )
         .unwrap();
 
@@ -126,25 +126,25 @@ mod smoke_xfr_identity {
             &cred_issuer_pk,
             &commitment_user1,
             &proof_user1,
-            &sender1.pub_key.to_bytes()
+            &sender1.get_pk().noah_to_bytes()
         )
         .is_ok());
-        AIR.insert(sender1.pub_key.to_bytes().to_vec(), commitment_user1);
+        AIR.insert(sender1.get_pk().noah_to_bytes(), commitment_user1);
         assert!(ac_verify_commitment(
             &cred_issuer_pk,
             &commitment_user2,
             &proof_user2,
-            &sender2.pub_key.to_bytes()
+            &sender2.get_pk().noah_to_bytes()
         )
         .is_ok());
-        AIR.insert(sender2.pub_key.to_bytes().to_vec(), commitment_user2);
+        AIR.insert(sender2.get_pk().noah_to_bytes(), commitment_user2);
 
         // prepare input AssetRecord
         let (bar1, memo1) =
-            conf_blind_asset_record_from_ledger(&sender1.pub_key, amount_in1, ASSET1_TYPE);
+            conf_blind_asset_record_from_ledger(&sender1.get_pk(), amount_in1, ASSET1_TYPE);
         let oar1 = open_blind_asset_record(&bar1, &Some(memo1), &sender1).unwrap();
         let (bar2, memo2) =
-            conf_blind_asset_record_from_ledger(&sender2.pub_key, amount_in2, ASSET1_TYPE);
+            conf_blind_asset_record_from_ledger(&sender2.get_pk(), amount_in2, ASSET1_TYPE);
         let oar2 = open_blind_asset_record(&bar2, &Some(memo2), &sender2).unwrap();
 
         let ar_in1 = AssetRecord::from_open_asset_record_with_tracing(
@@ -171,7 +171,7 @@ mod smoke_xfr_identity {
             amount_out1,
             ASSET1_TYPE,
             AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
-            receiver1.pub_key,
+            receiver1.get_pk(),
         );
         let ar_out = AssetRecord::from_template_no_identity_tracing(&mut prng, &template).unwrap();
 
@@ -188,8 +188,8 @@ mod smoke_xfr_identity {
         let policies = XfrNotePoliciesRef::new(
             vec![&policies, &policies],
             vec![
-                Some(&AIR[&xfr_note.body.inputs[0].public_key.to_bytes().to_vec()]),
-                Some(&AIR[&xfr_note.body.inputs[1].public_key.to_bytes().to_vec()]),
+                Some(&AIR[&xfr_note.body.inputs[0].public_key.noah_to_bytes()]),
+                Some(&AIR[&xfr_note.body.inputs[1].public_key.noah_to_bytes()]),
             ],
             vec![&no_policies],
             vec![None],
@@ -205,7 +205,7 @@ mod smoke_xfr_identity {
         assert!(!recv_bar1.asset_type.is_confidential());
         assert_eq!(recv_oar1.asset_type, ASSET1_TYPE);
         assert_eq!(recv_oar1.amount, amount_out1);
-        assert_eq!(recv_oar1.blind_asset_record.public_key, receiver1.pub_key);
+        assert_eq!(recv_oar1.blind_asset_record.public_key, receiver1.get_pk());
 
         // check asset tracing on inputs
         assert_eq!(xfr_note.body.asset_tracing_memos.len(), 3);
@@ -220,14 +220,14 @@ mod smoke_xfr_identity {
             amount_in1,
             ASSET1_TYPE,
             vec![1u32, 2],
-            &sender1.pub_key,
+            &sender1.get_pk(),
         );
         check_record_data(
             &records_data[1],
             amount_in2,
             ASSET1_TYPE,
             vec![11u32, 22],
-            &sender2.pub_key,
+            &sender2.get_pk(),
         );
     }
 
@@ -242,9 +242,9 @@ mod smoke_xfr_identity {
         let amount_out1 = 75u64;
         let amount_out2 = 25u64;
 
-        let sender1 = XfrKeyPair::generate(&mut prng);
-        let receiver1 = XfrKeyPair::generate(&mut prng);
-        let receiver2 = XfrKeyPair::generate(&mut prng);
+        let sender1 = KeyPair::generate(&mut prng);
+        let receiver1 = KeyPair::generate(&mut prng);
+        let receiver2 = KeyPair::generate(&mut prng);
 
         // credential keys
         let (cred_issuer_sk, cred_issuer_pk) = anon_creds::ac_keygen_issuer(&mut prng, 4);
@@ -290,14 +290,14 @@ mod smoke_xfr_identity {
             &mut prng,
             &recv_user1_ac_sk,
             &credential_user1,
-            &receiver1.pub_key.to_bytes(),
+            &receiver1.get_pk().noah_to_bytes(),
         )
         .unwrap();
         let (commitment_user2, proof_user2, commitment_key_user2) = ac_commit(
             &mut prng,
             &recv_user2_ac_sk,
             &credential_user2,
-            &receiver2.pub_key.to_bytes(),
+            &receiver2.get_pk().noah_to_bytes(),
         )
         .unwrap();
 
@@ -306,22 +306,22 @@ mod smoke_xfr_identity {
             &cred_issuer_pk,
             &commitment_user1,
             &proof_user1,
-            &receiver1.pub_key.to_bytes()
+            &receiver1.get_pk().noah_to_bytes()
         )
         .is_ok());
-        AIR.insert(receiver1.pub_key.to_bytes().to_vec(), commitment_user1);
+        AIR.insert(receiver1.get_pk().noah_to_bytes(), commitment_user1);
         assert!(ac_verify_commitment(
             &cred_issuer_pk,
             &commitment_user2,
             &proof_user2,
-            &receiver2.pub_key.to_bytes()
+            &receiver2.get_pk().noah_to_bytes()
         )
         .is_ok());
-        AIR.insert(receiver2.pub_key.to_bytes().to_vec(), commitment_user2);
+        AIR.insert(receiver2.get_pk().noah_to_bytes(), commitment_user2);
 
         // prepare input AssetRecord
         let (bar1, memo1) =
-            conf_blind_asset_record_from_ledger(&sender1.pub_key, amount_in1, ASSET1_TYPE);
+            conf_blind_asset_record_from_ledger(&sender1.get_pk(), amount_in1, ASSET1_TYPE);
         let oar1 = open_blind_asset_record(&bar1, &Some(memo1), &sender1).unwrap();
         let ar_in = AssetRecord::from_open_asset_record_no_asset_tracing(oar1);
 
@@ -330,14 +330,14 @@ mod smoke_xfr_identity {
             amount_out1,
             ASSET1_TYPE,
             AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
-            receiver1.pub_key,
+            receiver1.get_pk(),
             policies.clone(),
         );
         let template2 = AssetRecordTemplate::with_asset_tracing(
             amount_out2,
             ASSET1_TYPE,
             AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
-            receiver2.pub_key,
+            receiver2.get_pk(),
             policies.clone(),
         );
         let ar_out1 = AssetRecord::from_template_with_identity_tracing(
@@ -366,8 +366,8 @@ mod smoke_xfr_identity {
             vec![None],
             vec![&policies, &policies],
             vec![
-                Some(&AIR[&xfr_note.body.outputs[0].public_key.to_bytes().to_vec()]),
-                Some(&AIR[&xfr_note.body.outputs[1].public_key.to_bytes().to_vec()]),
+                Some(&AIR[&xfr_note.body.outputs[0].public_key.noah_to_bytes()]),
+                Some(&AIR[&xfr_note.body.outputs[1].public_key.noah_to_bytes()]),
             ],
         );
         assert!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies).is_ok());
@@ -381,7 +381,7 @@ mod smoke_xfr_identity {
         assert!(!recv_bar1.asset_type.is_confidential());
         assert_eq!(recv_oar1.asset_type, ASSET1_TYPE);
         assert_eq!(recv_oar1.amount, amount_out1);
-        assert_eq!(recv_oar1.blind_asset_record.public_key, receiver1.pub_key);
+        assert_eq!(recv_oar1.blind_asset_record.public_key, receiver1.get_pk());
 
         let recv_bar2 = &xfr_note.body.outputs[1];
         let recv_memo2 = &xfr_note.body.owners_memos[1];
@@ -391,7 +391,7 @@ mod smoke_xfr_identity {
         assert!(!recv_bar2.asset_type.is_confidential());
         assert_eq!(recv_oar2.asset_type, ASSET1_TYPE);
         assert_eq!(recv_oar2.amount, amount_out2);
-        assert_eq!(recv_oar2.blind_asset_record.public_key, receiver2.pub_key);
+        assert_eq!(recv_oar2.blind_asset_record.public_key, receiver2.get_pk());
 
         // check asset tracing
         assert_eq!(xfr_note.body.asset_tracing_memos.len(), 3);
@@ -407,14 +407,14 @@ mod smoke_xfr_identity {
             amount_out1,
             ASSET1_TYPE,
             vec![2u32, 3, 4],
-            &receiver1.pub_key,
+            &receiver1.get_pk(),
         );
         check_record_data(
             &records_data[1],
             amount_out2,
             ASSET1_TYPE,
             vec![22u32, 33, 44],
-            &receiver2.pub_key,
+            &receiver2.get_pk(),
         );
     }
 }

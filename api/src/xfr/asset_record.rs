@@ -2,12 +2,10 @@ use crate::anon_creds::{
     ac_confidential_open_commitment, ACCommitmentKey, ACUserSecretKey, Attr, AttributeCiphertext,
     ConfidentialAC, Credential,
 };
-use crate::xfr::{
-    sig::{XfrKeyPair, XfrPublicKey},
-    structs::{
-        AssetRecord, AssetRecordTemplate, AssetType, BlindAssetRecord, OpenAssetRecord, OwnerMemo,
-        TracerMemo, TracingPolicies, XfrAmount, XfrAssetType,
-    },
+use crate::keys::{KeyPair, PublicKey};
+use crate::xfr::structs::{
+    AssetRecord, AssetRecordTemplate, AssetType, BlindAssetRecord, OpenAssetRecord, OwnerMemo,
+    TracerMemo, TracingPolicies, XfrAmount, XfrAssetType,
 };
 use noah_algebra::{
     prelude::*,
@@ -295,7 +293,7 @@ impl AssetRecordTemplate {
         amount: u64,
         asset_type: AssetType,
         asset_record_type: AssetRecordType,
-        address: XfrPublicKey,
+        address: PublicKey,
     ) -> AssetRecordTemplate {
         AssetRecordTemplate {
             amount,
@@ -311,7 +309,7 @@ impl AssetRecordTemplate {
         amount: u64,
         asset_type: AssetType,
         asset_record_type: AssetRecordType,
-        address: XfrPublicKey,
+        address: PublicKey,
         policies: TracingPolicies,
     ) -> AssetRecordTemplate {
         let mut template = AssetRecordTemplate::with_no_asset_tracing(
@@ -483,7 +481,7 @@ pub fn build_blind_asset_record<R: CryptoRng + RngCore>(
 pub fn open_blind_asset_record(
     input: &BlindAssetRecord,
     owner_memo: &Option<OwnerMemo>,
-    keypair: &XfrKeyPair,
+    keypair: &KeyPair,
 ) -> Result<OpenAssetRecord> {
     let (amount, asset_type, amount_blinds, type_blind) = match input.get_record_type() {
         AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType => (
@@ -589,9 +587,9 @@ fn build_record_input_from_template<R: CryptoRng + RngCore>(
 #[cfg(test)]
 mod test {
     use super::{build_blind_asset_record, build_open_asset_record, open_blind_asset_record};
+    use crate::keys::KeyPair;
     use crate::xfr::{
         asset_record::AssetRecordType,
-        sig::XfrKeyPair,
         structs::{
             AssetRecordTemplate, AssetTracerKeyPair, AssetType, OpenAssetRecord, TracingPolicies,
             TracingPolicy, XfrAmount, XfrAssetType,
@@ -610,7 +608,7 @@ mod test {
 
         let amount = 100u64;
         let asset_type = AssetType::from_identical_byte(0u8);
-        let keypair = XfrKeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate(&mut prng);
         let tracing_policy = match asset_tracing {
             true => {
                 let tracer_keys = AssetTracerKeyPair::generate(&mut prng);
@@ -833,7 +831,7 @@ mod test {
         let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
 
-        let keypair = XfrKeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate(&mut prng);
         let ar = AssetRecordTemplate::with_no_asset_tracing(
             amt,
             asset_type,
@@ -887,7 +885,7 @@ mod test {
         let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
 
-        let keypair = XfrKeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate(&mut prng);
         let asset_type: AssetType = AssetType(prng.gen());
         let amount = 10u64;
         let ar = AssetRecordTemplate::with_no_asset_tracing(

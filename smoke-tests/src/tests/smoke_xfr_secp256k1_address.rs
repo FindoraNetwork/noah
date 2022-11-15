@@ -1,11 +1,11 @@
 #[cfg(test)]
 mod smoke_xfr_secp256k1_address {
     use noah::{
+        keys::{KeyPair, PublicKey, PublicKeyInner, SecretKey},
         setup::BulletproofParams,
         xfr::{
             asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
             gen_xfr_note,
-            sig::{XfrKeyPair, XfrPublicKey, XfrPublicKeyInner, XfrSecretKey},
             structs::{
                 AssetRecord, AssetRecordTemplate, AssetType, BlindAssetRecord, OwnerMemo,
                 XfrAmount, XfrAssetType, ASSET_TYPE_LENGTH,
@@ -21,7 +21,7 @@ mod smoke_xfr_secp256k1_address {
 
     // Simulate getting a BlindAssetRecord from Ledger
     fn non_conf_blind_asset_record_from_ledger(
-        key: &XfrPublicKey,
+        key: &PublicKey,
         amount: u64,
         asset_type: AssetType,
     ) -> BlindAssetRecord {
@@ -34,7 +34,7 @@ mod smoke_xfr_secp256k1_address {
 
     // Simulate getting a BlindAssetRecord from Ledger
     fn conf_blind_asset_record_from_ledger(
-        key: &XfrPublicKey,
+        key: &PublicKey,
         amount: u64,
         asset_type: AssetType,
     ) -> (BlindAssetRecord, OwnerMemo) {
@@ -63,27 +63,27 @@ mod smoke_xfr_secp256k1_address {
 
         let sk = "df57089febbacf7ba0bc227dafbffa9fc08a93fdc68e1e42411a14efcf23656e";
         let address = "8626f6940e2eb28930efb4cef49b2d1f2c9c1199";
-        let xs = XfrSecretKey::from_secp256k1_with_address(&hex::decode(sk).unwrap()).unwrap();
+        let xs = SecretKey::from_secp256k1_with_address(&hex::decode(sk).unwrap()).unwrap();
         let sender = xs.into_keypair();
-        match sender.pub_key.inner() {
-            XfrPublicKeyInner::Address(hash) => {
+        match sender.get_pk().inner() {
+            PublicKeyInner::Address(hash) => {
                 assert_eq!(hash.to_vec(), hex::decode(address).unwrap())
             }
             _ => panic!("not secp256k1 address"),
         }
-        let receiver = XfrKeyPair::generate_secp256k1(&mut prng);
+        let receiver = KeyPair::generate_secp256k1(&mut prng);
 
         // fake and build blind_asset_record from ledger
-        let bar1 = non_conf_blind_asset_record_from_ledger(&sender.pub_key, AMOUNT, ASSET1_TYPE);
+        let bar1 = non_conf_blind_asset_record_from_ledger(&sender.get_pk(), AMOUNT, ASSET1_TYPE);
         let oar1 = open_blind_asset_record(&bar1, &None, &sender).unwrap();
         let ar1 = AssetRecord::from_open_asset_record_no_asset_tracing(oar1);
 
-        let bar2 = non_conf_blind_asset_record_from_ledger(&receiver.pub_key, AMOUNT, ASSET2_TYPE);
+        let bar2 = non_conf_blind_asset_record_from_ledger(&receiver.get_pk(), AMOUNT, ASSET2_TYPE);
         let oar2 = open_blind_asset_record(&bar2, &None, &receiver).unwrap();
         let ar2 = AssetRecord::from_open_asset_record_no_asset_tracing(oar2);
 
         let (bar3, memo3) =
-            conf_blind_asset_record_from_ledger(&receiver.pub_key, AMOUNT, ASSET2_TYPE);
+            conf_blind_asset_record_from_ledger(&receiver.get_pk(), AMOUNT, ASSET2_TYPE);
         let oar3 = open_blind_asset_record(&bar3, &Some(memo3), &receiver).unwrap();
         let ar3 = AssetRecord::from_open_asset_record_no_asset_tracing(oar3);
 
@@ -92,7 +92,7 @@ mod smoke_xfr_secp256k1_address {
             AMOUNT,
             ASSET1_TYPE,
             AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
-            receiver.pub_key,
+            receiver.get_pk(),
         );
         let recv_ar1 = AssetRecord::from_template_no_identity_tracing(&mut prng, &temp1).unwrap();
 
@@ -100,7 +100,7 @@ mod smoke_xfr_secp256k1_address {
             AMOUNT,
             ASSET2_TYPE,
             AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType, // address only support ar
-            sender.pub_key,
+            sender.get_pk(),
         );
         let recv_ar2 = AssetRecord::from_template_no_identity_tracing(&mut prng, &temp2).unwrap();
 
@@ -108,7 +108,7 @@ mod smoke_xfr_secp256k1_address {
             AMOUNT,
             ASSET2_TYPE,
             AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-            receiver.pub_key,
+            receiver.get_pk(),
         );
         let recv_ar3 = AssetRecord::from_template_no_identity_tracing(&mut prng, &temp3).unwrap();
 
@@ -135,7 +135,7 @@ mod smoke_xfr_secp256k1_address {
         assert!(!recv_bar1.asset_type.is_confidential());
         assert_eq!(recv_oar1.asset_type, ASSET1_TYPE);
         assert_eq!(recv_oar1.amount, AMOUNT);
-        assert_eq!(recv_oar1.blind_asset_record.public_key, receiver.pub_key);
+        assert_eq!(recv_oar1.blind_asset_record.public_key, receiver.get_pk());
 
         let recv_bar2 = &xfr_note.body.outputs[1];
         let recv_memo2 = &xfr_note.body.owners_memos[1];
@@ -145,7 +145,7 @@ mod smoke_xfr_secp256k1_address {
         assert!(!recv_bar2.asset_type.is_confidential());
         assert_eq!(recv_oar2.asset_type, ASSET2_TYPE);
         assert_eq!(recv_oar2.amount, AMOUNT);
-        assert_eq!(recv_oar2.blind_asset_record.public_key, sender.pub_key);
+        assert_eq!(recv_oar2.blind_asset_record.public_key, sender.get_pk());
 
         let recv_bar3 = &xfr_note.body.outputs[2];
         let recv_memo3 = &xfr_note.body.owners_memos[2];
@@ -155,6 +155,6 @@ mod smoke_xfr_secp256k1_address {
         assert!(recv_bar3.asset_type.is_confidential());
         assert_eq!(recv_oar3.asset_type, ASSET2_TYPE);
         assert_eq!(recv_oar3.amount, AMOUNT);
-        assert_eq!(recv_oar3.blind_asset_record.public_key, receiver.pub_key);
+        assert_eq!(recv_oar3.blind_asset_record.public_key, receiver.get_pk());
     }
 }

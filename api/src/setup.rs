@@ -1,7 +1,6 @@
 // The Public Setup needed for Proofs
 use crate::anon_xfr::abar_to_abar::{build_multi_xfr_cs, AXfrWitness};
 use crate::anon_xfr::address_folding_secp256k1::AXfrAddressFoldingWitnessSecp256k1;
-use crate::anon_xfr::keys::AXfrKeyPair;
 use crate::anon_xfr::structs::{PayeeWitness, PayerWitness};
 use crate::anon_xfr::{
     abar_to_ar::build_abar_to_ar_cs,
@@ -12,6 +11,7 @@ use crate::anon_xfr::{
     structs::{MTNode, MTPath},
     TurboPlonkCS, FEE_TYPE, TREE_DEPTH,
 };
+use crate::keys::KeyPair;
 use crate::parameters::{
     ABAR_TO_AR_VERIFIER_PARAMS, ABAR_TO_BAR_VERIFIER_PARAMS, AR_TO_ABAR_VERIFIER_PARAMS,
     BAR_TO_ABAR_VERIFIER_PARAMS, BULLETPROOF_CURVE25519_URS, BULLETPROOF_SECQ256K1_URS,
@@ -199,7 +199,7 @@ impl ProverParams {
         let mut output_commitments_traces = Vec::new();
         for payer_witness in fake_witness.payers_witnesses.iter() {
             let (_, trace) = nullify(
-                &AXfrKeyPair::from_secret_key(payer_witness.secret_key.clone()),
+                &payer_witness.secret_key.clone().into_keypair(),
                 payer_witness.amount,
                 payer_witness.asset_type,
                 payer_witness.uid,
@@ -207,7 +207,7 @@ impl ProverParams {
             nullifiers_traces.push(trace);
 
             let (_, trace) = commit(
-                &AXfrKeyPair::from_secret_key(payer_witness.secret_key.clone()).get_public_key(),
+                &payer_witness.secret_key.clone().into_keypair().get_pk(),
                 payer_witness.blind,
                 payer_witness.amount,
                 payer_witness.asset_type,
@@ -285,15 +285,15 @@ impl ProverParams {
 
         // It's okay to choose a fixed seed to build CS.
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let keypair = AXfrKeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate(&mut prng);
 
-        let (_, output_commitment_trace) = commit(&keypair.get_public_key(), zero, 0, zero)?;
+        let (_, output_commitment_trace) = commit(&keypair.get_pk(), zero, 0, zero)?;
 
         let (cs, _) = build_bar_to_abar_cs(
             zero,
             zero,
             zero,
-            &keypair.get_public_key(),
+            &keypair.get_pk(),
             &proof,
             &non_zk_state,
             &beta,
@@ -348,7 +348,7 @@ impl ProverParams {
 
         // It's okay to choose a fixed seed to build CS.
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let keypair = AXfrKeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate(&mut prng);
 
         let node = MTNode {
             left: bls_zero,
@@ -359,7 +359,7 @@ impl ProverParams {
             is_right_child: 0,
         };
         let payer_secret = PayerWitness {
-            secret_key: keypair.get_secret_key(),
+            secret_key: keypair.get_sk(),
             uid: 0,
             amount: 0,
             asset_type: bls_zero,
@@ -370,14 +370,14 @@ impl ProverParams {
         let folding_witness = AXfrAddressFoldingWitnessSecp256k1::default();
 
         let (_, nullifier_trace) = nullify(
-            &AXfrKeyPair::from_secret_key(payer_secret.secret_key.clone()),
+            &payer_secret.secret_key.clone().into_keypair(),
             payer_secret.amount,
             payer_secret.asset_type,
             payer_secret.uid,
         )?;
 
         let (_, input_commitment_trace) = commit(
-            &AXfrKeyPair::from_secret_key(payer_secret.secret_key.clone()).get_public_key(),
+            &payer_secret.secret_key.clone().into_keypair().get_pk(),
             payer_secret.blind,
             payer_secret.amount,
             payer_secret.asset_type,
@@ -421,12 +421,12 @@ impl ProverParams {
 
         // It's okay to choose a fixed seed to build CS.
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let keypair = AXfrKeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate(&mut prng);
         let dummy_payee = PayeeWitness {
             amount: 0,
             blind: bls_zero,
             asset_type: bls_zero,
-            public_key: keypair.get_public_key(),
+            public_key: keypair.get_pk(),
         };
 
         let (_, input_commitment_trace) = commit(
@@ -461,7 +461,7 @@ impl ProverParams {
 
         // It's okay to choose a fixed seed to build CS.
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let keypair = AXfrKeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate(&mut prng);
 
         let node = MTNode {
             left: bls_zero,
@@ -472,7 +472,7 @@ impl ProverParams {
             is_right_child: 0,
         };
         let payer_secret = PayerWitness {
-            secret_key: keypair.get_secret_key(),
+            secret_key: keypair.get_sk(),
             uid: 0,
             amount: 0,
             asset_type: bls_zero,
@@ -483,14 +483,14 @@ impl ProverParams {
         let folding_witness = AXfrAddressFoldingWitnessSecp256k1::default();
 
         let (_, nullifier_trace) = nullify(
-            &AXfrKeyPair::from_secret_key(payer_secret.secret_key.clone()),
+            &payer_secret.secret_key.clone().into_keypair(),
             payer_secret.amount,
             payer_secret.asset_type,
             payer_secret.uid,
         )?;
 
         let (_, input_commitment_trace) = commit(
-            &AXfrKeyPair::from_secret_key(payer_secret.secret_key.clone()).get_public_key(),
+            &payer_secret.secret_key.clone().into_keypair().get_pk(),
             payer_secret.blind,
             payer_secret.amount,
             payer_secret.asset_type,

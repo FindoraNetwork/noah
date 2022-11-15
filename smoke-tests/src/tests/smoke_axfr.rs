@@ -9,17 +9,16 @@ mod smoke_axfr {
             abar_to_bar::*,
             ar_to_abar::*,
             bar_to_abar::*,
-            keys::AXfrKeyPair,
             structs::{
                 AnonAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonAssetRecord,
                 OpenAnonAssetRecordBuilder,
             },
             FEE_TYPE, TREE_DEPTH,
         },
+        keys::{KeyPair, PublicKey},
         setup::{ProverParams, VerifierParams},
         xfr::{
             asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
-            sig::{XfrKeyPair, XfrPublicKey},
             structs::{
                 AssetRecordTemplate, AssetType, BlindAssetRecord, OwnerMemo, ASSET_TYPE_LENGTH,
             },
@@ -44,7 +43,7 @@ mod smoke_axfr {
     const ASSET6: AssetType = AssetType([2u8; ASSET_TYPE_LENGTH]);
 
     fn build_bar<R: RngCore + CryptoRng>(
-        pubkey: &XfrPublicKey,
+        pubkey: &PublicKey,
         prng: &mut R,
         pc_gens: &PedersenCommitmentRistretto,
         amt: u64,
@@ -60,12 +59,12 @@ mod smoke_axfr {
         prng: &mut R,
         amount: u64,
         asset_type: AssetType,
-        keypair: &AXfrKeyPair,
+        keypair: &KeyPair,
     ) -> OpenAnonAssetRecord {
         OpenAnonAssetRecordBuilder::new()
             .amount(amount)
             .asset_type(asset_type)
-            .pub_key(&keypair.get_public_key())
+            .pub_key(&keypair.get_pk())
             .finalize(prng)
             .unwrap()
             .build()
@@ -117,11 +116,11 @@ mod smoke_axfr {
         let params = ProverParams::ar_to_abar_params().unwrap();
         let verify_params = VerifierParams::ar_to_abar_params().unwrap();
 
-        let sender = XfrKeyPair::generate(&mut prng);
-        let receiver = AXfrKeyPair::generate(&mut prng);
+        let sender = KeyPair::generate(&mut prng);
+        let receiver = KeyPair::generate(&mut prng);
 
         let (bar, memo) = build_bar(
-            &sender.pub_key,
+            &sender.get_pk(),
             &mut prng,
             &pc_gens,
             AMOUNT,
@@ -130,14 +129,8 @@ mod smoke_axfr {
         );
         let obar = open_blind_asset_record(&bar, &memo, &sender).unwrap();
 
-        let note = gen_ar_to_abar_note(
-            &mut prng,
-            &params,
-            &obar,
-            &sender,
-            &receiver.get_public_key(),
-        )
-        .unwrap();
+        let note =
+            gen_ar_to_abar_note(&mut prng, &params, &obar, &sender, &receiver.get_pk()).unwrap();
         assert!(verify_ar_to_abar_note(&verify_params, &note).is_ok());
 
         #[cfg(feature = "parallel")]
@@ -163,11 +156,11 @@ mod smoke_axfr {
         let params = ProverParams::bar_to_abar_params().unwrap();
         let verify_params = VerifierParams::bar_to_abar_params().unwrap();
 
-        let sender = XfrKeyPair::generate(&mut prng);
-        let receiver = AXfrKeyPair::generate(&mut prng);
+        let sender = KeyPair::generate(&mut prng);
+        let receiver = KeyPair::generate(&mut prng);
 
         let (bar, memo) = build_bar(
-            &sender.pub_key,
+            &sender.get_pk(),
             &mut prng,
             &pc_gens,
             AMOUNT,
@@ -176,26 +169,20 @@ mod smoke_axfr {
         );
         let obar = open_blind_asset_record(&bar, &memo, &sender).unwrap();
 
-        let note = gen_bar_to_abar_note(
-            &mut prng,
-            &params,
-            &obar,
-            &sender,
-            &receiver.get_public_key(),
-        )
-        .unwrap();
-        assert!(verify_bar_to_abar_note(&verify_params, &note, &sender.pub_key).is_ok());
+        let note =
+            gen_bar_to_abar_note(&mut prng, &params, &obar, &sender, &receiver.get_pk()).unwrap();
+        assert!(verify_bar_to_abar_note(&verify_params, &note, &sender.get_pk()).is_ok());
 
         let mut err_note = note.clone();
         let message = b"error_message";
         let bad_sig = sender.sign(message).unwrap();
         err_note.signature = bad_sig;
-        assert!(verify_bar_to_abar_note(&verify_params, &err_note, &sender.pub_key).is_err());
+        assert!(verify_bar_to_abar_note(&verify_params, &err_note, &sender.get_pk()).is_err());
 
         #[cfg(feature = "parallel")]
         {
             let mut notes = vec![&note; 6];
-            let pub_keys = vec![&sender.pub_key; 6];
+            let pub_keys = vec![sender.get_pk_ref(); 6];
             assert!(batch_verify_bar_to_abar_note(&verify_params, &notes, &pub_keys).is_ok());
 
             notes[5] = &err_note;
@@ -218,8 +205,8 @@ mod smoke_axfr {
         let params = ProverParams::abar_to_ar_params(TREE_DEPTH).unwrap();
         let verify_params = VerifierParams::abar_to_ar_params().unwrap();
 
-        let sender = AXfrKeyPair::generate(&mut prng);
-        let receiver = XfrKeyPair::generate(&mut prng);
+        let sender = KeyPair::generate(&mut prng);
+        let receiver = KeyPair::generate(&mut prng);
 
         let fdb = MemoryDB::new();
         let cs = Arc::new(RwLock::new(ChainState::new(fdb, "abar_ar".to_owned(), 0)));
@@ -234,7 +221,8 @@ mod smoke_axfr {
         let proof = mt.generate_proof(0).unwrap();
         oabar.update_mt_leaf_info(build_mt_leaf_info_from_proof(proof.clone(), 0));
 
-        let pre_note = init_abar_to_ar_note(&mut prng, &oabar, &sender, &receiver.pub_key).unwrap();
+        let pre_note =
+            init_abar_to_ar_note(&mut prng, &oabar, &sender, &receiver.get_pk()).unwrap();
         let hash = random_hasher(&mut prng);
         let note = finish_abar_to_ar_note(&mut prng, &params, pre_note, hash.clone()).unwrap();
         verify_abar_to_ar_note(&verify_params, &note, &proof.root, hash.clone()).unwrap();
@@ -312,8 +300,8 @@ mod smoke_axfr {
         let params = ProverParams::abar_to_bar_params(TREE_DEPTH).unwrap();
         let verify_params = VerifierParams::abar_to_bar_params().unwrap();
 
-        let sender = AXfrKeyPair::generate(&mut prng);
-        let receiver = XfrKeyPair::generate(&mut prng);
+        let sender = KeyPair::generate(&mut prng);
+        let receiver = KeyPair::generate(&mut prng);
 
         let fdb = MemoryDB::new();
         let cs = Arc::new(RwLock::new(ChainState::new(fdb, "abar_bar".to_owned(), 0)));
@@ -333,7 +321,7 @@ mod smoke_axfr {
             &mut prng,
             &oabar,
             &sender,
-            &receiver.pub_key,
+            &receiver.get_pk(),
             AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
         )
         .unwrap();
@@ -529,9 +517,9 @@ mod smoke_axfr {
         let params = ProverParams::new(inputs.len(), outputs.len(), None).unwrap();
         let verifier_params = VerifierParams::load(inputs.len(), outputs.len()).unwrap();
 
-        let sender = AXfrKeyPair::generate(&mut prng);
-        let receivers: Vec<AXfrKeyPair> = (0..outputs.len())
-            .map(|_| AXfrKeyPair::generate(&mut prng))
+        let sender = KeyPair::generate(&mut prng);
+        let receivers: Vec<KeyPair> = (0..outputs.len())
+            .map(|_| KeyPair::generate(&mut prng))
             .collect();
 
         let mut oabars: Vec<OpenAnonAssetRecord> = inputs

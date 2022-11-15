@@ -6,18 +6,16 @@ use crate::anon_xfr::address_folding_secp256k1::{
 use crate::anon_xfr::{
     abar_to_abar::add_payers_witnesses,
     address_folding_secp256k1::AXfrAddressFoldingInstanceSecp256k1,
-    commit, commit_in_cs, compute_merkle_root_variables,
-    keys::AXfrKeyPair,
-    nullify, nullify_in_cs,
+    commit, commit_in_cs, compute_merkle_root_variables, nullify, nullify_in_cs,
     structs::{AccElemVars, Nullifier, OpenAnonAssetRecord, PayerWitness},
     AXfrPlonkPf, TurboPlonkCS,
 };
+use crate::keys::{KeyPair, PublicKey};
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::{
     asset_record::{
         build_open_asset_record, AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
     },
-    sig::XfrPublicKey,
     structs::{AssetRecordTemplate, BlindAssetRecord, OwnerMemo},
 };
 use digest::{consts::U64, Digest};
@@ -63,7 +61,7 @@ pub struct AbarToArPreNote {
     /// The trace of the nullifier.
     pub nullifier_trace: AnemoiVLHTrace<BLSScalar, 2, 12>,
     /// Input key pair.
-    pub input_keypair: AXfrKeyPair,
+    pub input_keypair: KeyPair,
 }
 
 /// The anonymous-to-transparent body.
@@ -85,10 +83,10 @@ pub struct AbarToArBody {
 pub fn init_abar_to_ar_note<R: CryptoRng + RngCore>(
     prng: &mut R,
     oabar: &OpenAnonAssetRecord,
-    abar_keypair: &AXfrKeyPair,
-    ar_pub_key: &XfrPublicKey,
+    abar_keypair: &KeyPair,
+    ar_pub_key: &PublicKey,
 ) -> Result<AbarToArPreNote> {
-    if oabar.mt_leaf_info.is_none() || abar_keypair.get_public_key() != oabar.pub_key {
+    if oabar.mt_leaf_info.is_none() || abar_keypair.get_pk() != oabar.pub_key {
         return Err(eg!(NoahError::ParameterError));
     }
 
@@ -113,7 +111,7 @@ pub fn init_abar_to_ar_note<R: CryptoRng + RngCore>(
     )?;
 
     let (_, this_commitment_trace) = commit(
-        &abar_keypair.get_public_key(),
+        &abar_keypair.get_pk(),
         oabar.blind,
         oabar.amount,
         oabar.asset_type.as_scalar(),
@@ -121,7 +119,7 @@ pub fn init_abar_to_ar_note<R: CryptoRng + RngCore>(
     .unwrap();
 
     let payers_secret = PayerWitness {
-        secret_key: abar_keypair.get_secret_key(),
+        secret_key: abar_keypair.get_sk(),
         uid: mt_leaf_info.uid,
         amount: oabar.amount,
         asset_type: oabar.asset_type.as_scalar(),
@@ -197,6 +195,7 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
     }
 
     let mut transcript = Transcript::new(ABAR_TO_AR_FOLDING_PROOF_TRANSCRIPT);
+
     let (beta, lambda) =
         verify_address_folding_secp256k1(hash, &mut transcript, &note.folding_instance)?;
 
@@ -259,6 +258,7 @@ pub fn batch_verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default + Sync
         .zip(hashes)
         .map(|((note, merkle_root), hash)| {
             let mut transcript = Transcript::new(ABAR_TO_AR_FOLDING_PROOF_TRANSCRIPT);
+
             let (beta, lambda) =
                 verify_address_folding_secp256k1(hash, &mut transcript, &note.folding_instance)?;
 
@@ -338,8 +338,8 @@ pub fn build_abar_to_ar_cs(
     let payer_witness_var = &payers_witnesses_vars[0];
 
     let keypair = folding_witness.keypair.clone();
-    let public_key_scalars = keypair.get_public_key().get_public_key_scalars().unwrap();
-    let secret_key_scalars = keypair.get_secret_key().get_secret_key_scalars().unwrap();
+    let public_key_scalars = keypair.get_pk().to_bls_scalars().unwrap();
+    let secret_key_scalars = keypair.get_sk().to_bls_scalars().unwrap();
 
     let public_key_scalars_vars = [
         cs.new_variable(public_key_scalars[0]),
@@ -398,7 +398,7 @@ pub fn build_abar_to_ar_cs(
 
     let mut path_traces = Vec::new();
     let (commitment, _) = commit(
-        &keypair.get_public_key(),
+        &keypair.get_pk(),
         payer_witness.blind,
         payer_witness.amount,
         payer_witness.asset_type,
