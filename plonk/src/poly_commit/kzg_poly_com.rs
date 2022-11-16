@@ -4,7 +4,7 @@ use crate::poly_commit::{
     pcs::{HomomorphicPolyComElem, PolyComScheme, ToBytes},
 };
 use merlin::Transcript;
-use noah_algebra::bls12_381::BLSPairingEngine;
+use noah_algebra::bls12_381::{BLSGt, BLSPairingEngine};
 use noah_algebra::{
     bls12_381::{BLSScalar, BLSG1},
     prelude::*,
@@ -361,10 +361,12 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         right_first.sub_assign(&g1_0.mul(&right_first_val));
         right_first.add_assign(&right_first_comm);
 
-        let left_pairing_eval = BLSPairingEngine::pairing(&left_first, &left_second);
-        let right_pairing_eval = BLSPairingEngine::pairing(&right_first, &right_second);
+        let pairing_eval = BLSPairingEngine::product_of_pairings(
+            &[left_first, right_first.neg()],
+            &[left_second, right_second],
+        );
 
-        if left_pairing_eval == right_pairing_eval {
+        if pairing_eval == BLSGt::get_identity() {
             Ok(())
         } else {
             Err(eg!(PolyComSchemeError::PCSProveEvalError))

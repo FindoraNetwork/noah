@@ -215,6 +215,9 @@ pub trait Pairing {
 
     /// The pairing operation
     fn pairing(a: &Self::G1, b: &Self::G2) -> Self::Gt;
+
+    /// The product of pairing operation
+    fn product_of_pairings(a: &[Self::G1], b: &[Self::G2]) -> Self::Gt;
 }
 
 /// Convert the scalar into a vector of small chunks, each of size `w`
