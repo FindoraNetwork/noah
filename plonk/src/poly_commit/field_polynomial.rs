@@ -1,4 +1,4 @@
-use ark_poly::{EvaluationDomain, MixedRadixEvaluationDomain};
+use ark_poly::{EvaluationDomain, MixedRadixEvaluationDomain, Radix2EvaluationDomain};
 use noah_algebra::{prelude::*, traits::Domain};
 
 #[cfg(feature = "parallel")]
@@ -512,8 +512,17 @@ impl<F: Domain> FpPolynomial<F> {
     }
 
     /// Construct a domain for evaluations of a polynomial having `num_coeffs` coefficients,
+    /// where `num_coeffs` is with the form 2^k.
+    pub fn evaluation_domain(num_coeffs: usize) -> Option<Radix2EvaluationDomain<F::Field>> {
+        assert!(num_coeffs.is_power_of_two());
+        Radix2EvaluationDomain::<F::Field>::new(num_coeffs)
+    }
+
+    /// Construct a domain for evaluations of a polynomial having `num_coeffs` coefficients,
     /// where `num_coeffs` is with the form 2^k or 3 * 2^k.
-    pub fn evaluation_domain(num_coeffs: usize) -> Option<MixedRadixEvaluationDomain<F::Field>> {
+    pub fn quotient_evaluation_domain<'a>(
+        num_coeffs: usize,
+    ) -> Option<MixedRadixEvaluationDomain<F::Field>> {
         assert!(
             num_coeffs.is_power_of_two()
                 || ((num_coeffs % 3 == 0) && (num_coeffs / 3).is_power_of_two())
@@ -522,16 +531,21 @@ impl<F: Domain> FpPolynomial<F> {
     }
 
     /// Compute the FFT of the polynomial, the parameter `num_coeffs` is with the form 2^k or 3 * 2^k.
-    pub fn fft(&self, num_coeffs: usize) -> Option<(MixedRadixEvaluationDomain<F::Field>, Vec<F>)> {
+    pub fn fft(&self, num_coeffs: usize) -> Option<Vec<F>> {
         assert!(num_coeffs > self.degree());
-        let domain = Self::evaluation_domain(num_coeffs)?;
-        let values = self.fft_with_domain(&domain);
-        Some((domain, values))
+
+        if num_coeffs.is_power_of_two() {
+            let domain = Self::evaluation_domain(num_coeffs)?;
+            Some(self.fft_with_domain(&domain))
+        } else {
+            let domain = Self::quotient_evaluation_domain(num_coeffs)?;
+            Some(self.fft_with_domain(&domain))
+        }
     }
 
     /// Compute the FFT of the polynomial with the given domain.
-    pub fn fft_with_domain(&self, domain: &MixedRadixEvaluationDomain<F::Field>) -> Vec<F> {
-        assert!(domain.size > self.degree() as u64);
+    pub fn fft_with_domain<E: EvaluationDomain<F::Field>>(&self, domain: &E) -> Vec<F> {
+        assert!(domain.size() > self.degree());
         let coefs = self
             .coefs
             .iter()
@@ -543,16 +557,16 @@ impl<F: Domain> FpPolynomial<F> {
     }
 
     /// Compute the FFT of the polynomial on the set k * <root>.
-    pub fn coset_fft_with_domain(
+    pub fn coset_fft_with_domain<E: EvaluationDomain<F::Field>>(
         &self,
-        domain: &MixedRadixEvaluationDomain<F::Field>,
+        domain: &E,
         k: &F,
     ) -> Vec<F> {
-        self.mul_var(k).fft_with_domain(&domain)
+        self.mul_var(k).fft_with_domain(domain)
     }
 
     /// Compute the polynomial given its evaluation values and domain.
-    pub fn ifft_with_domain(domain: &MixedRadixEvaluationDomain<F::Field>, values: &[F]) -> Self {
+    pub fn ifft_with_domain<E: EvaluationDomain<F::Field>>(domain: &E, values: &[F]) -> Self {
         let values = values
             .iter()
             .map(|value| value.get_field())
@@ -565,8 +579,8 @@ impl<F: Domain> FpPolynomial<F> {
 
     /// Compute the polynomial given its evaluation values at a coset k * H,
     /// where H is evaluation domain and k_inv is the inverse of k.
-    pub fn coset_ifft_with_domain(
-        domain: &MixedRadixEvaluationDomain<F::Field>,
+    pub fn coset_ifft_with_domain<E: EvaluationDomain<F::Field>>(
+        domain: &E,
         values: &[F],
         k_inv: &F,
     ) -> Self {
@@ -577,7 +591,6 @@ impl<F: Domain> FpPolynomial<F> {
 #[cfg(test)]
 mod test {
     use crate::poly_commit::field_polynomial::FpPolynomial;
-    use ark_poly::MixedRadixEvaluationDomain;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*, traits::Domain};
 
     #[test]
@@ -600,11 +613,7 @@ mod test {
         }
     }
 
-    fn check_fft<F: Domain>(
-        poly: &FpPolynomial<F>,
-        domain: &MixedRadixEvaluationDomain<F::Field>,
-        fft: &[F],
-    ) -> bool {
+    fn check_fft<F: Domain>(poly: &FpPolynomial<F>, root: &F::Field, fft: &[F]) -> bool {
         assert!(
             fft.len().is_power_of_two()
                 || ((fft.len() % 3 == 0) && (fft.len() / 3).is_power_of_two())
@@ -615,7 +624,7 @@ mod test {
             if *fft_elem != poly.eval(&F::from_field(omega)) {
                 return false;
             }
-            omega.mul_assign(&domain.group_gen)
+            omega.mul_assign(root)
         }
         true
     }
@@ -627,26 +636,29 @@ mod test {
         let one = BLSScalar::one();
 
         let polynomial = FpPolynomial::from_coefs(vec![one]);
-        let (domian, fft) = polynomial.fft(1).unwrap();
-        assert!(check_fft(&polynomial, &domian, &fft));
+        let fft = polynomial.fft(1).unwrap();
+        let domain = FpPolynomial::<BLSScalar>::evaluation_domain(1).unwrap();
+        assert!(check_fft(&polynomial, &domain.group_gen, &fft));
 
         let polynomial = FpPolynomial::from_coefs(vec![one, one]);
-        let (domian, fft) = polynomial.fft(2).unwrap();
-        assert!(check_fft(&polynomial, &domian, &fft));
+        let fft = polynomial.fft(2).unwrap();
+        let domain = FpPolynomial::<BLSScalar>::evaluation_domain(2).unwrap();
+        assert!(check_fft(&polynomial, &domain.group_gen, &fft));
 
         let polynomial = FpPolynomial::from_coefs(vec![one, zero]);
-        let (domian, fft) = polynomial.fft(2).unwrap();
-        assert!(check_fft(&polynomial, &domian, &fft));
+        let fft = polynomial.fft(2).unwrap();
+        assert!(check_fft(&polynomial, &domain.group_gen, &fft));
 
         let polynomial = FpPolynomial::from_coefs(vec![zero, one]);
-        let (domian, fft) = polynomial.fft(2).unwrap();
-        assert!(check_fft(&polynomial, &domian, &fft));
+        let fft = polynomial.fft(2).unwrap();
+        assert!(check_fft(&polynomial, &domain.group_gen, &fft));
 
         let polynomial = FpPolynomial::from_coefs(vec![zero, one, one]);
-        let (domian, fft) = polynomial.fft(3).unwrap();
-        assert!(check_fft(&polynomial, &domian, &fft));
+        let fft = polynomial.fft(3).unwrap();
+        let domain = FpPolynomial::<BLSScalar>::quotient_evaluation_domain(3).unwrap();
+        assert!(check_fft(&polynomial, &domain.group_gen, &fft));
 
-        let ffti_polynomial = FpPolynomial::ifft_with_domain(&domian, &fft);
+        let ffti_polynomial = FpPolynomial::ifft_with_domain(&domain, &fft);
         assert_eq!(ffti_polynomial, polynomial);
 
         let mut coefs = vec![];
@@ -654,8 +666,9 @@ mod test {
             coefs.push(BLSScalar::random(&mut prng));
         }
         let polynomial = FpPolynomial::from_coefs(coefs);
-        let (domian, fft) = polynomial.fft(16).unwrap();
-        let ffti_polynomial = FpPolynomial::ifft_with_domain(&domian, &fft);
+        let fft = polynomial.fft(16).unwrap();
+        let domain = FpPolynomial::<BLSScalar>::evaluation_domain(16).unwrap();
+        let ffti_polynomial = FpPolynomial::ifft_with_domain(&domain, &fft);
         assert_eq!(ffti_polynomial, polynomial);
 
         let mut coefs = vec![];
@@ -663,8 +676,9 @@ mod test {
             coefs.push(BLSScalar::random(&mut prng));
         }
         let polynomial = FpPolynomial::from_coefs(coefs);
-        let (domian, fft) = polynomial.fft(32).unwrap();
-        let ffti_polynomial = FpPolynomial::ifft_with_domain(&domian, &fft);
+        let domain = FpPolynomial::<BLSScalar>::evaluation_domain(32).unwrap();
+        let fft = polynomial.fft_with_domain(&domain);
+        let ffti_polynomial = FpPolynomial::ifft_with_domain(&domain, &fft);
         assert_eq!(ffti_polynomial, polynomial);
 
         let mut coefs = vec![];
@@ -672,8 +686,9 @@ mod test {
             coefs.push(BLSScalar::random(&mut prng));
         }
         let polynomial = FpPolynomial::from_coefs(coefs);
-        let (domian, fft) = polynomial.fft(3).unwrap();
-        let ffti_polynomial = FpPolynomial::ifft_with_domain(&domian, &fft);
+        let domain = FpPolynomial::<BLSScalar>::quotient_evaluation_domain(3).unwrap();
+        let fft = polynomial.fft_with_domain(&domain);
+        let ffti_polynomial = FpPolynomial::ifft_with_domain(&domain, &fft);
         assert_eq!(ffti_polynomial, polynomial);
 
         let mut coefs = vec![];
@@ -681,8 +696,9 @@ mod test {
             coefs.push(BLSScalar::random(&mut prng));
         }
         let polynomial = FpPolynomial::from_coefs(coefs);
-        let (domian, fft) = polynomial.fft(48).unwrap();
-        let ffti_polynomial = FpPolynomial::ifft_with_domain(&domian, &fft);
+        let domain = FpPolynomial::<BLSScalar>::quotient_evaluation_domain(48).unwrap();
+        let fft = polynomial.fft_with_domain(&domain);
+        let ffti_polynomial = FpPolynomial::ifft_with_domain(&domain, &fft);
         assert_eq!(ffti_polynomial, polynomial);
     }
 }
