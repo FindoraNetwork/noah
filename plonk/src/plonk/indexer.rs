@@ -2,8 +2,7 @@ use crate::plonk::{
     constraint_system::ConstraintSystem, errors::PlonkError, helpers::compute_lagrange_constant,
 };
 use crate::poly_commit::{field_polynomial::FpPolynomial, pcs::PolyComScheme};
-use ark_poly::{EvaluationDomain, MixedRadixEvaluationDomain};
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_poly::EvaluationDomain;
 use noah_algebra::{prelude::*, traits::Domain};
 use rand_chacha::ChaChaRng;
 
@@ -57,8 +56,6 @@ pub struct PlonkProverParams<O, C, F> {
     pub group: Vec<F>,
     /// The evaluation domain for computing the quotient polynomial.
     pub coset_quotient: Vec<F>,
-    /// The evaluation domain of size m.
-    pub domain_m: Vec<u8>,
     /// First lagrange basis.
     pub l1_coefs: FpPolynomial<F>,
     /// The l1's FFT of the polynomial of unity root set.
@@ -113,8 +110,6 @@ pub struct PlonkVerifierParams<C, F> {
     pub anemoi_generator_inv: F,
     /// `n_wires_per_gate` different quadratic non-residue in F_q-{0}.
     pub k: Vec<F>,
-    /// The primitive evaluation domain.
-    pub domain: Vec<u8>,
     /// The size of constraint system.
     pub cs_size: usize,
     /// The public constrain variables indices.
@@ -126,28 +121,6 @@ pub struct PlonkVerifierParams<C, F> {
 /// Define the PLONK verifier params by given `PolyComScheme`.
 pub type PlonkVK<PCS> =
     PlonkVerifierParams<<PCS as PolyComScheme>::Commitment, <PCS as PolyComScheme>::Field>;
-
-/// Perform deserialization, then return domain and root(a generator of the subgroup).
-pub fn get_domain_and_root<PCS: PolyComScheme>(
-    domain: &[u8],
-) -> (
-    MixedRadixEvaluationDomain<<<PCS as PolyComScheme>::Field as Domain>::Field>,
-    PCS::Field,
-) {
-    let reader = ark_std::io::BufReader::new(domain);
-    let domain = MixedRadixEvaluationDomain::deserialize_unchecked(reader).unwrap();
-    let root = PCS::Field::from_field(domain.group_gen);
-    (domain, root)
-}
-
-/// Convert the domain to bytes in the compressed representation.
-fn compress_domain<PCS: PolyComScheme>(
-    domain: &MixedRadixEvaluationDomain<<<PCS as PolyComScheme>::Field as Domain>::Field>,
-) -> Vec<u8> {
-    let mut buf = Vec::new();
-    domain.serialize_unchecked(&mut buf).unwrap();
-    buf
-}
 
 /// Encode the permutation value, from an index to a group element.
 pub fn encode_perm_to_group<F: Scalar>(group: &[F], perm: &[usize], k: &[F]) -> Vec<F> {
@@ -223,8 +196,8 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
 
     let domain =
         FpPolynomial::<PCS::Field>::evaluation_domain(n).c(d!(PlonkError::GroupNotFound(n)))?;
-    let domain_m =
-        FpPolynomial::<PCS::Field>::evaluation_domain(m).c(d!(PlonkError::GroupNotFound(m)))?;
+    let domain_m = FpPolynomial::<PCS::Field>::quotient_evaluation_domain(m)
+        .c(d!(PlonkError::GroupNotFound(m)))?;
     let group = domain
         .elements()
         .into_iter()
@@ -376,7 +349,6 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
             anemoi_generator,
             anemoi_generator_inv,
             k,
-            domain: compress_domain::<PCS>(&domain),
             cs_size: n,
             public_vars_constraint_indices: cs.public_vars_constraint_indices().to_vec(),
             lagrange_constants,
@@ -392,7 +364,6 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
         verifier_params,
         group,
         coset_quotient,
-        domain_m: compress_domain::<PCS>(&domain_m),
         l1_coefs,
         l1_coset_evals,
         z_h_coefs,

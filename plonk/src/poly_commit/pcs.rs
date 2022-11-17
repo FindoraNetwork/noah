@@ -149,7 +149,7 @@ pub trait PolyComScheme: Sized {
             }
 
             let sub_q = FpPolynomial::from_coefs(new_coefs);
-            let (_domain, q_eval) = FpPolynomial::fft(&sub_q, max_power_of_2).c(d!())?;
+            let q_eval = FpPolynomial::fft(&sub_q, max_power_of_2).c(d!())?;
             let q_eval = FpPolynomial::from_coefs(q_eval);
 
             let cm = lagrange_pcs.commit(&q_eval).c(d!())?;

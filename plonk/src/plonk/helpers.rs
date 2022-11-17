@@ -1,14 +1,14 @@
 use crate::plonk::{
     constraint_system::ConstraintSystem,
     errors::PlonkError,
-    indexer::{get_domain_and_root, PlonkPK, PlonkPf, PlonkVK},
+    indexer::{PlonkPK, PlonkPf, PlonkVK},
 };
 use crate::poly_commit::{
     field_polynomial::FpPolynomial,
     pcs::{HomomorphicPolyComElem, PolyComScheme},
 };
 use ark_ff::batch_inversion;
-use ark_poly::MixedRadixEvaluationDomain;
+use ark_poly::EvaluationDomain;
 use noah_algebra::cfg_into_iter;
 use noah_algebra::prelude::*;
 use noah_algebra::{cmp::min, traits::Domain};
@@ -112,10 +112,10 @@ impl<F: Scalar> PlonkChallenges<F> {
 }
 
 /// Return the PI polynomial.
-pub(super) fn pi_poly<PCS: PolyComScheme>(
+pub(super) fn pi_poly<PCS: PolyComScheme, E: EvaluationDomain<<PCS::Field as Domain>::Field>>(
     prover_params: &PlonkPK<PCS>,
     pi: &[PCS::Field],
-    domain: &MixedRadixEvaluationDomain<<PCS::Field as Domain>::Field>,
+    domain: &E,
 ) -> FpPolynomial<PCS::Field> {
     let mut evals = Vec::with_capacity(prover_params.verifier_params.cs_size);
     for (i, _) in prover_params.group.iter().enumerate() {
@@ -242,7 +242,9 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
     if n * factor != m {
         return Err(eg!(PlonkError::SetupError));
     }
-    let (domain_m, _) = get_domain_and_root::<PCS>(&prover_params.domain_m);
+
+    let domain_m = FpPolynomial::<PCS::Field>::quotient_evaluation_domain(m)
+        .c(d!(PlonkError::GroupNotFound(n)))?;
     let k = &prover_params.verifier_params.k;
 
     // Compute the evaluations of w/pi/z polynomials on the coset k[1] * <root_m>.
@@ -917,7 +919,7 @@ pub(crate) fn split_t_and_commit<R: CryptoRng + RngCore, PCS: PolyComScheme>(
             }
 
             let sub_q = FpPolynomial::from_coefs(new_coefs);
-            let (_domian, q_eval) = FpPolynomial::fft(&sub_q, max_power_of_2).c(d!())?;
+            let q_eval = FpPolynomial::fft(&sub_q, max_power_of_2).c(d!())?;
             let q_eval = FpPolynomial::from_coefs(q_eval);
 
             let cm = lagrange_pcs.commit(&q_eval).c(d!())?;
