@@ -520,7 +520,7 @@ impl<F: Domain> FpPolynomial<F> {
 
     /// Construct a domain for evaluations of a polynomial having `num_coeffs` coefficients,
     /// where `num_coeffs` is with the form 2^k or 3 * 2^k.
-    pub fn quotient_evaluation_domain<'a>(
+    pub fn quotient_evaluation_domain(
         num_coeffs: usize,
     ) -> Option<MixedRadixEvaluationDomain<F::Field>> {
         assert!(
