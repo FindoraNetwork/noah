@@ -562,7 +562,7 @@ impl OwnerMemo {
                 let shared_point = point.mul(&scalar);
                 Ok(shared_point.to_compressed_bytes())
             }
-            KeyType::Address => Err(eg!("Address not supported")),
+            KeyType::EthAddress => Err(eg!("Address not supported")),
         }
     }
 
