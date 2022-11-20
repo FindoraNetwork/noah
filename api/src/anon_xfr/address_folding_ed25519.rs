@@ -139,8 +139,7 @@ pub fn prove_address_folding_in_cs_secp256k1(
     secret_key_scalars_vars: &[VarIndex; 2],
     witness: &AXfrAddressFoldingWitnessEd25519,
 ) -> Result<()> {
-    //let (sk, pk) = witness.keypair.to_zorro()?; // TODO change to this
-    let (sk, pk) = witness.keypair.to_secp256k1()?; // TMP to fix get_x, get_y
+    let (sk, pk) = witness.keypair.to_zorro()?;
 
     // 1. decompose the scalar inputs.
     let mut public_key_bits_vars = cs.range_check(public_key_scalars_vars[0], 248);
@@ -295,9 +294,10 @@ pub fn prove_address_folding_in_cs_secp256k1(
     }
 
     // 3. allocate the simulated field elements and obtain their bit representations.
-    let x_sim_fr = SimFr::<SimFrParamsZorro>::from(&pk.get_x().into());
+    let pk_affine = pk.get_raw();
+    let x_sim_fr = SimFr::<SimFrParamsZorro>::from(&pk_affine.x.into());
     let (x_sim_fr_var, x_sim_bits_vars) = SimFrVar::alloc_witness(cs, &x_sim_fr);
-    let y_sim_fr = SimFr::<SimFrParamsZorro>::from(&pk.get_y().into());
+    let y_sim_fr = SimFr::<SimFrParamsZorro>::from(&pk_affine.y.into());
     let (y_sim_fr_var, y_sim_bits_vars) = SimFrVar::alloc_witness(cs, &y_sim_fr);
 
     // we can do so only because the secp256k1's order is smaller than its base field modulus.
