@@ -98,7 +98,7 @@ pub fn create_address_folding_ed25519<
     AXfrAddressFoldingInstanceEd25519,
     AXfrAddressFoldingWitnessEd25519,
 )> {
-    let (_sk, _pk) = keypair.to_zorro()?;
+    let (_sk, _pk) = keypair.to_ed25519()?;
 
     let _pc_gens = PedersenCommitmentZorro::default();
     let _bp_gens = ZorroBulletproofGens::load().unwrap();
@@ -139,7 +139,7 @@ pub fn prove_address_folding_in_cs_secp256k1(
     secret_key_scalars_vars: &[VarIndex; 2],
     witness: &AXfrAddressFoldingWitnessEd25519,
 ) -> Result<()> {
-    let (sk, pk) = witness.keypair.to_zorro()?;
+    let (sk, pk) = witness.keypair.to_ed25519()?;
 
     // 1. decompose the scalar inputs.
     let mut public_key_bits_vars = cs.range_check(public_key_scalars_vars[0], 248);

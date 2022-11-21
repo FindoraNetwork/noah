@@ -1,5 +1,5 @@
 use aes_gcm::{aead::Aead, KeyInit};
-use ark_serialize::{CanonicalSerialize, Flags, SWFlags};
+use ark_serialize::{CanonicalSerialize, EdwardsFlags, Flags, SWFlags};
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use digest::consts::U64;
 use digest::{generic_array::GenericArray, Digest};
@@ -16,15 +16,14 @@ use libsecp256k1::{
 use noah_algebra::{
     bls12_381::BLSScalar,
     cmp::Ordering,
+    ed25519::{Ed25519Point, Ed25519Scalar},
     hash::{Hash, Hasher},
     prelude::*,
     secp256k1::{SECP256K1Scalar, SECP256K1G1},
-    zorro::{ZorroG1, ZorroScalar},
 };
 use noah_crypto::basic::hybrid_encryption::{
     hybrid_decrypt_with_ed25519_secret_key, hybrid_encrypt_ed25519, NoahHybridCiphertext,
 };
-use num_bigint::BigUint;
 use sha3::Keccak256;
 use wasm_bindgen::prelude::*;
 
@@ -196,11 +195,11 @@ impl PublicKey {
     }
 
     /// Change to algebra Ristretto Point
-    pub fn to_zorro(&self) -> Result<ZorroG1> {
+    pub fn to_ed25519(&self) -> Result<Ed25519Point> {
         match self.inner() {
             PublicKeyInner::Ed25519(pk) => {
-                Ok(convert_point_ed25519_to_algebra(pk))
-                //ZorroG1::from_compressed_bytes(&pk_bytes)
+                let pk_bytes = convert_point_ed25519_to_algebra(&pk);
+                Ed25519Point::from_compressed_bytes(&pk_bytes)
             }
             _ => Err(eg!(NoahError::ParameterError)),
         }
@@ -219,7 +218,7 @@ impl PublicKey {
                     .collect::<Vec<u8>>()
             }
             PublicKeyInner::Ed25519(_) => {
-                let pk = self.to_zorro()?;
+                let pk = self.to_ed25519()?;
                 let affine = pk.get_raw();
                 let mut bytes = Vec::new();
                 affine
@@ -249,7 +248,7 @@ impl PublicKey {
     ) -> (KeyType, Vec<u8>, Vec<u8>) {
         match self.0 {
             PublicKeyInner::Ed25519(_) => {
-                let (s, p) = ZorroScalar::random_scalar_with_compressed_point(prng);
+                let (s, p) = Ed25519Scalar::random_scalar_with_compressed_point(prng);
                 (KeyType::Ed25519, s.to_bytes(), p.to_compressed_bytes())
             }
             PublicKeyInner::Secp256k1(_) | PublicKeyInner::Address(_) => {
@@ -480,9 +479,9 @@ impl SecretKey {
     }
 
     /// Change to algebra Ristretto Point
-    pub fn to_zorro(&self) -> Result<ZorroScalar> {
+    pub fn to_ed25519(&self) -> Result<Ed25519Scalar> {
         match self {
-            SecretKey::Ed25519(sk) => ZorroScalar::from_bytes(sk.as_bytes()),
+            SecretKey::Ed25519(sk) => Ed25519Scalar::from_bytes(sk.as_bytes()),
             _ => Err(eg!(NoahError::ParameterError)),
         }
     }
@@ -495,7 +494,7 @@ impl SecretKey {
                 sk.to_bytes()
             }
             SecretKey::Ed25519(_) => {
-                let sk = self.to_zorro()?;
+                let sk = self.to_ed25519()?;
                 sk.to_bytes()
             }
             _ => return Err(eg!(NoahError::ParameterError)),
@@ -712,10 +711,10 @@ impl KeyPair {
     }
 
     /// Change to algebra Ristretto keypair
-    pub fn to_zorro(&self) -> Result<(ZorroScalar, ZorroG1)> {
+    pub fn to_ed25519(&self) -> Result<(Ed25519Scalar, Ed25519Point)> {
         match (&self.sec_key, &self.pub_key) {
             (SecretKey::Ed25519(_), PublicKey(PublicKeyInner::Ed25519(_))) => {
-                Ok((self.sec_key.to_zorro()?, self.pub_key.to_zorro()?))
+                Ok((self.sec_key.to_ed25519()?, self.pub_key.to_ed25519()?))
             }
             _ => Err(eg!(NoahError::ParameterError)),
         }
@@ -968,7 +967,7 @@ fn convert_scalar_libsecp256k1_to_algebra(b: &[u32; 8]) -> Vec<u8> {
     bytes.to_vec()
 }
 
-fn convert_point_ed25519_to_algebra(pk: &Ed25519PublicKey) -> ZorroG1 {
+fn convert_point_ed25519_to_algebra(pk: &Ed25519PublicKey) -> Vec<u8> {
     let y = CompressedEdwardsY(pk.to_bytes());
     let p = y.decompress().unwrap();
 
@@ -976,27 +975,14 @@ fn convert_point_ed25519_to_algebra(pk: &Ed25519PublicKey) -> ZorroG1 {
     let x = &p.X * &recip;
     let y = &p.Y * &recip;
 
-    let mut bytes = x.to_bytes().to_vec();
-    let flag = if bool::from(y.is_negative()) {
-        SWFlags::NegativeY.u8_bitmask()
+    let mut bytes = y.to_bytes().to_vec();
+    let flag = if bool::from(x.is_negative()) {
+        EdwardsFlags::NegativeX.u8_bitmask()
     } else {
-        SWFlags::PositiveY.u8_bitmask()
+        EdwardsFlags::PositiveX.u8_bitmask()
     };
     bytes.push(flag);
-    let z = ZorroG1::from_compressed_bytes(&bytes).unwrap();
-
-    // let g = ark_bulletproofs::curve::zorro::G1Projective {
-    //     x: BigUint::from_bytes_le(&p.X.to_bytes()).into(),
-    //     y: BigUint::from_bytes_le(&p.Y.to_bytes()).into(),
-    //     z: BigUint::from_bytes_le(&p.Z.to_bytes()).into(),
-    // };
-
-    //let z = ZorroG1::from_projective(g);
-    let z1 = z.get_raw();
-
-    println!("------ {}", z1.is_on_curve());
-
-    z
+    bytes
 }
 
 #[cfg(test)]
@@ -1077,11 +1063,19 @@ mod test {
     }
 
     #[test]
-    fn ed25519_key() {
+    fn convert_secp256k1_key() {
+        let mut prng = test_rng();
+        let kp = KeyPair::generate_secp256k1(&mut prng);
+        let (s, p) = kp.to_secp256k1().unwrap();
+        assert_eq!(SECP256K1G1::get_base().mul(&s), p);
+    }
+
+    #[test]
+    fn convert_ed25519_key() {
         let mut prng = test_rng();
         let kp = KeyPair::generate_ed25519(&mut prng);
-        let (s, p) = kp.to_zorro().unwrap();
-        assert_eq!(ZorroG1::get_base().mul(&s), p);
+        let _ = kp.to_ed25519().unwrap();
+        //assert_eq!(Ed25519Point::get_base().mul(&s), p);
     }
 
     #[test]
