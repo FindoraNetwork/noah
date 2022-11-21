@@ -219,8 +219,10 @@ pub fn finish_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> 
     } = pre_note;
 
     let mut transcript = Transcript::new(ANON_XFR_FOLDING_PROOF_TRANSCRIPT);
+
     let (folding_instance, folding_witness) =
         create_address_folding_secp256k1(prng, hash, &mut transcript, &input_keypair)?;
+
     let proof = prove_xfr(
         prng,
         params,

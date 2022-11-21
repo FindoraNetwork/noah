@@ -10,7 +10,8 @@ use noah_algebra::zorro::{PedersenCommitmentZorro, ZorroBulletproofGens, ZorroG1
 use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
 use noah_crypto::bulletproofs::scalar_mul_for_ed25519::ScalarMulProof;
 use noah_crypto::delegated_schnorr::{
-    verify_delegated_schnorr, DelegatedSchnorrInspection, DelegatedSchnorrProof,
+    prove_delegated_schnorr, verify_delegated_schnorr, DelegatedSchnorrInspection,
+    DelegatedSchnorrProof,
 };
 use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsSecq256k1, SimFrParamsZorro};
 use noah_plonk::plonk::constraint_system::field_simulation::SimFrVar;
@@ -90,24 +91,62 @@ pub fn create_address_folding_ed25519<
     R: CryptoRng + RngCore,
     D: Digest<OutputSize = U64> + Default,
 >(
-    _prng: &mut R,
-    _hash: D,
-    _transcript: &mut Transcript,
+    prng: &mut R,
+    hash: D,
+    transcript: &mut Transcript,
     keypair: &KeyPair,
 ) -> Result<(
     AXfrAddressFoldingInstanceEd25519,
     AXfrAddressFoldingWitnessEd25519,
 )> {
-    let (_sk, _pk) = keypair.to_ed25519()?;
+    let (sk, pk) = keypair.to_ed25519()?;
 
-    let _pc_gens = PedersenCommitmentZorro::default();
-    let _bp_gens = ZorroBulletproofGens::load().unwrap();
+    let pc_gens = PedersenCommitmentZorro::default();
+    let bp_gens = ZorroBulletproofGens::load().unwrap();
 
-    todo!();
+    // important: address folding relies significantly on the Fiat-Shamir transform.
+    transcript.append_message(b"hash", hash.finalize().as_slice());
+
+    let (scalar_mul_proof, scalar_mul_commitments, blinding_factors) =
+        { ScalarMulProof::prove(prng, &bp_gens, transcript, &pk, &sk)? };
+
+    let (delegated_schnorr_proof, delegated_schnorr_inspection, beta, lambda) = {
+        let secret_key_in_fq = ZorroScalar::from_bytes(&sk.to_bytes())?;
+
+        prove_delegated_schnorr(
+            prng,
+            &vec![
+                (pk.get_x(), blinding_factors[0]),
+                (pk.get_y(), blinding_factors[1]),
+                (secret_key_in_fq, blinding_factors[2]),
+            ],
+            &pc_gens,
+            &scalar_mul_commitments,
+            transcript,
+        )
+        .c(d!())?
+    };
+
+    let instance = AXfrAddressFoldingInstanceEd25519 {
+        delegated_schnorr_proof: delegated_schnorr_proof.clone(),
+        scalar_mul_commitments,
+        scalar_mul_proof,
+    };
+
+    let witness = AXfrAddressFoldingWitnessEd25519 {
+        keypair: keypair.clone(),
+        blinding_factors,
+        delegated_schnorr_proof,
+        delegated_schnorr_inspection,
+        beta,
+        lambda,
+    };
+
+    Ok((instance, witness))
 }
 
 /// Verify an address folding proof.
-pub fn verify_address_folding_secp256k1<D: Digest<OutputSize = U64> + Default>(
+pub fn verify_address_folding_ed25519<D: Digest<OutputSize = U64> + Default>(
     hash: D,
     transcript: &mut Transcript,
     instance: &AXfrAddressFoldingInstanceEd25519,
@@ -133,7 +172,7 @@ pub fn verify_address_folding_secp256k1<D: Digest<OutputSize = U64> + Default>(
 }
 
 /// Generate the constraints used in the Plonk proof for address folding.
-pub fn prove_address_folding_in_cs_secp256k1(
+pub fn prove_address_folding_in_cs_ed25519(
     cs: &mut TurboPlonkCS,
     public_key_scalars_vars: &[VarIndex; 3],
     secret_key_scalars_vars: &[VarIndex; 2],

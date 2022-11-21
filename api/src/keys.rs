@@ -198,7 +198,7 @@ impl PublicKey {
     pub fn to_ed25519(&self) -> Result<Ed25519Point> {
         match self.inner() {
             PublicKeyInner::Ed25519(pk) => {
-                let pk_bytes = convert_point_ed25519_to_algebra(&pk);
+                let pk_bytes = convert_ed25519_pk_to_algebra(&pk);
                 Ed25519Point::from_compressed_bytes(&pk_bytes)
             }
             _ => Err(eg!(NoahError::ParameterError)),
@@ -261,7 +261,7 @@ impl PublicKey {
     /// Convert into the point format.
     pub fn as_compressed_point(&self) -> Vec<u8> {
         match self.0 {
-            PublicKeyInner::Ed25519(pk) => pk.as_bytes().to_vec(),
+            PublicKeyInner::Ed25519(pk) => convert_ed25519_pk_to_algebra(&pk),
             PublicKeyInner::Secp256k1(pk) => convert_point_libsecp256k1_to_algebra(&pk),
             PublicKeyInner::Address(_) => panic!("Address not supported"),
         }
@@ -481,7 +481,10 @@ impl SecretKey {
     /// Change to algebra Ristretto Point
     pub fn to_ed25519(&self) -> Result<Ed25519Scalar> {
         match self {
-            SecretKey::Ed25519(sk) => Ed25519Scalar::from_bytes(sk.as_bytes()),
+            SecretKey::Ed25519(sk) => {
+                let bytes = convert_ed25519_sk_to_algebra(&sk);
+                Ed25519Scalar::from_bytes(&bytes)
+            }
             _ => Err(eg!(NoahError::ParameterError)),
         }
     }
@@ -613,12 +616,7 @@ impl SecretKey {
     /// Convert into scalar bytes.
     pub fn as_scalar_bytes(&self) -> (KeyType, Vec<u8>) {
         match self {
-            SecretKey::Ed25519(sk) => {
-                let expanded: ExpandedSecretKey = (sk).into();
-                let mut key_bytes = vec![];
-                key_bytes.extend_from_slice(&expanded.to_bytes()[0..32]); //1st 32 bytes are key
-                (KeyType::Ed25519, key_bytes)
-            }
+            SecretKey::Ed25519(sk) => (KeyType::Ed25519, convert_ed25519_sk_to_algebra(sk)),
             SecretKey::Secp256k1(sk) => {
                 let s: LibSecp256k1Scalar = (*sk).into();
                 (
@@ -967,7 +965,12 @@ fn convert_scalar_libsecp256k1_to_algebra(b: &[u32; 8]) -> Vec<u8> {
     bytes.to_vec()
 }
 
-fn convert_point_ed25519_to_algebra(pk: &Ed25519PublicKey) -> Vec<u8> {
+fn convert_ed25519_sk_to_algebra(sk: &Ed25519SecretKey) -> Vec<u8> {
+    let esk = ExpandedSecretKey::from(sk);
+    esk.to_bytes()[..32].to_vec()
+}
+
+fn convert_ed25519_pk_to_algebra(pk: &Ed25519PublicKey) -> Vec<u8> {
     let y = CompressedEdwardsY(pk.to_bytes());
     let p = y.decompress().unwrap();
 
