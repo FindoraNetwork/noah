@@ -43,8 +43,8 @@ pub enum KeyType {
     Ed25519,
     /// Secp256k1
     Secp256k1,
-    /// Secp256k1 address
-    Address,
+    /// ETH-compatible address
+    EthAddress,
 }
 
 impl KeyType {
@@ -53,7 +53,7 @@ impl KeyType {
         match self {
             KeyType::Ed25519 => 0,
             KeyType::Secp256k1 => 1,
-            KeyType::Address => 2,
+            KeyType::EthAddress => 2,
         }
     }
 
@@ -62,7 +62,7 @@ impl KeyType {
         match byte {
             0u8 => KeyType::Ed25519,
             1u8 => KeyType::Secp256k1,
-            2u8 => KeyType::Address,
+            2u8 => KeyType::EthAddress,
             _ => KeyType::Ed25519,
         }
     }
@@ -81,7 +81,7 @@ pub enum PublicKeyInner {
     /// Secp256k1 Public Key
     Secp256k1(Secp256k1PublicKey),
     /// Hash of the secp256k1 public key.
-    Address([u8; 20]),
+    EthAddress([u8; 20]),
 }
 
 impl Default for PublicKey {
@@ -130,8 +130,8 @@ impl NoahFromToBytes for PublicKey {
                 bytes[0] = KeyType::Secp256k1.to_byte();
                 bytes[1..PUBLIC_KEY_LENGTH].copy_from_slice(&pk.serialize_compressed());
             }
-            PublicKeyInner::Address(hash) => {
-                bytes[0] = KeyType::Address.to_byte();
+            PublicKeyInner::EthAddress(hash) => {
+                bytes[0] = KeyType::EthAddress.to_byte();
                 bytes[1..21].copy_from_slice(&hash);
             }
         }
@@ -168,10 +168,10 @@ impl NoahFromToBytes for PublicKey {
                     Err(_) => Err(eg!(NoahError::DeserializationError)),
                 }
             }
-            KeyType::Address => {
+            KeyType::EthAddress => {
                 let mut hash_bytes = [0u8; 20];
                 hash_bytes.copy_from_slice(&bytes[1..21]);
-                Ok(PublicKey(PublicKeyInner::Address(hash_bytes)))
+                Ok(PublicKey(PublicKeyInner::EthAddress(hash_bytes)))
             }
         }
     }
@@ -181,6 +181,18 @@ impl PublicKey {
     /// Get the reference of the inner type
     pub fn inner(&self) -> &PublicKeyInner {
         &self.0
+    }
+
+    /// Convert the secp256k1 keypair to ETH address
+    pub fn to_eth_address(&self) -> Result<PublicKey> {
+        match self.inner() {
+            PublicKeyInner::Secp256k1(pk) => {
+                let address = convert_libsecp256k1_public_key_to_address(&pk);
+                Ok(PublicKey(PublicKeyInner::EthAddress(address)))
+            }
+            PublicKeyInner::EthAddress(_) => Ok(self.clone()),
+            _ => Err(eg!(NoahError::ParameterError)),
+        }
     }
 
     /// Change to algebra secp256k1 Point
@@ -251,7 +263,7 @@ impl PublicKey {
                 let (s, p) = Ed25519Scalar::random_scalar_with_compressed_point(prng);
                 (KeyType::Ed25519, s.to_bytes(), p.to_compressed_bytes())
             }
-            PublicKeyInner::Secp256k1(_) | PublicKeyInner::Address(_) => {
+            PublicKeyInner::Secp256k1(_) | PublicKeyInner::EthAddress(_) => {
                 let (s, p) = SECP256K1Scalar::random_scalar_with_compressed_point(prng);
                 (KeyType::Secp256k1, s.to_bytes(), p.to_compressed_bytes())
             }
@@ -263,7 +275,7 @@ impl PublicKey {
         match self.0 {
             PublicKeyInner::Ed25519(pk) => convert_ed25519_pk_to_algebra(&pk),
             PublicKeyInner::Secp256k1(pk) => convert_point_libsecp256k1_to_algebra(&pk),
-            PublicKeyInner::Address(_) => panic!("Address not supported"),
+            PublicKeyInner::EthAddress(_) => panic!("EthAddress not supported"),
         }
     }
 
@@ -317,7 +329,7 @@ impl PublicKey {
                 bytes.append(&mut ctext);
                 Ok(bytes)
             }
-            PublicKeyInner::Address(_) => panic!("Address not supported"),
+            PublicKeyInner::EthAddress(_) => panic!("EthAddress not supported"),
         }
     }
 
@@ -338,7 +350,7 @@ impl PublicKey {
                     Err(eg!(NoahError::SignatureError))
                 }
             }
-            (PublicKeyInner::Address(hash), Signature::Address(sign, rec)) => {
+            (PublicKeyInner::EthAddress(hash), Signature::Secp256k1(sign, rec)) => {
                 let mut hasher = Keccak256::new();
                 hasher.update(message);
                 let res = hasher.finalize();
@@ -372,8 +384,6 @@ pub enum SecretKey {
     Ed25519(Ed25519SecretKey),
     /// Secp256k1 Secret Key
     Secp256k1(Secp256k1SecretKey),
-    /// Secp256k1 Secret Key with address
-    Address(Secp256k1SecretKey),
 }
 
 impl Default for SecretKey {
@@ -426,10 +436,6 @@ impl NoahFromToBytes for SecretKey {
                 bytes[0] = KeyType::Secp256k1.to_byte();
                 bytes[1..].copy_from_slice(&sk.serialize());
             }
-            SecretKey::Address(sk) => {
-                bytes[0] = KeyType::Address.to_byte();
-                bytes[1..].copy_from_slice(&sk.serialize());
-            }
         }
         bytes
     }
@@ -453,14 +459,12 @@ impl NoahFromToBytes for SecretKey {
                 Ok(sk) => Ok(SecretKey::Ed25519(sk)),
                 Err(_) => Err(eg!(NoahError::DeserializationError)),
             },
-            KeyType::Secp256k1 => match Secp256k1SecretKey::parse_slice(&bytes[1..]) {
-                Ok(sk) => Ok(SecretKey::Secp256k1(sk)),
-                Err(_) => Err(eg!(NoahError::DeserializationError)),
-            },
-            KeyType::Address => match Secp256k1SecretKey::parse_slice(&bytes[1..]) {
-                Ok(sk) => Ok(SecretKey::Address(sk)),
-                Err(_) => Err(eg!(NoahError::DeserializationError)),
-            },
+            KeyType::Secp256k1 | KeyType::EthAddress => {
+                match Secp256k1SecretKey::parse_slice(&bytes[1..]) {
+                    Ok(sk) => Ok(SecretKey::Secp256k1(sk)),
+                    Err(_) => Err(eg!(NoahError::DeserializationError)),
+                }
+            }
         }
     }
 }
@@ -500,7 +504,6 @@ impl SecretKey {
                 let sk = self.to_ed25519()?;
                 sk.to_bytes()
             }
-            _ => return Err(eg!(NoahError::ParameterError)),
         };
 
         let first = BLSScalar::from_bytes(&bytes[0..31])?;
@@ -517,12 +520,6 @@ impl SecretKey {
             SecretKey::Secp256k1(ref sk) => PublicKey(PublicKeyInner::Secp256k1(
                 Secp256k1PublicKey::from_secret_key(sk),
             )),
-            SecretKey::Address(ref sk) => {
-                let pk = Secp256k1PublicKey::from_secret_key(sk);
-                PublicKey(PublicKeyInner::Address(
-                    convert_libsecp256k1_public_key_to_address(&pk),
-                ))
-            }
         };
         KeyPair {
             pub_key: pk,
@@ -576,7 +573,6 @@ impl SecretKey {
                 };
                 Ok(res)
             }
-            SecretKey::Address(_) => panic!("Address not supported"),
         }
     }
 
@@ -600,16 +596,6 @@ impl SecretKey {
                 let (sign, rec) = secp256k1_sign(&msg, sk);
                 Ok(Signature::Secp256k1(sign, rec))
             }
-            SecretKey::Address(sk) => {
-                // If the Ethereum sign is used outside,
-                // it needs to be dealt with first, only hash in Noah.
-                let mut hasher = Keccak256::new();
-                hasher.update(message);
-                let res = hasher.finalize();
-                let msg = Message::parse_slice(&res[..]).c(d!(NoahError::SignatureError))?;
-                let (sign, rec) = secp256k1_sign(&msg, sk);
-                Ok(Signature::Address(sign, rec))
-            }
         }
     }
 
@@ -624,20 +610,13 @@ impl SecretKey {
                     convert_scalar_libsecp256k1_to_algebra(&s.0),
                 )
             }
-            SecretKey::Address(sk) => {
-                let s: LibSecp256k1Scalar = (*sk).into();
-                (
-                    KeyType::Address,
-                    convert_scalar_libsecp256k1_to_algebra(&s.0),
-                )
-            }
         }
     }
 
     /// Convert from raw bytes used secp256k1 and use it with address.
     pub fn from_secp256k1_with_address(bytes: &[u8]) -> Result<Self> {
         let sk = Secp256k1SecretKey::parse_slice(bytes).c(d!(NoahError::DeserializationError))?;
-        Ok(SecretKey::Address(sk))
+        Ok(SecretKey::Secp256k1(sk))
     }
 }
 
@@ -757,11 +736,19 @@ impl KeyPair {
         let sk = Secp256k1SecretKey::random(prng);
         let pk = Secp256k1PublicKey::from_secret_key(&sk);
         KeyPair {
-            pub_key: PublicKey(PublicKeyInner::Address(
+            pub_key: PublicKey(PublicKeyInner::EthAddress(
                 convert_libsecp256k1_public_key_to_address(&pk),
             )),
-            sec_key: SecretKey::Address(sk),
+            sec_key: SecretKey::Secp256k1(sk),
         }
+    }
+
+    /// Convert to eth address keypair.
+    pub fn to_eth_address(&self) -> Result<Self> {
+        Ok(Self {
+            pub_key: self.pub_key.to_eth_address()?,
+            sec_key: self.sec_key.clone(),
+        })
     }
 
     /// Hybrid decryption
@@ -804,11 +791,8 @@ impl KeyPair {
 pub enum Signature {
     /// Ed25519 Signature
     Ed25519(Ed25519Signature),
-    /// Secp256k1 Signature
-    Secp256k1(Secp256k1Signature, RecoveryId),
     /// Secp256k1 Signature with recovery.
-    /// params is r, s, v
-    Address(Secp256k1Signature, RecoveryId),
+    Secp256k1(Secp256k1Signature, RecoveryId),
 }
 
 impl NoahFromToBytes for Signature {
@@ -821,11 +805,6 @@ impl NoahFromToBytes for Signature {
             }
             Signature::Secp256k1(sign, rec) => {
                 bytes[0] = KeyType::Secp256k1.to_byte();
-                bytes[1..SIGNATURE_LENGTH - 1].copy_from_slice(&sign.serialize());
-                bytes[SIGNATURE_LENGTH - 1] = rec.serialize();
-            }
-            Signature::Address(sign, rec) => {
-                bytes[0] = KeyType::Address.to_byte();
                 bytes[1..SIGNATURE_LENGTH - 1].copy_from_slice(&sign.serialize());
                 bytes[SIGNATURE_LENGTH - 1] = rec.serialize();
             }
@@ -855,7 +834,7 @@ impl NoahFromToBytes for Signature {
                     Err(_) => Err(eg!(NoahError::DeserializationError)),
                 }
             }
-            KeyType::Secp256k1 => {
+            KeyType::Secp256k1 | KeyType::EthAddress => {
                 let mut s_bytes = [0u8; SIGNATURE_LENGTH - 2];
                 s_bytes.copy_from_slice(&bytes[1..SIGNATURE_LENGTH - 1]);
                 let sign = Secp256k1Signature::parse_standard(&s_bytes)
@@ -863,15 +842,6 @@ impl NoahFromToBytes for Signature {
                 let rec = RecoveryId::parse(bytes[SIGNATURE_LENGTH - 1])
                     .c(d!(NoahError::DeserializationError))?;
                 Ok(Signature::Secp256k1(sign, rec))
-            }
-            KeyType::Address => {
-                let mut s_bytes = [0u8; SIGNATURE_LENGTH - 2];
-                s_bytes.copy_from_slice(&bytes[1..SIGNATURE_LENGTH - 1]);
-                let sign = Secp256k1Signature::parse_standard(&s_bytes)
-                    .c(d!(NoahError::DeserializationError))?;
-                let rec = RecoveryId::parse(bytes[SIGNATURE_LENGTH - 1])
-                    .c(d!(NoahError::DeserializationError))?;
-                Ok(Signature::Address(sign, rec))
             }
         }
     }
@@ -1054,12 +1024,12 @@ mod test {
         let sk = "df57089febbacf7ba0bc227dafbffa9fc08a93fdc68e1e42411a14efcf23656e";
         let address = "8626f6940e2eb28930efb4cef49b2d1f2c9c1199";
         let xs = SecretKey::from_secp256k1_with_address(&hex::decode(sk).unwrap()).unwrap();
-        let kp = xs.into_keypair();
-        match kp.pub_key.0 {
-            PublicKeyInner::Address(hash) => {
+        let kp = xs.into_keypair().to_eth_address().unwrap();
+        match kp.get_pk() {
+            PublicKey(PublicKeyInner::EthAddress(hash)) => {
                 assert_eq!(hash.to_vec(), hex::decode(address).unwrap())
             }
-            _ => panic!("not secp256k1 address"),
+            _ => panic!("not eth address"),
         }
         let sign = kp.sign(b"message").unwrap();
         kp.pub_key.verify(b"message", &sign).unwrap();

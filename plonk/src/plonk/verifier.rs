@@ -1,17 +1,20 @@
-use crate::plonk::{
-    constraint_system::ConstraintSystem,
-    errors::PlonkError,
-    helpers::{eval_pi_poly, first_lagrange_poly, r_commitment, r_eval_zeta, PlonkChallenges},
-    indexer::{get_domain_and_root, PlonkPf, PlonkVK},
-    transcript::{
-        transcript_get_plonk_challenge_alpha, transcript_get_plonk_challenge_beta,
-        transcript_get_plonk_challenge_gamma, transcript_get_plonk_challenge_u,
-        transcript_get_plonk_challenge_zeta, transcript_init_plonk,
-    },
-};
 use crate::poly_commit::{pcs::PolyComScheme, transcript::PolyComTranscript};
+use crate::{
+    plonk::{
+        constraint_system::ConstraintSystem,
+        errors::PlonkError,
+        helpers::{eval_pi_poly, first_lagrange_poly, r_commitment, r_eval_zeta, PlonkChallenges},
+        indexer::{PlonkPf, PlonkVK},
+        transcript::{
+            transcript_get_plonk_challenge_alpha, transcript_get_plonk_challenge_beta,
+            transcript_get_plonk_challenge_gamma, transcript_get_plonk_challenge_u,
+            transcript_get_plonk_challenge_zeta, transcript_init_plonk,
+        },
+    },
+    poly_commit::field_polynomial::FpPolynomial,
+};
 use merlin::Transcript;
-use noah_algebra::prelude::*;
+use noah_algebra::{prelude::*, traits::Domain};
 
 /// Verify a proof.
 pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
@@ -22,7 +25,10 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     pi: &[PCS::Field],
     proof: &PlonkPf<PCS>,
 ) -> Result<()> {
-    let (_, root) = get_domain_and_root::<PCS>(&verifier_params.domain);
+    let domain = FpPolynomial::<PCS::Field>::evaluation_domain(cs.size())
+        .c(d!(PlonkError::GroupNotFound(cs.size())))?;
+    let root = PCS::Field::from_field(domain.group_gen);
+
     transcript_init_plonk(transcript, verifier_params, pi, &root);
     let mut challenges = PlonkChallenges::new();
     // 1. compute all challenges such as gamma, beta, alpha, zeta and u.

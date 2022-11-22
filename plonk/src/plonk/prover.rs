@@ -5,7 +5,7 @@ use crate::plonk::{
         first_lagrange_poly, hide_polynomial, pi_poly, r_poly, split_t_and_commit, t_poly, z_poly,
         PlonkChallenges,
     },
-    indexer::{get_domain_and_root, PlonkPK, PlonkPf, PlonkProof},
+    indexer::{PlonkPK, PlonkPf, PlonkProof},
     transcript::{
         transcript_get_plonk_challenge_alpha, transcript_get_plonk_challenge_beta,
         transcript_get_plonk_challenge_gamma, transcript_get_plonk_challenge_u,
@@ -15,9 +15,10 @@ use crate::plonk::{
 use crate::poly_commit::{
     field_polynomial::FpPolynomial, pcs::PolyComScheme, transcript::PolyComTranscript,
 };
+use ark_poly::Radix2EvaluationDomain;
 use ark_std::{end_timer, start_timer};
 use merlin::Transcript;
-use noah_algebra::prelude::*;
+use noah_algebra::{prelude::*, traits::Domain};
 
 /// PLONK Prover: it produces a proof that `witness` satisfies the constraint system `cs`,
 /// Proof verifier must use a transcript with same state as prover and match the public parameters,
@@ -107,7 +108,9 @@ pub fn prover_with_lagrange<
     let prover_timer = start_timer!(|| "TurboPlonk::Prover");
 
     let get_domain_and_root_timer = start_timer!(|| "Get the domain and a root");
-    let (domain, root) = get_domain_and_root::<PCS>(&prover_params.verifier_params.domain);
+    let domain = FpPolynomial::<PCS::Field>::evaluation_domain(cs.size())
+        .c(d!(PlonkError::GroupNotFound(cs.size())))?;
+    let root = PCS::Field::from_field(domain.group_gen);
     end_timer!(get_domain_and_root_timer);
 
     let online_values_timer = start_timer!(|| "List the online variables");
@@ -139,7 +142,7 @@ pub fn prover_with_lagrange<
         start_timer!(|| "Prepare the extended witness and the input");
     // Prepare extended witness
     let extended_witness = cs.extend_witness(w);
-    let pi = pi_poly::<PCS>(&prover_params, &online_values, &domain);
+    let pi = pi_poly::<PCS, Radix2EvaluationDomain<_>>(&prover_params, &online_values, &domain);
     end_timer!(extended_witness_and_pi_timer);
 
     // 1. build witness polynomials, hide them and commit

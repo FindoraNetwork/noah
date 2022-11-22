@@ -64,9 +64,9 @@ mod smoke_xfr_secp256k1_address {
         let sk = "df57089febbacf7ba0bc227dafbffa9fc08a93fdc68e1e42411a14efcf23656e";
         let address = "8626f6940e2eb28930efb4cef49b2d1f2c9c1199";
         let xs = SecretKey::from_secp256k1_with_address(&hex::decode(sk).unwrap()).unwrap();
-        let sender = xs.into_keypair();
+        let sender = xs.into_keypair().to_eth_address().unwrap();
         match sender.get_pk().inner() {
-            PublicKeyInner::Address(hash) => {
+            PublicKeyInner::EthAddress(hash) => {
                 assert_eq!(hash.to_vec(), hex::decode(address).unwrap())
             }
             _ => panic!("not secp256k1 address"),
