@@ -241,9 +241,6 @@ pub fn finish_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> 
                 AXfrAddressFoldingWitness::Ed25519(folding_witness),
             )
         }
-        _ => {
-            todo!() // TODO remove
-        }
     };
 
     let proof = prove_xfr(

@@ -246,9 +246,6 @@ pub fn finish_abar_to_bar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U6
                 AXfrAddressFoldingWitness::Ed25519(folding_witness),
             )
         }
-        _ => {
-            todo!() // TODO remove
-        }
     };
 
     let proof = prove_abar_to_bar(
