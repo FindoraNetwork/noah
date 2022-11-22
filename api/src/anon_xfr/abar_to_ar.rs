@@ -283,11 +283,17 @@ pub fn batch_verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default + Sync
         .map(|((note, merkle_root), hash)| {
             let mut transcript = Transcript::new(ABAR_TO_AR_FOLDING_PROOF_TRANSCRIPT);
 
-            let (beta, lambda) =
-                verify_address_folding_secp256k1(hash, &mut transcript, &note.folding_instance)?;
-
-            let address_folding_public_input =
-                prepare_verifier_input_secp256k1(&note.folding_instance, &beta, &lambda);
+            let address_folding_public_input = match &note.folding_instance {
+                AXfrAddressFoldingInstance::Secp256k1(a) => {
+                    let (beta, lambda) =
+                        verify_address_folding_secp256k1(hash, &mut transcript, a)?;
+                    prepare_verifier_input_secp256k1(&a, &beta, &lambda)
+                }
+                AXfrAddressFoldingInstance::Ed25519(a) => {
+                    let (beta, lambda) = verify_address_folding_ed25519(hash, &mut transcript, a)?;
+                    prepare_verifier_input_ed25519(&a, &beta, &lambda)
+                }
+            };
 
             let payer_amount = note.body.output.amount.get_amount().unwrap();
             let payer_asset_type = note.body.output.asset_type.get_asset_type().unwrap();

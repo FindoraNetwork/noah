@@ -344,11 +344,17 @@ pub fn batch_verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default + Sync +
 
             let mut transcript = Transcript::new(ANON_XFR_FOLDING_PROOF_TRANSCRIPT);
 
-            let (beta, lambda) =
-                verify_address_folding_secp256k1(hash, &mut transcript, &note.folding_instance)?;
-
-            let address_folding_public_input =
-                prepare_verifier_input_secp256k1(&note.folding_instance, &beta, &lambda);
+            let address_folding_public_input = match &note.folding_instance {
+                AXfrAddressFoldingInstance::Secp256k1(a) => {
+                    let (beta, lambda) =
+                        verify_address_folding_secp256k1(hash, &mut transcript, a)?;
+                    prepare_verifier_input_secp256k1(&a, &beta, &lambda)
+                }
+                AXfrAddressFoldingInstance::Ed25519(a) => {
+                    let (beta, lambda) = verify_address_folding_ed25519(hash, &mut transcript, a)?;
+                    prepare_verifier_input_ed25519(&a, &beta, &lambda)
+                }
+            };
 
             verify_xfr(
                 *param,
