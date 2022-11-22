@@ -9,7 +9,7 @@ use crate::anon_xfr::{
     bar_to_abar::build_bar_to_abar_cs,
     commit, nullify,
     structs::{MTNode, MTPath},
-    TurboPlonkCS, FEE_TYPE, TREE_DEPTH,
+    AXfrAddressFoldingWitness, TurboPlonkCS, FEE_TYPE, TREE_DEPTH,
 };
 use crate::keys::KeyPair;
 use crate::parameters::{
@@ -184,7 +184,8 @@ impl ProverParams {
         n_payees: usize,
         tree_depth: Option<usize>,
     ) -> Result<ProverParams> {
-        let folding_witness = AXfrAddressFoldingWitnessSecp256k1::default();
+        let folding_witness =
+            AXfrAddressFoldingWitness::Secp256k1(AXfrAddressFoldingWitnessSecp256k1::default());
 
         let (fake_witness, depth) = match tree_depth {
             Some(depth) => (AXfrWitness::fake(n_payers, n_payees, depth, 0), depth),
@@ -367,7 +368,8 @@ impl ProverParams {
             blind: bls_zero,
         };
 
-        let folding_witness = AXfrAddressFoldingWitnessSecp256k1::default();
+        let folding_witness =
+            AXfrAddressFoldingWitness::Secp256k1(AXfrAddressFoldingWitnessSecp256k1::default());
 
         let (_, nullifier_trace) = nullify(
             &payer_secret.secret_key.clone().into_keypair(),
@@ -480,7 +482,8 @@ impl ProverParams {
             blind: bls_zero,
         };
 
-        let folding_witness = AXfrAddressFoldingWitnessSecp256k1::default();
+        let folding_witness =
+            AXfrAddressFoldingWitness::Secp256k1(AXfrAddressFoldingWitnessSecp256k1::default());
 
         let (_, nullifier_trace) = nullify(
             &payer_secret.secret_key.clone().into_keypair(),

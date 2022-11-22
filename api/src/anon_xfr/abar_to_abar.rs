@@ -1,7 +1,10 @@
+use crate::anon_xfr::address_folding_ed25519::{
+    create_address_folding_ed25519, prepare_verifier_input_ed25519,
+    prove_address_folding_in_cs_ed25519, verify_address_folding_ed25519,
+};
 use crate::anon_xfr::address_folding_secp256k1::{
     create_address_folding_secp256k1, prepare_verifier_input_secp256k1,
     prove_address_folding_in_cs_secp256k1, verify_address_folding_secp256k1,
-    AXfrAddressFoldingInstanceSecp256k1, AXfrAddressFoldingWitnessSecp256k1,
 };
 use crate::anon_xfr::{
     add_merkle_path_variables, check_asset_amount, check_inputs, check_roots, commit, commit_in_cs,
@@ -10,7 +13,8 @@ use crate::anon_xfr::{
         AccElemVars, AnonAssetRecord, AxfrOwnerMemo, Commitment, MTNode, MTPath, Nullifier,
         OpenAnonAssetRecord, PayeeWitness, PayeeWitnessVars, PayerWitness, PayerWitnessVars,
     },
-    AXfrPlonkPf, TurboPlonkCS, AMOUNT_LEN, FEE_TYPE,
+    AXfrAddressFoldingInstance, AXfrAddressFoldingWitness, AXfrPlonkPf, TurboPlonkCS, AMOUNT_LEN,
+    FEE_TYPE,
 };
 use crate::errors::NoahError;
 use crate::keys::{KeyPair, PublicKey, SecretKey};
@@ -46,7 +50,7 @@ pub struct AXfrNote {
     /// The Plonk proof (assuming non-malleability).
     pub proof: AXfrPlonkPf,
     /// The address folding instance.
-    pub folding_instance: AXfrAddressFoldingInstanceSecp256k1,
+    pub folding_instance: AXfrAddressFoldingInstance,
 }
 
 /// Anonymous transfer pre-note without proofs and signatures.
@@ -220,8 +224,27 @@ pub fn finish_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> 
 
     let mut transcript = Transcript::new(ANON_XFR_FOLDING_PROOF_TRANSCRIPT);
 
-    let (folding_instance, folding_witness) =
-        create_address_folding_secp256k1(prng, hash, &mut transcript, &input_keypair)?;
+    let (folding_instance, folding_witness) = match input_keypair.get_sk_ref() {
+        SecretKey::Secp256k1(_) => {
+            let (folding_instance, folding_witness) =
+                create_address_folding_secp256k1(prng, hash, &mut transcript, &input_keypair)?;
+            (
+                AXfrAddressFoldingInstance::Secp256k1(folding_instance),
+                AXfrAddressFoldingWitness::Secp256k1(folding_witness),
+            )
+        }
+        SecretKey::Ed25519(_) => {
+            let (folding_instance, folding_witness) =
+                create_address_folding_ed25519(prng, hash, &mut transcript, &input_keypair)?;
+            (
+                AXfrAddressFoldingInstance::Ed25519(folding_instance),
+                AXfrAddressFoldingWitness::Ed25519(folding_witness),
+            )
+        }
+        _ => {
+            todo!() // TODO remove
+        }
+    };
 
     let proof = prove_xfr(
         prng,
@@ -266,11 +289,16 @@ pub fn verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default>(
 
     let mut transcript = Transcript::new(ANON_XFR_FOLDING_PROOF_TRANSCRIPT);
 
-    let (beta, lambda) =
-        verify_address_folding_secp256k1(hash, &mut transcript, &note.folding_instance)?;
-
-    let address_folding_public_input =
-        prepare_verifier_input_secp256k1(&note.folding_instance, &beta, &lambda);
+    let address_folding_public_input = match &note.folding_instance {
+        AXfrAddressFoldingInstance::Secp256k1(a) => {
+            let (beta, lambda) = verify_address_folding_secp256k1(hash, &mut transcript, a)?;
+            prepare_verifier_input_secp256k1(&a, &beta, &lambda)
+        }
+        AXfrAddressFoldingInstance::Ed25519(a) => {
+            let (beta, lambda) = verify_address_folding_ed25519(hash, &mut transcript, a)?;
+            prepare_verifier_input_ed25519(&a, &beta, &lambda)
+        }
+    };
 
     verify_xfr(
         params,
@@ -349,7 +377,7 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     nullifiers_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
     input_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
     output_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
-    folding_witness: &AXfrAddressFoldingWitnessSecp256k1,
+    folding_witness: &AXfrAddressFoldingWitness,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(ANON_XFR_PLONK_PROOF_TRANSCRIPT);
     transcript.append_u64(
@@ -546,7 +574,7 @@ pub(crate) fn build_multi_xfr_cs(
     nullifiers_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
     input_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
     output_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
-    folding_witness: &AXfrAddressFoldingWitnessSecp256k1,
+    folding_witness: &AXfrAddressFoldingWitness,
 ) -> (TurboPlonkCS, usize) {
     assert_ne!(witness.payers_witnesses.len(), 0);
     assert_ne!(witness.payees_witnesses.len(), 0);
@@ -559,7 +587,7 @@ pub(crate) fn build_multi_xfr_cs(
         add_payers_witnesses(&mut cs, &witness.payers_witnesses.iter().collect_vec());
     let payees_secrets = add_payees_witnesses(&mut cs, &witness.payees_witnesses);
 
-    let keypair = folding_witness.keypair.clone();
+    let keypair = folding_witness.keypair();
     let public_key_scalars = keypair.get_pk().to_bls_scalars().unwrap();
     let secret_key_scalars = keypair.get_sk().to_bls_scalars().unwrap();
 
@@ -699,13 +727,22 @@ pub(crate) fn build_multi_xfr_cs(
     let fee_var = cs.new_variable(BLSScalar::from(witness.fee));
     cs.prepare_pi_variable(fee_var);
 
-    prove_address_folding_in_cs_secp256k1(
-        &mut cs,
-        &public_key_scalars_vars,
-        &secret_key_scalars_vars,
-        &folding_witness,
-    )
-    .unwrap();
+    match folding_witness {
+        AXfrAddressFoldingWitness::Secp256k1(a) => prove_address_folding_in_cs_secp256k1(
+            &mut cs,
+            &public_key_scalars_vars,
+            &secret_key_scalars_vars,
+            &a,
+        )
+        .unwrap(),
+        AXfrAddressFoldingWitness::Ed25519(a) => prove_address_folding_in_cs_ed25519(
+            &mut cs,
+            &public_key_scalars_vars,
+            &secret_key_scalars_vars,
+            &a,
+        )
+        .unwrap(),
+    }
 
     asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
 
@@ -919,7 +956,7 @@ mod tests {
             AccElemVars, AnonAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonAssetRecord,
             OpenAnonAssetRecordBuilder, PayeeWitness, PayerWitness,
         },
-        FEE_TYPE,
+        AXfrAddressFoldingWitness, FEE_TYPE,
     };
     use crate::keys::KeyPair;
     use crate::setup::{ProverParams, VerifierParams};
@@ -2417,7 +2454,7 @@ mod tests {
             &nullifiers_traces,
             &input_commitments_traces,
             &output_commitments_traces,
-            &folding_witness,
+            &AXfrAddressFoldingWitness::Secp256k1(folding_witness),
         );
         let witness = cs.get_and_clear_witness();
 
