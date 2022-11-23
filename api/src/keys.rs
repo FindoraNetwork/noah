@@ -24,6 +24,8 @@ use noah_algebra::{
 use noah_crypto::basic::hybrid_encryption::{
     hybrid_decrypt_with_ed25519_secret_key, hybrid_encrypt_ed25519, NoahHybridCiphertext,
 };
+use num_bigint::BigUint;
+use serde::Serialize;
 use sha3::Keccak256;
 use wasm_bindgen::prelude::*;
 
@@ -487,7 +489,9 @@ impl SecretKey {
         match self {
             SecretKey::Ed25519(sk) => {
                 let bytes = convert_ed25519_sk_to_algebra(&sk);
-                Ed25519Scalar::from_bytes(&bytes)
+                let be = BigUint::from_bytes_be(&bytes);
+                Ed25519Scalar::from_bytes(&be.to_bytes_le())
+                //Ed25519Scalar::from_bytes(&bytes)
             }
             _ => Err(eg!(NoahError::ParameterError)),
         }
@@ -937,7 +941,16 @@ fn convert_scalar_libsecp256k1_to_algebra(b: &[u32; 8]) -> Vec<u8> {
 
 fn convert_ed25519_sk_to_algebra(sk: &Ed25519SecretKey) -> Vec<u8> {
     let esk = ExpandedSecretKey::from(sk);
-    esk.to_bytes()[..32].to_vec()
+    let bytes = esk.to_bytes()[..32].to_vec();
+
+    println!("p-sk: {:?}", bytes);
+    let b = BigUint::from_bytes_le(&bytes);
+    println!("b-sk: {:?}", b.to_bytes_le());
+
+    let a = Ed25519Scalar::from_bytes(&bytes).unwrap();
+    println!("a-sk: {:?}", a.to_bytes());
+
+    bytes
 }
 
 fn convert_ed25519_pk_to_algebra(pk: &Ed25519PublicKey) -> Vec<u8> {
@@ -947,14 +960,27 @@ fn convert_ed25519_pk_to_algebra(pk: &Ed25519PublicKey) -> Vec<u8> {
     let recip = p.Z.invert();
     let x = &p.X * &recip;
     let y = &p.Y * &recip;
+    println!("p-x: {:?}", x.to_bytes());
+    println!("p-y: {:?}", y.to_bytes());
 
     let mut bytes = y.to_bytes().to_vec();
+
     let flag = if bool::from(x.is_negative()) {
         EdwardsFlags::NegativeX.u8_bitmask()
     } else {
         EdwardsFlags::PositiveX.u8_bitmask()
     };
     bytes.push(flag);
+
+    let g = Ed25519Point::from_compressed_bytes(&bytes).unwrap();
+    let a = g.get_raw();
+    let mut a_x = vec![];
+    let mut a_y = vec![];
+    a.x.serialize(&mut a_x).unwrap();
+    a.y.serialize(&mut a_y).unwrap();
+    println!("a-x: {:?}", a_x);
+    println!("a-y: {:?}", a_y);
+
     bytes
 }
 
@@ -1045,10 +1071,11 @@ mod test {
 
     #[test]
     fn convert_ed25519_key() {
+        env::set_var("DETERMINISTIC_TEST_RNG", "0");
         let mut prng = test_rng();
         let kp = KeyPair::generate_ed25519(&mut prng);
-        let _ = kp.to_ed25519().unwrap();
-        //assert_eq!(Ed25519Point::get_base().mul(&s), p);
+        let (s, p) = kp.to_ed25519().unwrap();
+        assert_eq!(Ed25519Point::get_base().mul(&s), p);
     }
 
     #[test]
