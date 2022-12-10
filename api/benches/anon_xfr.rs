@@ -8,17 +8,16 @@ use noah::{
         abar_to_bar::*,
         ar_to_abar::*,
         bar_to_abar::*,
-        keys::KeyPair,
         structs::{
             AnonAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonAssetRecord,
             OpenAnonAssetRecordBuilder,
         },
         FEE_TYPE, TREE_DEPTH,
     },
+    keys::KeyPair,
     setup::{ProverParams, VerifierParams},
     xfr::{
         asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
-        sig::Keypair,
         structs::{AssetRecordTemplate, AssetType, ASSET_TYPE_LENGTH},
     },
 };
@@ -164,7 +163,7 @@ fn abar_to_ar(c: &mut Criterion) {
     let verify_params = VerifierParams::abar_to_ar_params().unwrap();
 
     let sender = KeyPair::generate(&mut prng);
-    let receiver = XfrKeyPair::generate(&mut prng);
+    let receiver = KeyPair::generate(&mut prng);
 
     let fdb = MemoryDB::new();
     let cs = Arc::new(RwLock::new(ChainState::new(fdb, "abar_ar".to_owned(), 0)));
@@ -179,7 +178,7 @@ fn abar_to_ar(c: &mut Criterion) {
     let proof = mt.generate_proof(0).unwrap();
     oabar.update_mt_leaf_info(build_mt_leaf_info_from_proof(proof.clone(), 0));
 
-    let pre_note = init_abar_to_ar_note(&mut prng, &oabar, &sender, &receiver.pub_key).unwrap();
+    let pre_note = init_abar_to_ar_note(&mut prng, &oabar, &sender, &receiver.get_pk()).unwrap();
     let hash = random_hasher(&mut prng);
     let note = finish_abar_to_ar_note(&mut prng, &params, pre_note, hash.clone()).unwrap();
 
@@ -245,7 +244,7 @@ fn abar_to_bar(c: &mut Criterion) {
         &mut prng,
         &oabar,
         &sender,
-        &receiver.pub_key,
+        &receiver.get_pk(),
         AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
     )
     .unwrap();
@@ -301,7 +300,7 @@ fn ar_to_abar(c: &mut Criterion) {
             AMOUNT,
             ASSET,
             AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
-            sender.pub_key,
+            sender.get_pk(),
         );
         let (bar, _, memo) = build_blind_asset_record(&mut prng, &pc_gens, &ar, vec![]);
         (bar, memo)
@@ -347,7 +346,7 @@ fn bar_to_abar(c: &mut Criterion) {
             AMOUNT,
             ASSET,
             AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
-            sender.pub_key,
+            sender.get_pk(),
         );
         let (bar, _, memo) = build_blind_asset_record(&mut prng, &pc_gens, &ar, vec![]);
         (bar, memo)
@@ -356,12 +355,14 @@ fn bar_to_abar(c: &mut Criterion) {
 
     let note =
         gen_bar_to_abar_note(&mut prng, &params, &obar, &sender, &receiver.get_pk()).unwrap();
-    assert!(verify_bar_to_abar_note(&verify_params, &note, &sender.pub_key).is_ok());
+    assert!(verify_bar_to_abar_note(&verify_params, &note, &sender.get_pk()).is_ok());
 
     let mut single_group = c.benchmark_group("bar_to_abar");
     single_group.sample_size(10);
     single_group.bench_function("non batch verify".to_string(), |b| {
-        b.iter(|| assert!(verify_bar_to_abar_note(&verify_params, &note, &sender.pub_key).is_ok()));
+        b.iter(|| {
+            assert!(verify_bar_to_abar_note(&verify_params, &note, &sender.get_pk()).is_ok())
+        });
     });
     single_group.finish();
 
@@ -369,7 +370,7 @@ fn bar_to_abar(c: &mut Criterion) {
     {
         for batch_size in BATCHSIZE {
             let notes = vec![&note; batch_size];
-            let pub_keys = vec![&sender.pub_key; batch_size];
+            let pub_keys = vec![&sender.get_pk(); batch_size];
 
             let mut batch_group = c.benchmark_group("bar_to_abar");
             batch_group.sample_size(10);

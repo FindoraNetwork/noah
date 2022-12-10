@@ -1,10 +1,10 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use noah::{
+    keys::KeyPair,
     setup::BulletproofParams,
     xfr::{
         asset_record::AssetRecordType,
         batch_verify_xfr_notes, gen_xfr_note,
-        sig::XfrKeyPair,
         structs::{AssetRecord, AssetRecordTemplate, AssetType, XfrAmount, XfrAssetType},
         verify_xfr_note, XfrNotePolicies,
     },
@@ -119,7 +119,7 @@ fn verify_single_asset_transfer(
                 input_amount,
                 asset_type,
                 *asset_record_type,
-                key_pair.pub_key,
+                key_pair.get_pk(),
             )
         })
         .collect_vec();
@@ -132,7 +132,7 @@ fn verify_single_asset_transfer(
                 output_amount,
                 asset_type,
                 *asset_record_type,
-                key_pair.pub_key,
+                key_pair.get_pk(),
             )
         })
         .collect_vec();
@@ -209,7 +209,7 @@ fn batch_verify_single_asset_transfer(
                 input_amount,
                 asset_type,
                 *asset_record_type,
-                key_pair.pub_key,
+                key_pair.get_pk(),
             )
         })
         .collect_vec();
@@ -222,7 +222,7 @@ fn batch_verify_single_asset_transfer(
                 output_amount,
                 asset_type,
                 *asset_record_type,
-                key_pair.pub_key,
+                key_pair.get_pk(),
             )
         })
         .collect_vec();
@@ -293,7 +293,7 @@ fn verify_multi_asset_transfer(c: &mut Criterion, asset_record_type: AssetRecord
                 *amount,
                 *asset_type,
                 asset_record_type,
-                key_pair.pub_key,
+                key_pair.get_pk(),
             )
         })
         .collect_vec();
@@ -316,7 +316,7 @@ fn verify_multi_asset_transfer(c: &mut Criterion, asset_record_type: AssetRecord
                 *amount,
                 *asset_type,
                 asset_record_type,
-                key_pair.pub_key,
+                key_pair.get_pk(),
             )
         })
         .collect_vec();
@@ -396,7 +396,7 @@ fn batch_verify_multi_asset_transfer(
                 *amount,
                 *asset_type,
                 asset_record_type,
-                key_pair.pub_key,
+                key_pair.get_pk(),
             )
         })
         .collect_vec();
@@ -419,7 +419,7 @@ fn batch_verify_multi_asset_transfer(
                 *amount,
                 *asset_type,
                 asset_record_type,
-                key_pair.pub_key,
+                key_pair.get_pk(),
             )
         })
         .collect_vec();
@@ -465,10 +465,10 @@ fn batch_verify_multi_asset_transfer(
     multi_asset_group.finish();
 }
 
-fn gen_key_pair_vec<R: CryptoRng + RngCore>(size: usize, prng: &mut R) -> Vec<XfrKeyPair> {
+fn gen_key_pair_vec<R: CryptoRng + RngCore>(size: usize, prng: &mut R) -> Vec<KeyPair> {
     let mut keys = vec![];
     for _i in 0..size {
-        keys.push(XfrKeyPair::generate_secp256k1(prng));
+        keys.push(KeyPair::generate_secp256k1(prng));
     }
     keys
 }
