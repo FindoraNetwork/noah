@@ -177,9 +177,8 @@ impl Scalar for ZorroFq {
     #[inline]
     fn get_field_size_le_bytes() -> Vec<u8> {
         [
-            0xcb, 0xfe, 0x50, 0xea, 0x26, 0x8b, 0xbf, 0x51, 0xaa, 0x20, 0xc7, 0x20, 0xf0, 0x0d,
-            0x89, 0x36, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x01,
+            0x21, 0x10, 0x65, 0xd3, 0x23, 0x19, 0x5f, 0x88, 0xed, 0xb, 0x21, 0xa6, 0x6, 0x3, 0xf4,
+            0x69, 0x1, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x0, 0x80,
         ]
         .to_vec()
     }
@@ -187,7 +186,7 @@ impl Scalar for ZorroFq {
     #[inline]
     fn get_field_size_biguint() -> BigUint {
         BigUint::from_str_radix(
-            "115792089237316195423570985008687907853682756971699735333147980285963064639179",
+            "57896044618658097711785492504343953927116110621106131396339151912985063395361",
             10,
         )
         .unwrap()
@@ -200,18 +199,17 @@ impl Scalar for ZorroFq {
         let a2 = u8_le_slice_to_u64(&a[8..16]);
         let a3 = u8_le_slice_to_u64(&a[16..24]);
         let a4 = u8_le_slice_to_u64(&a[24..32]);
-        let a5 = u8_le_slice_to_u64(&a[32..]);
-        vec![a1, a2, a3, a4, a5]
+        vec![a1, a2, a3, a4]
     }
 
     #[inline]
     fn bytes_len() -> usize {
-        33
+        32
     }
 
     #[inline]
     fn to_bytes(&self) -> Vec<u8> {
-        (self.0).into_repr().to_bytes_le()[..33].to_vec()
+        (self.0).into_repr().to_bytes_le()[..32].to_vec()
     }
 
     #[inline]
