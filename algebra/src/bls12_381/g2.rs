@@ -2,9 +2,8 @@ use crate::bls12_381::BLSScalar;
 use crate::errors::AlgebraError;
 use crate::prelude::{derive_prng_from_hash, *};
 use ark_bls12_381::{G2Affine, G2Projective};
-use ark_ec::{AffineCurve, ProjectiveCurve};
-use ark_ff::PrimeField;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_ec::{AffineRepr, CurveGroup, Group as ArkGroup, VariableBaseMSM};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use ark_std::fmt::{Debug, Display, Formatter};
 use digest::{consts::U64, Digest};
 use wasm_bindgen::prelude::*;
@@ -36,7 +35,7 @@ impl Group for BLSG2 {
 
     #[inline]
     fn get_base() -> Self {
-        Self(G2Projective::prime_subgroup_generator())
+        Self(G2Projective::generator())
     }
 
     #[inline]
@@ -47,7 +46,7 @@ impl Group for BLSG2 {
     #[inline]
     fn to_compressed_bytes(&self) -> Vec<u8> {
         let mut buf = Vec::new();
-        self.0.serialize(&mut buf).unwrap();
+        self.0.serialize_with_mode(&mut buf, Compress::Yes).unwrap();
 
         buf
     }
@@ -56,7 +55,7 @@ impl Group for BLSG2 {
     fn to_unchecked_bytes(&self) -> Vec<u8> {
         let affine = G2Affine::from(self.0);
         let mut buf = Vec::new();
-        affine.serialize_unchecked(&mut buf).unwrap();
+        affine.serialize_with_mode(&mut buf, Compress::No).unwrap();
 
         buf
     }
@@ -65,10 +64,10 @@ impl Group for BLSG2 {
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
         let mut reader = ark_std::io::BufReader::new(bytes);
 
-        let affine = G2Affine::deserialize(&mut reader);
+        let affine = G2Affine::deserialize_with_mode(&mut reader, Compress::Yes, Validate::Yes);
 
         if affine.is_ok() {
-            Ok(Self(affine.unwrap().into_projective()))
+            Ok(Self(affine.unwrap().into_group()))
         } else {
             Err(eg!(AlgebraError::DeserializationError))
         }
@@ -78,10 +77,10 @@ impl Group for BLSG2 {
     fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
         let mut reader = ark_std::io::BufReader::new(bytes);
 
-        let affine = G2Affine::deserialize_unchecked(&mut reader);
+        let affine = G2Affine::deserialize_with_mode(&mut reader, Compress::No, Validate::No);
 
         if affine.is_ok() {
-            Ok(Self(affine.unwrap().into_projective()))
+            Ok(Self(affine.unwrap().into_group()))
         } else {
             Err(eg!(AlgebraError::DeserializationError))
         }
@@ -134,7 +133,7 @@ impl<'a> Mul<&'a BLSScalar> for BLSG2 {
 
     #[inline]
     fn mul(self, rhs: &'a BLSScalar) -> Self::Output {
-        Self(self.0.mul(&rhs.0.into_repr()))
+        Self(self.0.mul(&rhs.0))
     }
 }
 

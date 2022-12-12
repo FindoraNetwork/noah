@@ -4,7 +4,8 @@ use crate::bls12_381::{BLSScalar, BLSG1};
 use crate::traits::Pairing;
 use ark_bls12_381::Bls12_381 as Bls12381pairing;
 use ark_ec::bls12::{G1Prepared, G2Prepared};
-use ark_ec::{PairingEngine, ProjectiveCurve};
+use ark_ec::pairing::Pairing as ArkPairing;
+use ark_ec::CurveGroup;
 
 /// The pairing engine for BLS12-381
 pub struct BLSPairingEngine;

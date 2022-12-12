@@ -40,29 +40,37 @@ version = '0.2.50'
 features = ['serde-serialize']
 
 [dependencies.ark-ed-on-bls12-381]
-version = '^0.3.0'
+version = '0.4.0-alpha'
 default-features = false
 
 [dependencies.ark-bls12-381]
-version = '^0.3.0'
+version = '0.4.0-alpha'
 default-features = false
 features = ['curve']
 
+[dependencies.ark-secp256k1]
+version = '0.4.0-alpha'
+default-features = false
+
+[dependencies.ark-secq256k1]
+version = '0.4.0-alpha'
+default-features = false
+
 [dependencies.ark-ec]
-version = '^0.3.0'
+version = '0.4.0-alpha'
 default-features = false
 
 [dependencies.ark-ff]
-version = '^0.3.0'
+version = '0.4.0-alpha'
 default-features = false
 features = ['asm']
 
 [dependencies.ark-std]
-version = '^0.3.0'
+version = '0.4.0-alpha'
 default-features = false
 
 [dependencies.ark-serialize]
-version = '^0.3.0'
+version = '0.4.0-alpha'
 default-features = false
 
 [dependencies.rand_chacha]
@@ -80,7 +88,7 @@ version = "0.1"
 
 [dependencies.ark-bulletproofs]
 git = "https://github.com/FindoraNetwork/ark-bulletproofs"
-tag = "v2.0.4-f"
+tag = "v3.0.0-f"
 default-features = false
 features = ['yoloproofs']
 

@@ -35,22 +35,22 @@ pub mod secq256k1;
 pub mod secp256k1;
 
 /// Module for the Zorro curve
-pub mod zorro;
+//pub mod zorro;
 
 /// Module for error handling
 pub mod errors;
 
 /// Module for the ed25519 curve used to work with the Zorro curve in address folding
-pub mod ed25519;
+//pub mod ed25519;
 
 /// Module for traits
 pub mod traits;
 
 /// Module for the Ristretto group
-pub mod ristretto;
+//pub mod ristretto;
 
 /// Module for the Jubjub curve
-pub mod jubjub;
+//pub mod jubjub;
 
 /// Module for serialization of scalars and group elements
 pub mod serialization;

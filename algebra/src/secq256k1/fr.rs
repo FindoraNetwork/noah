@@ -2,8 +2,8 @@ use crate::errors::AlgebraError;
 use crate::prelude::*;
 use crate::prelude::{derive_prng_from_hash, u8_le_slice_to_u64, CryptoRng, RngCore, Scalar};
 use crate::secq256k1::SECQ256K1_SCALAR_LEN;
-use ark_bulletproofs::curve::secq256k1::Fr;
-use ark_ff::{BigInteger, BigInteger320, FftField, Field, FpParameters, PrimeField};
+use ark_ff::{BigInteger, BigInteger256, FftField, Field, PrimeField};
+use ark_secq256k1::Fr;
 use ark_std::fmt::{Debug, Formatter};
 use ark_std::iter::Sum;
 use ark_std::result::Result as StdResult;
@@ -14,7 +14,7 @@ use num_bigint::BigUint;
 use num_traits::Num;
 use wasm_bindgen::prelude::*;
 
-/// The wrapped struct for `ark_bulletproofs::curve::secq256k1::Fr`
+/// The wrapped struct for `ark_secq256k1::Fr`
 #[wasm_bindgen]
 #[derive(Copy, Clone, PartialEq, Eq, Default, PartialOrd, Ord, Hash)]
 pub struct SECQ256K1Scalar(pub(crate) Fr);
@@ -22,7 +22,7 @@ pub struct SECQ256K1Scalar(pub(crate) Fr);
 impl Debug for SECQ256K1Scalar {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         <BigUint as Debug>::fmt(
-            &<BigInteger320 as Into<BigUint>>::into(self.0.into_repr()),
+            &<BigInteger256 as Into<BigUint>>::into(self.0.into_bigint()),
             f,
         )
     }
@@ -180,12 +180,12 @@ impl Scalar for SECQ256K1Scalar {
 
     #[inline]
     fn capacity() -> usize {
-        ark_bulletproofs::curve::secq256k1::FrParameters::CAPACITY as usize
+        (Fr::MODULUS_BIT_SIZE - 1) as usize
     }
 
     #[inline]
     fn multiplicative_generator() -> Self {
-        Self(Fr::multiplicative_generator())
+        Self(Fr::GENERATOR)
     }
 
     #[inline]
@@ -209,7 +209,7 @@ impl Scalar for SECQ256K1Scalar {
 
     #[inline]
     fn get_little_endian_u64(&self) -> Vec<u64> {
-        let a = self.0.into_repr().to_bytes_le();
+        let a = self.0.into_bigint().to_bytes_le();
         let a1 = u8_le_slice_to_u64(&a[0..8]);
         let a2 = u8_le_slice_to_u64(&a[8..16]);
         let a3 = u8_le_slice_to_u64(&a[16..24]);
@@ -225,7 +225,7 @@ impl Scalar for SECQ256K1Scalar {
 
     #[inline]
     fn to_bytes(&self) -> Vec<u8> {
-        self.0.into_repr().to_bytes_le()[..SECQ256K1_SCALAR_LEN].to_vec()
+        self.0.into_bigint().to_bytes_le()[..SECQ256K1_SCALAR_LEN].to_vec()
     }
 
     #[inline]
@@ -276,7 +276,7 @@ impl SECQ256K1Scalar {
 impl Into<BigUint> for SECQ256K1Scalar {
     #[inline]
     fn into(self) -> BigUint {
-        let value: BigUint = self.0.into_repr().into();
+        let value: BigUint = self.0.into_bigint().into();
         value
     }
 }
