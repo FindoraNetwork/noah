@@ -23,8 +23,8 @@ pub use pairing::*;
 #[macro_export]
 macro_rules! new_bls12_381 {
     ($c0:expr) => {{
-        let (is_positive, limbs) = ark_ff::ark_ff_macros::to_sign_and_limbs!($c0);
-        BLSScalar::new(is_positive, &limbs)
+        let b = num_bigint::BigUint::from($c0);
+        BLSScalar::from(ark_bls12_381::Fr::from(b))
     }};
 }
 
@@ -33,6 +33,7 @@ mod bls12_381_groups_test {
     use crate::bls12_381::BLSPairingEngine;
     use crate::bls12_381::BLSG2;
     use crate::bls12_381::{BLSFq, BLSGt};
+    use crate::traits::Group;
     use crate::{
         bls12_381::{BLSScalar, BLSG1},
         prelude::*,
@@ -42,7 +43,7 @@ mod bls12_381_groups_test {
         },
     };
     use ark_bls12_381::{G1Affine, G2Affine};
-    use ark_ec::ProjectiveCurve;
+    use ark_ec::CurveGroup;
 
     #[test]
     fn test_scalar_ops() {
@@ -137,10 +138,10 @@ mod bls12_381_groups_test {
 
         // These two operations correspond to summation of points,
         // one in projective form and the other in affine form
-        let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_affine);
+        let g1_pr_plus_g1_prime_af = g1_projective.add(&g1_prime_affine);
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
 
-        let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_projective.into_affine());
+        let g1_pr_plus_g1_prime_af = g1_projective.add(&g1_prime_projective.into_affine());
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
     }
 
@@ -166,10 +167,10 @@ mod bls12_381_groups_test {
 
         // These two operations correspond to summation of points,
         // one in projective form and the other in affine form
-        let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_affine);
+        let g1_pr_plus_g1_prime_af = g1_projective.add(&g1_prime_affine);
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
 
-        let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_projective.into_affine());
+        let g1_pr_plus_g1_prime_af = g1_projective.add(&g1_prime_projective.into_affine());
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
     }
 

@@ -71,6 +71,7 @@ mod secq256k1_groups_test {
         secq256k1::{SECQ256K1Scalar, SECQ256K1G1},
         traits::group_tests::{test_scalar_operations, test_scalar_serialization},
     };
+    use ark_ec::CurveGroup;
     use ark_secq256k1::Affine;
 
     #[test]
@@ -119,10 +120,10 @@ mod secq256k1_groups_test {
 
         // These two operations correspond to summation of points,
         // one in projective form and the other in affine form
-        let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_affine);
+        let g1_pr_plus_g1_prime_af = g1_projective.add(&g1_prime_affine);
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
 
-        let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_projective.into_affine());
+        let g1_pr_plus_g1_prime_af = g1_projective.add(&g1_prime_projective.into_affine());
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
     }
 

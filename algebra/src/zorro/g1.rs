@@ -1,10 +1,9 @@
 use crate::errors::AlgebraError;
 use crate::prelude::*;
 use crate::zorro::ZorroScalar;
-use ark_bulletproofs::curve::zorro::{FrParameters, G1Affine, G1Projective};
-use ark_ec::{AffineCurve, ProjectiveCurve};
-use ark_ff::{FftParameters, PrimeField};
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_bulletproofs::curve::zorro::{G1Affine, G1Projective};
+use ark_ec::{AffineRepr, CurveGroup, Group as ArkGroup, VariableBaseMSM};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use ark_std::fmt::{Debug, Formatter};
 use digest::consts::U64;
 use digest::Digest;
@@ -37,7 +36,7 @@ impl ZorroG1 {
 
     /// From the raw data.
     pub fn from_raw(raw: G1Affine) -> Self {
-        Self(raw.into_projective())
+        Self(raw.into_group())
     }
 }
 
@@ -64,7 +63,7 @@ impl<'a> Mul<&'a ZorroScalar> for ZorroG1 {
 
     #[inline]
     fn mul(self, rhs: &ZorroScalar) -> Self::Output {
-        Self(self.0.mul(&rhs.0.into_repr()))
+        Self(self.0.mul(&rhs.0))
     }
 }
 
@@ -95,7 +94,7 @@ impl Group for ZorroG1 {
 
     #[inline]
     fn double(&self) -> Self {
-        Self(ProjectiveCurve::double(&self.0))
+        Self(G1Projective::double(&self.0))
     }
 
     #[inline]
@@ -105,7 +104,7 @@ impl Group for ZorroG1 {
 
     #[inline]
     fn get_base() -> Self {
-        Self(G1Projective::prime_subgroup_generator())
+        Self(G1Projective::generator())
     }
 
     #[inline]
@@ -117,7 +116,7 @@ impl Group for ZorroG1 {
     fn to_compressed_bytes(&self) -> Vec<u8> {
         let affine = G1Affine::from(self.0);
         let mut buf = Vec::new();
-        affine.serialize(&mut buf).unwrap();
+        affine.serialize_with_mode(&mut buf, Compress::Yes).unwrap();
 
         buf
     }
@@ -126,7 +125,7 @@ impl Group for ZorroG1 {
     fn to_unchecked_bytes(&self) -> Vec<u8> {
         let affine = G1Affine::from(self.0);
         let mut buf = Vec::new();
-        affine.serialize_unchecked(&mut buf).unwrap();
+        affine.serialize_with_mode(&mut buf, Compress::No).unwrap();
 
         buf
     }
@@ -135,7 +134,7 @@ impl Group for ZorroG1 {
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
         let mut reader = ark_std::io::BufReader::new(bytes);
 
-        let affine = G1Affine::deserialize(&mut reader);
+        let affine = G1Affine::deserialize_with_mode(&mut reader, Compress::Yes, Validate::Yes);
 
         if affine.is_ok() {
             Ok(Self(G1Projective::from(affine.unwrap()))) // safe unwrap
@@ -148,7 +147,7 @@ impl Group for ZorroG1 {
     fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
         let mut reader = ark_std::io::BufReader::new(bytes);
 
-        let affine = G1Affine::deserialize_unchecked(&mut reader);
+        let affine = G1Affine::deserialize_with_mode(&mut reader, Compress::No, Validate::No);
 
         if affine.is_ok() {
             Ok(Self(G1Projective::from(affine.unwrap()))) // safe unwrap
@@ -174,14 +173,11 @@ impl Group for ZorroG1 {
 
     #[inline]
     fn multi_exp(scalars: &[&Self::ScalarType], points: &[&Self]) -> Self {
-        let scalars_raw = scalars
-            .iter()
-            .map(|r| r.0.into_repr())
-            .collect::<Vec<<FrParameters as FftParameters>::BigInt>>();
-        let points_raw = G1Projective::batch_normalization_into_affine(
+        let scalars_raw: Vec<_> = scalars.iter().map(|r| r.0).collect();
+        let points_raw = G1Projective::normalize_batch(
             &points.iter().map(|r| r.0).collect::<Vec<G1Projective>>(),
         );
 
-        Self(ark_ec::msm::VariableBase::msm(&points_raw, &scalars_raw))
+        Self(G1Projective::msm(&points_raw, &scalars_raw).unwrap())
     }
 }

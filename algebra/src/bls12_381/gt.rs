@@ -2,8 +2,8 @@ use crate::bls12_381::{BLSPairingEngine, BLSScalar, BLSG1, BLSG2};
 use crate::errors::AlgebraError;
 use crate::prelude::{derive_prng_from_hash, *};
 use crate::traits::Pairing;
-use ark_bls12_381::Fq12Config;
-use ark_ec::pairing::Pairing as ArkPairing;
+use ark_bls12_381::{Bls12_381, Fq12Config};
+use ark_ec::pairing::PairingOutput;
 use ark_ff::{BigInteger, Fp12, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use ark_std::UniformRand;
@@ -118,10 +118,8 @@ impl Group for BLSGt {
 
     #[inline]
     fn random<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
-        Self(
-            ark_bls12_381::Bls12_381::final_exponentiation(&Fp12::<Fq12Config>::rand(prng))
-                .unwrap(),
-        )
+        let g: PairingOutput<Bls12_381> = prng.gen();
+        Self(g.0)
     }
 
     #[inline]

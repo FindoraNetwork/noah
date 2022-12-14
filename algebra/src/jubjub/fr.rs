@@ -1,7 +1,7 @@
 use crate::jubjub::JUBJUB_SCALAR_LEN;
 use crate::{errors::AlgebraError, hash::Hash, prelude::*};
 use ark_ed_on_bls12_381::Fr;
-use ark_ff::{BigInteger, FftField, Field, FpParameters, PrimeField};
+use ark_ff::{BigInteger, FftField, Field, PrimeField};
 use digest::{generic_array::typenum::U64, Digest};
 use num_bigint::BigUint;
 use num_traits::Num;
@@ -137,7 +137,7 @@ impl From<u64> for JubjubScalar {
 impl Into<BigUint> for JubjubScalar {
     #[inline]
     fn into(self) -> BigUint {
-        self.0.into_repr().into()
+        self.0.into_bigint().into()
     }
 }
 
@@ -165,12 +165,12 @@ impl Scalar for JubjubScalar {
 
     #[inline]
     fn capacity() -> usize {
-        ark_ed_on_bls12_381::FrParameters::CAPACITY as usize
+        (Fr::MODULUS_BIT_SIZE - 1) as usize
     }
 
     #[inline]
     fn multiplicative_generator() -> Self {
-        Self(Fr::multiplicative_generator())
+        Self(Fr::GENERATOR)
     }
 
     #[inline]
@@ -193,7 +193,7 @@ impl Scalar for JubjubScalar {
 
     #[inline]
     fn get_little_endian_u64(&self) -> Vec<u64> {
-        let a = self.0.into_repr().to_bytes_le();
+        let a = self.0.into_bigint().to_bytes_le();
         let a1 = u8_le_slice_to_u64(&a[0..8]);
         let a2 = u8_le_slice_to_u64(&a[8..16]);
         let a3 = u8_le_slice_to_u64(&a[16..24]);
@@ -208,7 +208,7 @@ impl Scalar for JubjubScalar {
 
     #[inline]
     fn to_bytes(&self) -> Vec<u8> {
-        (self.0).into_repr().to_bytes_le()
+        (self.0).into_bigint().to_bytes_le()
     }
 
     #[inline]

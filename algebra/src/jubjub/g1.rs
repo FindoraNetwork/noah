@@ -6,10 +6,9 @@ use crate::{
     cmp::Ordering,
     hash::{Hash, Hasher},
 };
-use ark_ec::{AffineCurve, ProjectiveCurve};
+use ark_ec::{AffineRepr, CurveGroup, Group as ArkGroup};
 use ark_ed_on_bls12_381::{EdwardsAffine as AffinePoint, EdwardsProjective};
-use ark_ff::PrimeField;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use digest::consts::U64;
 use digest::Digest;
 
@@ -54,7 +53,7 @@ impl JubjubPoint {
     /// Multiply the point by the cofactor
     #[inline]
     pub fn mul_by_cofactor(&self) -> Self {
-        Self(self.0.into_affine().mul_by_cofactor_to_projective())
+        Self(self.0.into_affine().mul_by_cofactor_to_group())
     }
 }
 
@@ -74,7 +73,7 @@ impl Group for JubjubPoint {
 
     #[inline]
     fn get_base() -> Self {
-        Self(EdwardsProjective::prime_subgroup_generator())
+        Self(EdwardsProjective::generator())
     }
 
     #[inline]
@@ -85,7 +84,7 @@ impl Group for JubjubPoint {
     #[inline]
     fn to_compressed_bytes(&self) -> Vec<u8> {
         let mut buf = Vec::new();
-        self.0.serialize(&mut buf).unwrap();
+        self.0.serialize_with_mode(&mut buf, Compress::Yes).unwrap();
 
         buf
     }
@@ -93,7 +92,7 @@ impl Group for JubjubPoint {
     #[inline]
     fn to_unchecked_bytes(&self) -> Vec<u8> {
         let mut buf = Vec::new();
-        self.0.serialize_unchecked(&mut buf).unwrap();
+        self.0.serialize_with_mode(&mut buf, Compress::No).unwrap();
 
         buf
     }
@@ -102,7 +101,7 @@ impl Group for JubjubPoint {
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
         let mut reader = ark_std::io::BufReader::new(bytes);
 
-        let affine = AffinePoint::deserialize(&mut reader);
+        let affine = AffinePoint::deserialize_with_mode(&mut reader, Compress::Yes, Validate::Yes);
 
         if let Ok(affine) = affine {
             Ok(Self(EdwardsProjective::from(affine))) // safe unwrap
@@ -115,7 +114,7 @@ impl Group for JubjubPoint {
     fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
         let mut reader = ark_std::io::BufReader::new(bytes);
 
-        let affine = AffinePoint::deserialize_unchecked(&mut reader);
+        let affine = AffinePoint::deserialize_with_mode(&mut reader, Compress::No, Validate::No);
 
         if let Ok(affine) = affine {
             Ok(Self(EdwardsProjective::from(affine))) // safe unwrap
@@ -164,7 +163,7 @@ impl<'a> Mul<&'a JubjubScalar> for JubjubPoint {
 
     #[inline]
     fn mul(self, rhs: &JubjubScalar) -> Self::Output {
-        Self(self.0.mul(&rhs.0.into_repr()))
+        Self(self.0.mul(&rhs.0))
     }
 }
 

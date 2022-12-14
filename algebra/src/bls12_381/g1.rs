@@ -2,7 +2,7 @@ use crate::bls12_381::BLSScalar;
 use crate::errors::AlgebraError;
 use crate::prelude::{derive_prng_from_hash, *};
 use ark_bls12_381::{G1Affine, G1Projective};
-use ark_ec::{AffineRepr, CurveGroup, Group as ArkGroup, VariableBaseMSM};
+use ark_ec::{CurveGroup, Group as ArkGroup, VariableBaseMSM};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use ark_std::fmt::{Debug, Display, Formatter};
 use digest::{consts::U64, Digest};

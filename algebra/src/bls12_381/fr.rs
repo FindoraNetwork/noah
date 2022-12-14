@@ -9,7 +9,6 @@ use ark_std::{
     result::Result as StdResult,
     str::FromStr,
 };
-use base64::Config;
 use digest::{consts::U64, Digest};
 use num_bigint::BigUint;
 use num_traits::Num;
@@ -40,20 +39,6 @@ impl FromStr for BLSScalar {
         } else {
             Err(AlgebraError::DeserializationError)
         }
-    }
-}
-
-impl BLSScalar {
-    /// Create a new scalar element from the arkworks-rs representation.
-    pub const fn new(is_positive: bool, limbs: &[u64]) -> Self {
-        type Params = <Fr as PrimeField>::Config;
-        BLSScalar(Fr::const_from_str(
-            &limbs,
-            is_positive,
-            Config::R2,
-            Config::MODULUS,
-            Config::INV,
-        ))
     }
 }
 

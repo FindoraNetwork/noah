@@ -1,14 +1,13 @@
 use crate::{
-    //ed25519::Ed25519Point,
     bls12_381::{BLSFq, BLSGt, BLSScalar, BLSG1, BLSG2},
-    //ed25519::Ed25519Scalar,
-    //jubjub::{JubjubPoint, JubjubScalar},
+    jubjub::{JubjubPoint, JubjubScalar},
     prelude::*,
+    //ed25519::{Ed25519Point, Ed25519Scalar},
     //ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar},
     secp256k1::{SECP256K1Scalar, SECP256K1G1},
     secq256k1::SECQ256K1Proof,
     secq256k1::{SECQ256K1Scalar, SECQ256K1G1},
-    //zorro::{ZorroFq, ZorroG1, ZorroProof, ZorroScalar},
+    zorro::{ZorroFq, ZorroG1, ZorroProof, ZorroScalar},
 };
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use ark_std::io::Cursor;
@@ -31,14 +30,14 @@ macro_rules! to_from_bytes_scalar {
     };
 }
 
-//to_from_bytes_scalar!(RistrettoScalar);
 to_from_bytes_scalar!(BLSScalar);
 to_from_bytes_scalar!(BLSFq);
-//to_from_bytes_scalar!(JubjubScalar);
+to_from_bytes_scalar!(JubjubScalar);
 to_from_bytes_scalar!(SECQ256K1Scalar);
 to_from_bytes_scalar!(SECP256K1Scalar);
-//to_from_bytes_scalar!(ZorroScalar);
-//to_from_bytes_scalar!(ZorroFq);
+to_from_bytes_scalar!(ZorroScalar);
+to_from_bytes_scalar!(ZorroFq);
+//to_from_bytes_scalar!(RistrettoScalar);
 //to_from_bytes_scalar!(Ed25519Scalar);
 
 // impl NoahFromToBytes for CompressedRistretto {
@@ -67,17 +66,17 @@ to_from_bytes_scalar!(SECP256K1Scalar);
 //     }
 // }
 
-// serialize_deserialize!(CompressedRistretto);
-// serialize_deserialize!(CompressedEdwardsY);
-// serialize_deserialize!(RistrettoScalar);
 serialize_deserialize!(BLSScalar);
 serialize_deserialize!(BLSFq);
-// serialize_deserialize!(JubjubScalar);
+serialize_deserialize!(JubjubScalar);
 serialize_deserialize!(SECQ256K1Scalar);
 serialize_deserialize!(SECP256K1Scalar);
-//serialize_deserialize!(ZorroScalar);
-//serialize_deserialize!(ZorroFq);
+serialize_deserialize!(ZorroScalar);
+serialize_deserialize!(ZorroFq);
+//serialize_deserialize!(RistrettoScalar);
 //serialize_deserialize!(Ed25519Scalar);
+//serialize_deserialize!(CompressedRistretto);
+//serialize_deserialize!(CompressedEdwardsY);
 
 macro_rules! to_from_bytes_group {
     ($g:ident) => {
@@ -93,24 +92,24 @@ macro_rules! to_from_bytes_group {
     };
 }
 
-// to_from_bytes_group!(RistrettoPoint);
 to_from_bytes_group!(BLSG1);
 to_from_bytes_group!(BLSG2);
 to_from_bytes_group!(BLSGt);
-// to_from_bytes_group!(JubjubPoint);
+to_from_bytes_group!(JubjubPoint);
 to_from_bytes_group!(SECQ256K1G1);
 to_from_bytes_group!(SECP256K1G1);
-//to_from_bytes_group!(ZorroG1);
+to_from_bytes_group!(ZorroG1);
+//to_from_bytes_group!(RistrettoPoint);
 //to_from_bytes_group!(Ed25519Point);
 
-//serialize_deserialize!(RistrettoPoint);
 serialize_deserialize!(BLSG1);
 serialize_deserialize!(BLSG2);
 serialize_deserialize!(BLSGt);
-//serialize_deserialize!(JubjubPoint);
+serialize_deserialize!(JubjubPoint);
 serialize_deserialize!(SECQ256K1G1);
 serialize_deserialize!(SECP256K1G1);
-//serialize_deserialize!(ZorroG1);
+serialize_deserialize!(ZorroG1);
+//serialize_deserialize!(RistrettoPoint);
 //serialize_deserialize!(Ed25519Point);
 
 /// Helper trait to serialize Noah's and foreign objects that implement from/to bytes/bits
@@ -159,17 +158,22 @@ impl NoahFromToBytes for SECQ256K1Proof {
     }
 }
 
-// impl NoahFromToBytes for ZorroProof {
-//     fn noah_to_bytes(&self) -> Vec<u8> {
-//         let mut cursor = Cursor::new(Vec::new());
-//         self.serialize(&mut cursor).unwrap();
-//         cursor.into_inner()
-//     }
-//     fn noah_from_bytes(bytes: &[u8]) -> Result<ZorroProof> {
-//         ark_bulletproofs::r1cs::R1CSProof::deserialize(bytes)
-//             .map_err(|_| eg!(NoahError::DeserializationError))
-//     }
-// }
+impl NoahFromToBytes for ZorroProof {
+    fn noah_to_bytes(&self) -> Vec<u8> {
+        let mut cursor = Cursor::new(Vec::new());
+        self.serialize_with_mode(&mut cursor, Compress::Yes)
+            .unwrap();
+        cursor.into_inner()
+    }
+    fn noah_from_bytes(bytes: &[u8]) -> Result<ZorroProof> {
+        ark_bulletproofs::r1cs::R1CSProof::deserialize_with_mode(
+            bytes,
+            Compress::Yes,
+            Validate::Yes,
+        )
+        .map_err(|_| eg!(NoahError::DeserializationError))
+    }
+}
 
 impl NoahFromToBytes for x25519_dalek::PublicKey {
     fn noah_to_bytes(&self) -> Vec<u8> {
