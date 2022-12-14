@@ -56,6 +56,10 @@ default-features = false
 version = '0.4.0-alpha'
 default-features = false
 
+[dependencies.ark-ed25519]
+version = '0.4.0-alpha'
+default-features = false
+
 [dependencies.ark-ec]
 version = '0.4.0-alpha'
 default-features = false
@@ -101,6 +105,9 @@ std = [
     'curve25519-dalek/std',
     'ark-ed-on-bls12-381/std',
     'ark-bls12-381/std',
+    'ark-secp256k1/std',
+    'ark-secq256k1/std',
+    'ark-ed25519/std',
     'ark-ec/std',
     'ark-std/std',
     'ark-ff/std',

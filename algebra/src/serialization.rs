@@ -1,9 +1,9 @@
 use crate::{
     bls12_381::{BLSFq, BLSGt, BLSScalar, BLSG1, BLSG2},
+    ed25519::{Ed25519Point, Ed25519Scalar},
     jubjub::{JubjubPoint, JubjubScalar},
     prelude::*,
-    //ed25519::{Ed25519Point, Ed25519Scalar},
-    //ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar},
+    ristretto::{CompressedEdwardsY, CompressedRistretto, RistrettoPoint, RistrettoScalar},
     secp256k1::{SECP256K1Scalar, SECP256K1G1},
     secq256k1::SECQ256K1Proof,
     secq256k1::{SECQ256K1Scalar, SECQ256K1G1},
@@ -37,34 +37,34 @@ to_from_bytes_scalar!(SECQ256K1Scalar);
 to_from_bytes_scalar!(SECP256K1Scalar);
 to_from_bytes_scalar!(ZorroScalar);
 to_from_bytes_scalar!(ZorroFq);
-//to_from_bytes_scalar!(RistrettoScalar);
-//to_from_bytes_scalar!(Ed25519Scalar);
+to_from_bytes_scalar!(RistrettoScalar);
+to_from_bytes_scalar!(Ed25519Scalar);
 
-// impl NoahFromToBytes for CompressedRistretto {
-//     #[inline]
-//     fn noah_to_bytes(&self) -> Vec<u8> {
-//         self.0.as_bytes().to_vec()
-//     }
-//     #[inline]
-//     fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
-//         Ok(Self(
-//             curve25519_dalek::ristretto::CompressedRistretto::from_slice(bytes),
-//         ))
-//     }
-// }
+impl NoahFromToBytes for CompressedRistretto {
+    #[inline]
+    fn noah_to_bytes(&self) -> Vec<u8> {
+        self.0.as_bytes().to_vec()
+    }
+    #[inline]
+    fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
+        Ok(Self(
+            curve25519_dalek::ristretto::CompressedRistretto::from_slice(bytes),
+        ))
+    }
+}
 
-// impl NoahFromToBytes for CompressedEdwardsY {
-//     #[inline]
-//     fn noah_to_bytes(&self) -> Vec<u8> {
-//         self.0.as_bytes().to_vec()
-//     }
-//     #[inline]
-//     fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
-//         Ok(CompressedEdwardsY(
-//             curve25519_dalek::edwards::CompressedEdwardsY::from_slice(bytes),
-//         ))
-//     }
-// }
+impl NoahFromToBytes for CompressedEdwardsY {
+    #[inline]
+    fn noah_to_bytes(&self) -> Vec<u8> {
+        self.0.as_bytes().to_vec()
+    }
+    #[inline]
+    fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
+        Ok(CompressedEdwardsY(
+            curve25519_dalek::edwards::CompressedEdwardsY::from_slice(bytes),
+        ))
+    }
+}
 
 serialize_deserialize!(BLSScalar);
 serialize_deserialize!(BLSFq);
@@ -73,10 +73,10 @@ serialize_deserialize!(SECQ256K1Scalar);
 serialize_deserialize!(SECP256K1Scalar);
 serialize_deserialize!(ZorroScalar);
 serialize_deserialize!(ZorroFq);
-//serialize_deserialize!(RistrettoScalar);
-//serialize_deserialize!(Ed25519Scalar);
-//serialize_deserialize!(CompressedRistretto);
-//serialize_deserialize!(CompressedEdwardsY);
+serialize_deserialize!(RistrettoScalar);
+serialize_deserialize!(Ed25519Scalar);
+serialize_deserialize!(CompressedRistretto);
+serialize_deserialize!(CompressedEdwardsY);
 
 macro_rules! to_from_bytes_group {
     ($g:ident) => {
@@ -99,8 +99,8 @@ to_from_bytes_group!(JubjubPoint);
 to_from_bytes_group!(SECQ256K1G1);
 to_from_bytes_group!(SECP256K1G1);
 to_from_bytes_group!(ZorroG1);
-//to_from_bytes_group!(RistrettoPoint);
-//to_from_bytes_group!(Ed25519Point);
+to_from_bytes_group!(RistrettoPoint);
+to_from_bytes_group!(Ed25519Point);
 
 serialize_deserialize!(BLSG1);
 serialize_deserialize!(BLSG2);
@@ -109,8 +109,8 @@ serialize_deserialize!(JubjubPoint);
 serialize_deserialize!(SECQ256K1G1);
 serialize_deserialize!(SECP256K1G1);
 serialize_deserialize!(ZorroG1);
-//serialize_deserialize!(RistrettoPoint);
-//serialize_deserialize!(Ed25519Point);
+serialize_deserialize!(RistrettoPoint);
+serialize_deserialize!(Ed25519Point);
 
 /// Helper trait to serialize Noah's and foreign objects that implement from/to bytes/bits
 pub trait NoahFromToBytes: Sized {

@@ -1,15 +1,15 @@
 use crate::ed25519::ED25519_SCALAR_LEN;
 use crate::errors::AlgebraError;
 use crate::prelude::*;
-use ark_bulletproofs::curve::ed25519::Fr;
-use ark_ff::{BigInteger, FftField, Field, FpParameters, PrimeField};
+use ark_ed25519::Fr;
+use ark_ff::{BigInteger, FftField, Field, PrimeField};
 use digest::consts::U64;
 use digest::Digest;
 use num_bigint::BigUint;
 use num_traits::Num;
 use wasm_bindgen::prelude::*;
 
-/// The wrapped struct for `ark_bulletproofs::curve::ed25519::Fr`
+/// The wrapped struct for `ark_ed25519::Fr`
 #[wasm_bindgen]
 #[derive(Copy, Clone, PartialEq, Eq, Default, PartialOrd, Ord, Debug, Hash)]
 pub struct Ed25519Scalar(pub(crate) Fr);
@@ -139,7 +139,7 @@ impl From<u64> for Ed25519Scalar {
 impl Into<BigUint> for Ed25519Scalar {
     #[inline]
     fn into(self) -> BigUint {
-        self.0.into_repr().into()
+        self.0.into_bigint().into()
     }
 }
 
@@ -167,12 +167,12 @@ impl Scalar for Ed25519Scalar {
 
     #[inline]
     fn capacity() -> usize {
-        ark_bulletproofs::curve::zorro::FrParameters::CAPACITY as usize
+        (Fr::MODULUS_BIT_SIZE - 1) as usize
     }
 
     #[inline]
     fn multiplicative_generator() -> Self {
-        Self(Fr::multiplicative_generator())
+        Self(Fr::GENERATOR)
     }
 
     #[inline]
@@ -196,7 +196,7 @@ impl Scalar for Ed25519Scalar {
 
     #[inline]
     fn get_little_endian_u64(&self) -> Vec<u64> {
-        let a = self.0.into_repr().to_bytes_le();
+        let a = self.0.into_bigint().to_bytes_le();
         let a1 = u8_le_slice_to_u64(&a[0..8]);
         let a2 = u8_le_slice_to_u64(&a[8..16]);
         let a3 = u8_le_slice_to_u64(&a[16..24]);
@@ -211,7 +211,7 @@ impl Scalar for Ed25519Scalar {
 
     #[inline]
     fn to_bytes(&self) -> Vec<u8> {
-        (self.0).into_repr().to_bytes_le()
+        (self.0).into_bigint().to_bytes_le()
     }
 
     #[inline]

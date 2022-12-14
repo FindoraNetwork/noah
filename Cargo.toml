@@ -19,6 +19,7 @@ ark-bls12-381 = { git = "https://github.com/arkworks-rs/curves" }
 ark-ed-on-bls12-381 = { git = "https://github.com/arkworks-rs/curves" }
 ark-secp256k1 = { git = "https://github.com/arkworks-rs/curves" }
 ark-secq256k1 = { git = "https://github.com/arkworks-rs/curves" }
+ark-ed25519 = { git = "https://github.com/arkworks-rs/curves" }
 ark-algebra-test-templates = { git = "https://github.com/arkworks-rs/algebra", branch = "release-0.4-fix-field-test" }
 
 [profile.release]

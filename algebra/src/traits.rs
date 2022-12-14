@@ -443,14 +443,13 @@ mod multi_exp_tests {
     use crate::bls12_381::BLSGt;
     use crate::bls12_381::BLSG1;
     use crate::bls12_381::BLSG2;
-    //use crate::ristretto::RistrettoPoint;
+    use crate::ristretto::RistrettoPoint;
     use crate::traits::Group;
 
-    // #[test]
-    // fn test_multiexp_ristretto() {
-    //     run_multiexp_test::<RistrettoPoint>();
-    // }
-
+    #[test]
+    fn test_multiexp_ristretto() {
+        run_multiexp_test::<RistrettoPoint>();
+    }
     #[test]
     fn test_multiexp_blsg1() {
         run_multiexp_test::<BLSG1>();
