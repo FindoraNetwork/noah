@@ -55,7 +55,7 @@ sha2 = '0.10'
 sha3 = '0.10'
 
 [dependencies.ark-serialize]
-version = '^0.3.0'
+version = '0.4.0-alpha'
 default-features = false
 
 [dependencies.noah-algebra]
@@ -109,7 +109,11 @@ typenum = '1.11.2'
 parking_lot = '0.12'
 
 [dependencies.ark-std]
-version = '^0.3.0'
+version = '0.4.0-alpha'
+default-features = false
+
+[dependencies.ark-ec]
+version = '0.4.0-alpha'
 default-features = false
 
 [dev-dependencies.noah-accumulators]
@@ -139,7 +143,7 @@ default = [
     'u64_backend',
 ]
 debug = [ 'noah-plonk/debug' ]
-std = ['curve25519-dalek/std', 'bulletproofs/std', 'ark-bulletproofs/std', 'ark-std/std']
+std = ['curve25519-dalek/std', 'bulletproofs/std', 'ark-bulletproofs/std', 'ark-std/std', 'ark-ec/std']
 alloc = ['curve25519-dalek/alloc']
 nightly = [
     'curve25519-dalek/nightly',

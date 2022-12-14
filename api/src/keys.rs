@@ -1,5 +1,6 @@
 use aes_gcm::{aead::Aead, KeyInit};
-use ark_serialize::{Flags, SWFlags};
+use ark_ec::models::short_weierstrass::SWFlags;
+use ark_serialize::Flags;
 use digest::consts::U64;
 use digest::{generic_array::GenericArray, Digest};
 use ed25519_dalek::{
@@ -905,9 +906,9 @@ fn convert_point_libsecp256k1_to_algebra(pk: &Secp256k1PublicKey) -> Vec<u8> {
     let mut y_neg = y.neg(1);
     y_neg.normalize();
     let flag = if y >= y_neg {
-        SWFlags::PositiveY.u8_bitmask()
+        SWFlags::YIsPositive.u8_bitmask()
     } else {
-        SWFlags::NegativeY.u8_bitmask()
+        SWFlags::YIsNegative.u8_bitmask()
     };
     bytes.push(flag);
     bytes

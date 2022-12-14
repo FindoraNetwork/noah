@@ -1,13 +1,13 @@
 //! Module for the Bulletproof scalar mul proof scheme
 //!
-use ark_bulletproofs::{
-    curve::secp256k1::{Fq, FrParameters, G1Affine},
-    curve::secq256k1::G1Affine as G1AffineBig,
-    r1cs::{LinearCombination, Prover, RandomizableConstraintSystem, Variable, Verifier},
+use ark_bulletproofs::r1cs::{
+    LinearCombination, Prover, RandomizableConstraintSystem, Variable, Verifier,
 };
 use ark_bulletproofs::{BulletproofGens, PedersenGens};
-use ark_ec::{AffineCurve, ProjectiveCurve};
-use ark_ff::{BigInteger, Field, FpParameters, PrimeField};
+use ark_ec::{AffineRepr, CurveGroup, Group as ArkGroup};
+use ark_ff::{BigInteger, Field, PrimeField};
+use ark_secp256k1::{Affine, Fq, Fr, Projective};
+use ark_secq256k1::Affine as AffineBig;
 use digest::Digest;
 use merlin::Transcript;
 use noah_algebra::secq256k1::{PedersenCommitmentSecq256k1, SECQ256K1Proof, SECQ256K1Scalar};
@@ -65,7 +65,7 @@ impl ScalarMulProof {
         cs: &mut CS,
         public_key_var: &PointVar,
         secret_key_var: &ScalarVar,
-        public_key: &Option<G1Affine>,
+        public_key: &Option<Affine>,
         secret_key: &Option<Fq>,
     ) -> Result<()> {
         assert_eq!(public_key.is_some(), secret_key.is_some());
@@ -80,7 +80,7 @@ impl ScalarMulProof {
             res.copy_from_slice(&h[..32]);
 
             let mut prng = ChaChaRng::from_seed(res);
-            G1Affine::rand(&mut prng)
+            Affine::rand(&mut prng)
         };
 
         let mut cur = if public_key.is_some() {
@@ -104,10 +104,10 @@ impl ScalarMulProof {
 
         // 2. Compute the bit decomposition of `secret_key`.
         let (bits, bits_var) = if let Some(secret_key) = secret_key {
-            let mut bits = secret_key.into_repr().to_bits_le();
+            let mut bits = secret_key.into_bigint().to_bits_le();
             let mut bits_var = Vec::new();
 
-            bits.truncate(FrParameters::MODULUS_BITS as usize);
+            bits.truncate(Fr::MODULUS_BIT_SIZE as usize);
 
             for bit in bits.iter() {
                 let (bit_var, one_minus_bit_var, product) = cs
@@ -125,7 +125,7 @@ impl ScalarMulProof {
             let mut wrapped_bits = Vec::new();
             let mut bits_var = Vec::new();
 
-            for _ in 0..FrParameters::MODULUS_BITS {
+            for _ in 0..Fr::MODULUS_BIT_SIZE {
                 let (bit_var, one_minus_bit_var, product) = cs
                     .allocate_multiplier(None)
                     .c(d!(NoahError::R1CSProofError))?;
@@ -152,10 +152,10 @@ impl ScalarMulProof {
         // 4. Generate the points.
         let points = {
             let mut v = Vec::new();
-            let mut cur = SECP256K1G1::get_base().get_raw().into_projective();
-            for _ in 0..FrParameters::MODULUS_BITS {
+            let mut cur = SECP256K1G1::get_base().get_raw().into_group();
+            for _ in 0..Fr::MODULUS_BIT_SIZE {
                 v.push(cur.into_affine());
-                ProjectiveCurve::double_in_place(&mut cur);
+                Projective::double_in_place(&mut cur);
             }
             v
         };
@@ -181,9 +181,9 @@ impl ScalarMulProof {
     fn point_add_constant<CS: RandomizableConstraintSystem<Fq>>(
         cs: &mut CS,
         left_var: &PointVar,
-        left: &Option<G1Affine>,
-        right: &G1Affine,
-    ) -> Result<(Option<G1Affine>, PointVar)> {
+        left: &Option<Affine>,
+        right: &Affine,
+    ) -> Result<(Option<Affine>, PointVar)> {
         let (s_var, res_var, res) = if let Some(left) = left {
             let s = (left.y - &right.y) * (left.x - &right.x).inverse().unwrap();
             let s_var = cs.allocate(Some(s)).c(d!(NoahError::R1CSProofError))?;
@@ -194,7 +194,7 @@ impl ScalarMulProof {
             let res_var = PointVar::allocate(cs, &Some(new_x), &Some(new_y))?;
             let res = left.add(right.clone());
 
-            (s_var, res_var, Some(res))
+            (s_var, res_var, Some(res.into_affine()))
         } else {
             let s_var = cs.allocate(None).c(d!(NoahError::R1CSProofError))?;
             let res_var = PointVar::allocate(cs, &None, &None).c(d!(NoahError::R1CSProofError))?;
@@ -216,10 +216,10 @@ impl ScalarMulProof {
         bit_var: &Variable<Fq>,
         bit: &Option<bool>,
         yes_var: &PointVar,
-        yes: &Option<G1Affine>,
+        yes: &Option<Affine>,
         no_var: &PointVar,
-        no: &Option<G1Affine>,
-    ) -> Result<(Option<G1Affine>, PointVar)> {
+        no: &Option<Affine>,
+    ) -> Result<(Option<Affine>, PointVar)> {
         let (res, res_var) = if let Some(bit) = bit {
             let res = if *bit { yes.unwrap() } else { no.unwrap() };
             let res_var = PointVar::allocate(cs, &Some(res.x), &Some(res.y))?;
@@ -247,7 +247,7 @@ impl ScalarMulProof {
     /// Returns a tuple `(proof, x_comm || y_comm || scalar_fq_comm )`.
     pub fn prove<'a, 'b, R: CryptoRng + RngCore>(
         prng: &mut R,
-        bp_gens: &'b BulletproofGens<G1AffineBig>,
+        bp_gens: &'b BulletproofGens<AffineBig>,
         transcript: &'a mut Transcript,
         public_key: &SECP256K1G1,
         secret_key: &SECP256K1Scalar,
@@ -260,13 +260,13 @@ impl ScalarMulProof {
         let base = SECP256K1G1::get_base();
 
         // 1. Sanity-check if the statement is valid.
-        assert_eq!(base.get_raw().mul(secret_key.into_repr()), public_key);
+        assert_eq!(base.get_raw().mul(secret_key), public_key);
 
         // 2. Apply a domain separator to the transcript.
         transcript.append_message(b"dom-sep", b"ScalarMulProof");
 
         // 3. Initialize the prover.
-        let pc_gens_for_prover = PedersenGens::<G1AffineBig>::from(&pc_gens);
+        let pc_gens_for_prover = PedersenGens::<AffineBig>::from(&pc_gens);
         let mut prover = Prover::new(&pc_gens_for_prover, transcript);
 
         // 4. Allocate `public_key`.
@@ -279,7 +279,7 @@ impl ScalarMulProof {
 
         // 5. Allocate `secret_key`.
         // We can do this because Fq is larger than Fr.
-        let secret_key_fq = Fq::from_le_bytes_mod_order(&secret_key.into_repr().to_bytes_le());
+        let secret_key_fq = Fq::from_le_bytes_mod_order(&secret_key.into_bigint().to_bytes_le());
 
         let secret_key_blinding = Fq::rand(prng);
         let (secret_key_comm, secret_key_var) =
@@ -319,7 +319,7 @@ impl ScalarMulProof {
     /// Attempt to verify a `ScalarMulProof`.
     pub fn verify<'a, 'b>(
         &self,
-        bp_gens: &'b BulletproofGens<G1AffineBig>,
+        bp_gens: &'b BulletproofGens<AffineBig>,
         transcript: &'a mut Transcript,
         commitments: &Vec<SECQ256K1G1>,
     ) -> Result<()> {
@@ -327,7 +327,7 @@ impl ScalarMulProof {
         let commitments = commitments
             .iter()
             .map(|x| x.get_raw())
-            .collect::<Vec<G1AffineBig>>();
+            .collect::<Vec<AffineBig>>();
 
         // Apply a domain separator to the transcript.
         transcript.append_message(b"dom-sep", b"ScalarMulProof");
@@ -350,7 +350,7 @@ impl ScalarMulProof {
         )
         .c(d!(NoahError::R1CSProofError))?;
 
-        let pc_gens_for_verifier = PedersenGens::<G1AffineBig>::from(&pc_gens);
+        let pc_gens_for_verifier = PedersenGens::<AffineBig>::from(&pc_gens);
         verifier
             .verify(&self.0, &pc_gens_for_verifier, &bp_gens)
             .c(d!(NoahError::R1CSProofError))?;
@@ -360,16 +360,14 @@ impl ScalarMulProof {
 
 #[test]
 fn scalar_mul_test() {
-    use ark_bulletproofs::curve::secp256k1::Fr;
+    use ark_secp256k1::Fr;
 
     let bp_gens = BulletproofGens::new(2048, 1);
 
     let mut rng = rand::thread_rng();
 
     let secert_key = Fr::rand(&mut rng);
-    let public_key = G1Affine::prime_subgroup_generator()
-        .mul(secert_key.into_repr())
-        .into_affine();
+    let public_key = Affine::generator().mul(secert_key).into_affine();
 
     let (proof, commitments, _) = {
         let mut prover_transcript = Transcript::new(b"ScalarMulProofTest");

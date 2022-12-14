@@ -23,8 +23,8 @@ pub use pairing::*;
 #[macro_export]
 macro_rules! new_bls12_381 {
     ($c0:expr) => {{
-        let b = num_bigint::BigUint::from($c0);
-        BLSScalar::from(ark_bls12_381::Fr::from(b))
+        let (is_positive, limbs) = ark_ff::ark_ff_macros::to_sign_and_limbs!($c0);
+        BLSScalar::new(is_positive, &limbs)
     }};
 }
 

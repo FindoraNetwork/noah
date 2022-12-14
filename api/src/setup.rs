@@ -17,7 +17,7 @@ use crate::parameters::{
     BAR_TO_ABAR_VERIFIER_PARAMS, BULLETPROOF_CURVE25519_URS, BULLETPROOF_SECQ256K1_URS,
     BULLETPROOF_ZORRO_URS, LAGRANGE_BASES, SRS, VERIFIER_COMMON_PARAMS, VERIFIER_SPECIFIC_PARAMS,
 };
-use ark_serialize::CanonicalDeserialize;
+use ark_serialize::{CanonicalDeserialize, Compress, Validate};
 use bulletproofs::BulletproofGens;
 use noah_algebra::ristretto::RistrettoPoint;
 use noah_algebra::secq256k1::Secq256k1BulletproofGens;
@@ -150,9 +150,10 @@ impl BulletproofURS for Secq256k1BulletproofGens {
         let urs = BULLETPROOF_SECQ256K1_URS.c(d!(NoahError::MissingSRSError))?;
 
         let reader = ark_std::io::BufReader::new(urs);
-        let bp_gens = Secq256k1BulletproofGens::deserialize_unchecked(reader)
-            .c(d!(NoahError::DeserializationError))
-            .unwrap();
+        let bp_gens =
+            Secq256k1BulletproofGens::deserialize_with_mode(reader, Compress::No, Validate::No)
+                .c(d!(NoahError::DeserializationError))
+                .unwrap();
         Ok(bp_gens)
     }
 
@@ -166,9 +167,10 @@ impl BulletproofURS for ZorroBulletproofGens {
         let urs = BULLETPROOF_ZORRO_URS.c(d!(NoahError::MissingSRSError))?;
 
         let reader = ark_std::io::BufReader::new(urs);
-        let bp_gens = ZorroBulletproofGens::deserialize_unchecked(reader)
-            .c(d!(NoahError::DeserializationError))
-            .unwrap();
+        let bp_gens =
+            ZorroBulletproofGens::deserialize_with_mode(reader, Compress::No, Validate::No)
+                .c(d!(NoahError::DeserializationError))
+                .unwrap();
         Ok(bp_gens)
     }
 

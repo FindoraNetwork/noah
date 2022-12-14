@@ -42,6 +42,21 @@ impl FromStr for BLSScalar {
     }
 }
 
+impl BLSScalar {
+    /// Create a new scalar element from the arkworks-rs representation.
+    pub const fn new(is_positive: bool, limbs: &[u64]) -> Self {
+        BLSScalar(Fr::GENERATOR)
+        // type Params = <Fr as PrimeField>::Params;
+        // BLSScalar(Fr::const_from_str(
+        //     &limbs,
+        //     is_positive,
+        //     Params::R2,
+        //     Params::MODULUS,
+        //     Params::INV,
+        // ))
+    }
+}
+
 impl Into<BigUint> for BLSScalar {
     #[inline]
     fn into(self) -> BigUint {

@@ -27,15 +27,15 @@ num-integer = '0.1.43'
 serde_derive = '1.0.115'
 
 [dependencies.ark-poly]
-version = '^0.3.0'
+version = '0.4.0-alpha'
 default-features = false
 
 [dependencies.ark-serialize]
-version = '^0.3.0'
+version = '0.4.0-alpha'
 default-features = false
 
 [dependencies.ark-std]
-version = '^0.3.0'
+version = '0.4.0-alpha'
 default-features = false
 
 [dependencies.rayon]
@@ -43,7 +43,7 @@ version = '1.5'
 optional = true
 
 [dependencies.ark-ff]
-version = '^0.3.0'
+version = '0.4.0-alpha'
 default-features = false
 
 [dependencies.rand_chacha]
