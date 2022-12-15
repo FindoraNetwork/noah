@@ -206,7 +206,7 @@ impl Ed25519Point {
         ZorroScalar(affine_point.y)
     }
 
-    /// Obtain a point using the x coordinate (which would be ZorroScalar).
+    /// Obtain a point using the y coordinate (which would be ZorroScalar).
     pub fn get_point_from_y(y: &ZorroScalar) -> Result<Self> {
         let point = EdwardsAffine::get_point_from_y_unchecked(y.0.clone(), false)
             .ok_or(eg!(NoahError::DeserializationError))?
