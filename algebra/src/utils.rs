@@ -1,14 +1,14 @@
 #![deny(warnings)]
 #![allow(clippy::upper_case_acronyms)]
 
-use base64::engine::fast_portable::{FastPortable, FastPortableConfig};
 use crate::{fs::File, io::Write, path::PathBuf, prelude::*, rand::SeedableRng};
+use base64::engine::fast_portable::{FastPortable, FastPortableConfig};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use rand_chacha::ChaCha20Rng;
 
-const BASE64_PADDING_CONFIG: FastPortableConfig =
-    FastPortableConfig::new().with_decode_padding_mode(base64::engine::DecodePaddingMode::Indifferent);
+const BASE64_PADDING_CONFIG: FastPortableConfig = FastPortableConfig::new()
+    .with_decode_padding_mode(base64::engine::DecodePaddingMode::Indifferent);
 
 const BASE64_ENGINE: FastPortable =
     FastPortable::from(&base64::alphabet::URL_SAFE, BASE64_PADDING_CONFIG);
