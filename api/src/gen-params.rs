@@ -6,7 +6,7 @@
 )]
 
 use ark_bulletproofs::BulletproofGens as BulletproofGensOverSecq256k1;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use bulletproofs::BulletproofGens;
 use noah::setup::{
     BulletproofParams, BulletproofURS, ProverParams, VerifierParams, ANON_XFR_BP_GENS_LEN,
@@ -287,13 +287,17 @@ fn gen_bulletproof_secq256k1_urs(mut path: PathBuf) {
 
     let bp_gens = Secq256k1BulletproofGens::new(ANON_XFR_BP_GENS_LEN, 1);
     let mut bytes = Vec::new();
-    bp_gens.serialize_unchecked(&mut bytes).unwrap();
+    bp_gens
+        .serialize_with_mode(&mut bytes, Compress::No)
+        .unwrap();
     path.push("bulletproof-secq256k1-urs.bin");
     save_to_file(&bytes, path);
 
     let start = std::time::Instant::now();
     let reader = ark_std::io::BufReader::new(bytes.as_slice());
-    let _bp_gens = Secq256k1BulletproofGens::deserialize_unchecked(reader).unwrap();
+    let _bp_gens =
+        Secq256k1BulletproofGens::deserialize_with_mode(reader, Compress::No, Validate::No)
+            .unwrap();
     println!("Deserialize time: {:.2?}", start.elapsed());
 }
 
@@ -303,13 +307,16 @@ fn gen_bulletproof_zorro_urs(mut path: PathBuf) {
 
     let bp_gens = ZorroBulletproofGens::new(ANON_XFR_BP_GENS_LEN, 1);
     let mut bytes = Vec::new();
-    bp_gens.serialize_unchecked(&mut bytes).unwrap();
+    bp_gens
+        .serialize_with_mode(&mut bytes, Compress::No)
+        .unwrap();
     path.push("bulletproof-zorro-urs.bin");
     save_to_file(&bytes, path);
 
     let start = std::time::Instant::now();
     let reader = ark_std::io::BufReader::new(bytes.as_slice());
-    let _bp_gens = ZorroBulletproofGens::deserialize_unchecked(reader).unwrap();
+    let _bp_gens =
+        ZorroBulletproofGens::deserialize_with_mode(reader, Compress::No, Validate::No).unwrap();
     println!("Deserialize time: {:.2?}", start.elapsed());
 }
 

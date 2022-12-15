@@ -905,7 +905,7 @@ fn convert_point_libsecp256k1_to_algebra(pk: &Secp256k1PublicKey) -> Vec<u8> {
     let mut bytes = convert_scalar_libsecp256k1_to_algebra(&f.0);
     let mut y_neg = y.neg(1);
     y_neg.normalize();
-    let flag = if y >= y_neg {
+    let flag = if y < y_neg {
         SWFlags::YIsPositive.u8_bitmask()
     } else {
         SWFlags::YIsNegative.u8_bitmask()
