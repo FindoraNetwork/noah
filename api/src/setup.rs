@@ -552,31 +552,36 @@ fn load_lagrange_params(size: usize) -> Option<KZGCommitmentSchemeBLS> {
 
 fn load_srs_params(size: usize) -> Result<KZGCommitmentSchemeBLS> {
     let srs = SRS.c(d!(NoahError::MissingSRSError))?;
-    let KZGCommitmentSchemeBLS {
-        public_parameter_group_1,
-        public_parameter_group_2,
-    } = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
-        .c(d!(NoahError::DeserializationError))?;
 
-    let mut new_group_1 = vec![BLSG1::default(); core::cmp::max(size + 3, 2051)];
-    new_group_1[0..2051].copy_from_slice(&public_parameter_group_1[0..2051]);
+    println!("size: {}", size);
 
-    if size == 4096 {
-        new_group_1[4096..4099].copy_from_slice(&public_parameter_group_1[2051..2054]);
-    }
+    return KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs);
 
-    if size == 8192 {
-        new_group_1[8192..8195].copy_from_slice(&public_parameter_group_1[2054..2057]);
-    }
+    // let KZGCommitmentSchemeBLS {
+    //     public_parameter_group_1,
+    //     public_parameter_group_2,
+    // } = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
+    //     .c(d!(NoahError::DeserializationError))?;
 
-    if size > 8192 {
-        return Err(SimpleError::new(d!(NoahError::ParameterError), None).into());
-    }
+    // let mut new_group_1 = vec![BLSG1::default(); core::cmp::max(size + 3, 2051)];
+    // new_group_1[0..2051].copy_from_slice(&public_parameter_group_1[0..2051]);
 
-    Ok(KZGCommitmentSchemeBLS {
-        public_parameter_group_2,
-        public_parameter_group_1: new_group_1,
-    })
+    // if size == 4096 {
+    //     new_group_1[4096..4099].copy_from_slice(&public_parameter_group_1[2051..2054]);
+    // }
+
+    // if size == 8192 {
+    //     new_group_1[8192..8195].copy_from_slice(&public_parameter_group_1[2054..2057]);
+    // }
+
+    // if size > 8192 {
+    //     return Err(SimpleError::new(d!(NoahError::ParameterError), None).into());
+    // }
+
+    // Ok(KZGCommitmentSchemeBLS {
+    //     public_parameter_group_2,
+    //     public_parameter_group_1: new_group_1,
+    // })
 }
 
 impl VerifierParams {
