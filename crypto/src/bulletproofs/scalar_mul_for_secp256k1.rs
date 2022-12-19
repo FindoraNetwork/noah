@@ -192,9 +192,9 @@ impl ScalarMulProof {
             let new_y = s * (left.x - &new_x) - &left.y;
 
             let res_var = PointVar::allocate(cs, &Some(new_x), &Some(new_y))?;
-            let res = left.add(right.clone());
+            let res = left.add(right).into_affine();
 
-            (s_var, res_var, Some(res.into_affine()))
+            (s_var, res_var, Some(res))
         } else {
             let s_var = cs.allocate(None).c(d!(NoahError::R1CSProofError))?;
             let res_var = PointVar::allocate(cs, &None, &None).c(d!(NoahError::R1CSProofError))?;

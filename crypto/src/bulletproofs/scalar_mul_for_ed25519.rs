@@ -186,9 +186,9 @@ impl ScalarMulProof {
         right: &EdwardsAffine,
     ) -> Result<(Option<EdwardsAffine>, PointVar)> {
         let (res_var, res) = if let Some(left) = left {
-            let res = left.add(right);
+            let res = left.add(right).into_affine();
             let res_var = PointVar::allocate(cs, &Some(res.x), &Some(res.y))?;
-            (res_var, Some(res.into_affine()))
+            (res_var, Some(res))
         } else {
             let res_var = PointVar::allocate(cs, &None, &None).c(d!(NoahError::R1CSProofError))?;
             (res_var, None)
