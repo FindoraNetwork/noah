@@ -13,7 +13,7 @@ use digest::consts::U64;
 use digest::Digest;
 use wasm_bindgen::prelude::*;
 
-/// The wrapped struct for `ark_bulletproofs::curve::ed25519::EdwardsProjective`
+/// The wrapped struct for `ark_ed25519::EdwardsProjective`
 #[wasm_bindgen]
 #[derive(Clone, PartialEq, Debug, Copy)]
 pub struct Ed25519Point(pub(crate) EdwardsProjective);
