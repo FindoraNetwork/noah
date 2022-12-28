@@ -10,17 +10,17 @@ members = [
 resolver = "2"
 
 [patch.crates-io]
-ark-ec = { git = "https://github.com/arkworks-rs/algebra", branch = "release-0.4-fix-field-test" }
-ark-ff = { git = "https://github.com/arkworks-rs/algebra", branch = "release-0.4-fix-field-test" }
-ark-poly = { git = "https://github.com/arkworks-rs/algebra", branch = "release-0.4-fix-field-test" }
-ark-serialize = { git = "https://github.com/arkworks-rs/algebra", branch = "release-0.4-fix-field-test" }
+ark-ec = { git = "https://github.com/arkworks-rs/algebra", branch = "release-0.4-debug-secp256k1" }
+ark-ff = { git = "https://github.com/arkworks-rs/algebra", branch = "release-0.4-debug-secp256k1" }
+ark-poly = { git = "https://github.com/arkworks-rs/algebra", branch = "release-0.4-debug-secp256k1" }
+ark-serialize = { git = "https://github.com/arkworks-rs/algebra", branch = "release-0.4-debug-secp256k1" }
 ark-std = { git = "https://github.com/arkworks-rs/std", branch = "release-0.4" }
 ark-bls12-381 = { git = "https://github.com/arkworks-rs/curves" }
 ark-ed-on-bls12-381 = { git = "https://github.com/arkworks-rs/curves" }
 ark-secp256k1 = { git = "https://github.com/arkworks-rs/curves" }
 ark-secq256k1 = { git = "https://github.com/arkworks-rs/curves" }
 ark-ed25519 = { git = "https://github.com/arkworks-rs/curves" }
-ark-algebra-test-templates = { git = "https://github.com/arkworks-rs/algebra", branch = "release-0.4-fix-field-test" }
+ark-algebra-test-templates = { git = "https://github.com/arkworks-rs/algebra", branch = "release-0.4-debug-secp256k1" }
 
 [profile.release]
 opt-level = 3
