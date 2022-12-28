@@ -178,6 +178,6 @@ impl Group for ZorroG1 {
             &points.iter().map(|r| r.0).collect::<Vec<G1Projective>>(),
         );
 
-        Self(G1Projective::msm(&points_raw, &scalars_raw).unwrap())
+        Self(G1Projective::msm(&points_raw, scalars_raw.as_ref()).unwrap())
     }
 }

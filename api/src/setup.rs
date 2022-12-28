@@ -530,23 +530,7 @@ impl ProverParams {
 fn load_lagrange_params(size: usize) -> Option<KZGCommitmentSchemeBLS> {
     match LAGRANGE_BASES.get(&size) {
         None => None,
-        Some(bytes) => {
-            let mut len_bytes = [0u8; 4];
-            len_bytes.copy_from_slice(&bytes[0..4]);
-            let len = u32::from_le_bytes(len_bytes) as usize;
-
-            let n = BLSG1::unchecked_size();
-
-            let mut v = vec![];
-            for i in 0..len {
-                v.push(BLSG1::from_unchecked_bytes(&bytes[(4 + n * i)..(4 + n * (i + 1))]).ok()?);
-            }
-
-            Some(KZGCommitmentSchemeBLS {
-                public_parameter_group_1: v,
-                public_parameter_group_2: vec![],
-            })
-        }
+        Some(bytes) => KZGCommitmentSchemeBLS::from_unchecked_bytes(&bytes).ok(),
     }
 }
 

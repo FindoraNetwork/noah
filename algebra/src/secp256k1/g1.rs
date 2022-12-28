@@ -141,7 +141,7 @@ impl Group for SECP256K1G1 {
         let points_raw =
             Projective::normalize_batch(&points.iter().map(|r| r.0).collect::<Vec<Projective>>());
 
-        Self(Projective::msm(&points_raw, &scalars_raw).unwrap())
+        Self(Projective::msm(&points_raw, scalars_raw.as_ref()).unwrap())
     }
 }
 
