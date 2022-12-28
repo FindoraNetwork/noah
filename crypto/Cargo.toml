@@ -11,17 +11,14 @@ crate-type = ['rlib']
 
 [dependencies]
 aes = '0.8.1'
-bulletproofs = { git = "https://github.com/FindoraNetwork/bulletproofs", tag = "v1.0.2-f"  }
 ctr = '0.9.1'
 digest = '0.10'
-ed25519-dalek = { git = "https://github.com/FindoraNetwork/ed25519-dalek", tag = "v1.0.1-f" }
 itertools = '0.10.3'
 merlin = '3.0'
 rand_chacha = '0.3'
 serde = '1.0'
 serde_derive = '1.0'
 sha2 = '0.10'
-x25519-dalek = { git = "https://github.com/FindoraNetwork/x25519-dalek", tag = "v1.2.2-f" }
 ruc = '1.0'
 sha3 = { version = "0.10", default-features = false }
 
@@ -32,6 +29,44 @@ path = '../algebra'
 git = "https://github.com/FindoraNetwork/curve25519-dalek"
 tag = "v3.2.0-f"
 features = ['serde']
+
+[dependencies.ed25519-dalek]
+git = "https://github.com/FindoraNetwork/ed25519-dalek"
+tag = "v1.0.1-f"
+
+[dependencies.x25519-dalek]
+git = "https://github.com/FindoraNetwork/x25519-dalek"
+tag = "v1.2.2-f"
+
+[dependencies.bulletproofs]
+git = "https://github.com/FindoraNetwork/bulletproofs"
+tag = "v1.0.2-f"
+
+[dependencies.ark-ec]
+version = '0.4.0-alpha'
+default-features = false
+
+[dependencies.ark-ff]
+version = '0.4.0-alpha'
+default-features = false
+features = ['asm']
+
+[dependencies.ark-ed25519]
+version = '0.4.0-alpha'
+default-features = false
+
+[dependencies.ark-secp256k1]
+version = '0.4.0-alpha'
+default-features = false
+
+[dependencies.ark-secq256k1]
+version = '0.4.0-alpha'
+default-features = false
+
+[dependencies.ark-bulletproofs]
+version = '4.0.0'
+default-features = false
+features = ['yoloproofs']
 
 [dependencies.rand_core]
 version = '0.6'
@@ -55,33 +90,6 @@ version = '0.2.12'
 [dependencies.num-bigint]
 version = '0.4.0'
 features = ['rand']
-
-[dependencies.ark-ec]
-version = '0.4.0-alpha'
-default-features = false
-
-[dependencies.ark-ff]
-version = '0.4.0-alpha'
-default-features = false
-features = ['asm']
-
-[dependencies.ark-bulletproofs]
-git = "https://github.com/FindoraNetwork/ark-bulletproofs"
-tag = "v3.0.0-f"
-default-features = false
-features = ['yoloproofs']
-
-[dependencies.ark-ed25519]
-version = '0.4.0-alpha'
-default-features = false
-
-[dependencies.ark-secp256k1]
-version = '0.4.0-alpha'
-default-features = false
-
-[dependencies.ark-secq256k1]
-version = '0.4.0-alpha'
-default-features = false
 
 [dev-dependencies]
 bit-array = '0.4.3'

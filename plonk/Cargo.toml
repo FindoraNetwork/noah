@@ -26,6 +26,16 @@ num-bigint = '0.4'
 num-integer = '0.1.43'
 serde_derive = '1.0.115'
 
+[dependencies.noah-algebra]
+path = '../algebra'
+
+[dependencies.noah-crypto]
+path = '../crypto'
+
+[dependencies.ark-ff]
+version = '0.4.0-alpha'
+default-features = false
+
 [dependencies.ark-poly]
 version = '0.4.0-alpha'
 default-features = false
@@ -42,19 +52,9 @@ default-features = false
 version = '1.5'
 optional = true
 
-[dependencies.ark-ff]
-version = '0.4.0-alpha'
-default-features = false
-
 [dependencies.rand_chacha]
 version = '0.3'
 default-features = false
-
-[dependencies.noah-algebra]
-path = '../algebra'
-
-[dependencies.noah-crypto]
-path = '../crypto'
 
 [dependencies.serde]
 version = '1.0.115'
