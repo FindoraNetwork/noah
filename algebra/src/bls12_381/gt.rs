@@ -169,7 +169,7 @@ impl Group for BLSGt {
     #[inline]
     fn unchecked_size() -> usize {
         let g = Self::get_base().0;
-        g.uncompressed_size()
+        g.serialized_size(Compress::No)
     }
 
     #[inline]

@@ -88,8 +88,7 @@ impl Group for BLSG2 {
 
     #[inline]
     fn unchecked_size() -> usize {
-        let g = G2Affine::from(Self::get_base().0);
-        g.uncompressed_size()
+        G2Affine::default().serialized_size(Compress::No)
     }
 
     #[inline]

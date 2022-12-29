@@ -128,8 +128,7 @@ impl Group for Ed25519Point {
 
     #[inline]
     fn unchecked_size() -> usize {
-        let g = Self::get_base().0;
-        g.uncompressed_size()
+        EdwardsAffine::default().serialized_size(Compress::No)
     }
 
     #[inline]

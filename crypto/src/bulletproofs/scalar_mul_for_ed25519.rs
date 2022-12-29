@@ -370,7 +370,7 @@ fn scalar_mul_test() {
 
     let secert_key = Fq::rand(&mut rng);
     let public_key = EdwardsAffine::generator()
-        .mul(secert_key.into_bigint().into())
+        .mul_bigint(secert_key.into_bigint())
         .into_affine();
 
     let (proof, commitments, _) = {

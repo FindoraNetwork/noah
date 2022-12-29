@@ -403,7 +403,7 @@ impl OwnerMemo {
     ) -> Result<(Self, (RistrettoScalar, RistrettoScalar))> {
         let (key_type, r, blind_share_bytes) = pub_key.random_scalar_with_compressed_point(prng);
         let shared_point =
-            OwnerMemo::derive_shared_point(&key_type, &r, &pub_key.as_compressed_point())?;
+            OwnerMemo::derive_shared_point(&key_type, &r, &pub_key.as_compressed_point()?)?;
         let amount_blinds = OwnerMemo::calc_amount_blinds(&shared_point);
 
         let lock_bytes = pub_key.hybrid_encrypt(prng, &amount.to_be_bytes())?;
@@ -425,7 +425,7 @@ impl OwnerMemo {
     ) -> Result<(Self, RistrettoScalar)> {
         let (key_type, r, blind_share_bytes) = pub_key.random_scalar_with_compressed_point(prng);
         let shared_point =
-            OwnerMemo::derive_shared_point(&key_type, &r, &pub_key.as_compressed_point())?;
+            OwnerMemo::derive_shared_point(&key_type, &r, &pub_key.as_compressed_point()?)?;
         let asset_type_blind = OwnerMemo::calc_asset_type_blind(&shared_point);
 
         let lock_bytes = pub_key.hybrid_encrypt(prng, &asset_type.0)?;
@@ -448,7 +448,7 @@ impl OwnerMemo {
     ) -> Result<(Self, (RistrettoScalar, RistrettoScalar), RistrettoScalar)> {
         let (key_type, r, blind_share_bytes) = pub_key.random_scalar_with_compressed_point(prng);
         let shared_point =
-            OwnerMemo::derive_shared_point(&key_type, &r, &pub_key.as_compressed_point())?;
+            OwnerMemo::derive_shared_point(&key_type, &r, &pub_key.as_compressed_point()?)?;
         let amount_blinds = OwnerMemo::calc_amount_blinds(&shared_point);
         let asset_type_blind = OwnerMemo::calc_asset_type_blind(&shared_point);
 
@@ -515,14 +515,14 @@ impl OwnerMemo {
         &self,
         keypair: &KeyPair,
     ) -> Result<(RistrettoScalar, RistrettoScalar)> {
-        let (key_type, s) = keypair.sec_key.as_scalar_bytes();
+        let (key_type, s) = keypair.sec_key.as_scalar_bytes()?;
         let shared_point = OwnerMemo::derive_shared_point(&key_type, &s, &self.blind_share_bytes)?;
         Ok(OwnerMemo::calc_amount_blinds(&shared_point))
     }
 
     /// Return the asset type blind
     pub fn derive_asset_type_blind(&self, keypair: &KeyPair) -> Result<RistrettoScalar> {
-        let (key_type, s) = keypair.sec_key.as_scalar_bytes();
+        let (key_type, s) = keypair.sec_key.as_scalar_bytes()?;
         let shared_point = OwnerMemo::derive_shared_point(&key_type, &s, &self.blind_share_bytes)?;
         Ok(OwnerMemo::calc_asset_type_blind(&shared_point))
     }

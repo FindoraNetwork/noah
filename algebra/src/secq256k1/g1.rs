@@ -98,8 +98,7 @@ impl Group for SECQ256K1G1 {
 
     #[inline]
     fn unchecked_size() -> usize {
-        let g = Affine::from(Self::get_base().0);
-        g.uncompressed_size()
+        Affine::default().serialized_size(Compress::No)
     }
 
     #[inline]
