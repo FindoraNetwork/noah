@@ -10,10 +10,9 @@ use ark_ed25519::{EdwardsAffine, EdwardsProjective, Fq, Fr};
 use ark_ff::{BigInteger, Field, PrimeField};
 use digest::Digest;
 use merlin::Transcript;
-use noah_algebra::ed25519::get_ed25519_d;
 use noah_algebra::zorro::{PedersenCommitmentZorro, ZorroProof, ZorroScalar};
 use noah_algebra::{
-    ed25519::{Ed25519Point, Ed25519Scalar},
+    ed25519::{get_ed25519_d, Ed25519Fq, Ed25519Point},
     prelude::*,
     zorro::ZorroG1,
 };
@@ -253,17 +252,17 @@ impl ScalarMulProof {
         bp_gens: &'b BulletproofGens<G1AffineBig>,
         transcript: &'a mut Transcript,
         public_key: &Ed25519Point,
-        secret_key: &Ed25519Scalar,
+        secret_key: &Ed25519Fq,
     ) -> Result<(ScalarMulProof, Vec<ZorroG1>, Vec<ZorroScalar>)> {
         let pc_gens = PedersenCommitmentZorro::default();
 
         let public_key = public_key.get_raw();
-        let secret_key = secret_key.get_raw();
+        let secret_key = secret_key.get_raw().into_bigint();
 
         let base = Ed25519Point::get_base();
 
         // 1. Sanity-check if the statement is valid.
-        assert_eq!(base.get_raw().mul(secret_key), public_key);
+        assert_eq!(base.get_raw().mul_bigint(&secret_key), public_key);
 
         // 2. Apply a domain separator to the transcript.
         transcript.append_message(b"dom-sep", b"ScalarMulProof");
@@ -282,7 +281,7 @@ impl ScalarMulProof {
 
         // 5. Allocate `secret_key`.
         // We can do this because Fq is larger than Fr.
-        let secret_key_fq = Fq::from_le_bytes_mod_order(&secret_key.into_bigint().to_bytes_le());
+        let secret_key_fq = Fq::from_le_bytes_mod_order(&secret_key.to_bytes_le());
 
         let secret_key_blinding = Fq::rand(prng);
         let (secret_key_comm, secret_key_var) =
@@ -363,14 +362,16 @@ impl ScalarMulProof {
 
 #[test]
 fn scalar_mul_test() {
-    use ark_ed25519::Fr;
+    use ark_ed25519::Fq;
 
     let bp_gens = BulletproofGens::new(2048, 1);
 
     let mut rng = rand::thread_rng();
 
-    let secert_key = Fr::rand(&mut rng);
-    let public_key = EdwardsAffine::generator().mul(secert_key).into_affine();
+    let secert_key = Fq::rand(&mut rng);
+    let public_key = EdwardsAffine::generator()
+        .mul(secert_key.into_bigint().into())
+        .into_affine();
 
     let (proof, commitments, _) = {
         let mut prover_transcript = Transcript::new(b"ScalarMulProofTest");
@@ -379,7 +380,7 @@ fn scalar_mul_test() {
             &bp_gens,
             &mut prover_transcript,
             &Ed25519Point::from_raw(public_key),
-            &Ed25519Scalar::from_raw(secert_key),
+            &Ed25519Fq::from_raw(secert_key),
         )
         .unwrap()
     };

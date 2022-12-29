@@ -10,7 +10,8 @@ use noah_algebra::zorro::{PedersenCommitmentZorro, ZorroBulletproofGens, ZorroG1
 use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
 use noah_crypto::bulletproofs::scalar_mul_for_ed25519::ScalarMulProof;
 use noah_crypto::delegated_schnorr::{
-    verify_delegated_schnorr, DelegatedSchnorrInspection, DelegatedSchnorrProof,
+    prove_delegated_schnorr, verify_delegated_schnorr, DelegatedSchnorrInspection,
+    DelegatedSchnorrProof,
 };
 use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsSecq256k1, SimFrParamsZorro};
 use noah_plonk::plonk::constraint_system::field_simulation::SimFrVar;
@@ -90,24 +91,62 @@ pub fn create_address_folding_ed25519<
     R: CryptoRng + RngCore,
     D: Digest<OutputSize = U64> + Default,
 >(
-    _prng: &mut R,
-    _hash: D,
-    _transcript: &mut Transcript,
+    prng: &mut R,
+    hash: D,
+    transcript: &mut Transcript,
     keypair: &KeyPair,
 ) -> Result<(
     AXfrAddressFoldingInstanceEd25519,
     AXfrAddressFoldingWitnessEd25519,
 )> {
-    let (_sk, _pk) = keypair.to_zorro()?;
+    let (sk, pk) = keypair.to_ed25519()?;
 
-    let _pc_gens = PedersenCommitmentZorro::default();
-    let _bp_gens = ZorroBulletproofGens::load().unwrap();
+    let pc_gens = PedersenCommitmentZorro::default();
+    let bp_gens = ZorroBulletproofGens::load().unwrap();
 
-    todo!();
+    // important: address folding relies significantly on the Fiat-Shamir transform.
+    transcript.append_message(b"hash", hash.finalize().as_slice());
+
+    let (scalar_mul_proof, scalar_mul_commitments, blinding_factors) =
+        { ScalarMulProof::prove(prng, &bp_gens, transcript, &pk, &sk)? };
+
+    let (delegated_schnorr_proof, delegated_schnorr_inspection, beta, lambda) = {
+        let secret_key_in_fq = ZorroScalar::from_bytes(&sk.to_bytes())?;
+
+        prove_delegated_schnorr(
+            prng,
+            &vec![
+                (pk.get_x(), blinding_factors[0]),
+                (pk.get_y(), blinding_factors[1]),
+                (secret_key_in_fq, blinding_factors[2]),
+            ],
+            &pc_gens,
+            &scalar_mul_commitments,
+            transcript,
+        )
+        .c(d!())?
+    };
+
+    let instance = AXfrAddressFoldingInstanceEd25519 {
+        delegated_schnorr_proof: delegated_schnorr_proof.clone(),
+        scalar_mul_commitments,
+        scalar_mul_proof,
+    };
+
+    let witness = AXfrAddressFoldingWitnessEd25519 {
+        keypair: keypair.clone(),
+        blinding_factors,
+        delegated_schnorr_proof,
+        delegated_schnorr_inspection,
+        beta,
+        lambda,
+    };
+
+    Ok((instance, witness))
 }
 
 /// Verify an address folding proof.
-pub fn verify_address_folding_secp256k1<D: Digest<OutputSize = U64> + Default>(
+pub fn verify_address_folding_ed25519<D: Digest<OutputSize = U64> + Default>(
     hash: D,
     transcript: &mut Transcript,
     instance: &AXfrAddressFoldingInstanceEd25519,
@@ -133,14 +172,13 @@ pub fn verify_address_folding_secp256k1<D: Digest<OutputSize = U64> + Default>(
 }
 
 /// Generate the constraints used in the Plonk proof for address folding.
-pub fn prove_address_folding_in_cs_secp256k1(
+pub fn prove_address_folding_in_cs_ed25519(
     cs: &mut TurboPlonkCS,
     public_key_scalars_vars: &[VarIndex; 3],
     secret_key_scalars_vars: &[VarIndex; 2],
     witness: &AXfrAddressFoldingWitnessEd25519,
 ) -> Result<()> {
-    //let (sk, pk) = witness.keypair.to_zorro()?; // TODO change to this
-    let (sk, pk) = witness.keypair.to_secp256k1()?; // TMP to fix get_x, get_y
+    let (sk, pk) = witness.keypair.to_ed25519()?;
 
     // 1. decompose the scalar inputs.
     let mut public_key_bits_vars = cs.range_check(public_key_scalars_vars[0], 248);
@@ -295,9 +333,10 @@ pub fn prove_address_folding_in_cs_secp256k1(
     }
 
     // 3. allocate the simulated field elements and obtain their bit representations.
-    let x_sim_fr = SimFr::<SimFrParamsZorro>::from(&pk.get_x().into());
+    let pk_affine = pk.get_raw();
+    let x_sim_fr = SimFr::<SimFrParamsZorro>::from(&pk_affine.x.into());
     let (x_sim_fr_var, x_sim_bits_vars) = SimFrVar::alloc_witness(cs, &x_sim_fr);
-    let y_sim_fr = SimFr::<SimFrParamsZorro>::from(&pk.get_y().into());
+    let y_sim_fr = SimFr::<SimFrParamsZorro>::from(&pk_affine.y.into());
     let (y_sim_fr_var, y_sim_bits_vars) = SimFrVar::alloc_witness(cs, &y_sim_fr);
 
     // we can do so only because the secp256k1's order is smaller than its base field modulus.
