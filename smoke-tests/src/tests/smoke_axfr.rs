@@ -116,8 +116,8 @@ mod smoke_axfr {
         let params = ProverParams::ar_to_abar_params().unwrap();
         let verify_params = VerifierParams::ar_to_abar_params().unwrap();
 
-        let sender = KeyPair::generate(&mut prng);
-        let receiver = KeyPair::generate(&mut prng);
+        let sender = KeyPair::generate_secp256k1(&mut prng);
+        let receiver = KeyPair::generate_secp256k1(&mut prng);
 
         let (bar, memo) = build_bar(
             &sender.get_pk(),
@@ -156,8 +156,8 @@ mod smoke_axfr {
         let params = ProverParams::bar_to_abar_params().unwrap();
         let verify_params = VerifierParams::bar_to_abar_params().unwrap();
 
-        let sender = KeyPair::generate(&mut prng);
-        let receiver = KeyPair::generate(&mut prng);
+        let sender = KeyPair::generate_secp256k1(&mut prng);
+        let receiver = KeyPair::generate_secp256k1(&mut prng);
 
         let (bar, memo) = build_bar(
             &sender.get_pk(),
@@ -205,8 +205,8 @@ mod smoke_axfr {
         let params = ProverParams::abar_to_ar_params(TREE_DEPTH).unwrap();
         let verify_params = VerifierParams::abar_to_ar_params().unwrap();
 
-        let sender = KeyPair::generate(&mut prng);
-        let receiver = KeyPair::generate(&mut prng);
+        let sender = KeyPair::generate_secp256k1(&mut prng);
+        let receiver = KeyPair::generate_secp256k1(&mut prng);
 
         let fdb = MemoryDB::new();
         let cs = Arc::new(RwLock::new(ChainState::new(fdb, "abar_ar".to_owned(), 0)));
@@ -300,8 +300,8 @@ mod smoke_axfr {
         let params = ProverParams::abar_to_bar_params(TREE_DEPTH).unwrap();
         let verify_params = VerifierParams::abar_to_bar_params().unwrap();
 
-        let sender = KeyPair::generate(&mut prng);
-        let receiver = KeyPair::generate(&mut prng);
+        let sender = KeyPair::generate_secp256k1(&mut prng);
+        let receiver = KeyPair::generate_secp256k1(&mut prng);
 
         let fdb = MemoryDB::new();
         let cs = Arc::new(RwLock::new(ChainState::new(fdb, "abar_bar".to_owned(), 0)));
@@ -517,9 +517,9 @@ mod smoke_axfr {
         let params = ProverParams::new(inputs.len(), outputs.len(), None).unwrap();
         let verifier_params = VerifierParams::load(inputs.len(), outputs.len()).unwrap();
 
-        let sender = KeyPair::generate(&mut prng);
+        let sender = KeyPair::generate_secp256k1(&mut prng);
         let receivers: Vec<KeyPair> = (0..outputs.len())
-            .map(|_| KeyPair::generate(&mut prng))
+            .map(|_| KeyPair::generate_secp256k1(&mut prng))
             .collect();
 
         let mut oabars: Vec<OpenAnonAssetRecord> = inputs

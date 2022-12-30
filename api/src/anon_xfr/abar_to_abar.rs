@@ -302,6 +302,7 @@ pub fn verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default>(
         &pub_inputs,
         &note.proof,
         &address_folding_public_input,
+        &note.folding_instance,
     )
     .c(d!(NoahError::AXfrVerificationError))
 }
@@ -361,6 +362,7 @@ pub fn batch_verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default + Sync +
                 &pub_inputs,
                 &note.proof,
                 &address_folding_public_input,
+                &note.folding_instance,
             )
         })
         .all(|x| x.is_ok());
@@ -403,7 +405,7 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     );
     let witness = cs.get_and_clear_witness();
 
-    let (cs, prover_params) = params.cs_params(folding_witness)?;
+    let (cs, prover_params) = params.cs_params(folding_witness);
     prover_with_lagrange(
         rng,
         &mut transcript,
@@ -422,6 +424,7 @@ pub(crate) fn verify_xfr(
     pub_inputs: &AXfrPubInputs,
     proof: &AXfrPlonkPf,
     address_folding_public_input: &Vec<BLSScalar>,
+    folding_instance: &AXfrAddressFoldingInstance,
 ) -> Result<()> {
     let mut transcript = Transcript::new(ANON_XFR_PLONK_PROOF_TRANSCRIPT);
     transcript.append_u64(N_INPUTS_TRANSCRIPT, pub_inputs.payers_inputs.len() as u64);
@@ -433,11 +436,13 @@ pub(crate) fn verify_xfr(
     let mut online_inputs = pub_inputs.to_vec();
     online_inputs.extend_from_slice(address_folding_public_input);
 
+    let (cs, verifier_params) = params.cs_params(folding_instance);
+
     verifier(
         &mut transcript,
         &params.pcs,
-        &params.cs,
-        &params.verifier_params,
+        cs,
+        verifier_params,
         &online_inputs,
         proof,
     )
@@ -457,7 +462,7 @@ pub struct AXfrWitness {
 
 impl AXfrWitness {
     /// Create a fake `AXfrWitness` for testing.
-    pub fn fake(n_payers: usize, n_payees: usize, tree_depth: usize, fee: u32) -> Self {
+    pub fn fake_secp256k1(n_payers: usize, n_payees: usize, tree_depth: usize, fee: u32) -> Self {
         let bls_zero = BLSScalar::zero();
 
         let node = MTNode {
@@ -469,7 +474,7 @@ impl AXfrWitness {
             is_right_child: 0,
         };
         let payer_witness = PayerWitness {
-            secret_key: SecretKey::default(),
+            secret_key: SecretKey::default_secp256k1(),
             uid: 0,
             amount: 0,
             asset_type: bls_zero,
@@ -480,7 +485,41 @@ impl AXfrWitness {
             amount: 0,
             blind: bls_zero,
             asset_type: bls_zero,
-            public_key: PublicKey::default(),
+            public_key: PublicKey::default_secp256k1(),
+        };
+
+        AXfrWitness {
+            payers_witnesses: vec![payer_witness; n_payers],
+            payees_witnesses: vec![payee_witness; n_payees],
+            fee,
+        }
+    }
+
+    /// Create a fake `AXfrWitness` for testing.
+    pub fn fake_ed25519(n_payers: usize, n_payees: usize, tree_depth: usize, fee: u32) -> Self {
+        let bls_zero = BLSScalar::zero();
+
+        let node = MTNode {
+            left: bls_zero,
+            mid: bls_zero,
+            right: bls_zero,
+            is_left_child: 0,
+            is_mid_child: 0,
+            is_right_child: 0,
+        };
+        let payer_witness = PayerWitness {
+            secret_key: SecretKey::default_ed25519(),
+            uid: 0,
+            amount: 0,
+            asset_type: bls_zero,
+            path: MTPath::new(vec![node; tree_depth]),
+            blind: bls_zero,
+        };
+        let payee_witness = PayeeWitness {
+            amount: 0,
+            blind: bls_zero,
+            asset_type: bls_zero,
+            public_key: PublicKey::default_ed25519(),
         };
 
         AXfrWitness {
@@ -975,7 +1014,7 @@ mod tests {
     use sha2::Sha512;
 
     fn gen_keys<R: CryptoRng + RngCore>(prng: &mut R, n: usize) -> Vec<KeyPair> {
-        (0..n).map(|_| KeyPair::generate(prng)).collect()
+        (0..n).map(|_| KeyPair::generate_secp256k1(prng)).collect()
     }
 
     fn gen_oabar_with_key<R: CryptoRng + RngCore>(
@@ -1020,7 +1059,7 @@ mod tests {
         let mut prng = test_rng();
         let zero = BLSScalar::zero();
 
-        let input_keypair = KeyPair::generate(&mut prng);
+        let input_keypair = KeyPair::generate_secp256k1(&mut prng);
 
         let mut payers_secrets: Vec<PayerWitness> = inputs
             .iter()
@@ -1106,7 +1145,7 @@ mod tests {
                 amount,
                 blind: BLSScalar::random(&mut prng),
                 asset_type,
-                public_key: KeyPair::generate(&mut prng).get_pk(),
+                public_key: KeyPair::generate_secp256k1(&mut prng).get_pk(),
             })
             .collect();
 
@@ -1134,7 +1173,7 @@ mod tests {
         let output_amount = 1 + prng.next_u64() % 100;
         let input_amount = output_amount + fee_amount as u64;
 
-        let keypair = KeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate_secp256k1(&mut prng);
 
         // sample an input anonymous asset record for testing.
         let oabar = gen_oabar_with_key(&mut prng, input_amount, asset_type, &keypair);
@@ -1166,7 +1205,7 @@ mod tests {
         };
 
         // sample output keys for testing.
-        let keypair_out = KeyPair::generate(&mut prng);
+        let keypair_out = KeyPair::generate_secp256k1(&mut prng);
 
         let test_hash = {
             let mut hasher = Sha512::new();
@@ -1252,7 +1291,7 @@ mod tests {
             AssetType::from_identical_byte(1),
         ];
         let mut in_abars = vec![];
-        let in_keypair = KeyPair::generate(&mut prng);
+        let in_keypair = KeyPair::generate_secp256k1(&mut prng);
         let mut in_owner_memos = vec![];
         for i in 0..n_payers {
             let oabar =
@@ -2056,7 +2095,7 @@ mod tests {
         let mut prng = test_rng();
         let blind = BLSScalar::random(&mut prng);
 
-        let keypair = KeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate_secp256k1(&mut prng);
 
         let public_key_scalars = keypair.pub_key.to_bls_scalars().unwrap();
         let public_key_scalars_vars = [
@@ -2104,7 +2143,7 @@ mod tests {
         let uid_amount = BLSScalar::from_bytes(&bytes[..]).unwrap(); // safe unwrap
         let asset_type = one;
 
-        let keypair = KeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate_secp256k1(&mut prng);
 
         let public_key_scalars = keypair.pub_key.to_bls_scalars().unwrap();
         let public_key_scalars_vars = [

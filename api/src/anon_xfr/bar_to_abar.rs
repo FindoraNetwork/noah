@@ -324,8 +324,8 @@ pub(crate) fn prove_bar_to_abar_cs<R: CryptoRng + RngCore>(
         &mut transcript,
         &params.pcs,
         params.lagrange_pcs.as_ref(),
-        &params.cs,
-        &params.prover_params,
+        &params.secp256k1_cs,
+        &params.secp256k1_prover_params,
         &witness,
     )
     .c(d!(NoahError::AXfrProofError))
@@ -366,8 +366,8 @@ pub(crate) fn verify_inspection(
     verifier(
         &mut transcript,
         &params.pcs,
-        &params.cs,
-        &params.verifier_params,
+        &params.secp256k1_cs,
+        &params.secp256k1_verifier_params,
         &online_inputs,
         proof,
     )
@@ -680,7 +680,7 @@ mod test {
         let point_q = pc_gens.commit(y, delta);
 
         let z_randomizer = BLSScalar::random(&mut prng);
-        let keypair = KeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate_secp256k1(&mut prng);
         let pubkey = keypair.get_pk();
 
         let (z, output_commitment_trace) =

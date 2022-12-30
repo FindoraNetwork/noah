@@ -85,14 +85,6 @@ pub enum PublicKeyInner {
     EthAddress([u8; 20]),
 }
 
-impl Default for PublicKey {
-    fn default() -> Self {
-        let sk = Secp256k1SecretKey::default();
-        let pk = Secp256k1PublicKey::from_secret_key(&sk);
-        PublicKey(PublicKeyInner::Secp256k1(pk))
-    }
-}
-
 impl Eq for PublicKey {}
 
 impl PartialEq for PublicKey {
@@ -179,6 +171,16 @@ impl NoahFromToBytes for PublicKey {
 }
 
 impl PublicKey {
+    /// Default secp256k1 public key
+    pub fn default_secp256k1() -> Self {
+        SecretKey::default_secp256k1().into_keypair().pub_key
+    }
+
+    /// Default ed25519 public key
+    pub fn default_ed25519() -> Self {
+        SecretKey::default_ed25519().into_keypair().pub_key
+    }
+
     /// Get the reference of the inner type
     pub fn inner(&self) -> &PublicKeyInner {
         &self.0
@@ -380,12 +382,6 @@ pub enum SecretKey {
     Secp256k1(Secp256k1SecretKey),
 }
 
-impl Default for SecretKey {
-    fn default() -> Self {
-        SecretKey::Secp256k1(Secp256k1SecretKey::default())
-    }
-}
-
 impl Clone for SecretKey {
     fn clone(&self) -> Self {
         Self::noah_from_bytes(&self.noah_to_bytes()).unwrap()
@@ -464,6 +460,17 @@ impl NoahFromToBytes for SecretKey {
 }
 
 impl SecretKey {
+    /// Default secp256k1 secret key
+    pub fn default_secp256k1() -> Self {
+        SecretKey::Secp256k1(Secp256k1SecretKey::default())
+    }
+
+    /// Default ed25519 secret key
+    pub fn default_ed25519() -> Self {
+        let default_bytes = [0u8; 32];
+        SecretKey::Ed25519(Ed25519SecretKey::from_bytes(&default_bytes).unwrap())
+    }
+
     /// Change to algebra secp256k1 Point
     pub fn to_secp256k1(&self) -> Result<SECP256K1Scalar> {
         match self {
@@ -656,19 +663,14 @@ impl NoahFromToBytes for KeyPair {
 impl KeyPair {
     /// Default secp256k1 keypair
     pub fn default_secp256k1() -> Self {
-        Self {
-            sec_key: SecretKey::default(),
-            pub_key: PublicKey::default(),
-        }
+        let sk = SecretKey::default_secp256k1();
+        sk.into_keypair()
     }
 
     /// Default ed25519 keypair
     pub fn default_ed25519() -> Self {
-        let sk = Ed25519SecretKey::from_bytes(&[0u8; 32]).unwrap();
-        Self {
-            sec_key: SecretKey::Ed25519(sk),
-            pub_key: PublicKey(PublicKeyInner::Ed25519(Default::default())),
-        }
+        let sk = SecretKey::default_ed25519();
+        sk.into_keypair()
     }
 
     /// Change to algebra Secp256k1 keypair
@@ -689,11 +691,6 @@ impl KeyPair {
             }
             _ => Err(eg!(NoahError::ParameterError)),
         }
-    }
-
-    /// Default generate a key pair.
-    pub fn generate<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
-        Self::generate_secp256k1(prng)
     }
 
     /// Generate a Ed25519 key pair.

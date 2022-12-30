@@ -144,8 +144,8 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
         &mut transcript,
         &params.pcs,
         params.lagrange_pcs.as_ref(),
-        &params.cs,
-        &params.prover_params,
+        &params.secp256k1_cs,
+        &params.secp256k1_prover_params,
         &witness,
     )
     .c(d!(NoahError::AXfrProofError))?;
@@ -177,8 +177,8 @@ pub fn verify_ar_to_abar_body(params: &VerifierParams, body: &ArToAbarBody) -> R
     verifier(
         &mut transcript,
         &params.pcs,
-        &params.cs,
-        &params.verifier_params,
+        &params.secp256k1_cs,
+        &params.secp256k1_verifier_params,
         &online_inputs,
         &body.proof,
     )

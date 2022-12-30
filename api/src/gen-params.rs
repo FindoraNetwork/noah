@@ -131,7 +131,7 @@ fn gen_transfer_vk(directory: PathBuf) {
                     let node_params = VerifierParams::create(*i, *j, Some(TREE_DEPTH)).unwrap();
                     println!(
                         "the size of the constraint system for {} payers & {} payees: {}",
-                        i, j, node_params.cs.size
+                        i, j, node_params.ed25519_cs.size
                     );
                     let (_, special) = node_params.split().unwrap();
                     (*j, bincode::serialize(&special).unwrap())
@@ -167,7 +167,7 @@ fn gen_transfer_vk(directory: PathBuf) {
                     let node_params = VerifierParams::create(*i, *j, Some(TREE_DEPTH)).unwrap();
                     println!(
                         "the size of the constraint system for {} payers & {} payees: {}",
-                        i, j, node_params.cs.size
+                        i, j, node_params.ed25519_cs.size
                     );
                     let (_, special) = node_params.split().unwrap();
                     (*j, bincode::serialize(&special).unwrap())
@@ -201,7 +201,7 @@ fn gen_abar_to_bar_vk(mut path: PathBuf) {
     let node_params = VerifierParams::from(user_params).shrink().unwrap();
     println!(
         "the size of the constraint system for ABAR TO BAR: {}",
-        node_params.cs.size
+        node_params.ed25519_cs.size
     );
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("abar-to-bar-vk.bin");
@@ -221,7 +221,7 @@ fn gen_bar_to_abar_vk(mut path: PathBuf) {
     let node_params = VerifierParams::from(user_params).shrink().unwrap();
     println!(
         "the size of the constraint system for BAR TO ABAR: {}",
-        node_params.cs.size
+        node_params.ed25519_cs.size
     );
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("bar-to-abar-vk.bin");
@@ -241,7 +241,7 @@ fn gen_ar_to_abar_vk(mut path: PathBuf) {
     let node_params = VerifierParams::from(user_params).shrink().unwrap();
     println!(
         "the size of the constraint system for AR TO ABAR: {}",
-        node_params.cs.size
+        node_params.ed25519_cs.size
     );
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("ar-to-abar-vk.bin");
@@ -261,7 +261,7 @@ fn gen_abar_to_ar_vk(mut path: PathBuf) {
     let node_params = VerifierParams::from(user_params).shrink().unwrap();
     println!(
         "the size of the constraint system for ABAR TO AR: {}",
-        node_params.cs.size
+        node_params.ed25519_cs.size
     );
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("abar-to-ar-vk.bin");

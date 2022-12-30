@@ -108,7 +108,7 @@ mod smoke_axfr_secp256k1_address {
         let verify_params = VerifierParams::bar_to_abar_params().unwrap();
 
         let sender = KeyPair::generate_secp256k1(&mut prng);
-        let receiver = KeyPair::generate(&mut prng);
+        let receiver = KeyPair::generate_secp256k1(&mut prng);
 
         let (bar, memo) = build_bar(
             &sender.get_pk(),
@@ -147,7 +147,7 @@ mod smoke_axfr_secp256k1_address {
         let verify_params = VerifierParams::ar_to_abar_params().unwrap();
 
         let sender = KeyPair::generate_address(&mut prng);
-        let receiver = KeyPair::generate(&mut prng);
+        let receiver = KeyPair::generate_secp256k1(&mut prng);
 
         let (bar, memo) = build_bar(
             &sender.get_pk(),
@@ -179,7 +179,7 @@ mod smoke_axfr_secp256k1_address {
         let params = ProverParams::abar_to_ar_params(TREE_DEPTH).unwrap();
         let verify_params = VerifierParams::abar_to_ar_params().unwrap();
 
-        let sender = KeyPair::generate(&mut prng);
+        let sender = KeyPair::generate_secp256k1(&mut prng);
         let receiver = KeyPair::generate_address(&mut prng);
 
         let fdb = MemoryDB::new();
@@ -227,7 +227,7 @@ mod smoke_axfr_secp256k1_address {
         let params = ProverParams::abar_to_bar_params(TREE_DEPTH).unwrap();
         let verify_params = VerifierParams::abar_to_bar_params().unwrap();
 
-        let sender = KeyPair::generate(&mut prng);
+        let sender = KeyPair::generate_secp256k1(&mut prng);
         let receiver = KeyPair::generate_secp256k1(&mut prng);
 
         let fdb = MemoryDB::new();
