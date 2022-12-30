@@ -103,7 +103,7 @@ tag = 'v1.1.4'
 
 [dependencies.ark-bulletproofs]
 git = "https://github.com/FindoraNetwork/ark-bulletproofs"
-tag = "v2.0.5-f"
+tag = "v4.0.0"
 default-features = false
 features = ['yoloproofs']
 
