@@ -6,7 +6,7 @@ use ark_bulletproofs::{
 };
 use ark_bulletproofs::{BulletproofGens, PedersenGens};
 use ark_ec::{AffineRepr, CurveGroup, Group as ArkGroup};
-use ark_ed25519::{EdwardsAffine, EdwardsProjective, Fq, Fr};
+use ark_ed25519::{EdwardsAffine, EdwardsProjective, Fq};
 use ark_ff::{BigInteger, Field, PrimeField};
 use digest::Digest;
 use merlin::Transcript;
@@ -107,7 +107,7 @@ impl ScalarMulProof {
             let mut bits = secret_key.into_bigint().to_bits_le();
             let mut bits_var = Vec::new();
 
-            bits.truncate(Fr::MODULUS_BIT_SIZE as usize);
+            bits.truncate(Fq::MODULUS_BIT_SIZE as usize);
 
             for bit in bits.iter() {
                 let (bit_var, one_minus_bit_var, product) = cs
@@ -125,7 +125,7 @@ impl ScalarMulProof {
             let mut wrapped_bits = Vec::new();
             let mut bits_var = Vec::new();
 
-            for _ in 0..Fr::MODULUS_BIT_SIZE {
+            for _ in 0..Fq::MODULUS_BIT_SIZE {
                 let (bit_var, one_minus_bit_var, product) = cs
                     .allocate_multiplier(None)
                     .c(d!(NoahError::R1CSProofError))?;
@@ -153,7 +153,7 @@ impl ScalarMulProof {
         let points = {
             let mut v = Vec::new();
             let mut cur = Ed25519Point::get_base().get_raw().into_group();
-            for _ in 0..Fr::MODULUS_BIT_SIZE {
+            for _ in 0..Fq::MODULUS_BIT_SIZE {
                 v.push(cur.into_affine());
                 EdwardsProjective::double_in_place(&mut cur);
             }
@@ -257,12 +257,14 @@ impl ScalarMulProof {
         let pc_gens = PedersenCommitmentZorro::default();
 
         let public_key = public_key.get_raw();
-        let secret_key = secret_key.get_raw().into_bigint();
-
+        let secret_key = secret_key.get_raw();
         let base = Ed25519Point::get_base();
 
         // 1. Sanity-check if the statement is valid.
-        assert_eq!(base.get_raw().mul_bigint(&secret_key), public_key);
+        assert_eq!(
+            base.get_raw().mul_bigint(&secret_key.into_bigint()),
+            public_key
+        );
 
         // 2. Apply a domain separator to the transcript.
         transcript.append_message(b"dom-sep", b"ScalarMulProof");
@@ -274,18 +276,13 @@ impl ScalarMulProof {
         // 4. Allocate `public_key`.
         let x_blinding = Fq::rand(prng);
         let y_blinding = Fq::rand(prng);
-        let (x_comm, x_var) = prover.commit(public_key.x, x_blinding.clone());
-        let (y_comm, y_var) = prover.commit(public_key.y, y_blinding.clone());
+        let (x_comm, x_var) = prover.commit(public_key.x, x_blinding);
+        let (y_comm, y_var) = prover.commit(public_key.y, y_blinding);
 
         let public_key_var = PointVar::new(x_var, y_var);
 
-        // 5. Allocate `secret_key`.
-        // We can do this because Fq is larger than Fr.
-        let secret_key_fq = Fq::from_le_bytes_mod_order(&secret_key.to_bytes_le());
-
         let secret_key_blinding = Fq::rand(prng);
-        let (secret_key_comm, secret_key_var) =
-            prover.commit(secret_key_fq, secret_key_blinding.clone());
+        let (secret_key_comm, secret_key_var) = prover.commit(secret_key, secret_key_blinding);
 
         let secret_key_var = ScalarVar(secret_key_var);
 
@@ -293,8 +290,8 @@ impl ScalarMulProof {
             &mut prover,
             &public_key_var,
             &secret_key_var,
-            &Some(public_key.clone()),
-            &Some(secret_key_fq.clone()),
+            &Some(public_key),
+            &Some(secret_key),
         )?;
 
         let proof = prover
@@ -304,9 +301,9 @@ impl ScalarMulProof {
         Ok((
             ScalarMulProof(proof),
             vec![
-                ZorroG1::from_raw(x_comm.clone()),
-                ZorroG1::from_raw(y_comm.clone()),
-                ZorroG1::from_raw(secret_key_comm.clone()),
+                ZorroG1::from_raw(x_comm),
+                ZorroG1::from_raw(y_comm),
+                ZorroG1::from_raw(secret_key_comm),
             ],
             vec![
                 ZorroScalar::from_raw(x_blinding),
@@ -362,8 +359,6 @@ impl ScalarMulProof {
 
 #[test]
 fn scalar_mul_test() {
-    use ark_ed25519::Fq;
-
     let bp_gens = BulletproofGens::new(2048, 1);
 
     let mut rng = rand::thread_rng();
@@ -387,8 +382,8 @@ fn scalar_mul_test() {
 
     {
         let mut verifier_transcript = Transcript::new(b"ScalarMulProofTest");
-        assert!(proof
-            .verify(&bp_gens, &mut verifier_transcript, &commitments,)
-            .is_ok());
+        proof
+            .verify(&bp_gens, &mut verifier_transcript, &commitments)
+            .unwrap();
     }
 }

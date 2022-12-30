@@ -217,12 +217,12 @@ impl PublicKey {
         let bytes = match self.inner() {
             PublicKeyInner::Secp256k1(_) => {
                 let pk = self.to_secp256k1()?;
-                pk.get_x()
-                    .to_bytes()
-                    .iter()
-                    .chain(pk.get_y().to_bytes().iter())
-                    .copied()
-                    .collect::<Vec<u8>>()
+                let affine = pk.get_raw();
+                let mut bytes = Vec::new();
+                bytes.extend(affine.x.into_bigint().to_bytes_le());
+                bytes.extend(affine.y.into_bigint().to_bytes_le());
+
+                bytes
             }
             PublicKeyInner::Ed25519(_) => {
                 let pk = self.to_ed25519()?;

@@ -251,7 +251,7 @@ pub fn finish_abar_to_bar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U6
     let proof = prove_abar_to_bar(
         prng,
         params,
-        witness,
+        &witness,
         &nullifier_trace,
         &input_commitment_trace,
         &body.delegated_schnorr_proof,
@@ -539,7 +539,7 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
 fn prove_abar_to_bar<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
-    payers_witness: PayerWitness,
+    payers_witness: &PayerWitness,
     nullifier_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
     input_commitment_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
     proof: &DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
@@ -562,13 +562,14 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
     );
     let witness = cs.get_and_clear_witness();
 
+    let (cs, prover_params) = params.cs_params(folding_witness)?;
     prover_with_lagrange(
         rng,
         &mut transcript,
         &params.pcs,
         params.lagrange_pcs.as_ref(),
-        &params.cs,
-        &params.prover_params,
+        cs,
+        prover_params,
         &witness,
     )
     .c(d!(NoahError::AXfrProofError))
@@ -576,7 +577,7 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
 
 /// Construct the anonymous-to-confidential constraint system.
 pub fn build_abar_to_bar_cs(
-    payer_witness: PayerWitness,
+    payer_witness: &PayerWitness,
     nullifier_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
     input_commitment_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
     proof: &DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
@@ -589,7 +590,7 @@ pub fn build_abar_to_bar_cs(
 
     cs.load_anemoi_jive_parameters::<AnemoiJive381>();
 
-    let payers_witnesses_vars = add_payers_witnesses(&mut cs, &[&payer_witness]);
+    let payers_witnesses_vars = add_payers_witnesses(&mut cs, &[payer_witness]);
     let payers_witness_vars = &payers_witnesses_vars[0];
 
     let keypair = folding_witness.keypair();

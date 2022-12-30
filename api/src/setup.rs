@@ -1,5 +1,6 @@
 // The Public Setup needed for Proofs
 use crate::anon_xfr::abar_to_abar::{build_multi_xfr_cs, AXfrWitness};
+use crate::anon_xfr::address_folding_ed25519::AXfrAddressFoldingWitnessEd25519;
 use crate::anon_xfr::address_folding_secp256k1::AXfrAddressFoldingWitnessSecp256k1;
 use crate::anon_xfr::structs::{PayeeWitness, PayerWitness};
 use crate::anon_xfr::{
@@ -68,10 +69,14 @@ pub struct ProverParams {
     pub pcs: KZGCommitmentSchemeBLS,
     /// The Lagrange basis format of SRS.
     pub lagrange_pcs: Option<KZGCommitmentSchemeBLS>,
-    /// The constraint system.
+    /// The default(secp256k1) constraint system.
     pub cs: TurboPlonkCS,
-    /// The TurboPlonk proving key.
+    /// The ed25519 constraint system.
+    pub ed25519_cs: Option<TurboPlonkCS>,
+    /// The default(secp256k1) TurboPlonk proving key.
     pub prover_params: PlonkPK<KZGCommitmentSchemeBLS>,
+    /// The ed25519 TurboPlonk proving key.
+    pub ed25519_prover_params: Option<PlonkPK<KZGCommitmentSchemeBLS>>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -180,15 +185,30 @@ impl BulletproofURS for ZorroBulletproofGens {
 }
 
 impl ProverParams {
+    /// Choose secp256k1 or ed25519 cs and prover_params
+    pub fn cs_params(
+        &self,
+        witness: &AXfrAddressFoldingWitness,
+    ) -> Result<(&TurboPlonkCS, &PlonkPK<KZGCommitmentSchemeBLS>)> {
+        match witness {
+            AXfrAddressFoldingWitness::Secp256k1(_) => Ok((&self.cs, &self.prover_params)),
+            AXfrAddressFoldingWitness::Ed25519(_) => {
+                match (&self.ed25519_cs, &self.ed25519_prover_params) {
+                    (Some(cs), Some(prover_params)) => Ok((cs, prover_params)),
+                    _ => Err(
+                        SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into(),
+                    ),
+                }
+            }
+        }
+    }
+
     /// Obtain the parameters for anonymous transfer for a given number of inputs and a given number of outputs.
     pub fn new(
         n_payers: usize,
         n_payees: usize,
         tree_depth: Option<usize>,
     ) -> Result<ProverParams> {
-        let folding_witness =
-            AXfrAddressFoldingWitness::Secp256k1(AXfrAddressFoldingWitnessSecp256k1::default());
-
         let (fake_witness, depth) = match tree_depth {
             Some(depth) => (AXfrWitness::fake(n_payers, n_payees, depth, 0), depth),
             None => (
@@ -229,17 +249,33 @@ impl ProverParams {
         }
 
         let (cs, _) = build_multi_xfr_cs(
-            fake_witness,
+            &fake_witness,
             FEE_TYPE.as_scalar(),
             &nullifiers_traces,
             &input_commitments_traces,
             &output_commitments_traces,
-            &folding_witness,
+            &AXfrAddressFoldingWitness::Secp256k1(AXfrAddressFoldingWitnessSecp256k1::default()),
         );
+        let (ed25519_cs, _) = build_multi_xfr_cs(
+            &fake_witness,
+            FEE_TYPE.as_scalar(),
+            &nullifiers_traces,
+            &input_commitments_traces,
+            &output_commitments_traces,
+            &AXfrAddressFoldingWitness::Ed25519(AXfrAddressFoldingWitnessEd25519::default()),
+        );
+        let cs_size = core::cmp::max(cs.size(), ed25519_cs.size());
 
-        let pcs = load_srs_params(cs.size())?;
-        let lagrange_pcs = load_lagrange_params(cs.size());
+        let pcs = load_srs_params(cs_size)?;
+        let lagrange_pcs = load_lagrange_params(cs_size);
         let verifier = if depth == TREE_DEPTH {
+            VerifierParams::load_prepare(n_payers, n_payees)
+                .map(|v| v.verifier_params)
+                .ok()
+        } else {
+            None
+        };
+        let ed25519_verifier = if depth == TREE_DEPTH {
             VerifierParams::load_prepare(n_payers, n_payees)
                 .map(|v| v.verifier_params)
                 .ok()
@@ -249,12 +285,17 @@ impl ProverParams {
 
         let prover_params =
             indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), verifier).unwrap();
+        let ed25519_prover_params =
+            indexer_with_lagrange(&ed25519_cs, &pcs, lagrange_pcs.as_ref(), ed25519_verifier)
+                .unwrap();
 
         Ok(ProverParams {
             pcs,
             lagrange_pcs,
             cs,
+            ed25519_cs: Some(ed25519_cs),
             prover_params,
+            ed25519_prover_params: Some(ed25519_prover_params),
         })
     }
 
@@ -318,6 +359,8 @@ impl ProverParams {
             lagrange_pcs,
             cs,
             prover_params,
+            ed25519_cs: None,
+            ed25519_prover_params: None,
         })
     }
 
@@ -370,9 +413,6 @@ impl ProverParams {
             blind: bls_zero,
         };
 
-        let folding_witness =
-            AXfrAddressFoldingWitness::Secp256k1(AXfrAddressFoldingWitnessSecp256k1::default());
-
         let (_, nullifier_trace) = nullify(
             &payer_secret.secret_key.clone().into_keypair(),
             payer_secret.amount,
@@ -388,19 +428,37 @@ impl ProverParams {
         )?;
 
         let (cs, _) = build_abar_to_bar_cs(
-            payer_secret,
+            &payer_secret,
             &nullifier_trace,
             &input_commitment_trace,
             &proof,
             &non_zk_state,
             &beta,
             &lambda,
-            &folding_witness,
+            &AXfrAddressFoldingWitness::Secp256k1(AXfrAddressFoldingWitnessSecp256k1::default()),
         );
+        let (ed25519_cs, _) = build_abar_to_bar_cs(
+            &payer_secret,
+            &nullifier_trace,
+            &input_commitment_trace,
+            &proof,
+            &non_zk_state,
+            &beta,
+            &lambda,
+            &AXfrAddressFoldingWitness::Ed25519(AXfrAddressFoldingWitnessEd25519::default()),
+        );
+        let cs_size = core::cmp::max(cs.size(), ed25519_cs.size());
 
-        let pcs = load_srs_params(cs.size())?;
-        let lagrange_pcs = load_lagrange_params(cs.size());
+        let pcs = load_srs_params(cs_size)?;
+        let lagrange_pcs = load_lagrange_params(cs_size);
         let verifier = if tree_depth == TREE_DEPTH {
+            VerifierParams::abar_to_bar_params_prepare()
+                .map(|v| v.verifier_params)
+                .ok()
+        } else {
+            None
+        };
+        let ed25519_verifier = if tree_depth == TREE_DEPTH {
             VerifierParams::abar_to_bar_params_prepare()
                 .map(|v| v.verifier_params)
                 .ok()
@@ -410,12 +468,17 @@ impl ProverParams {
 
         let prover_params =
             indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), verifier).unwrap();
+        let ed25519_prover_params =
+            indexer_with_lagrange(&ed25519_cs, &pcs, lagrange_pcs.as_ref(), ed25519_verifier)
+                .unwrap();
 
         Ok(ProverParams {
             pcs,
             lagrange_pcs,
             cs,
             prover_params,
+            ed25519_cs: Some(ed25519_cs),
+            ed25519_prover_params: Some(ed25519_prover_params),
         })
     }
 
@@ -456,6 +519,8 @@ impl ProverParams {
             lagrange_pcs,
             cs,
             prover_params,
+            ed25519_cs: None,
+            ed25519_prover_params: None,
         })
     }
 
@@ -484,9 +549,6 @@ impl ProverParams {
             blind: bls_zero,
         };
 
-        let folding_witness =
-            AXfrAddressFoldingWitness::Secp256k1(AXfrAddressFoldingWitnessSecp256k1::default());
-
         let (_, nullifier_trace) = nullify(
             &payer_secret.secret_key.clone().into_keypair(),
             payer_secret.amount,
@@ -502,14 +564,22 @@ impl ProverParams {
         )?;
 
         let (cs, _) = build_abar_to_ar_cs(
-            payer_secret,
+            &payer_secret,
             &nullifier_trace,
             &input_commitment_trace,
-            &folding_witness,
+            &AXfrAddressFoldingWitness::Secp256k1(AXfrAddressFoldingWitnessSecp256k1::default()),
         );
 
-        let pcs = load_srs_params(cs.size())?;
-        let lagrange_pcs = load_lagrange_params(cs.size());
+        let (ed25519_cs, _) = build_abar_to_ar_cs(
+            &payer_secret,
+            &nullifier_trace,
+            &input_commitment_trace,
+            &AXfrAddressFoldingWitness::Ed25519(AXfrAddressFoldingWitnessEd25519::default()),
+        );
+        let cs_size = core::cmp::max(cs.size(), ed25519_cs.size());
+
+        let pcs = load_srs_params(cs_size)?;
+        let lagrange_pcs = load_lagrange_params(cs_size);
         let verifier = if tree_depth == TREE_DEPTH {
             VerifierParams::abar_to_ar_params_prepare()
                 .map(|v| v.verifier_params)
@@ -517,15 +587,28 @@ impl ProverParams {
         } else {
             None
         };
+        let ed25519_verifier = if tree_depth == TREE_DEPTH {
+            None
+            // VerifierParams::abar_to_ar_params_prepare()
+            //     .map(|v| v.verifier_params)
+            //     .ok()
+        } else {
+            None
+        };
 
         let prover_params =
             indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), verifier).unwrap();
+        let ed25519_prover_params =
+            indexer_with_lagrange(&ed25519_cs, &pcs, lagrange_pcs.as_ref(), ed25519_verifier)
+                .unwrap();
 
         Ok(ProverParams {
             pcs,
             lagrange_pcs,
             cs,
             prover_params,
+            ed25519_cs: Some(ed25519_cs),
+            ed25519_prover_params: Some(ed25519_prover_params),
         })
     }
 }

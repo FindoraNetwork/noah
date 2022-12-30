@@ -246,7 +246,7 @@ pub fn finish_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> 
     let proof = prove_xfr(
         prng,
         params,
-        witness,
+        &witness,
         &nullifiers_traces,
         &input_commitments_traces,
         &output_commitments_traces,
@@ -376,7 +376,7 @@ pub fn batch_verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default + Sync +
 pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
-    secret_inputs: AXfrWitness,
+    secret_inputs: &AXfrWitness,
     nullifiers_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
     input_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
     output_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
@@ -403,13 +403,14 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     );
     let witness = cs.get_and_clear_witness();
 
+    let (cs, prover_params) = params.cs_params(folding_witness)?;
     prover_with_lagrange(
         rng,
         &mut transcript,
         &params.pcs,
         params.lagrange_pcs.as_ref(),
-        &params.cs,
-        &params.prover_params,
+        cs,
+        prover_params,
         &witness,
     )
     .c(d!(NoahError::AXfrProofError))
@@ -572,7 +573,7 @@ impl AXfrPubInputs {
 
 /// Instantiate the constraint system for anonymous transfer.
 pub(crate) fn build_multi_xfr_cs(
-    witness: AXfrWitness,
+    witness: &AXfrWitness,
     fee_type: BLSScalar,
     nullifiers_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
     input_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
@@ -2452,7 +2453,7 @@ mod tests {
 
         // check the constraints.
         let (mut cs, _) = build_multi_xfr_cs(
-            secret_inputs,
+            &secret_inputs,
             fee_type,
             &nullifiers_traces,
             &input_commitments_traces,
