@@ -36,17 +36,18 @@ path = '../crypto'
 path = '../plonk'
 
 [dependencies.curve25519-dalek]
-git = "https://github.com/FindoraNetwork/curve25519-dalek"
-tag = "v3.2.0-f"
+package = "noah-curve25519-dalek"
+version = "4.0.0"
+default-features = false
 features = ['serde']
 
 [dependencies.ed25519-dalek]
-git = "https://github.com/FindoraNetwork/ed25519-dalek"
-tag = "v1.0.1-f"
+package = "noah-ed25519-dalek"
+version = "4.0.0"
 
 [dependencies.bulletproofs]
-git = "https://github.com/FindoraNetwork/bulletproofs"
-tag = "v1.0.2-f"
+package = "noah-bulletproofs"
+version = "4.0.0"
 
 [dependencies.ark-serialize]
 version = '0.4.0-alpha'
