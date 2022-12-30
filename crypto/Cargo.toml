@@ -30,7 +30,7 @@ path = '../algebra'
 
 [dependencies.curve25519-dalek]
 git = "https://github.com/FindoraNetwork/curve25519-dalek"
-tag = "v3.2.0-f"
+tag = "v4.0.0"
 features = ['serde']
 
 [dependencies.rand_core]
