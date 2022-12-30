@@ -122,7 +122,7 @@ pub const MAX_CONFIDENTIAL_RECORD_NUMBER: usize = 128;
 /// The maximal number of inputs and outputs supported by this setup program, for standard payments.
 pub const MAX_ANONYMOUS_RECORD_NUMBER_STANDARD: usize = 6;
 /// The maximal number of inputs supported by this setup program, for consolidation.
-pub const MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER: usize = 9;
+pub const MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER: usize = 8;
 /// The maximal number of outputs supported by this setup program, for consolidation.
 pub const MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER: usize = 3;
 /// The default number of Bulletproofs generators

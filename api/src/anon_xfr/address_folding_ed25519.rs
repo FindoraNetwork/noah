@@ -4,7 +4,7 @@ use crate::setup::BulletproofURS;
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
 use noah_algebra::bls12_381::BLSScalar;
-use noah_algebra::ed25519::Ed25519Scalar;
+use noah_algebra::ed25519::Ed25519Fq;
 use noah_algebra::prelude::*;
 use noah_algebra::zorro::{PedersenCommitmentZorro, ZorroBulletproofGens, ZorroG1, ZorroScalar};
 use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
@@ -208,7 +208,7 @@ pub fn prove_address_folding_in_cs_ed25519(
         .collect::<Vec<bool>>();
 
     // 2. check that the secret key is smaller than the modulus.
-    let modulus_bits = Ed25519Scalar::get_field_size_le_bytes()
+    let modulus_bits = Ed25519Fq::get_field_size_le_bytes()
         .iter()
         .flat_map(bytes_to_bits)
         .collect::<Vec<bool>>();
