@@ -11,6 +11,7 @@ use crate::xfr::{
 use bulletproofs::RangeProof;
 use digest::Digest;
 use noah_algebra::{
+    ed25519::{Ed25519Point, Ed25519Scalar},
     prelude::*,
     ristretto::{
         CompressedEdwardsY, CompressedRistretto, PedersenCommitmentRistretto, RistrettoScalar,
@@ -551,10 +552,10 @@ impl OwnerMemo {
     fn derive_shared_point(key_type: &KeyType, s: &[u8], p: &[u8]) -> Result<Vec<u8>> {
         match key_type {
             KeyType::Ed25519 => {
-                let scalar = RistrettoScalar::from_bytes(s)?;
-                let point = CompressedEdwardsY::from_slice(p);
+                let scalar = Ed25519Scalar::from_bytes(s)?;
+                let point = Ed25519Point::from_compressed_bytes(p)?;
                 let shared_point = point.mul(&scalar);
-                Ok(shared_point.to_bytes().to_vec())
+                Ok(shared_point.to_compressed_bytes())
             }
             KeyType::Secp256k1 => {
                 let scalar = SECP256K1Scalar::from_bytes(s)?;
