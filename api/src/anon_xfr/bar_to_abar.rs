@@ -319,13 +319,15 @@ pub(crate) fn prove_bar_to_abar_cs<R: CryptoRng + RngCore>(
     );
     let witness = cs.get_and_clear_witness();
 
+    let (cs, prover_params) = params.cs_params(None);
+
     prover_with_lagrange(
         rng,
         &mut transcript,
         &params.pcs,
         params.lagrange_pcs.as_ref(),
-        &params.secp256k1_cs,
-        &params.secp256k1_prover_params,
+        cs,
+        prover_params,
         &witness,
     )
     .c(d!(NoahError::AXfrProofError))
@@ -363,11 +365,13 @@ pub(crate) fn verify_inspection(
     online_inputs.extend_from_slice(&beta_lambda_sim_fr.limbs);
     online_inputs.extend_from_slice(&s1_plus_lambda_s2_sim_fr.limbs);
 
+    let (cs, verifier_params) = params.cs_params(None);
+
     verifier(
         &mut transcript,
         &params.pcs,
-        &params.secp256k1_cs,
-        &params.secp256k1_verifier_params,
+        &cs,
+        verifier_params,
         &online_inputs,
         proof,
     )

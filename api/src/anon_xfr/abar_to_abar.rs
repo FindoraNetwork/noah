@@ -405,7 +405,8 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     );
     let witness = cs.get_and_clear_witness();
 
-    let (cs, prover_params) = params.cs_params(folding_witness);
+    let (cs, prover_params) = params.cs_params(Some(folding_witness));
+
     prover_with_lagrange(
         rng,
         &mut transcript,
@@ -436,12 +437,12 @@ pub(crate) fn verify_xfr(
     let mut online_inputs = pub_inputs.to_vec();
     online_inputs.extend_from_slice(address_folding_public_input);
 
-    let (cs, verifier_params) = params.cs_params(folding_instance);
+    let (cs, verifier_params) = params.cs_params(Some(folding_instance));
 
     verifier(
         &mut transcript,
         &params.pcs,
-        cs,
+        &cs,
         verifier_params,
         &online_inputs,
         proof,

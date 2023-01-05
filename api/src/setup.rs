@@ -1,4 +1,3 @@
-use crate::anon_xfr::AXfrAddressFoldingInstance;
 // The Public Setup needed for Proofs
 use crate::anon_xfr::abar_to_abar::{build_multi_xfr_cs, AXfrWitness};
 use crate::anon_xfr::address_folding_ed25519::AXfrAddressFoldingWitnessEd25519;
@@ -11,7 +10,8 @@ use crate::anon_xfr::{
     bar_to_abar::build_bar_to_abar_cs,
     commit, nullify,
     structs::{MTNode, MTPath},
-    AXfrAddressFoldingWitness, TurboPlonkCS, FEE_TYPE, TREE_DEPTH,
+    AXfrAddressFoldingInstance, AXfrAddressFoldingWitness, TurboPlonkCS, TurboVerifyCS, FEE_TYPE,
+    TREE_DEPTH,
 };
 use crate::keys::KeyPair;
 use crate::parameters::{
@@ -86,13 +86,46 @@ pub struct VerifierParams {
     /// The shrunk version of the polynomial commitment scheme.
     pub pcs: KZGCommitmentSchemeBLS,
     /// The shrunk version of the constraint system.
-    pub secp256k1_cs: TurboPlonkCS,
+    pub secp256k1_cs: TurboVerifyCS,
     /// The ed25519 shrunk version of the constraint system.
-    pub ed25519_cs: TurboPlonkCS,
+    pub ed25519_cs: TurboVerifyCS,
     /// The TurboPlonk verifying key.
     pub secp256k1_verifier_params: PlonkVK<KZGCommitmentSchemeBLS>,
     /// The ed25519 TurboPlonk verifying key.
     pub ed25519_verifier_params: PlonkVK<KZGCommitmentSchemeBLS>,
+}
+
+#[derive(Serialize, Deserialize)]
+/// The verifier common parameters.
+pub struct VerifierParamsCommon {
+    /// The shrunk version of the polynomial commitment scheme.
+    pub pcs: KZGCommitmentSchemeBLS,
+    /// The shrunk version of the constraint system.
+    pub cs: TurboVerifyCS,
+    /// The TurboPlonk verifying key.
+    pub verifier_params: PlonkVK<KZGCommitmentSchemeBLS>,
+}
+
+impl VerifierParamsCommon {
+    /// Convert to VerifierParams
+    pub fn to_full(self) -> VerifierParams {
+        VerifierParams {
+            pcs: self.pcs,
+            secp256k1_cs: self.cs.clone(),
+            ed25519_cs: self.cs,
+            secp256k1_verifier_params: self.verifier_params.clone(),
+            ed25519_verifier_params: self.verifier_params,
+        }
+    }
+
+    /// Convert from VerifierParams
+    pub fn from_full(params: VerifierParams) -> Self {
+        Self {
+            pcs: params.pcs,
+            cs: params.secp256k1_cs,
+            verifier_params: params.secp256k1_verifier_params,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize)]
@@ -106,9 +139,9 @@ pub struct VerifierParamsSplitCommon {
 /// The specific part of the verifier parameters.
 pub struct VerifierParamsSplitSpecific {
     /// The shrunk version of the constraint system.
-    pub secp256k1_cs: TurboPlonkCS,
+    pub secp256k1_cs: TurboVerifyCS,
     /// The ed25519 shrunk version of the constraint system.
-    pub ed25519_cs: TurboPlonkCS,
+    pub ed25519_cs: TurboVerifyCS,
     /// The verifier parameters.
     pub secp256k1_verifier_params: PlonkVK<KZGCommitmentSchemeBLS>,
     /// The ed25519 TurboPlonk verifying key.
@@ -198,13 +231,13 @@ impl ProverParams {
     /// Choose secp256k1 or ed25519 cs and prover_params
     pub fn cs_params(
         &self,
-        witness: &AXfrAddressFoldingWitness,
+        witness: Option<&AXfrAddressFoldingWitness>,
     ) -> (&TurboPlonkCS, &PlonkPK<KZGCommitmentSchemeBLS>) {
         match witness {
-            AXfrAddressFoldingWitness::Secp256k1(_) => {
+            None | Some(AXfrAddressFoldingWitness::Secp256k1(_)) => {
                 (&self.secp256k1_cs, &self.secp256k1_prover_params)
             }
-            AXfrAddressFoldingWitness::Ed25519(_) => {
+            Some(AXfrAddressFoldingWitness::Ed25519(_)) => {
                 (&self.ed25519_cs, &self.ed25519_prover_params)
             }
         }
@@ -873,15 +906,17 @@ impl VerifierParams {
     /// Choose secp256k1 or ed25519 cs and prover_params
     pub fn cs_params(
         &self,
-        witness: &AXfrAddressFoldingInstance,
-    ) -> (&TurboPlonkCS, &PlonkVK<KZGCommitmentSchemeBLS>) {
+        witness: Option<&AXfrAddressFoldingInstance>,
+    ) -> (TurboPlonkCS, &PlonkVK<KZGCommitmentSchemeBLS>) {
         match witness {
-            AXfrAddressFoldingInstance::Secp256k1(_) => {
-                (&self.secp256k1_cs, &self.secp256k1_verifier_params)
-            }
-            AXfrAddressFoldingInstance::Ed25519(_) => {
-                (&self.ed25519_cs, &self.ed25519_verifier_params)
-            }
+            None | Some(AXfrAddressFoldingInstance::Secp256k1(_)) => (
+                self.secp256k1_cs.clone().into(),
+                &self.secp256k1_verifier_params,
+            ),
+            Some(AXfrAddressFoldingInstance::Ed25519(_)) => (
+                self.ed25519_cs.clone().into(),
+                &self.ed25519_verifier_params,
+            ),
         }
     }
 
@@ -967,7 +1002,9 @@ impl VerifierParams {
     /// Obtain the parameters for confidential to anonymous from prepare.
     pub fn bar_to_abar_params_prepare() -> Result<VerifierParams> {
         if let Some(bytes) = BAR_TO_ABAR_VERIFIER_PARAMS {
-            bincode::deserialize(bytes).c(d!(NoahError::DeserializationError))
+            bincode::deserialize::<VerifierParamsCommon>(bytes)
+                .map(|v| v.to_full())
+                .c(d!(NoahError::DeserializationError))
         } else {
             Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
         }
@@ -987,7 +1024,9 @@ impl VerifierParams {
     /// Obtain the parameters for transparent to anonymous from prepare.
     pub fn ar_to_abar_params_prepare() -> Result<VerifierParams> {
         if let Some(bytes) = AR_TO_ABAR_VERIFIER_PARAMS {
-            bincode::deserialize(bytes).c(d!(NoahError::DeserializationError))
+            bincode::deserialize::<VerifierParamsCommon>(bytes)
+                .map(|v| v.to_full())
+                .c(d!(NoahError::DeserializationError))
         } else {
             Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
         }
@@ -1017,9 +1056,9 @@ impl VerifierParams {
     pub fn shrink(self) -> Result<VerifierParams> {
         Ok(VerifierParams {
             pcs: self.pcs.shrink_to_verifier_only()?,
-            secp256k1_cs: self.secp256k1_cs.shrink_to_verifier_only()?,
+            secp256k1_cs: self.secp256k1_cs.into(),
             secp256k1_verifier_params: self.secp256k1_verifier_params,
-            ed25519_cs: self.ed25519_cs.shrink_to_verifier_only()?,
+            ed25519_cs: self.ed25519_cs.into(),
             ed25519_verifier_params: self.ed25519_verifier_params,
         })
     }
@@ -1031,9 +1070,9 @@ impl VerifierParams {
                 pcs: self.pcs.shrink_to_verifier_only()?,
             },
             VerifierParamsSplitSpecific {
-                secp256k1_cs: self.secp256k1_cs.shrink_to_verifier_only()?,
+                secp256k1_cs: self.secp256k1_cs.into(),
                 secp256k1_verifier_params: self.secp256k1_verifier_params,
-                ed25519_cs: self.ed25519_cs.shrink_to_verifier_only()?,
+                ed25519_cs: self.ed25519_cs.into(),
                 ed25519_verifier_params: self.ed25519_verifier_params,
             },
         ))
@@ -1044,9 +1083,9 @@ impl From<ProverParams> for VerifierParams {
     fn from(params: ProverParams) -> Self {
         VerifierParams {
             pcs: params.pcs,
-            secp256k1_cs: params.secp256k1_cs,
+            secp256k1_cs: params.secp256k1_cs.into(),
             secp256k1_verifier_params: params.secp256k1_prover_params.get_verifier_params(),
-            ed25519_cs: params.ed25519_cs,
+            ed25519_cs: params.ed25519_cs.into(),
             ed25519_verifier_params: params.ed25519_prover_params.get_verifier_params(),
         }
     }

@@ -49,6 +49,8 @@ pub const TWO_POW_32: u64 = 1 << 32;
 
 pub(crate) type TurboPlonkCS = TurboCS<BLSScalar>;
 
+pub(crate) use noah_plonk::plonk::constraint_system::turbo::TurboVerifyCS;
+
 /// The Plonk proof type.
 pub(crate) type AXfrPlonkPf = PlonkPf<KZGCommitmentSchemeBLS>;
 

@@ -241,12 +241,12 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
     online_inputs.push(payer_asset_type.as_scalar());
     online_inputs.extend_from_slice(&address_folding_public_input);
 
-    let (cs, verifier_params) = params.cs_params(&note.folding_instance);
+    let (cs, verifier_params) = params.cs_params(Some(&note.folding_instance));
 
     verifier(
         &mut transcript,
         &params.pcs,
-        cs,
+        &cs,
         verifier_params,
         &online_inputs,
         &note.proof,
@@ -308,12 +308,12 @@ pub fn batch_verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default + Sync
             online_inputs.push(payer_asset_type.as_scalar());
             online_inputs.extend_from_slice(&address_folding_public_input);
 
-            let (cs, verifier_params) = params.cs_params(&note.folding_instance);
+            let (cs, verifier_params) = params.cs_params(Some(&note.folding_instance));
 
             verifier(
                 &mut transcript,
                 &params.pcs,
-                cs,
+                &cs,
                 verifier_params,
                 &online_inputs,
                 &note.proof,
@@ -345,7 +345,7 @@ fn prove_abar_to_ar<R: CryptoRng + RngCore>(
     );
     let witness = cs.get_and_clear_witness();
 
-    let (cs, prover_params) = params.cs_params(folding_witness);
+    let (cs, prover_params) = params.cs_params(Some(folding_witness));
     prover_with_lagrange(
         rng,
         &mut transcript,
