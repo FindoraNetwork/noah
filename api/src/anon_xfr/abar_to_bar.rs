@@ -624,12 +624,19 @@ pub fn build_abar_to_bar_cs(
     let step_4 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 4));
     let step_5 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 5));
 
+    let secret_key_type = match keypair.get_sk_ref() {
+        SecretKey::Ed25519(_) => BLSScalar::one(),
+        SecretKey::Secp256k1(_) => BLSScalar::zero()
+    };
+    let secret_key_type_var = cs.new_variable(secret_key_type);
+
     // Commit.
     let com_abar_in_var = commit_in_cs(
         &mut cs,
         payers_witness_vars.blind,
         payers_witness_vars.amount,
         payers_witness_vars.asset_type,
+        secret_key_type_var,
         &public_key_scalars_vars,
         input_commitment_trace,
     );
@@ -653,6 +660,7 @@ pub fn build_abar_to_bar_cs(
         &secret_key_scalars_vars,
         uid_amount,
         payers_witness_vars.asset_type,
+        secret_key_type_var,
         &public_key_scalars_vars,
         &nullifier_trace,
     );

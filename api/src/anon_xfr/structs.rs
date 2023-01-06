@@ -259,6 +259,7 @@ pub(crate) struct PayeeWitnessVars {
     pub(crate) amount: VarIndex,
     pub(crate) blind: VarIndex,
     pub(crate) asset_type: VarIndex,
+    pub(crate) public_key_type: VarIndex,
     pub(crate) public_key_scalars: [VarIndex; 3],
 }
 
