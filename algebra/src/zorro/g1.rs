@@ -38,6 +38,11 @@ impl ZorroG1 {
     pub fn from_raw(raw: G1Affine) -> Self {
         Self(raw.into_group())
     }
+
+    /// From the projective data.
+    pub fn from_projective(p: G1Projective) -> Self {
+        Self(p)
+    }
 }
 
 impl<'a> Add<&'a ZorroG1> for ZorroG1 {
@@ -158,8 +163,7 @@ impl Group for ZorroG1 {
 
     #[inline]
     fn unchecked_size() -> usize {
-        let g = G1Affine::from(Self::get_base().0);
-        g.uncompressed_size()
+        G1Affine::default().serialized_size(Compress::No)
     }
 
     #[inline]

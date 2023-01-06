@@ -144,7 +144,7 @@ impl XfrType {
 /// let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
 ///
 /// for x in inputs_amounts.iter() {
-///   let keypair = KeyPair::generate(&mut prng);
+///   let keypair = KeyPair::generate_secp256k1(&mut prng);
 ///   let asset_record = AssetRecordTemplate::with_no_asset_tracing( x.0,
 ///                                        x.1,
 ///                                        asset_record_type,
@@ -157,7 +157,7 @@ impl XfrType {
 /// }
 ///
 /// for x in outputs_amounts.iter() {
-///     let keypair = KeyPair::generate(&mut prng);
+///     let keypair = KeyPair::generate_secp256k1(&mut prng);
 ///
 ///     let ar = AssetRecordTemplate::with_no_asset_tracing(x.0, x.1, asset_record_type, keypair.get_pk().clone());
 ///     let output = AssetRecord::from_template_no_identity_tracing(&mut prng, &ar).unwrap();
@@ -219,7 +219,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
 /// let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
 ///
 /// for x in inputs_amounts.iter() {
-///   let keypair = KeyPair::generate(&mut prng);
+///   let keypair = KeyPair::generate_secp256k1(&mut prng);
 ///   let ar = AssetRecordTemplate::with_no_asset_tracing( x.0,
 ///                                        x.1,
 ///                                        asset_record_type,
@@ -229,7 +229,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
 ///   inputs.push(AssetRecord::from_template_no_identity_tracing(&mut prng, &ar).unwrap());
 /// }
 /// for x in outputs_amounts.iter() {
-///     let keypair = KeyPair::generate(&mut prng);
+///     let keypair = KeyPair::generate_secp256k1(&mut prng);
 ///
 ///     let ar = AssetRecordTemplate::with_no_asset_tracing(x.0, x.1, asset_record_type, keypair.get_pk());
 ///     outputs.push(AssetRecord::from_template_no_identity_tracing(&mut prng, &ar).unwrap());

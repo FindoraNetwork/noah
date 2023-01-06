@@ -1,16 +1,18 @@
+use crate::anon_xfr::address_folding_ed25519::{
+    create_address_folding_ed25519, prepare_verifier_input_ed25519,
+    prove_address_folding_in_cs_ed25519, verify_address_folding_ed25519,
+};
 use crate::anon_xfr::address_folding_secp256k1::{
     create_address_folding_secp256k1, prepare_verifier_input_secp256k1,
     prove_address_folding_in_cs_secp256k1, verify_address_folding_secp256k1,
-    AXfrAddressFoldingWitnessSecp256k1,
 };
 use crate::anon_xfr::{
     abar_to_abar::add_payers_witnesses,
-    address_folding_secp256k1::AXfrAddressFoldingInstanceSecp256k1,
     commit, commit_in_cs, compute_merkle_root_variables, nullify, nullify_in_cs,
     structs::{AccElemVars, Nullifier, OpenAnonAssetRecord, PayerWitness},
-    AXfrPlonkPf, TurboPlonkCS, TWO_POW_32,
+    AXfrAddressFoldingInstance, AXfrAddressFoldingWitness, AXfrPlonkPf, TurboPlonkCS, TWO_POW_32,
 };
-use crate::keys::{KeyPair, PublicKey};
+use crate::keys::{KeyPair, PublicKey, SecretKey};
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::{
     asset_record::{build_open_asset_record, AssetRecordType},
@@ -56,7 +58,7 @@ pub struct AbarToBarNote {
     /// The PLonk proof (assuming non-malleability).
     pub proof: AXfrPlonkPf,
     /// The address folding instance.
-    pub folding_instance: AXfrAddressFoldingInstanceSecp256k1,
+    pub folding_instance: AXfrAddressFoldingInstance,
 }
 
 /// An anonymous-to-confidential note without the proof.
@@ -226,13 +228,30 @@ pub fn finish_abar_to_bar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U6
     } = pre_note;
 
     let mut transcript = Transcript::new(ABAR_TO_BAR_FOLDING_PROOF_TRANSCRIPT);
-    let (folding_instance, folding_witness) =
-        create_address_folding_secp256k1(prng, hash, &mut transcript, &input_keypair)?;
+
+    let (folding_instance, folding_witness) = match input_keypair.get_sk_ref() {
+        SecretKey::Secp256k1(_) => {
+            let (folding_instance, folding_witness) =
+                create_address_folding_secp256k1(prng, hash, &mut transcript, &input_keypair)?;
+            (
+                AXfrAddressFoldingInstance::Secp256k1(folding_instance),
+                AXfrAddressFoldingWitness::Secp256k1(folding_witness),
+            )
+        }
+        SecretKey::Ed25519(_) => {
+            let (folding_instance, folding_witness) =
+                create_address_folding_ed25519(prng, hash, &mut transcript, &input_keypair)?;
+            (
+                AXfrAddressFoldingInstance::Ed25519(folding_instance),
+                AXfrAddressFoldingWitness::Ed25519(folding_witness),
+            )
+        }
+    };
 
     let proof = prove_abar_to_bar(
         prng,
         params,
-        witness,
+        &witness,
         &nullifier_trace,
         &input_commitment_trace,
         &body.delegated_schnorr_proof,
@@ -323,10 +342,16 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
 
     let mut transcript = Transcript::new(ABAR_TO_BAR_FOLDING_PROOF_TRANSCRIPT);
 
-    let (beta_folding, lambda_folding) =
-        verify_address_folding_secp256k1(hash, &mut transcript, &note.folding_instance)?;
-    let address_folding_public_input =
-        prepare_verifier_input_secp256k1(&note.folding_instance, &beta_folding, &lambda_folding);
+    let address_folding_public_input = match &note.folding_instance {
+        AXfrAddressFoldingInstance::Secp256k1(a) => {
+            let (beta, lambda) = verify_address_folding_secp256k1(hash, &mut transcript, a)?;
+            prepare_verifier_input_secp256k1(&a, &beta, &lambda)
+        }
+        AXfrAddressFoldingInstance::Ed25519(a) => {
+            let (beta, lambda) = verify_address_folding_ed25519(hash, &mut transcript, a)?;
+            prepare_verifier_input_ed25519(&a, &beta, &lambda)
+        }
+    };
 
     let delegated_schnorr_proof = note.body.delegated_schnorr_proof.clone();
 
@@ -355,11 +380,13 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     online_inputs.extend_from_slice(&s1_plus_lambda_s2_sim_fr.limbs);
     online_inputs.extend_from_slice(&address_folding_public_input);
 
+    let (cs, verifier_params) = params.cs_params(Some(&note.folding_instance));
+
     verifier(
         &mut transcript,
         &params.pcs,
-        &params.cs,
-        &params.verifier_params,
+        &cs,
+        verifier_params,
         &online_inputs,
         &note.proof,
     )
@@ -452,13 +479,17 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
 
             let mut transcript = Transcript::new(ABAR_TO_BAR_FOLDING_PROOF_TRANSCRIPT);
 
-            let (beta_folding, lambda_folding) =
-                verify_address_folding_secp256k1(hash, &mut transcript, &note.folding_instance)?;
-            let address_folding_public_input = prepare_verifier_input_secp256k1(
-                &note.folding_instance,
-                &beta_folding,
-                &lambda_folding,
-            );
+            let address_folding_public_input = match &note.folding_instance {
+                AXfrAddressFoldingInstance::Secp256k1(a) => {
+                    let (beta, lambda) =
+                        verify_address_folding_secp256k1(hash, &mut transcript, a)?;
+                    prepare_verifier_input_secp256k1(&a, &beta, &lambda)
+                }
+                AXfrAddressFoldingInstance::Ed25519(a) => {
+                    let (beta, lambda) = verify_address_folding_ed25519(hash, &mut transcript, a)?;
+                    prepare_verifier_input_ed25519(&a, &beta, &lambda)
+                }
+            };
 
             let delegated_schnorr_proof = note.body.delegated_schnorr_proof.clone();
 
@@ -489,11 +520,13 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
             online_inputs.extend_from_slice(&s1_plus_lambda_s2_sim_fr.limbs);
             online_inputs.extend_from_slice(&address_folding_public_input);
 
+            let (cs, verifier_params) = params.cs_params(Some(&note.folding_instance));
+
             verifier(
                 &mut transcript,
                 &params.pcs,
-                &params.cs,
-                &params.verifier_params,
+                &cs,
+                verifier_params,
                 &online_inputs,
                 &note.proof,
             )
@@ -510,14 +543,14 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
 fn prove_abar_to_bar<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
-    payers_witness: PayerWitness,
+    payers_witness: &PayerWitness,
     nullifier_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
     input_commitment_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
     proof: &DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     inspection: &DelegatedSchnorrInspection<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
-    folding_witness: &AXfrAddressFoldingWitnessSecp256k1,
+    folding_witness: &AXfrAddressFoldingWitness,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(ABAR_TO_BAR_PLONK_PROOF_TRANSCRIPT);
 
@@ -533,13 +566,15 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
     );
     let witness = cs.get_and_clear_witness();
 
+    let (cs, prover_params) = params.cs_params(Some(folding_witness));
+
     prover_with_lagrange(
         rng,
         &mut transcript,
         &params.pcs,
         params.lagrange_pcs.as_ref(),
-        &params.cs,
-        &params.prover_params,
+        cs,
+        prover_params,
         &witness,
     )
     .c(d!(NoahError::AXfrProofError))
@@ -547,23 +582,23 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
 
 /// Construct the anonymous-to-confidential constraint system.
 pub fn build_abar_to_bar_cs(
-    payer_witness: PayerWitness,
+    payer_witness: &PayerWitness,
     nullifier_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
     input_commitment_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
     proof: &DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     inspection: &DelegatedSchnorrInspection<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
-    folding_witness: &AXfrAddressFoldingWitnessSecp256k1,
+    folding_witness: &AXfrAddressFoldingWitness,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
 
     cs.load_anemoi_jive_parameters::<AnemoiJive381>();
 
-    let payers_witnesses_vars = add_payers_witnesses(&mut cs, &[&payer_witness]);
+    let payers_witnesses_vars = add_payers_witnesses(&mut cs, &[payer_witness]);
     let payers_witness_vars = &payers_witnesses_vars[0];
 
-    let keypair = folding_witness.keypair.clone();
+    let keypair = folding_witness.keypair();
     let public_key_scalars = keypair.get_pk().to_bls_scalars().unwrap();
     let secret_key_scalars = keypair.get_sk().to_bls_scalars().unwrap();
 
@@ -871,13 +906,22 @@ pub fn build_abar_to_bar_cs(
         cs.prepare_pi_variable(s1_plus_lambda_s2_sim_fr_var.var[i]);
     }
 
-    prove_address_folding_in_cs_secp256k1(
-        &mut cs,
-        &public_key_scalars_vars,
-        &secret_key_scalars_vars,
-        &folding_witness,
-    )
-    .unwrap();
+    match folding_witness {
+        AXfrAddressFoldingWitness::Secp256k1(a) => prove_address_folding_in_cs_secp256k1(
+            &mut cs,
+            &public_key_scalars_vars,
+            &secret_key_scalars_vars,
+            &a,
+        )
+        .unwrap(),
+        AXfrAddressFoldingWitness::Ed25519(a) => prove_address_folding_in_cs_ed25519(
+            &mut cs,
+            &public_key_scalars_vars,
+            &secret_key_scalars_vars,
+            &a,
+        )
+        .unwrap(),
+    }
 
     // pad the number of constraints to power of two
     cs.pad();

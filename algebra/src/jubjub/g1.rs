@@ -125,8 +125,7 @@ impl Group for JubjubPoint {
 
     #[inline]
     fn unchecked_size() -> usize {
-        let g = Self::get_base().0;
-        g.uncompressed_size()
+        AffinePoint::default().serialized_size(Compress::No)
     }
 
     #[inline]

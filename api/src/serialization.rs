@@ -110,7 +110,7 @@ mod test {
     #[test]
     fn anon_xfr_pub_key_serialization() {
         let mut prng = test_rng();
-        let keypair = KeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate_secp256k1(&mut prng);
 
         let mut pk_mp_vec = vec![];
         assert_eq!(
@@ -139,7 +139,7 @@ mod test {
     #[test]
     fn public_key_message_pack_serialization() {
         let mut prng = test_rng();
-        let keypair = KeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate_secp256k1(&mut prng);
 
         let mut pk_mp_vec = vec![];
         assert_eq!(
@@ -175,7 +175,7 @@ mod test {
     #[test]
     fn signature_message_pack_serialization() {
         let mut prng = test_rng();
-        let keypair = KeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate_secp256k1(&mut prng);
         let message = [10u8; 55];
 
         let signature = keypair.sign(&message).unwrap();
@@ -205,7 +205,7 @@ mod test {
     #[test]
     fn serialize_and_deserialize_as_json() {
         let mut prng = test_rng();
-        let keypair = KeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate_secp256k1(&mut prng);
         let test_struct = StructWithPubKey {
             key: keypair.pub_key,
         };

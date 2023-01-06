@@ -49,8 +49,36 @@ pub const TWO_POW_32: u64 = 1 << 32;
 
 pub(crate) type TurboPlonkCS = TurboCS<BLSScalar>;
 
+pub(crate) use noah_plonk::plonk::constraint_system::turbo::TurboVerifyCS;
+
 /// The Plonk proof type.
 pub(crate) type AXfrPlonkPf = PlonkPf<KZGCommitmentSchemeBLS>;
+
+/// The address folding instance.
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
+pub enum AXfrAddressFoldingInstance {
+    /// The Secp256k1 address folding instance.
+    Secp256k1(address_folding_secp256k1::AXfrAddressFoldingInstanceSecp256k1),
+    /// The Ed25519 address folding instance.
+    Ed25519(address_folding_ed25519::AXfrAddressFoldingInstanceEd25519),
+}
+
+/// The witness for address folding.
+pub enum AXfrAddressFoldingWitness {
+    /// The Secp256k1 witness for address folding.
+    Secp256k1(address_folding_secp256k1::AXfrAddressFoldingWitnessSecp256k1),
+    /// The Ed25519 witness for address folding.
+    Ed25519(address_folding_ed25519::AXfrAddressFoldingWitnessEd25519),
+}
+
+impl AXfrAddressFoldingWitness {
+    pub(crate) fn keypair(&self) -> KeyPair {
+        match self {
+            AXfrAddressFoldingWitness::Secp256k1(a) => a.keypair.clone(),
+            AXfrAddressFoldingWitness::Ed25519(a) => a.keypair.clone(),
+        }
+    }
+}
 
 /// Check that inputs have Merkle tree witness and matching key pair.
 fn check_inputs(inputs: &[OpenAnonAssetRecord], keypair: &KeyPair) -> Result<()> {

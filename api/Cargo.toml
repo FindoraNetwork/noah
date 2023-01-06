@@ -52,6 +52,7 @@ serde_str = '0.1.0'
 sha2 = '0.10'
 sha3 = '0.10'
 
+
 [dependencies.noah-algebra]
 path = '../algebra'
 
@@ -74,6 +75,10 @@ version = "4.0.0"
 [dependencies.bulletproofs]
 package = "noah-bulletproofs"
 version = "4.0.0"
+
+[dependencies.ark-ff]
+version = '0.4.0-alpha'
+default-features = false
 
 [dependencies.ark-serialize]
 version = '0.4.0-alpha'

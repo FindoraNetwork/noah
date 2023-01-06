@@ -1,4 +1,4 @@
-use crate::ed25519::ED25519_SCALAR_LEN;
+use crate::ed25519::{Ed25519Point, ED25519_SCALAR_LEN};
 use crate::errors::AlgebraError;
 use crate::prelude::*;
 use ark_ed25519::Fr;
@@ -241,6 +241,17 @@ impl Scalar for Ed25519Scalar {
 }
 
 impl Ed25519Scalar {
+    /// Return a tuple of (r, g^r)
+    /// where r is a random `Scalar`, and g is the `BASEPOINT_POINT`
+    #[inline]
+    pub fn random_scalar_with_compressed_point<R: CryptoRng + RngCore>(
+        prng: &mut R,
+    ) -> (Self, Ed25519Point) {
+        let r = Self::random(prng);
+        let p = Ed25519Point::get_base().mul(&r);
+        (r, p)
+    }
+
     /// Get the raw data.
     pub fn get_raw(&self) -> Fr {
         self.0.clone()

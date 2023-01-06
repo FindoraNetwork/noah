@@ -629,7 +629,7 @@ mod keys {
         let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
 
         for x in amounts.iter() {
-            let keypair = KeyPair::generate(&mut prng);
+            let keypair = KeyPair::generate_secp256k1(&mut prng);
             let asset_record = AssetRecordTemplate::with_no_asset_tracing(
                 x.0,
                 x.1,
@@ -646,7 +646,7 @@ mod keys {
         }
 
         for x in amounts.iter() {
-            let keypair = KeyPair::generate(&mut prng);
+            let keypair = KeyPair::generate_secp256k1(&mut prng);
 
             let ar_template = AssetRecordTemplate::with_no_asset_tracing(
                 x.0,
@@ -668,8 +668,8 @@ mod keys {
         );
         msg_eq!(NoahError::ParameterError, xfr_note.unwrap_err());
 
-        let key1 = KeyPair::generate(&mut prng);
-        let key2 = KeyPair::generate(&mut prng);
+        let key1 = KeyPair::generate_secp256k1(&mut prng);
+        let key2 = KeyPair::generate_secp256k1(&mut prng);
         let xfr_note = gen_xfr_note(
             &mut prng,
             inputs.as_slice(),
@@ -724,7 +724,7 @@ mod identity_tracing {
             identity_tracing: Some(id_tracing_policy),
         });
 
-        let input_keypair = KeyPair::generate(&mut prng);
+        let input_keypair = KeyPair::generate_secp256k1(&mut prng);
 
         let input_asset_record = AssetRecordTemplate::with_no_asset_tracing(
             10,
@@ -1056,7 +1056,7 @@ mod asset_tracing {
             identity_tracing: None,
         });
 
-        let input_keypair = KeyPair::generate(&mut prng);
+        let input_keypair = KeyPair::generate_secp256k1(&mut prng);
         let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
         let input_asset_record = AssetRecordTemplate::with_asset_tracing(
             10,

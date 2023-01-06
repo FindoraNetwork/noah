@@ -85,7 +85,7 @@ fn abar_to_abar(
     let params = ProverParams::new(inputs.len(), outputs.len(), None).unwrap();
     let verifier_params = VerifierParams::load(inputs.len(), outputs.len()).unwrap();
 
-    let sender = KeyPair::generate(&mut prng);
+    let sender = KeyPair::generate_secp256k1(&mut prng);
     let receivers: Vec<KeyPair> = (0..outputs.len())
         .map(|_| KeyPair::generate(&mut prng))
         .collect();
@@ -162,8 +162,8 @@ fn abar_to_ar(c: &mut Criterion) {
     let params = ProverParams::abar_to_ar_params(TREE_DEPTH).unwrap();
     let verify_params = VerifierParams::abar_to_ar_params().unwrap();
 
-    let sender = KeyPair::generate(&mut prng);
-    let receiver = KeyPair::generate(&mut prng);
+    let sender = KeyPair::generate_secp256k1(&mut prng);
+    let receiver = KeyPair::generate_secp256k1(&mut prng);
 
     let fdb = MemoryDB::new();
     let cs = Arc::new(RwLock::new(ChainState::new(fdb, "abar_ar".to_owned(), 0)));
@@ -223,8 +223,8 @@ fn abar_to_bar(c: &mut Criterion) {
     let params = ProverParams::abar_to_bar_params(TREE_DEPTH).unwrap();
     let verify_params = VerifierParams::abar_to_bar_params().unwrap();
 
-    let sender = KeyPair::generate(&mut prng);
-    let receiver = KeyPair::generate(&mut prng);
+    let sender = KeyPair::generate_secp256k1(&mut prng);
+    let receiver = KeyPair::generate_secp256k1(&mut prng);
 
     let fdb = MemoryDB::new();
     let cs = Arc::new(RwLock::new(ChainState::new(fdb, "abar_bar".to_owned(), 0)));
@@ -292,8 +292,8 @@ fn ar_to_abar(c: &mut Criterion) {
     let params = ProverParams::ar_to_abar_params().unwrap();
     let verify_params = VerifierParams::ar_to_abar_params().unwrap();
 
-    let sender = KeyPair::generate(&mut prng);
-    let receiver = KeyPair::generate(&mut prng);
+    let sender = KeyPair::generate_secp256k1(&mut prng);
+    let receiver = KeyPair::generate_secp256k1(&mut prng);
 
     let (bar, memo) = {
         let ar = AssetRecordTemplate::with_no_asset_tracing(
@@ -338,8 +338,8 @@ fn bar_to_abar(c: &mut Criterion) {
     let params = ProverParams::bar_to_abar_params().unwrap();
     let verify_params = VerifierParams::bar_to_abar_params().unwrap();
 
-    let sender = KeyPair::generate(&mut prng);
-    let receiver = KeyPair::generate(&mut prng);
+    let sender = KeyPair::generate_secp256k1(&mut prng);
+    let receiver = KeyPair::generate_secp256k1(&mut prng);
 
     let (bar, memo) = {
         let ar = AssetRecordTemplate::with_no_asset_tracing(

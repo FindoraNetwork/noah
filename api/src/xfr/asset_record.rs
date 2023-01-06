@@ -608,7 +608,7 @@ mod test {
 
         let amount = 100u64;
         let asset_type = AssetType::from_identical_byte(0u8);
-        let keypair = KeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate_secp256k1(&mut prng);
         let tracing_policy = match asset_tracing {
             true => {
                 let tracer_keys = AssetTracerKeyPair::generate(&mut prng);
@@ -831,7 +831,7 @@ mod test {
         let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
 
-        let keypair = KeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate_secp256k1(&mut prng);
         let ar = AssetRecordTemplate::with_no_asset_tracing(
             amt,
             asset_type,
@@ -885,7 +885,7 @@ mod test {
         let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
 
-        let keypair = KeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate_secp256k1(&mut prng);
         let asset_type: AssetType = AssetType(prng.gen());
         let amount = 10u64;
         let ar = AssetRecordTemplate::with_no_asset_tracing(

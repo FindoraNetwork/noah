@@ -10,7 +10,8 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate
 use bulletproofs::BulletproofGens;
 use noah::parameters::SRS;
 use noah::setup::{
-    BulletproofParams, BulletproofURS, ProverParams, VerifierParams, ANON_XFR_BP_GENS_LEN,
+    BulletproofParams, BulletproofURS, ProverParams, VerifierParams, VerifierParamsCommon,
+    VerifierParamsSplitCommon, ANON_XFR_BP_GENS_LEN,
     MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER,
     MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER, MAX_ANONYMOUS_RECORD_NUMBER_STANDARD,
 };
@@ -131,7 +132,7 @@ fn gen_transfer_vk(directory: PathBuf) {
                     let node_params = VerifierParams::create(*i, *j, Some(TREE_DEPTH)).unwrap();
                     println!(
                         "the size of the constraint system for {} payers & {} payees: {}",
-                        i, j, node_params.cs.size
+                        i, j, node_params.ed25519_cs.size
                     );
                     let (_, special) = node_params.split().unwrap();
                     (*j, bincode::serialize(&special).unwrap())
@@ -167,7 +168,7 @@ fn gen_transfer_vk(directory: PathBuf) {
                     let node_params = VerifierParams::create(*i, *j, Some(TREE_DEPTH)).unwrap();
                     println!(
                         "the size of the constraint system for {} payers & {} payees: {}",
-                        i, j, node_params.cs.size
+                        i, j, node_params.ed25519_cs.size
                     );
                     let (_, special) = node_params.split().unwrap();
                     (*j, bincode::serialize(&special).unwrap())
@@ -201,7 +202,7 @@ fn gen_abar_to_bar_vk(mut path: PathBuf) {
     let node_params = VerifierParams::from(user_params).shrink().unwrap();
     println!(
         "the size of the constraint system for ABAR TO BAR: {}",
-        node_params.cs.size
+        node_params.ed25519_cs.size
     );
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("abar-to-bar-vk.bin");
@@ -218,7 +219,8 @@ fn gen_bar_to_abar_vk(mut path: PathBuf) {
     println!("Generating the verifying key for BAR TO ABAR ...");
 
     let user_params = ProverParams::bar_to_abar_params().unwrap();
-    let node_params = VerifierParams::from(user_params).shrink().unwrap();
+    let node_params =
+        VerifierParamsCommon::from_full(VerifierParams::from(user_params).shrink().unwrap());
     println!(
         "the size of the constraint system for BAR TO ABAR: {}",
         node_params.cs.size
@@ -228,7 +230,7 @@ fn gen_bar_to_abar_vk(mut path: PathBuf) {
     save_to_file(&bytes, path);
 
     let start = std::time::Instant::now();
-    let _n: VerifierParams = bincode::deserialize(&bytes).unwrap();
+    let _n: VerifierParamsCommon = bincode::deserialize(&bytes).unwrap();
     let elapsed = start.elapsed();
     println!("Deserialize time: {:.2?}", elapsed);
 }
@@ -238,7 +240,8 @@ fn gen_ar_to_abar_vk(mut path: PathBuf) {
     println!("Generating the verifying key for AR TO ABAR ...");
 
     let user_params = ProverParams::ar_to_abar_params().unwrap();
-    let node_params = VerifierParams::from(user_params).shrink().unwrap();
+    let node_params =
+        VerifierParamsCommon::from_full(VerifierParams::from(user_params).shrink().unwrap());
     println!(
         "the size of the constraint system for AR TO ABAR: {}",
         node_params.cs.size
@@ -248,7 +251,7 @@ fn gen_ar_to_abar_vk(mut path: PathBuf) {
     save_to_file(&bytes, path);
 
     let start = std::time::Instant::now();
-    let _n: VerifierParams = bincode::deserialize(&bytes).unwrap();
+    let _n: VerifierParamsCommon = bincode::deserialize(&bytes).unwrap();
     let elapsed = start.elapsed();
     println!("Deserialize time: {:.2?}", elapsed);
 }
@@ -261,7 +264,7 @@ fn gen_abar_to_ar_vk(mut path: PathBuf) {
     let node_params = VerifierParams::from(user_params).shrink().unwrap();
     println!(
         "the size of the constraint system for ABAR TO AR: {}",
-        node_params.cs.size
+        node_params.ed25519_cs.size
     );
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("abar-to-ar-vk.bin");
