@@ -1,6 +1,6 @@
 [package]
 name = 'noah-accumulators'
-version = '0.2.0'
+version = '0.4.0'
 authors = ['Findora <engineering@findora.org>']
 edition = '2021'
 description = 'Noah accumulators commons'
