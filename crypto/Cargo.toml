@@ -24,7 +24,7 @@ ruc = '1.0'
 sha3 = { version = "0.10", default-features = false }
 
 [dependencies.noah-algebra]
-path = '../algebra'
+version = "0.4.0"
 
 [dependencies.curve25519-dalek]
 package = "noah-curve25519-dalek"
