@@ -58,7 +58,7 @@ enum Actions {
     /// Generates the uniform reference string for Bulletproof (over the Zorro curve),
     BULLETPROOF_OVER_ZORRO { directory: PathBuf },
 
-    /// Cut the SRS, adapt to lagrange calculate, and only save the minimum 2^11, and 2^12, 2^13 padding
+    /// Cut the SRS, adapt to Lagrange, and only save the minimum 2^11, 2^12, and 2^13 padding
     CUT_SRS { directory: PathBuf },
 
     /// Generates all necessary parameters
