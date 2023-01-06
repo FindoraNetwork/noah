@@ -3,6 +3,7 @@ name = 'noah-crypto'
 version = '0.4.0'
 authors = ['Findora <engineering@findora.org>']
 edition = '2021'
+license = 'BUSL-1.1'
 description = 'Noah Cryptographic Primitives and Protocols'
 
 [lib]
