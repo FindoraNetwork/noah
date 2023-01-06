@@ -3,6 +3,7 @@ name = 'noah-accumulators'
 version = '0.4.0'
 authors = ['Findora <engineering@findora.org>']
 edition = '2021'
+license = 'BUSL-1.1'
 description = 'Noah accumulators commons'
 
 [lib]
@@ -15,10 +16,10 @@ ruc = '1.0'
 parking_lot = '0.12'
 
 [dependencies.noah-algebra]
-path = '../algebra'
+version = "0.4.0"
 
 [dependencies.noah-crypto]
-path = '../crypto'
+version = "0.4.0"
 
 [dependencies.storage]
 git = 'https://github.com/FindoraNetwork/storage.git'
