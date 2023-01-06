@@ -24,7 +24,7 @@ path = 'benches/merkle_tree.rs'
 harness = false
 
 [package]
-name = 'noah'
+name = 'noah-api'
 version = '0.4.0'
 license = 'BUSL-1.1'
 authors = ['Findora <engineering@findora.org>']
@@ -32,7 +32,7 @@ edition = '2021'
 description = 'Noah Platform Interface'
 
 [lib]
-name = 'noah-api'
+name = 'noah_api'
 crate-type = ['rlib']
 
 [dependencies]

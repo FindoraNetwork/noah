@@ -1,10 +1,9 @@
 use ark_std::sync::Arc;
-use ark_std::test_rng;
 use criterion::{criterion_group, criterion_main, Criterion};
 use mem_db::MemoryDB;
 use merlin::Transcript;
-use noah::anon_xfr::add_merkle_path_variables;
-use noah::anon_xfr::structs::{AccElemVars, MTLeafInfo, MTNode, MTPath, MerklePathVars};
+use noah_api::anon_xfr::add_merkle_path_variables;
+use noah_api::anon_xfr::structs::{AccElemVars, MTLeafInfo, MTNode, MTPath, MerklePathVars};
 use noah_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
 use noah_algebra::bls12_381::BLSScalar;
 use noah_algebra::prelude::*;

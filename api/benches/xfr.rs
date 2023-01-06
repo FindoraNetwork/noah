@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use noah::{
+use noah_api::{
     keys::KeyPair,
     setup::BulletproofParams,
     xfr::{

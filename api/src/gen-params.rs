@@ -8,8 +8,8 @@
 use ark_bulletproofs::BulletproofGens as BulletproofGensOverSecq256k1;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use bulletproofs::BulletproofGens;
-use noah::parameters::SRS;
-use noah::setup::{
+use noah_api::parameters::SRS;
+use noah_api::setup::{
     BulletproofParams, BulletproofURS, ProverParams, VerifierParams, VerifierParamsCommon,
     VerifierParamsSplitCommon, ANON_XFR_BP_GENS_LEN,
     MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER,
@@ -24,7 +24,7 @@ use rand_core::SeedableRng;
 use std::{collections::HashMap, path::PathBuf};
 use structopt::StructOpt;
 
-use noah::anon_xfr::TREE_DEPTH;
+use noah_api::anon_xfr::TREE_DEPTH;
 use noah_algebra::zorro::ZorroBulletproofGens;
 use rayon::prelude::*;
 

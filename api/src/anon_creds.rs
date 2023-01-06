@@ -46,7 +46,7 @@ pub type Attr = u32;
 /// ```
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
-/// use noah::anon_creds::ac_keygen_issuer;
+/// use noah_api::anon_creds::ac_keygen_issuer;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 10;
 /// let keys = ac_keygen_issuer::<ChaChaRng>(&mut prng, num_attrs);
@@ -62,7 +62,7 @@ pub fn ac_keygen_issuer<R: CryptoRng + RngCore>(
 /// ```
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
-/// use noah::anon_creds::{ac_keygen_issuer,ac_keygen_user};
+/// use noah_api::anon_creds::{ac_keygen_issuer,ac_keygen_user};
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 10;
 /// let (_, issuer_pk) = ac_keygen_issuer::<ChaChaRng>(&mut prng, num_attrs);
@@ -79,7 +79,7 @@ pub fn ac_keygen_user<R: CryptoRng + RngCore>(
 /// ```
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
-/// use noah::anon_creds::{ac_keygen_issuer,ac_keygen_user, ac_sign};
+/// use noah_api::anon_creds::{ac_keygen_issuer,ac_keygen_user, ac_sign};
 /// use noah_algebra::bls12_381::BLSScalar;
 /// use noah_algebra::traits::Scalar;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
@@ -110,7 +110,7 @@ pub fn ac_sign<R: CryptoRng + RngCore>(
 /// ```
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
-/// use noah::anon_creds::{ac_keygen_commitment};
+/// use noah_api::anon_creds::{ac_keygen_commitment};
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let com_key = ac_keygen_commitment::<ChaChaRng>(&mut prng);
 /// ```
@@ -123,7 +123,7 @@ pub fn ac_keygen_commitment<R: CryptoRng + RngCore>(prng: &mut R) -> ACCommitmen
 /// ```
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
-/// use noah::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_commit, Credential};
+/// use noah_api::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_commit, Credential};
 /// use noah_algebra::bls12_381::BLSScalar;
 /// use noah_algebra::traits::Scalar;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
@@ -173,7 +173,7 @@ pub fn ac_commit<R: CryptoRng + RngCore>(
 /// ```
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
-/// use noah::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_commit, ac_keygen_commitment, ac_commit_with_key, Credential};
+/// use noah_api::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_commit, ac_keygen_commitment, ac_commit_with_key, Credential};
 /// use noah_algebra::bls12_381::BLSScalar;
 /// use noah_algebra::traits::Scalar;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
@@ -238,7 +238,7 @@ pub fn ac_verify_commitment(
 /// ```
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
-/// use noah::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_open_commitment, ac_commit, Credential};
+/// use noah_api::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_open_commitment, ac_commit, Credential};
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 2;
 /// let (issuer_sk, issuer_pk) = ac_keygen_issuer(&mut prng, num_attrs);
@@ -308,7 +308,7 @@ pub fn ac_reveal<R: CryptoRng + RngCore>(
 /// use rand_chacha::ChaChaRng;
 /// use noah_algebra::traits::Scalar;
 /// use noah_algebra::bls12_381::BLSScalar;
-/// use noah::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_open_commitment, ac_verify, ac_reveal, Credential};
+/// use noah_api::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_open_commitment, ac_verify, ac_reveal, Credential};
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 2;
 /// let (issuer_sk, issuer_pk) = ac_keygen_issuer::<ChaChaRng>(&mut prng, num_attrs);
@@ -365,13 +365,13 @@ pub type ConfidentialAC = noah_crypto::confidential_anon_creds::ConfidentialAC<G
 /// Produce a confidential anonymous credential revealing proof.
 /// # Example
 /// ```
-/// use noah::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_commit};
-/// use noah::anon_creds::{ac_confidential_open_commitment, ac_confidential_verify, ac_confidential_gen_encryption_keys};
+/// use noah_api::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_commit};
+/// use noah_api::anon_creds::{ac_confidential_open_commitment, ac_confidential_verify, ac_confidential_gen_encryption_keys};
 /// use rand_chacha::ChaChaRng;
 /// use rand_core::SeedableRng;
 /// use noah_algebra::bls12_381::{BLSScalar };
 /// use noah_algebra::traits::Group;
-/// use noah::anon_creds::Credential;
+/// use noah_api::anon_creds::Credential;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let (issuer_sk, issuer_pk) = ac_keygen_issuer::<ChaChaRng>(&mut prng, 3);
 /// let (user_sk, user_pk) = ac_keygen_user::<ChaChaRng>(&mut prng, &issuer_pk);

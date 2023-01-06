@@ -117,12 +117,12 @@ default-features = false
 default = [
     'std'
 ]
-debug = [ 'noah-plonk/debug', 'noah/debug' ]
-std = ['curve25519-dalek/std', 'noah/std', 'bulletproofs/std', 'ark-bulletproofs/std', 'ark-std/std']
+debug = [ 'noah-plonk/debug', 'noah-api/debug' ]
+std = ['curve25519-dalek/std', 'noah-api/std', 'bulletproofs/std', 'ark-bulletproofs/std', 'ark-std/std']
 parallel = [
     'default',
     'rayon',
-    'noah/parallel',
+    'noah-api/parallel',
     'noah-algebra/parallel',
     'noah-plonk/parallel'
 ]

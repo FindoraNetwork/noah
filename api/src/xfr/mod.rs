@@ -116,13 +116,13 @@ impl XfrType {
 /// # Example
 /// ```
 /// use rand_chacha::ChaChaRng;
-/// use noah::keys::KeyPair;
-/// use noah::xfr::structs::{AssetRecordTemplate, AssetRecord, AssetType};
-/// use noah::xfr::asset_record::AssetRecordType;
-/// use noah::xfr::{gen_xfr_note, verify_xfr_note, XfrNotePolicies};
+/// use noah_api::keys::KeyPair;
+/// use noah_api::xfr::structs::{AssetRecordTemplate, AssetRecord, AssetType};
+/// use noah_api::xfr::asset_record::AssetRecordType;
+/// use noah_api::xfr::{gen_xfr_note, verify_xfr_note, XfrNotePolicies};
 /// use noah_algebra::prelude::*;
 /// use ruc::err::*;
-/// use noah::setup::BulletproofParams;
+/// use noah_api::setup::BulletproofParams;
 ///
 /// let mut prng = ChaChaRng::from_seed([0u8; 32]);
 /// let mut params = BulletproofParams::default();
@@ -196,11 +196,11 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
 /// use rand_chacha::ChaChaRng;
 /// use ruc::{*, err::*};
 /// use rand_core::SeedableRng;
-/// use noah::keys::KeyPair;
-/// use noah::xfr::structs::{AssetRecordTemplate, AssetRecord, AssetType};
-/// use noah::xfr::asset_record::AssetRecordType;
-/// use noah::xfr::{gen_xfr_body, verify_xfr_body, XfrNotePolicies, XfrNotePoliciesRef};
-/// use noah::setup::BulletproofParams;
+/// use noah_api::keys::KeyPair;
+/// use noah_api::xfr::structs::{AssetRecordTemplate, AssetRecord, AssetType};
+/// use noah_api::xfr::asset_record::AssetRecordType;
+/// use noah_api::xfr::{gen_xfr_body, verify_xfr_body, XfrNotePolicies, XfrNotePoliciesRef};
+/// use noah_api::setup::BulletproofParams;
 ///
 /// let mut prng = ChaChaRng::from_seed([0u8; 32]);
 /// let mut params = BulletproofParams::default();

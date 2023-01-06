@@ -128,7 +128,7 @@ impl XfrAmount {
     /// Return true only if amount is confidential.
     /// # Example:
     /// ```
-    /// use noah::xfr::structs::XfrAmount;
+    /// use noah_api::xfr::structs::XfrAmount;
     /// use noah_algebra::ristretto::CompressedRistretto;
     /// let xfr_amount = XfrAmount::Confidential((CompressedRistretto::default(), CompressedRistretto::default()));
     /// assert!(xfr_amount.is_confidential());
@@ -141,7 +141,7 @@ impl XfrAmount {
     /// Return Some(amount) if amount is non-confidential. Otherwise, return None
     /// # Example:
     /// ```
-    /// use noah::xfr::structs::XfrAmount;
+    /// use noah_api::xfr::structs::XfrAmount;
     /// use noah_algebra::ristretto::CompressedRistretto;
     /// let xfr_amount = XfrAmount::NonConfidential(100u64);
     /// assert_eq!(xfr_amount.get_amount().unwrap(), 100u64);
@@ -159,7 +159,7 @@ impl XfrAmount {
     /// if amount is confidential. Otherwise, return None
     /// # Example:
     /// ```
-    /// use noah::xfr::structs::XfrAmount;
+    /// use noah_api::xfr::structs::XfrAmount;
     /// use noah_algebra::ristretto::CompressedRistretto;
     /// let xfr_amount = XfrAmount::NonConfidential(100u64);
     /// assert!(xfr_amount.get_commitments().is_none());
@@ -204,7 +204,7 @@ impl XfrAssetType {
     /// Return true only if amount is confidential
     /// # Example:
     /// ```
-    /// use noah::xfr::structs::{AssetType, XfrAssetType};
+    /// use noah_api::xfr::structs::{AssetType, XfrAssetType};
     /// use noah_algebra::ristretto::CompressedRistretto;
     /// let xfr_asset_type = XfrAssetType::Confidential(CompressedRistretto::default());
     /// assert!(xfr_asset_type.is_confidential());
@@ -218,7 +218,7 @@ impl XfrAssetType {
     /// Return Some(asset_type) if asset_type is non-confidential. Otherwise, return None
     /// # Example:
     /// ```
-    /// use noah::xfr::structs::{AssetType, XfrAssetType};
+    /// use noah_api::xfr::structs::{AssetType, XfrAssetType};
     /// use noah_algebra::ristretto::CompressedRistretto;
     /// let xfr_asset_type = XfrAssetType::NonConfidential(AssetType::from_identical_byte(0u8));
     /// assert_eq!(xfr_asset_type.get_asset_type().unwrap(), AssetType::from_identical_byte(0u8));
@@ -236,7 +236,7 @@ impl XfrAssetType {
     /// if asset_type is confidential. Otherwise, return None.
     /// # Example:
     /// ```
-    /// use noah::xfr::structs::{AssetType, XfrAssetType};
+    /// use noah_api::xfr::structs::{AssetType, XfrAssetType};
     /// use noah_algebra::ristretto::CompressedRistretto;
     /// let xfr_asset_type = XfrAssetType::NonConfidential(AssetType::from_identical_byte(0u8));
     /// assert!(xfr_asset_type.get_commitment().is_none());

@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use digest::Digest;
 use mem_db::MemoryDB;
-use noah::{
+use noah_api::{
     anon_xfr::{
         abar_to_abar::*,
         abar_to_ar::*,
@@ -87,7 +87,7 @@ fn abar_to_abar(
 
     let sender = KeyPair::generate_secp256k1(&mut prng);
     let receivers: Vec<KeyPair> = (0..outputs.len())
-        .map(|_| KeyPair::generate(&mut prng))
+        .map(|_| KeyPair::generate_secp256k1(&mut prng))
         .collect();
 
     let mut oabars: Vec<OpenAnonAssetRecord> = inputs

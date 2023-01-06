@@ -27,7 +27,7 @@ impl Eq for AssetMixProof {}
 /// # Example
 /// ```
 /// use noah_algebra::ristretto::RistrettoScalar;
-/// use noah::xfr::asset_mixer::prove_asset_mixing;
+/// use noah_api::xfr::asset_mixer::prove_asset_mixing;
 /// use noah_algebra::prelude::*;
 /// let input = [
 ///            (60u64, RistrettoScalar::zero(), RistrettoScalar::from(10000u32), RistrettoScalar::from(200000u32)),
@@ -135,11 +135,11 @@ pub struct AssetMixingInstance<'a> {
 /// ```
 /// use noah_algebra::ristretto::{RistrettoScalar, CompressedRistretto, PedersenCommitmentRistretto};
 /// use noah_algebra::prelude::*;
-/// use noah::xfr::asset_mixer::{prove_asset_mixing, AssetMixingInstance, batch_verify_asset_mixing};
+/// use noah_api::xfr::asset_mixer::{prove_asset_mixing, AssetMixingInstance, batch_verify_asset_mixing};
 /// use bulletproofs::PedersenGens;
 /// use rand::thread_rng;
 /// use ruc::err::*;
-/// use noah::setup::BulletproofParams;
+/// use noah_api::setup::BulletproofParams;
 /// use noah_algebra::traits::PedersenCommitment;
 /// let input = [
 ///            (60u64, RistrettoScalar::from(0u32), RistrettoScalar::from(10000u32), RistrettoScalar::from(200000u32)),
