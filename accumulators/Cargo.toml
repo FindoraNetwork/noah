@@ -11,7 +11,7 @@ crate-type = ['rlib']
 
 [dependencies]
 itertools = '0.10.5'
-ruc = '1.0'
+ruc = '3.0'
 parking_lot = '0.12'
 
 [dependencies.noah-algebra]
