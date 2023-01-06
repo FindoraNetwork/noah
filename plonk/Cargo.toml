@@ -6,6 +6,7 @@ harness = false
 [package]
 name = 'noah-plonk'
 version = '0.4.0'
+license = 'BUSL-1.1'
 authors = ['Findora <engineering@findora.org>']
 edition = '2021'
 description = 'Noah TurboPLONK protocol'
@@ -27,10 +28,10 @@ num-integer = '0.1.43'
 serde_derive = '1.0.115'
 
 [dependencies.noah-algebra]
-path = '../algebra'
+version = "0.4.0"
 
 [dependencies.noah-crypto]
-path = '../crypto'
+version = "0.4.0"
 
 [dependencies.ark-ff]
 version = '0.4.0-alpha'
