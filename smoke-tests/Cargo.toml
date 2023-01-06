@@ -24,16 +24,16 @@ sha2 = '0.10'
 sha3 = '0.10'
 
 [dependencies.noah-api]
-path = '../api'
+version = "0.4.0"
 
 [dependencies.noah-algebra]
-path = '../algebra'
+version = "0.4.0"
 
 [dependencies.noah-crypto]
-path = '../crypto'
+version = "0.4.0"
 
 [dependencies.noah-plonk]
-path = '../plonk'
+version = "0.4.0"
 
 [dependencies.curve25519-dalek]
 package = "noah-curve25519-dalek"
