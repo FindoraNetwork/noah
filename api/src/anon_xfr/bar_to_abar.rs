@@ -610,7 +610,7 @@ pub(crate) fn build_bar_to_abar_cs(
     let public_key_type = match pubkey.0 {
         PublicKeyInner::Ed25519(_) => cs.new_variable(BLSScalar::one()),
         PublicKeyInner::Secp256k1(_) => cs.new_variable(BLSScalar::zero()),
-        PublicKeyInner::EthAddress(_) => unimplemented!()
+        PublicKeyInner::EthAddress(_) => unimplemented!(),
     };
     cs.insert_boolean_gate(public_key_type);
 

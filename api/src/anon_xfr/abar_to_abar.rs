@@ -653,7 +653,7 @@ pub(crate) fn build_multi_xfr_cs(
 
     let secret_key_type = match keypair.get_sk_ref() {
         SecretKey::Ed25519(_) => BLSScalar::one(),
-        SecretKey::Secp256k1(_) => BLSScalar::zero()
+        SecretKey::Secp256k1(_) => BLSScalar::zero(),
     };
     let secret_key_type_var = cs.new_variable(secret_key_type);
     cs.insert_boolean_gate(secret_key_type_var);
@@ -981,11 +981,10 @@ pub(crate) fn add_payees_witnesses(
                 cs.new_variable(public_key_scalars[2]),
             ];
 
-
             let public_key_type = match secret.public_key.0 {
                 PublicKeyInner::Ed25519(_) => cs.new_variable(BLSScalar::one()),
                 PublicKeyInner::Secp256k1(_) => cs.new_variable(BLSScalar::zero()),
-                PublicKeyInner::EthAddress(_) => unimplemented!()
+                PublicKeyInner::EthAddress(_) => unimplemented!(),
             };
 
             PayeeWitnessVars {
@@ -2196,7 +2195,7 @@ mod tests {
         let uid_amount_var = cs.new_variable(uid_amount);
         let asset_var = cs.new_variable(asset_type);
 
-        let secret_key_type=  cs.new_variable(BLSScalar::zero());
+        let secret_key_type = cs.new_variable(BLSScalar::zero());
 
         let nullifier_var = nullify_in_cs(
             &mut cs,

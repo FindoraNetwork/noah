@@ -626,7 +626,7 @@ pub fn build_abar_to_bar_cs(
 
     let secret_key_type = match keypair.get_sk_ref() {
         SecretKey::Ed25519(_) => BLSScalar::one(),
-        SecretKey::Secp256k1(_) => BLSScalar::zero()
+        SecretKey::Secp256k1(_) => BLSScalar::zero(),
     };
     let secret_key_type_var = cs.new_variable(secret_key_type);
 

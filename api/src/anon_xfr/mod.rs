@@ -291,7 +291,7 @@ pub fn commit(
         }
         PublicKeyInner::EthAddress(_) => {
             return Err(eg!(NoahError::ParameterError));
-        },
+        }
     };
 
     let zero = BLSScalar::zero();

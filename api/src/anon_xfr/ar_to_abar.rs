@@ -214,7 +214,7 @@ pub fn build_ar_to_abar_cs(
     let public_key_type = match payee_data.public_key.0 {
         PublicKeyInner::Ed25519(_) => cs.new_variable(BLSScalar::one()),
         PublicKeyInner::Secp256k1(_) => cs.new_variable(BLSScalar::zero()),
-        PublicKeyInner::EthAddress(_) => unimplemented!()
+        PublicKeyInner::EthAddress(_) => unimplemented!(),
     };
     cs.insert_boolean_gate(public_key_type);
 
