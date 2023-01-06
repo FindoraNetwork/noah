@@ -139,13 +139,15 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
     let (mut cs, _) = build_ar_to_abar_cs(payee_witness, &output_trace);
     let witness = cs.get_and_clear_witness();
 
+    let (cs, prover_params) = params.cs_params(None);
+
     let proof = prover_with_lagrange(
         prng,
         &mut transcript,
         &params.pcs,
         params.lagrange_pcs.as_ref(),
-        &params.cs,
-        &params.prover_params,
+        cs,
+        prover_params,
         &witness,
     )
     .c(d!(NoahError::AXfrProofError))?;
@@ -174,11 +176,13 @@ pub fn verify_ar_to_abar_body(params: &VerifierParams, body: &ArToAbarBody) -> R
     online_inputs.push(asset_type.as_scalar());
     online_inputs.push(body.output.commitment);
 
+    let (cs, verifier_params) = params.cs_params(None);
+
     verifier(
         &mut transcript,
         &params.pcs,
-        &params.cs,
-        &params.verifier_params,
+        &cs,
+        verifier_params,
         &online_inputs,
         &body.proof,
     )

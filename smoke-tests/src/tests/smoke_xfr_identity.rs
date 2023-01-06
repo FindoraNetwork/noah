@@ -66,9 +66,9 @@ mod smoke_xfr_identity {
         let amount_in2 = 75u64;
         let amount_out1 = 125u64;
 
-        let sender1 = KeyPair::generate(&mut prng);
-        let sender2 = KeyPair::generate(&mut prng);
-        let receiver1 = KeyPair::generate(&mut prng);
+        let sender1 = KeyPair::generate_secp256k1(&mut prng);
+        let sender2 = KeyPair::generate_secp256k1(&mut prng);
+        let receiver1 = KeyPair::generate_secp256k1(&mut prng);
 
         // create credential keys
         let (cred_issuer_sk, cred_issuer_pk) = anon_creds::ac_keygen_issuer(&mut prng, 4);
@@ -242,9 +242,9 @@ mod smoke_xfr_identity {
         let amount_out1 = 75u64;
         let amount_out2 = 25u64;
 
-        let sender1 = KeyPair::generate(&mut prng);
-        let receiver1 = KeyPair::generate(&mut prng);
-        let receiver2 = KeyPair::generate(&mut prng);
+        let sender1 = KeyPair::generate_secp256k1(&mut prng);
+        let receiver1 = KeyPair::generate_secp256k1(&mut prng);
+        let receiver2 = KeyPair::generate_secp256k1(&mut prng);
 
         // credential keys
         let (cred_issuer_sk, cred_issuer_pk) = anon_creds::ac_keygen_issuer(&mut prng, 4);

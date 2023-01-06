@@ -1,7 +1,7 @@
 use crate::errors::AlgebraError;
 use crate::prelude::*;
 use ark_bulletproofs::curve::zorro::Fq;
-use ark_ff::{BigInteger, FftField, Field, FpParameters, PrimeField};
+use ark_ff::{BigInteger, FftField, Field, PrimeField};
 use digest::consts::U64;
 use digest::Digest;
 use num_bigint::BigUint;
@@ -138,7 +138,7 @@ impl From<u64> for ZorroFq {
 impl Into<BigUint> for ZorroFq {
     #[inline]
     fn into(self) -> BigUint {
-        self.0.into_repr().into()
+        self.0.into_bigint().into()
     }
 }
 
@@ -166,12 +166,12 @@ impl Scalar for ZorroFq {
 
     #[inline]
     fn multiplicative_generator() -> Self {
-        Self(Fq::multiplicative_generator())
+        Self(Fq::GENERATOR)
     }
 
     #[inline]
     fn capacity() -> usize {
-        ark_bulletproofs::curve::zorro::FrParameters::CAPACITY as usize
+        (Fq::MODULUS_BIT_SIZE - 1) as usize
     }
 
     #[inline]
@@ -194,7 +194,7 @@ impl Scalar for ZorroFq {
 
     #[inline]
     fn get_little_endian_u64(&self) -> Vec<u64> {
-        let a = self.0.into_repr().to_bytes_le();
+        let a = self.0.into_bigint().to_bytes_le();
         let a1 = u8_le_slice_to_u64(&a[0..8]);
         let a2 = u8_le_slice_to_u64(&a[8..16]);
         let a3 = u8_le_slice_to_u64(&a[16..24]);
@@ -209,7 +209,7 @@ impl Scalar for ZorroFq {
 
     #[inline]
     fn to_bytes(&self) -> Vec<u8> {
-        (self.0).into_repr().to_bytes_le()[..32].to_vec()
+        (self.0).into_bigint().to_bytes_le()[..32].to_vec()
     }
 
     #[inline]

@@ -78,7 +78,7 @@ impl Default for MTLeafInfo {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Clone, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Clone, Serialize, Deserialize)]
 /// An opened anonymous asset record.
 pub struct OpenAnonAssetRecord {
     pub(crate) amount: u64,
@@ -87,6 +87,19 @@ pub struct OpenAnonAssetRecord {
     pub(crate) pub_key: PublicKey,
     pub(crate) owner_memo: Option<AxfrOwnerMemo>,
     pub(crate) mt_leaf_info: Option<MTLeafInfo>,
+}
+
+impl Default for OpenAnonAssetRecord {
+    fn default() -> Self {
+        Self {
+            amount: 0,
+            asset_type: AssetType::default(),
+            blind: BLSScalar::default(),
+            pub_key: PublicKey::default_secp256k1(),
+            owner_memo: None,
+            mt_leaf_info: None,
+        }
+    }
 }
 
 impl OpenAnonAssetRecord {
@@ -208,7 +221,7 @@ impl OpenAnonAssetRecordBuilder {
 
     fn sanity_check(&self) -> Result<()> {
         // 1. check public key is non-default
-        if self.oabar.pub_key == PublicKey::default() {
+        if self.oabar.pub_key == PublicKey::default_secp256k1() {
             return Err(eg!(NoahError::InconsistentStructureError));
         }
 
@@ -339,7 +352,7 @@ mod test {
     #[test]
     fn test_axfr_pub_key_serialization() {
         let mut prng = test_rng();
-        let keypair: KeyPair = KeyPair::generate(&mut prng);
+        let keypair: KeyPair = KeyPair::generate_secp256k1(&mut prng);
 
         let pub_key: PublicKey = keypair.get_pk();
 
@@ -353,7 +366,7 @@ mod test {
     #[test]
     fn test_axfr_key_pair_serialization() {
         let mut prng = test_rng();
-        let keypair: KeyPair = KeyPair::generate(&mut prng);
+        let keypair: KeyPair = KeyPair::generate_secp256k1(&mut prng);
 
         let bytes: Vec<u8> = keypair.noah_to_bytes();
         assert_ne!(bytes.len(), 0);

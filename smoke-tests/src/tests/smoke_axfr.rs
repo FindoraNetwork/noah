@@ -110,14 +110,26 @@ mod smoke_axfr {
     }
 
     #[test]
-    fn ar_to_abar() {
+    fn ar_to_abar_secp256k1() {
+        let mut prng = test_rng();
+        let sender = KeyPair::generate_secp256k1(&mut prng);
+        let receiver = KeyPair::generate_secp256k1(&mut prng);
+        ar_to_abar(sender, receiver);
+    }
+
+    #[test]
+    fn ar_to_abar_ed25519() {
+        let mut prng = test_rng();
+        let sender = KeyPair::generate_ed25519(&mut prng);
+        let receiver = KeyPair::generate_ed25519(&mut prng);
+        ar_to_abar(sender, receiver);
+    }
+
+    fn ar_to_abar(sender: KeyPair, receiver: KeyPair) {
         let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
         let params = ProverParams::ar_to_abar_params().unwrap();
         let verify_params = VerifierParams::ar_to_abar_params().unwrap();
-
-        let sender = KeyPair::generate(&mut prng);
-        let receiver = KeyPair::generate(&mut prng);
 
         let (bar, memo) = build_bar(
             &sender.get_pk(),
@@ -150,14 +162,26 @@ mod smoke_axfr {
     }
 
     #[test]
-    fn bar_to_abar() {
+    fn bar_to_abar_secp256k1() {
+        let mut prng = test_rng();
+        let sender = KeyPair::generate_secp256k1(&mut prng);
+        let receiver = KeyPair::generate_secp256k1(&mut prng);
+        bar_to_abar(sender, receiver);
+    }
+
+    #[test]
+    fn bar_to_abar_ed25519() {
+        let mut prng = test_rng();
+        let sender = KeyPair::generate_ed25519(&mut prng);
+        let receiver = KeyPair::generate_ed25519(&mut prng);
+        bar_to_abar(sender, receiver);
+    }
+
+    fn bar_to_abar(sender: KeyPair, receiver: KeyPair) {
         let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
         let params = ProverParams::bar_to_abar_params().unwrap();
         let verify_params = VerifierParams::bar_to_abar_params().unwrap();
-
-        let sender = KeyPair::generate(&mut prng);
-        let receiver = KeyPair::generate(&mut prng);
 
         let (bar, memo) = build_bar(
             &sender.get_pk(),
@@ -200,13 +224,25 @@ mod smoke_axfr {
     }
 
     #[test]
-    fn abar_to_ar() {
+    fn abar_to_ar_secp256k1() {
+        let mut prng = test_rng();
+        let sender = KeyPair::generate_secp256k1(&mut prng);
+        let receiver = KeyPair::generate_secp256k1(&mut prng);
+        abar_to_ar(sender, receiver);
+    }
+
+    #[test]
+    fn abar_to_ar_ed25519() {
+        let mut prng = test_rng();
+        let sender = KeyPair::generate_ed25519(&mut prng);
+        let receiver = KeyPair::generate_ed25519(&mut prng);
+        abar_to_ar(sender, receiver);
+    }
+
+    fn abar_to_ar(sender: KeyPair, receiver: KeyPair) {
         let mut prng = test_rng();
         let params = ProverParams::abar_to_ar_params(TREE_DEPTH).unwrap();
         let verify_params = VerifierParams::abar_to_ar_params().unwrap();
-
-        let sender = KeyPair::generate(&mut prng);
-        let receiver = KeyPair::generate(&mut prng);
 
         let fdb = MemoryDB::new();
         let cs = Arc::new(RwLock::new(ChainState::new(fdb, "abar_ar".to_owned(), 0)));
@@ -295,13 +331,25 @@ mod smoke_axfr {
     }
 
     #[test]
-    fn abar_to_bar() {
+    fn abar_to_bar_secp256k1() {
+        let mut prng = test_rng();
+        let sender = KeyPair::generate_secp256k1(&mut prng);
+        let receiver = KeyPair::generate_secp256k1(&mut prng);
+        abar_to_bar(sender, receiver);
+    }
+
+    #[test]
+    fn abar_to_bar_ed25519() {
+        let mut prng = test_rng();
+        let sender = KeyPair::generate_ed25519(&mut prng);
+        let receiver = KeyPair::generate_ed25519(&mut prng);
+        abar_to_bar(sender, receiver);
+    }
+
+    fn abar_to_bar(sender: KeyPair, receiver: KeyPair) {
         let mut prng = test_rng();
         let params = ProverParams::abar_to_bar_params(TREE_DEPTH).unwrap();
         let verify_params = VerifierParams::abar_to_bar_params().unwrap();
-
-        let sender = KeyPair::generate(&mut prng);
-        let receiver = KeyPair::generate(&mut prng);
 
         let fdb = MemoryDB::new();
         let cs = Arc::new(RwLock::new(ChainState::new(fdb, "abar_bar".to_owned(), 0)));
@@ -472,8 +520,8 @@ mod smoke_axfr {
     }
 
     #[test]
-    fn abar_9in_2out_2asset() {
-        let fee_amount = mock_fee(9, 2);
+    fn abar_8in_2out_2asset() {
+        let fee_amount = mock_fee(8, 2);
         let outputs = vec![(20, FEE_TYPE), (30, ASSET)];
         let inputs = vec![
             (15 + fee_amount as u64, FEE_TYPE),
@@ -481,8 +529,7 @@ mod smoke_axfr {
             (4, FEE_TYPE),
             (5, ASSET),
             (5, ASSET),
-            (1, ASSET),
-            (3, ASSET),
+            (4, ASSET),
             (6, ASSET),
             (10, ASSET),
         ];
@@ -490,8 +537,8 @@ mod smoke_axfr {
     }
 
     #[test]
-    fn abar_9in_3out_2asset() {
-        let fee_amount = mock_fee(9, 3);
+    fn abar_8in_3out_2asset() {
+        let fee_amount = mock_fee(8, 3);
         let outputs = vec![(5, FEE_TYPE), (15, FEE_TYPE), (30, ASSET)];
         let inputs = vec![
             (15 + fee_amount as u64, FEE_TYPE),
@@ -499,8 +546,7 @@ mod smoke_axfr {
             (4, FEE_TYPE),
             (5, ASSET),
             (5, ASSET),
-            (1, ASSET),
-            (3, ASSET),
+            (4, ASSET),
             (6, ASSET),
             (10, ASSET),
         ];
@@ -517,9 +563,19 @@ mod smoke_axfr {
         let params = ProverParams::new(inputs.len(), outputs.len(), None).unwrap();
         let verifier_params = VerifierParams::load(inputs.len(), outputs.len()).unwrap();
 
-        let sender = KeyPair::generate(&mut prng);
+        let sender = if prng.gen() {
+            KeyPair::generate_secp256k1(&mut prng)
+        } else {
+            KeyPair::generate_ed25519(&mut prng)
+        };
         let receivers: Vec<KeyPair> = (0..outputs.len())
-            .map(|_| KeyPair::generate(&mut prng))
+            .map(|_| {
+                if prng.gen() {
+                    KeyPair::generate_secp256k1(&mut prng)
+                } else {
+                    KeyPair::generate_ed25519(&mut prng)
+                }
+            })
             .collect();
 
         let mut oabars: Vec<OpenAnonAssetRecord> = inputs

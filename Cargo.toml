@@ -9,16 +9,6 @@ members = [
 ]
 resolver = "2"
 
-[patch.crates-io]
-ark-ec = { git = "https://github.com/FindoraNetwork/ark-algebra", tag = "stable-2022" }
-ark-ff = { git = "https://github.com/FindoraNetwork/ark-algebra", tag = "stable-2022" }
-ark-poly = { git = "https://github.com/FindoraNetwork/ark-algebra", tag = "stable-2022" }
-ark-serialize = { git = "https://github.com/FindoraNetwork/ark-algebra", tag = "stable-2022" }
-ark-std = { git = "https://github.com/FindoraNetwork/ark-std", tag = "stable-2022" }
-ark-bls12-381 = { git = "https://github.com/FindoraNetwork/ark-curves", tag = "stable-2022" }
-ark-ed-on-bls12-381 = { git = "https://github.com/FindoraNetwork/ark-curves", tag = "stable-2022" }
-ark-algebra-test-templates = { git = "https://github.com/FindoraNetwork/ark-algebra", tag = "stable-2022" }
-
 [profile.release]
 opt-level = 3
 lto = "thin"

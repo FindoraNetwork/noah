@@ -1,5 +1,5 @@
-use ark_bulletproofs::curve::ed25519::Fq;
-use ark_ff::field_new;
+use ark_ed25519::Fq;
+use ark_ff::MontFp;
 
 /// The number of bytes for a scalar value over the ed25519 curve
 pub const ED25519_SCALAR_LEN: usize = 32;
@@ -15,10 +15,7 @@ pub use g1::*;
 
 /// Obtain the d parameter of the ed25519 curve
 pub const fn get_ed25519_d() -> Fq {
-    field_new!(
-        Fq,
-        "37095705934669439343138083508754565189542113879843219016388785533085940283555"
-    )
+    MontFp!("37095705934669439343138083508754565189542113879843219016388785533085940283555")
 }
 
 #[cfg(test)]
@@ -28,8 +25,8 @@ mod ed25519_groups_test {
         prelude::*,
         traits::group_tests::{test_scalar_operations, test_scalar_serialization},
     };
-    use ark_bulletproofs::curve::ed25519::G1Affine;
-    use ark_ec::ProjectiveCurve;
+    use ark_ec::CurveGroup;
+    use ark_ed25519::EdwardsAffine;
 
     #[test]
     fn test_scalar_ops() {
@@ -71,16 +68,16 @@ mod ed25519_groups_test {
         let g1_prime_projective = g1_prime.0;
 
         // This is the affine representation of g1_prime
-        let g1_prime_affine = G1Affine::from(g1_prime_projective);
+        let g1_prime_affine = EdwardsAffine::from(g1_prime_projective);
 
         let g1_pr_plus_g1_prime_pr = g1_projective.add(&g1_prime_projective);
 
         // These two operations correspond to summation of points,
         // one in projective form and the other in affine form
-        let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_affine);
+        let g1_pr_plus_g1_prime_af = g1_projective.add(&g1_prime_affine);
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
 
-        let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_projective.into_affine());
+        let g1_pr_plus_g1_prime_af = g1_projective.add(&g1_prime_projective.into_affine());
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
     }
 

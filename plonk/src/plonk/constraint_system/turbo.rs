@@ -972,6 +972,48 @@ impl<F: Scalar> TurboCS<F> {
     }
 }
 
+/// Turbo PLONK Verify Constraint System.
+#[derive(Serialize, Deserialize, Clone)]
+pub struct TurboVerifyCS {
+    /// the number of variable.
+    pub num_vars: usize,
+    /// the size of circuit.
+    pub size: usize,
+}
+
+impl<F: Scalar> From<TurboCS<F>> for TurboVerifyCS {
+    fn from(cs: TurboCS<F>) -> TurboVerifyCS {
+        TurboVerifyCS {
+            num_vars: cs.num_vars,
+            size: cs.size,
+        }
+    }
+}
+
+impl<F: Scalar> From<TurboVerifyCS> for TurboCS<F> {
+    fn from(cs: TurboVerifyCS) -> TurboCS<F> {
+        TurboCS {
+            selectors: vec![],
+            wiring: [vec![], vec![], vec![], vec![], vec![]],
+            anemoi_preprocessed_round_keys_x: [[F::zero(); 2]; 12],
+            anemoi_preprocessed_round_keys_y: [[F::zero(); 2]; 12],
+            anemoi_generator: F::zero(),
+            anemoi_generator_inv: F::zero(),
+            anemoi_constraints_indices: vec![],
+            num_vars: cs.num_vars,
+            size: cs.size,
+            public_vars_constraint_indices: vec![],
+            public_vars_witness_indices: vec![],
+            boolean_constraint_indices: vec![],
+            verifier_only: true,
+            witness: vec![],
+
+            #[cfg(feature = "debug")]
+            witness_backtrace: HashMap::new(),
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use crate::plonk::{

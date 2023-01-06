@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use crate::traits::PedersenCommitment;
-use ark_bulletproofs::curve::secq256k1::G1Affine;
+use ark_secq256k1::Affine;
 
 mod fr;
 pub use fr::*;
@@ -12,8 +12,8 @@ mod g1;
 pub use g1::*;
 
 /// The wrapped struct for
-/// `ark_bulletproofs::r1cs::R1CSProof<ark_bulletproofs::curve::secq256k1::G1Affine>`
-pub type SECQ256K1Proof = ark_bulletproofs::r1cs::R1CSProof<G1Affine>;
+/// `ark_bulletproofs::r1cs::R1CSProof<ark_secq256k1::Affine>`
+pub type SECQ256K1Proof = ark_bulletproofs::r1cs::R1CSProof<Affine>;
 
 #[allow(non_snake_case)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -49,7 +49,7 @@ impl PedersenCommitment<SECQ256K1G1> for PedersenCommitmentSecq256k1 {
     }
 }
 
-impl From<&PedersenCommitmentSecq256k1> for ark_bulletproofs::PedersenGens<G1Affine> {
+impl From<&PedersenCommitmentSecq256k1> for ark_bulletproofs::PedersenGens<Affine> {
     fn from(rp: &PedersenCommitmentSecq256k1) -> Self {
         ark_bulletproofs::PedersenGens {
             B: rp.B.get_raw(),
@@ -59,7 +59,7 @@ impl From<&PedersenCommitmentSecq256k1> for ark_bulletproofs::PedersenGens<G1Aff
 }
 
 /// The wrapper struct for the Bulletproof generators.
-pub type Secq256k1BulletproofGens = ark_bulletproofs::BulletproofGens<G1Affine>;
+pub type Secq256k1BulletproofGens = ark_bulletproofs::BulletproofGens<Affine>;
 
 /// The number of bytes for a scalar value over the secq256k1 curve
 pub const SECQ256K1_SCALAR_LEN: usize = 32;
@@ -71,8 +71,8 @@ mod secq256k1_groups_test {
         secq256k1::{SECQ256K1Scalar, SECQ256K1G1},
         traits::group_tests::{test_scalar_operations, test_scalar_serialization},
     };
-    use ark_bulletproofs::curve::secq256k1::G1Affine;
-    use ark_ec::ProjectiveCurve;
+    use ark_ec::CurveGroup;
+    use ark_secq256k1::Affine;
 
     #[test]
     fn test_scalar_ops() {
@@ -114,16 +114,16 @@ mod secq256k1_groups_test {
         let g1_prime_projective = g1_prime.0;
 
         // This is the affine representation of g1_prime
-        let g1_prime_affine = G1Affine::from(g1_prime_projective);
+        let g1_prime_affine = Affine::from(g1_prime_projective);
 
         let g1_pr_plus_g1_prime_pr = g1_projective.add(&g1_prime_projective);
 
         // These two operations correspond to summation of points,
         // one in projective form and the other in affine form
-        let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_affine);
+        let g1_pr_plus_g1_prime_af = g1_projective.add(&g1_prime_affine);
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
 
-        let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_projective.into_affine());
+        let g1_pr_plus_g1_prime_af = g1_projective.add(&g1_prime_projective.into_affine());
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
     }
 

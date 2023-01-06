@@ -1,7 +1,10 @@
+use crate::anon_xfr::address_folding_ed25519::{
+    create_address_folding_ed25519, prepare_verifier_input_ed25519,
+    prove_address_folding_in_cs_ed25519, verify_address_folding_ed25519,
+};
 use crate::anon_xfr::address_folding_secp256k1::{
     create_address_folding_secp256k1, prepare_verifier_input_secp256k1,
     prove_address_folding_in_cs_secp256k1, verify_address_folding_secp256k1,
-    AXfrAddressFoldingInstanceSecp256k1, AXfrAddressFoldingWitnessSecp256k1,
 };
 use crate::anon_xfr::{
     add_merkle_path_variables, check_asset_amount, check_inputs, check_roots, commit, commit_in_cs,
@@ -10,7 +13,8 @@ use crate::anon_xfr::{
         AccElemVars, AnonAssetRecord, AxfrOwnerMemo, Commitment, MTNode, MTPath, Nullifier,
         OpenAnonAssetRecord, PayeeWitness, PayeeWitnessVars, PayerWitness, PayerWitnessVars,
     },
-    AXfrPlonkPf, TurboPlonkCS, AMOUNT_LEN, FEE_TYPE,
+    AXfrAddressFoldingInstance, AXfrAddressFoldingWitness, AXfrPlonkPf, TurboPlonkCS, AMOUNT_LEN,
+    FEE_TYPE,
 };
 use crate::errors::NoahError;
 use crate::keys::{KeyPair, PublicKey, SecretKey};
@@ -46,7 +50,7 @@ pub struct AXfrNote {
     /// The Plonk proof (assuming non-malleability).
     pub proof: AXfrPlonkPf,
     /// The address folding instance.
-    pub folding_instance: AXfrAddressFoldingInstanceSecp256k1,
+    pub folding_instance: AXfrAddressFoldingInstance,
 }
 
 /// Anonymous transfer pre-note without proofs and signatures.
@@ -219,12 +223,30 @@ pub fn finish_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> 
     } = pre_note;
 
     let mut transcript = Transcript::new(ANON_XFR_FOLDING_PROOF_TRANSCRIPT);
-    let (folding_instance, folding_witness) =
-        create_address_folding_secp256k1(prng, hash, &mut transcript, &input_keypair)?;
+
+    let (folding_instance, folding_witness) = match input_keypair.get_sk_ref() {
+        SecretKey::Secp256k1(_) => {
+            let (folding_instance, folding_witness) =
+                create_address_folding_secp256k1(prng, hash, &mut transcript, &input_keypair)?;
+            (
+                AXfrAddressFoldingInstance::Secp256k1(folding_instance),
+                AXfrAddressFoldingWitness::Secp256k1(folding_witness),
+            )
+        }
+        SecretKey::Ed25519(_) => {
+            let (folding_instance, folding_witness) =
+                create_address_folding_ed25519(prng, hash, &mut transcript, &input_keypair)?;
+            (
+                AXfrAddressFoldingInstance::Ed25519(folding_instance),
+                AXfrAddressFoldingWitness::Ed25519(folding_witness),
+            )
+        }
+    };
+
     let proof = prove_xfr(
         prng,
         params,
-        witness,
+        &witness,
         &nullifiers_traces,
         &input_commitments_traces,
         &output_commitments_traces,
@@ -264,17 +286,23 @@ pub fn verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default>(
 
     let mut transcript = Transcript::new(ANON_XFR_FOLDING_PROOF_TRANSCRIPT);
 
-    let (beta, lambda) =
-        verify_address_folding_secp256k1(hash, &mut transcript, &note.folding_instance)?;
-
-    let address_folding_public_input =
-        prepare_verifier_input_secp256k1(&note.folding_instance, &beta, &lambda);
+    let address_folding_public_input = match &note.folding_instance {
+        AXfrAddressFoldingInstance::Secp256k1(a) => {
+            let (beta, lambda) = verify_address_folding_secp256k1(hash, &mut transcript, a)?;
+            prepare_verifier_input_secp256k1(&a, &beta, &lambda)
+        }
+        AXfrAddressFoldingInstance::Ed25519(a) => {
+            let (beta, lambda) = verify_address_folding_ed25519(hash, &mut transcript, a)?;
+            prepare_verifier_input_ed25519(&a, &beta, &lambda)
+        }
+    };
 
     verify_xfr(
         params,
         &pub_inputs,
         &note.proof,
         &address_folding_public_input,
+        &note.folding_instance,
     )
     .c(d!(NoahError::AXfrVerificationError))
 }
@@ -317,17 +345,24 @@ pub fn batch_verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default + Sync +
 
             let mut transcript = Transcript::new(ANON_XFR_FOLDING_PROOF_TRANSCRIPT);
 
-            let (beta, lambda) =
-                verify_address_folding_secp256k1(hash, &mut transcript, &note.folding_instance)?;
-
-            let address_folding_public_input =
-                prepare_verifier_input_secp256k1(&note.folding_instance, &beta, &lambda);
+            let address_folding_public_input = match &note.folding_instance {
+                AXfrAddressFoldingInstance::Secp256k1(a) => {
+                    let (beta, lambda) =
+                        verify_address_folding_secp256k1(hash, &mut transcript, a)?;
+                    prepare_verifier_input_secp256k1(&a, &beta, &lambda)
+                }
+                AXfrAddressFoldingInstance::Ed25519(a) => {
+                    let (beta, lambda) = verify_address_folding_ed25519(hash, &mut transcript, a)?;
+                    prepare_verifier_input_ed25519(&a, &beta, &lambda)
+                }
+            };
 
             verify_xfr(
                 *param,
                 &pub_inputs,
                 &note.proof,
                 &address_folding_public_input,
+                &note.folding_instance,
             )
         })
         .all(|x| x.is_ok());
@@ -343,11 +378,11 @@ pub fn batch_verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default + Sync +
 pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
-    secret_inputs: AXfrWitness,
+    secret_inputs: &AXfrWitness,
     nullifiers_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
     input_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
     output_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
-    folding_witness: &AXfrAddressFoldingWitnessSecp256k1,
+    folding_witness: &AXfrAddressFoldingWitness,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(ANON_XFR_PLONK_PROOF_TRANSCRIPT);
     transcript.append_u64(
@@ -370,13 +405,15 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     );
     let witness = cs.get_and_clear_witness();
 
+    let (cs, prover_params) = params.cs_params(Some(folding_witness));
+
     prover_with_lagrange(
         rng,
         &mut transcript,
         &params.pcs,
         params.lagrange_pcs.as_ref(),
-        &params.cs,
-        &params.prover_params,
+        cs,
+        prover_params,
         &witness,
     )
     .c(d!(NoahError::AXfrProofError))
@@ -388,6 +425,7 @@ pub(crate) fn verify_xfr(
     pub_inputs: &AXfrPubInputs,
     proof: &AXfrPlonkPf,
     address_folding_public_input: &Vec<BLSScalar>,
+    folding_instance: &AXfrAddressFoldingInstance,
 ) -> Result<()> {
     let mut transcript = Transcript::new(ANON_XFR_PLONK_PROOF_TRANSCRIPT);
     transcript.append_u64(N_INPUTS_TRANSCRIPT, pub_inputs.payers_inputs.len() as u64);
@@ -399,11 +437,13 @@ pub(crate) fn verify_xfr(
     let mut online_inputs = pub_inputs.to_vec();
     online_inputs.extend_from_slice(address_folding_public_input);
 
+    let (cs, verifier_params) = params.cs_params(Some(folding_instance));
+
     verifier(
         &mut transcript,
         &params.pcs,
-        &params.cs,
-        &params.verifier_params,
+        &cs,
+        verifier_params,
         &online_inputs,
         proof,
     )
@@ -423,7 +463,7 @@ pub struct AXfrWitness {
 
 impl AXfrWitness {
     /// Create a fake `AXfrWitness` for testing.
-    pub fn fake(n_payers: usize, n_payees: usize, tree_depth: usize, fee: u32) -> Self {
+    pub fn fake_secp256k1(n_payers: usize, n_payees: usize, tree_depth: usize, fee: u32) -> Self {
         let bls_zero = BLSScalar::zero();
 
         let node = MTNode {
@@ -435,7 +475,7 @@ impl AXfrWitness {
             is_right_child: 0,
         };
         let payer_witness = PayerWitness {
-            secret_key: SecretKey::default(),
+            secret_key: SecretKey::default_secp256k1(),
             uid: 0,
             amount: 0,
             asset_type: bls_zero,
@@ -446,7 +486,41 @@ impl AXfrWitness {
             amount: 0,
             blind: bls_zero,
             asset_type: bls_zero,
-            public_key: PublicKey::default(),
+            public_key: PublicKey::default_secp256k1(),
+        };
+
+        AXfrWitness {
+            payers_witnesses: vec![payer_witness; n_payers],
+            payees_witnesses: vec![payee_witness; n_payees],
+            fee,
+        }
+    }
+
+    /// Create a fake `AXfrWitness` for testing.
+    pub fn fake_ed25519(n_payers: usize, n_payees: usize, tree_depth: usize, fee: u32) -> Self {
+        let bls_zero = BLSScalar::zero();
+
+        let node = MTNode {
+            left: bls_zero,
+            mid: bls_zero,
+            right: bls_zero,
+            is_left_child: 0,
+            is_mid_child: 0,
+            is_right_child: 0,
+        };
+        let payer_witness = PayerWitness {
+            secret_key: SecretKey::default_ed25519(),
+            uid: 0,
+            amount: 0,
+            asset_type: bls_zero,
+            path: MTPath::new(vec![node; tree_depth]),
+            blind: bls_zero,
+        };
+        let payee_witness = PayeeWitness {
+            amount: 0,
+            blind: bls_zero,
+            asset_type: bls_zero,
+            public_key: PublicKey::default_ed25519(),
         };
 
         AXfrWitness {
@@ -539,12 +613,12 @@ impl AXfrPubInputs {
 
 /// Instantiate the constraint system for anonymous transfer.
 pub(crate) fn build_multi_xfr_cs(
-    witness: AXfrWitness,
+    witness: &AXfrWitness,
     fee_type: BLSScalar,
     nullifiers_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
     input_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
     output_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
-    folding_witness: &AXfrAddressFoldingWitnessSecp256k1,
+    folding_witness: &AXfrAddressFoldingWitness,
 ) -> (TurboPlonkCS, usize) {
     assert_ne!(witness.payers_witnesses.len(), 0);
     assert_ne!(witness.payees_witnesses.len(), 0);
@@ -557,7 +631,7 @@ pub(crate) fn build_multi_xfr_cs(
         add_payers_witnesses(&mut cs, &witness.payers_witnesses.iter().collect_vec());
     let payees_secrets = add_payees_witnesses(&mut cs, &witness.payees_witnesses);
 
-    let keypair = folding_witness.keypair.clone();
+    let keypair = folding_witness.keypair();
     let public_key_scalars = keypair.get_pk().to_bls_scalars().unwrap();
     let secret_key_scalars = keypair.get_sk().to_bls_scalars().unwrap();
 
@@ -697,13 +771,22 @@ pub(crate) fn build_multi_xfr_cs(
     let fee_var = cs.new_variable(BLSScalar::from(witness.fee));
     cs.prepare_pi_variable(fee_var);
 
-    prove_address_folding_in_cs_secp256k1(
-        &mut cs,
-        &public_key_scalars_vars,
-        &secret_key_scalars_vars,
-        &folding_witness,
-    )
-    .unwrap();
+    match folding_witness {
+        AXfrAddressFoldingWitness::Secp256k1(a) => prove_address_folding_in_cs_secp256k1(
+            &mut cs,
+            &public_key_scalars_vars,
+            &secret_key_scalars_vars,
+            &a,
+        )
+        .unwrap(),
+        AXfrAddressFoldingWitness::Ed25519(a) => prove_address_folding_in_cs_ed25519(
+            &mut cs,
+            &public_key_scalars_vars,
+            &secret_key_scalars_vars,
+            &a,
+        )
+        .unwrap(),
+    }
 
     asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
 
@@ -917,7 +1000,7 @@ mod tests {
             AccElemVars, AnonAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonAssetRecord,
             OpenAnonAssetRecordBuilder, PayeeWitness, PayerWitness,
         },
-        FEE_TYPE,
+        AXfrAddressFoldingWitness, FEE_TYPE,
     };
     use crate::keys::KeyPair;
     use crate::setup::{ProverParams, VerifierParams};
@@ -932,7 +1015,7 @@ mod tests {
     use sha2::Sha512;
 
     fn gen_keys<R: CryptoRng + RngCore>(prng: &mut R, n: usize) -> Vec<KeyPair> {
-        (0..n).map(|_| KeyPair::generate(prng)).collect()
+        (0..n).map(|_| KeyPair::generate_secp256k1(prng)).collect()
     }
 
     fn gen_oabar_with_key<R: CryptoRng + RngCore>(
@@ -977,7 +1060,7 @@ mod tests {
         let mut prng = test_rng();
         let zero = BLSScalar::zero();
 
-        let input_keypair = KeyPair::generate(&mut prng);
+        let input_keypair = KeyPair::generate_secp256k1(&mut prng);
 
         let mut payers_secrets: Vec<PayerWitness> = inputs
             .iter()
@@ -1063,7 +1146,7 @@ mod tests {
                 amount,
                 blind: BLSScalar::random(&mut prng),
                 asset_type,
-                public_key: KeyPair::generate(&mut prng).get_pk(),
+                public_key: KeyPair::generate_secp256k1(&mut prng).get_pk(),
             })
             .collect();
 
@@ -1091,7 +1174,7 @@ mod tests {
         let output_amount = 1 + prng.next_u64() % 100;
         let input_amount = output_amount + fee_amount as u64;
 
-        let keypair = KeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate_secp256k1(&mut prng);
 
         // sample an input anonymous asset record for testing.
         let oabar = gen_oabar_with_key(&mut prng, input_amount, asset_type, &keypair);
@@ -1123,7 +1206,7 @@ mod tests {
         };
 
         // sample output keys for testing.
-        let keypair_out = KeyPair::generate(&mut prng);
+        let keypair_out = KeyPair::generate_secp256k1(&mut prng);
 
         let test_hash = {
             let mut hasher = Sha512::new();
@@ -1209,7 +1292,7 @@ mod tests {
             AssetType::from_identical_byte(1),
         ];
         let mut in_abars = vec![];
-        let in_keypair = KeyPair::generate(&mut prng);
+        let in_keypair = KeyPair::generate_secp256k1(&mut prng);
         let mut in_owner_memos = vec![];
         for i in 0..n_payers {
             let oabar =
@@ -2013,7 +2096,7 @@ mod tests {
         let mut prng = test_rng();
         let blind = BLSScalar::random(&mut prng);
 
-        let keypair = KeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate_secp256k1(&mut prng);
 
         let public_key_scalars = keypair.pub_key.to_bls_scalars().unwrap();
         let public_key_scalars_vars = [
@@ -2061,7 +2144,7 @@ mod tests {
         let uid_amount = BLSScalar::from_bytes(&bytes[..]).unwrap(); // safe unwrap
         let asset_type = one;
 
-        let keypair = KeyPair::generate(&mut prng);
+        let keypair = KeyPair::generate_secp256k1(&mut prng);
 
         let public_key_scalars = keypair.pub_key.to_bls_scalars().unwrap();
         let public_key_scalars_vars = [
@@ -2410,12 +2493,12 @@ mod tests {
 
         // check the constraints.
         let (mut cs, _) = build_multi_xfr_cs(
-            secret_inputs,
+            &secret_inputs,
             fee_type,
             &nullifiers_traces,
             &input_commitments_traces,
             &output_commitments_traces,
-            &folding_witness,
+            &AXfrAddressFoldingWitness::Secp256k1(folding_witness),
         );
         let witness = cs.get_and_clear_witness();
 

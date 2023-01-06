@@ -72,7 +72,7 @@ mod zorro_groups_test {
         zorro::{ZorroFq, ZorroG1, ZorroScalar},
     };
     use ark_bulletproofs::curve::zorro::G1Affine;
-    use ark_ec::ProjectiveCurve;
+    use ark_ec::CurveGroup;
 
     #[test]
     fn test_scalar_ops() {
@@ -122,10 +122,10 @@ mod zorro_groups_test {
 
         // These two operations correspond to summation of points,
         // one in projective form and the other in affine form
-        let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_affine);
+        let g1_pr_plus_g1_prime_af = g1_projective.add(&g1_prime_affine);
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
 
-        let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_projective.into_affine());
+        let g1_pr_plus_g1_prime_af = g1_projective.add(&g1_prime_projective.into_affine());
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
     }
 

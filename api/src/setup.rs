@@ -1,5 +1,6 @@
 // The Public Setup needed for Proofs
 use crate::anon_xfr::abar_to_abar::{build_multi_xfr_cs, AXfrWitness};
+use crate::anon_xfr::address_folding_ed25519::AXfrAddressFoldingWitnessEd25519;
 use crate::anon_xfr::address_folding_secp256k1::AXfrAddressFoldingWitnessSecp256k1;
 use crate::anon_xfr::structs::{PayeeWitness, PayerWitness};
 use crate::anon_xfr::{
@@ -9,7 +10,8 @@ use crate::anon_xfr::{
     bar_to_abar::build_bar_to_abar_cs,
     commit, nullify,
     structs::{MTNode, MTPath},
-    TurboPlonkCS, FEE_TYPE, TREE_DEPTH,
+    AXfrAddressFoldingInstance, AXfrAddressFoldingWitness, TurboPlonkCS, TurboVerifyCS, FEE_TYPE,
+    TREE_DEPTH,
 };
 use crate::keys::KeyPair;
 use crate::parameters::{
@@ -17,7 +19,7 @@ use crate::parameters::{
     BAR_TO_ABAR_VERIFIER_PARAMS, BULLETPROOF_CURVE25519_URS, BULLETPROOF_SECQ256K1_URS,
     BULLETPROOF_ZORRO_URS, LAGRANGE_BASES, SRS, VERIFIER_COMMON_PARAMS, VERIFIER_SPECIFIC_PARAMS,
 };
-use ark_serialize::CanonicalDeserialize;
+use ark_serialize::{CanonicalDeserialize, Compress, Validate};
 use bulletproofs::BulletproofGens;
 use noah_algebra::ristretto::RistrettoPoint;
 use noah_algebra::secq256k1::Secq256k1BulletproofGens;
@@ -68,10 +70,14 @@ pub struct ProverParams {
     pub pcs: KZGCommitmentSchemeBLS,
     /// The Lagrange basis format of SRS.
     pub lagrange_pcs: Option<KZGCommitmentSchemeBLS>,
-    /// The constraint system.
-    pub cs: TurboPlonkCS,
-    /// The TurboPlonk proving key.
-    pub prover_params: PlonkPK<KZGCommitmentSchemeBLS>,
+    /// The default(secp256k1) constraint system.
+    pub secp256k1_cs: TurboPlonkCS,
+    /// The ed25519 constraint system.
+    pub ed25519_cs: TurboPlonkCS,
+    /// The default(secp256k1) TurboPlonk proving key.
+    pub secp256k1_prover_params: PlonkPK<KZGCommitmentSchemeBLS>,
+    /// The ed25519 TurboPlonk proving key.
+    pub ed25519_prover_params: PlonkPK<KZGCommitmentSchemeBLS>,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -80,10 +86,48 @@ pub struct VerifierParams {
     /// The shrunk version of the polynomial commitment scheme.
     pub pcs: KZGCommitmentSchemeBLS,
     /// The shrunk version of the constraint system.
-    pub cs: TurboPlonkCS,
+    pub secp256k1_cs: TurboVerifyCS,
+    /// The ed25519 shrunk version of the constraint system.
+    pub ed25519_cs: TurboVerifyCS,
+    /// The TurboPlonk verifying key.
+    pub secp256k1_verifier_params: PlonkVK<KZGCommitmentSchemeBLS>,
+    /// The ed25519 TurboPlonk verifying key.
+    pub ed25519_verifier_params: PlonkVK<KZGCommitmentSchemeBLS>,
+}
+
+#[derive(Serialize, Deserialize)]
+/// The verifier common parameters.
+pub struct VerifierParamsCommon {
+    /// The shrunk version of the polynomial commitment scheme.
+    pub pcs: KZGCommitmentSchemeBLS,
+    /// The shrunk version of the constraint system.
+    pub cs: TurboVerifyCS,
     /// The TurboPlonk verifying key.
     pub verifier_params: PlonkVK<KZGCommitmentSchemeBLS>,
 }
+
+impl VerifierParamsCommon {
+    /// Convert to VerifierParams
+    pub fn to_full(self) -> VerifierParams {
+        VerifierParams {
+            pcs: self.pcs,
+            secp256k1_cs: self.cs.clone(),
+            ed25519_cs: self.cs,
+            secp256k1_verifier_params: self.verifier_params.clone(),
+            ed25519_verifier_params: self.verifier_params,
+        }
+    }
+
+    /// Convert from VerifierParams
+    pub fn from_full(params: VerifierParams) -> Self {
+        Self {
+            pcs: params.pcs,
+            cs: params.secp256k1_cs,
+            verifier_params: params.secp256k1_verifier_params,
+        }
+    }
+}
+
 #[derive(Serialize, Deserialize)]
 /// The common part of the verifier parameters.
 pub struct VerifierParamsSplitCommon {
@@ -95,9 +139,13 @@ pub struct VerifierParamsSplitCommon {
 /// The specific part of the verifier parameters.
 pub struct VerifierParamsSplitSpecific {
     /// The shrunk version of the constraint system.
-    pub cs: TurboPlonkCS,
+    pub secp256k1_cs: TurboVerifyCS,
+    /// The ed25519 shrunk version of the constraint system.
+    pub ed25519_cs: TurboVerifyCS,
     /// The verifier parameters.
-    pub verifier_params: PlonkVK<KZGCommitmentSchemeBLS>,
+    pub secp256k1_verifier_params: PlonkVK<KZGCommitmentSchemeBLS>,
+    /// The ed25519 TurboPlonk verifying key.
+    pub ed25519_verifier_params: PlonkVK<KZGCommitmentSchemeBLS>,
 }
 
 /// The range in the Bulletproofs range check.
@@ -107,7 +155,7 @@ pub const MAX_CONFIDENTIAL_RECORD_NUMBER: usize = 128;
 /// The maximal number of inputs and outputs supported by this setup program, for standard payments.
 pub const MAX_ANONYMOUS_RECORD_NUMBER_STANDARD: usize = 6;
 /// The maximal number of inputs supported by this setup program, for consolidation.
-pub const MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER: usize = 9;
+pub const MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER: usize = 8;
 /// The maximal number of outputs supported by this setup program, for consolidation.
 pub const MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER: usize = 3;
 /// The default number of Bulletproofs generators
@@ -150,9 +198,10 @@ impl BulletproofURS for Secq256k1BulletproofGens {
         let urs = BULLETPROOF_SECQ256K1_URS.c(d!(NoahError::MissingSRSError))?;
 
         let reader = ark_std::io::BufReader::new(urs);
-        let bp_gens = Secq256k1BulletproofGens::deserialize_unchecked(reader)
-            .c(d!(NoahError::DeserializationError))
-            .unwrap();
+        let bp_gens =
+            Secq256k1BulletproofGens::deserialize_with_mode(reader, Compress::No, Validate::No)
+                .c(d!(NoahError::DeserializationError))
+                .unwrap();
         Ok(bp_gens)
     }
 
@@ -166,9 +215,10 @@ impl BulletproofURS for ZorroBulletproofGens {
         let urs = BULLETPROOF_ZORRO_URS.c(d!(NoahError::MissingSRSError))?;
 
         let reader = ark_std::io::BufReader::new(urs);
-        let bp_gens = ZorroBulletproofGens::deserialize_unchecked(reader)
-            .c(d!(NoahError::DeserializationError))
-            .unwrap();
+        let bp_gens =
+            ZorroBulletproofGens::deserialize_with_mode(reader, Compress::No, Validate::No)
+                .c(d!(NoahError::DeserializationError))
+                .unwrap();
         Ok(bp_gens)
     }
 
@@ -178,80 +228,173 @@ impl BulletproofURS for ZorroBulletproofGens {
 }
 
 impl ProverParams {
+    /// Choose secp256k1 or ed25519 cs and prover_params
+    pub fn cs_params(
+        &self,
+        witness: Option<&AXfrAddressFoldingWitness>,
+    ) -> (&TurboPlonkCS, &PlonkPK<KZGCommitmentSchemeBLS>) {
+        match witness {
+            None | Some(AXfrAddressFoldingWitness::Secp256k1(_)) => {
+                (&self.secp256k1_cs, &self.secp256k1_prover_params)
+            }
+            Some(AXfrAddressFoldingWitness::Ed25519(_)) => {
+                (&self.ed25519_cs, &self.ed25519_prover_params)
+            }
+        }
+    }
+
     /// Obtain the parameters for anonymous transfer for a given number of inputs and a given number of outputs.
     pub fn new(
         n_payers: usize,
         n_payees: usize,
         tree_depth: Option<usize>,
     ) -> Result<ProverParams> {
-        let folding_witness = AXfrAddressFoldingWitnessSecp256k1::default();
+        let (secp256k1_cs, depth) = {
+            let (fake_witness, depth) = match tree_depth {
+                Some(depth) => (
+                    AXfrWitness::fake_secp256k1(n_payers, n_payees, depth, 0),
+                    depth,
+                ),
+                None => (
+                    AXfrWitness::fake_secp256k1(n_payers, n_payees, TREE_DEPTH, 0),
+                    TREE_DEPTH,
+                ),
+            };
 
-        let (fake_witness, depth) = match tree_depth {
-            Some(depth) => (AXfrWitness::fake(n_payers, n_payees, depth, 0), depth),
-            None => (
-                AXfrWitness::fake(n_payers, n_payees, TREE_DEPTH, 0),
-                TREE_DEPTH,
-            ),
+            let mut nullifiers_traces = Vec::new();
+            let mut input_commitments_traces = Vec::new();
+            let mut output_commitments_traces = Vec::new();
+            for payer_witness in fake_witness.payers_witnesses.iter() {
+                let (_, trace) = nullify(
+                    &payer_witness.secret_key.clone().into_keypair(),
+                    payer_witness.amount,
+                    payer_witness.asset_type,
+                    payer_witness.uid,
+                )?;
+                nullifiers_traces.push(trace);
+
+                let (_, trace) = commit(
+                    &payer_witness.secret_key.clone().into_keypair().get_pk(),
+                    payer_witness.blind,
+                    payer_witness.amount,
+                    payer_witness.asset_type,
+                )?;
+                input_commitments_traces.push(trace);
+            }
+
+            for payee_witness in fake_witness.payees_witnesses.iter() {
+                let (_, trace) = commit(
+                    &payee_witness.public_key,
+                    payee_witness.blind,
+                    payee_witness.amount,
+                    payee_witness.asset_type,
+                )?;
+                output_commitments_traces.push(trace);
+            }
+
+            let (cs, _) = build_multi_xfr_cs(
+                &fake_witness,
+                FEE_TYPE.as_scalar(),
+                &nullifiers_traces,
+                &input_commitments_traces,
+                &output_commitments_traces,
+                &AXfrAddressFoldingWitness::Secp256k1(AXfrAddressFoldingWitnessSecp256k1::default()),
+            );
+            (cs, depth)
         };
 
-        let mut nullifiers_traces = Vec::new();
-        let mut input_commitments_traces = Vec::new();
-        let mut output_commitments_traces = Vec::new();
-        for payer_witness in fake_witness.payers_witnesses.iter() {
-            let (_, trace) = nullify(
-                &payer_witness.secret_key.clone().into_keypair(),
-                payer_witness.amount,
-                payer_witness.asset_type,
-                payer_witness.uid,
-            )?;
-            nullifiers_traces.push(trace);
+        let ed25519_cs = {
+            let (fake_witness, _depth) = match tree_depth {
+                Some(depth) => (
+                    AXfrWitness::fake_ed25519(n_payers, n_payees, depth, 0),
+                    depth,
+                ),
+                None => (
+                    AXfrWitness::fake_ed25519(n_payers, n_payees, TREE_DEPTH, 0),
+                    TREE_DEPTH,
+                ),
+            };
 
-            let (_, trace) = commit(
-                &payer_witness.secret_key.clone().into_keypair().get_pk(),
-                payer_witness.blind,
-                payer_witness.amount,
-                payer_witness.asset_type,
-            )?;
-            input_commitments_traces.push(trace);
-        }
+            let mut nullifiers_traces = Vec::new();
+            let mut input_commitments_traces = Vec::new();
+            let mut output_commitments_traces = Vec::new();
+            for payer_witness in fake_witness.payers_witnesses.iter() {
+                let (_, trace) = nullify(
+                    &payer_witness.secret_key.clone().into_keypair(),
+                    payer_witness.amount,
+                    payer_witness.asset_type,
+                    payer_witness.uid,
+                )?;
+                nullifiers_traces.push(trace);
 
-        for payee_witness in fake_witness.payees_witnesses.iter() {
-            let (_, trace) = commit(
-                &payee_witness.public_key,
-                payee_witness.blind,
-                payee_witness.amount,
-                payee_witness.asset_type,
-            )?;
-            output_commitments_traces.push(trace);
-        }
+                let (_, trace) = commit(
+                    &payer_witness.secret_key.clone().into_keypair().get_pk(),
+                    payer_witness.blind,
+                    payer_witness.amount,
+                    payer_witness.asset_type,
+                )?;
+                input_commitments_traces.push(trace);
+            }
 
-        let (cs, _) = build_multi_xfr_cs(
-            fake_witness,
-            FEE_TYPE.as_scalar(),
-            &nullifiers_traces,
-            &input_commitments_traces,
-            &output_commitments_traces,
-            &folding_witness,
-        );
+            for payee_witness in fake_witness.payees_witnesses.iter() {
+                let (_, trace) = commit(
+                    &payee_witness.public_key,
+                    payee_witness.blind,
+                    payee_witness.amount,
+                    payee_witness.asset_type,
+                )?;
+                output_commitments_traces.push(trace);
+            }
 
-        let pcs = load_srs_params(cs.size())?;
-        let lagrange_pcs = load_lagrange_params(cs.size());
-        let verifier = if depth == TREE_DEPTH {
-            VerifierParams::load_prepare(n_payers, n_payees)
-                .map(|v| v.verifier_params)
-                .ok()
+            let (cs, _) = build_multi_xfr_cs(
+                &fake_witness,
+                FEE_TYPE.as_scalar(),
+                &nullifiers_traces,
+                &input_commitments_traces,
+                &output_commitments_traces,
+                &AXfrAddressFoldingWitness::Ed25519(AXfrAddressFoldingWitnessEd25519::default()),
+            );
+            cs
+        };
+
+        let cs_size = core::cmp::max(secp256k1_cs.size(), ed25519_cs.size());
+        let pcs = load_srs_params(cs_size)?;
+        let lagrange_pcs = load_lagrange_params(cs_size);
+        let (secp256k1_verifier_params, ed25519_verifier_params) = if depth == TREE_DEPTH {
+            match VerifierParams::load_prepare(n_payers, n_payees).ok() {
+                Some(v) => (
+                    Some(v.secp256k1_verifier_params),
+                    Some(v.ed25519_verifier_params),
+                ),
+                None => (None, None),
+            }
         } else {
-            None
+            (None, None)
         };
 
-        let prover_params =
-            indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), verifier).unwrap();
+        let secp256k1_prover_params = indexer_with_lagrange(
+            &secp256k1_cs,
+            &pcs,
+            lagrange_pcs.as_ref(),
+            secp256k1_verifier_params,
+        )
+        .unwrap();
+
+        let ed25519_prover_params = indexer_with_lagrange(
+            &ed25519_cs,
+            &pcs,
+            lagrange_pcs.as_ref(),
+            ed25519_verifier_params,
+        )
+        .unwrap();
 
         Ok(ProverParams {
             pcs,
             lagrange_pcs,
-            cs,
-            prover_params,
+            secp256k1_cs,
+            ed25519_cs,
+            secp256k1_prover_params,
+            ed25519_prover_params,
         })
     }
 
@@ -285,36 +428,77 @@ impl ProverParams {
 
         // It's okay to choose a fixed seed to build CS.
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let keypair = KeyPair::generate(&mut prng);
 
-        let (_, output_commitment_trace) = commit(&keypair.get_pk(), zero, 0, zero)?;
+        let secp256k1_cs = {
+            let keypair = KeyPair::generate_secp256k1(&mut prng);
+            let (_, output_commitment_trace) = commit(&keypair.get_pk(), zero, 0, zero)?;
+            let (cs, _) = build_bar_to_abar_cs(
+                zero,
+                zero,
+                zero,
+                &keypair.get_pk(),
+                &proof,
+                &non_zk_state,
+                &beta,
+                &lambda,
+                &output_commitment_trace,
+            );
+            cs
+        };
 
-        let (cs, _) = build_bar_to_abar_cs(
-            zero,
-            zero,
-            zero,
-            &keypair.get_pk(),
-            &proof,
-            &non_zk_state,
-            &beta,
-            &lambda,
-            &output_commitment_trace,
-        );
+        let ed25519_cs = {
+            let keypair = KeyPair::generate_ed25519(&mut prng);
+            let (_, output_commitment_trace) = commit(&keypair.get_pk(), zero, 0, zero)?;
+            let (cs, _) = build_bar_to_abar_cs(
+                zero,
+                zero,
+                zero,
+                &keypair.get_pk(),
+                &proof,
+                &non_zk_state,
+                &beta,
+                &lambda,
+                &output_commitment_trace,
+            );
+            cs
+        };
 
-        let pcs = load_srs_params(cs.size())?;
-        let lagrange_pcs = load_lagrange_params(cs.size());
-        let verifier = VerifierParams::bar_to_abar_params_prepare()
-            .map(|v| v.verifier_params)
-            .ok();
+        let cs_size = core::cmp::max(secp256k1_cs.size(), ed25519_cs.size());
+        let pcs = load_srs_params(cs_size)?;
+        let lagrange_pcs = load_lagrange_params(cs_size);
 
-        let prover_params =
-            indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), verifier).unwrap();
+        let (secp256k1_verifier_params, ed25519_verifier_params) =
+            match VerifierParams::bar_to_abar_params_prepare().ok() {
+                Some(v) => (
+                    Some(v.secp256k1_verifier_params),
+                    Some(v.ed25519_verifier_params),
+                ),
+                None => (None, None),
+            };
+
+        let secp256k1_prover_params = indexer_with_lagrange(
+            &secp256k1_cs,
+            &pcs,
+            lagrange_pcs.as_ref(),
+            secp256k1_verifier_params,
+        )
+        .unwrap();
+
+        let ed25519_prover_params = indexer_with_lagrange(
+            &ed25519_cs,
+            &pcs,
+            lagrange_pcs.as_ref(),
+            ed25519_verifier_params,
+        )
+        .unwrap();
 
         Ok(ProverParams {
             pcs,
             lagrange_pcs,
-            cs,
-            prover_params,
+            secp256k1_cs,
+            secp256k1_prover_params,
+            ed25519_cs,
+            ed25519_prover_params,
         })
     }
 
@@ -348,7 +532,6 @@ impl ProverParams {
 
         // It's okay to choose a fixed seed to build CS.
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let keypair = KeyPair::generate(&mut prng);
 
         let node = MTNode {
             left: bls_zero,
@@ -358,60 +541,122 @@ impl ProverParams {
             is_mid_child: 0,
             is_right_child: 0,
         };
-        let payer_secret = PayerWitness {
-            secret_key: keypair.get_sk(),
-            uid: 0,
-            amount: 0,
-            asset_type: bls_zero,
-            path: MTPath::new(vec![node; tree_depth]),
-            blind: bls_zero,
+
+        let secp256k1_cs = {
+            let keypair = KeyPair::generate_secp256k1(&mut prng);
+            let payer_secret = PayerWitness {
+                secret_key: keypair.get_sk(),
+                uid: 0,
+                amount: 0,
+                asset_type: bls_zero,
+                path: MTPath::new(vec![node.clone(); tree_depth]),
+                blind: bls_zero,
+            };
+
+            let (_, nullifier_trace) = nullify(
+                &payer_secret.secret_key.clone().into_keypair(),
+                payer_secret.amount,
+                payer_secret.asset_type,
+                payer_secret.uid,
+            )?;
+
+            let (_, input_commitment_trace) = commit(
+                &payer_secret.secret_key.clone().into_keypair().get_pk(),
+                payer_secret.blind,
+                payer_secret.amount,
+                payer_secret.asset_type,
+            )?;
+
+            let (cs, _) = build_abar_to_bar_cs(
+                &payer_secret,
+                &nullifier_trace,
+                &input_commitment_trace,
+                &proof,
+                &non_zk_state,
+                &beta,
+                &lambda,
+                &AXfrAddressFoldingWitness::Secp256k1(AXfrAddressFoldingWitnessSecp256k1::default()),
+            );
+            cs
         };
 
-        let folding_witness = AXfrAddressFoldingWitnessSecp256k1::default();
+        let ed25519_cs = {
+            let keypair = KeyPair::generate_ed25519(&mut prng);
+            let payer_secret = PayerWitness {
+                secret_key: keypair.get_sk(),
+                uid: 0,
+                amount: 0,
+                asset_type: bls_zero,
+                path: MTPath::new(vec![node; tree_depth]),
+                blind: bls_zero,
+            };
 
-        let (_, nullifier_trace) = nullify(
-            &payer_secret.secret_key.clone().into_keypair(),
-            payer_secret.amount,
-            payer_secret.asset_type,
-            payer_secret.uid,
-        )?;
+            let (_, nullifier_trace) = nullify(
+                &payer_secret.secret_key.clone().into_keypair(),
+                payer_secret.amount,
+                payer_secret.asset_type,
+                payer_secret.uid,
+            )?;
 
-        let (_, input_commitment_trace) = commit(
-            &payer_secret.secret_key.clone().into_keypair().get_pk(),
-            payer_secret.blind,
-            payer_secret.amount,
-            payer_secret.asset_type,
-        )?;
+            let (_, input_commitment_trace) = commit(
+                &payer_secret.secret_key.clone().into_keypair().get_pk(),
+                payer_secret.blind,
+                payer_secret.amount,
+                payer_secret.asset_type,
+            )?;
 
-        let (cs, _) = build_abar_to_bar_cs(
-            payer_secret,
-            &nullifier_trace,
-            &input_commitment_trace,
-            &proof,
-            &non_zk_state,
-            &beta,
-            &lambda,
-            &folding_witness,
-        );
+            let (cs, _) = build_abar_to_bar_cs(
+                &payer_secret,
+                &nullifier_trace,
+                &input_commitment_trace,
+                &proof,
+                &non_zk_state,
+                &beta,
+                &lambda,
+                &AXfrAddressFoldingWitness::Ed25519(AXfrAddressFoldingWitnessEd25519::default()),
+            );
+            cs
+        };
 
-        let pcs = load_srs_params(cs.size())?;
-        let lagrange_pcs = load_lagrange_params(cs.size());
-        let verifier = if tree_depth == TREE_DEPTH {
-            VerifierParams::abar_to_bar_params_prepare()
-                .map(|v| v.verifier_params)
-                .ok()
+        let cs_size = core::cmp::max(secp256k1_cs.size(), ed25519_cs.size());
+        let pcs = load_srs_params(cs_size)?;
+        let lagrange_pcs = load_lagrange_params(cs_size);
+
+        let (secp256k1_verifier_params, ed25519_verifier_params) = if tree_depth == TREE_DEPTH {
+            match VerifierParams::abar_to_bar_params_prepare().ok() {
+                Some(v) => (
+                    Some(v.secp256k1_verifier_params),
+                    Some(v.ed25519_verifier_params),
+                ),
+                None => (None, None),
+            }
         } else {
-            None
+            (None, None)
         };
 
-        let prover_params =
-            indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), verifier).unwrap();
+        let secp256k1_prover_params = indexer_with_lagrange(
+            &secp256k1_cs,
+            &pcs,
+            lagrange_pcs.as_ref(),
+            secp256k1_verifier_params,
+        )
+        .unwrap();
+
+        let ed25519_prover_params = indexer_with_lagrange(
+            &ed25519_cs,
+            &pcs,
+            lagrange_pcs.as_ref(),
+            ed25519_verifier_params,
+        )
+        .unwrap();
 
         Ok(ProverParams {
             pcs,
             lagrange_pcs,
-            cs,
-            prover_params,
+            secp256k1_cs,
+            secp256k1_prover_params,
+            ed25519_cs,
+            ed25519_prover_params,
         })
     }
 
@@ -421,37 +666,78 @@ impl ProverParams {
 
         // It's okay to choose a fixed seed to build CS.
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let keypair = KeyPair::generate(&mut prng);
-        let dummy_payee = PayeeWitness {
-            amount: 0,
-            blind: bls_zero,
-            asset_type: bls_zero,
-            public_key: keypair.get_pk(),
+
+        let secp256k1_cs = {
+            let keypair = KeyPair::generate_secp256k1(&mut prng);
+            let dummy_payee = PayeeWitness {
+                amount: 0,
+                blind: bls_zero,
+                asset_type: bls_zero,
+                public_key: keypair.get_pk(),
+            };
+            let (_, input_commitment_trace) = commit(
+                &dummy_payee.public_key,
+                dummy_payee.blind,
+                dummy_payee.amount,
+                dummy_payee.asset_type,
+            )?;
+            let (cs, _) = build_ar_to_abar_cs(dummy_payee, &input_commitment_trace);
+            cs
         };
 
-        let (_, input_commitment_trace) = commit(
-            &dummy_payee.public_key,
-            dummy_payee.blind,
-            dummy_payee.amount,
-            dummy_payee.asset_type,
-        )?;
+        let ed25519_cs = {
+            let keypair = KeyPair::generate_ed25519(&mut prng);
+            let dummy_payee = PayeeWitness {
+                amount: 0,
+                blind: bls_zero,
+                asset_type: bls_zero,
+                public_key: keypair.get_pk(),
+            };
+            let (_, input_commitment_trace) = commit(
+                &dummy_payee.public_key,
+                dummy_payee.blind,
+                dummy_payee.amount,
+                dummy_payee.asset_type,
+            )?;
+            let (cs, _) = build_ar_to_abar_cs(dummy_payee, &input_commitment_trace);
+            cs
+        };
 
-        let (cs, _) = build_ar_to_abar_cs(dummy_payee, &input_commitment_trace);
+        let cs_size = core::cmp::max(secp256k1_cs.size(), ed25519_cs.size());
+        let pcs = load_srs_params(cs_size)?;
+        let lagrange_pcs = load_lagrange_params(cs_size);
+        let (secp256k1_verifier_params, ed25519_verifier_params) =
+            match VerifierParams::ar_to_abar_params_prepare().ok() {
+                Some(v) => (
+                    Some(v.secp256k1_verifier_params),
+                    Some(v.ed25519_verifier_params),
+                ),
+                None => (None, None),
+            };
 
-        let pcs = load_srs_params(cs.size())?;
-        let lagrange_pcs = load_lagrange_params(cs.size());
-        let verifier = VerifierParams::ar_to_abar_params_prepare()
-            .map(|v| v.verifier_params)
-            .ok();
+        let secp256k1_prover_params = indexer_with_lagrange(
+            &secp256k1_cs,
+            &pcs,
+            lagrange_pcs.as_ref(),
+            secp256k1_verifier_params,
+        )
+        .unwrap();
 
-        let prover_params =
-            indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), verifier).unwrap();
+        let ed25519_prover_params = indexer_with_lagrange(
+            &ed25519_cs,
+            &pcs,
+            lagrange_pcs.as_ref(),
+            ed25519_verifier_params,
+        )
+        .unwrap();
 
         Ok(ProverParams {
             pcs,
             lagrange_pcs,
-            cs,
-            prover_params,
+            secp256k1_cs,
+            secp256k1_prover_params,
+            ed25519_cs,
+            ed25519_prover_params,
         })
     }
 
@@ -461,7 +747,6 @@ impl ProverParams {
 
         // It's okay to choose a fixed seed to build CS.
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
-        let keypair = KeyPair::generate(&mut prng);
 
         let node = MTNode {
             left: bls_zero,
@@ -471,56 +756,111 @@ impl ProverParams {
             is_mid_child: 0,
             is_right_child: 0,
         };
-        let payer_secret = PayerWitness {
-            secret_key: keypair.get_sk(),
-            uid: 0,
-            amount: 0,
-            asset_type: bls_zero,
-            path: MTPath::new(vec![node; tree_depth]),
-            blind: bls_zero,
+
+        let secp256k1_cs = {
+            let keypair = KeyPair::generate_secp256k1(&mut prng);
+            let payer_secret = PayerWitness {
+                secret_key: keypair.get_sk(),
+                uid: 0,
+                amount: 0,
+                asset_type: bls_zero,
+                path: MTPath::new(vec![node.clone(); tree_depth]),
+                blind: bls_zero,
+            };
+            let (_, nullifier_trace) = nullify(
+                &payer_secret.secret_key.clone().into_keypair(),
+                payer_secret.amount,
+                payer_secret.asset_type,
+                payer_secret.uid,
+            )?;
+
+            let (_, input_commitment_trace) = commit(
+                &payer_secret.secret_key.clone().into_keypair().get_pk(),
+                payer_secret.blind,
+                payer_secret.amount,
+                payer_secret.asset_type,
+            )?;
+
+            let (cs, _) = build_abar_to_ar_cs(
+                &payer_secret,
+                &nullifier_trace,
+                &input_commitment_trace,
+                &AXfrAddressFoldingWitness::Secp256k1(AXfrAddressFoldingWitnessSecp256k1::default()),
+            );
+            cs
         };
 
-        let folding_witness = AXfrAddressFoldingWitnessSecp256k1::default();
+        let ed25519_cs = {
+            let keypair = KeyPair::generate_ed25519(&mut prng);
+            let payer_secret = PayerWitness {
+                secret_key: keypair.get_sk(),
+                uid: 0,
+                amount: 0,
+                asset_type: bls_zero,
+                path: MTPath::new(vec![node; tree_depth]),
+                blind: bls_zero,
+            };
+            let (_, nullifier_trace) = nullify(
+                &payer_secret.secret_key.clone().into_keypair(),
+                payer_secret.amount,
+                payer_secret.asset_type,
+                payer_secret.uid,
+            )?;
 
-        let (_, nullifier_trace) = nullify(
-            &payer_secret.secret_key.clone().into_keypair(),
-            payer_secret.amount,
-            payer_secret.asset_type,
-            payer_secret.uid,
-        )?;
+            let (_, input_commitment_trace) = commit(
+                &payer_secret.secret_key.clone().into_keypair().get_pk(),
+                payer_secret.blind,
+                payer_secret.amount,
+                payer_secret.asset_type,
+            )?;
+            let (cs, _) = build_abar_to_ar_cs(
+                &payer_secret,
+                &nullifier_trace,
+                &input_commitment_trace,
+                &AXfrAddressFoldingWitness::Ed25519(AXfrAddressFoldingWitnessEd25519::default()),
+            );
+            cs
+        };
 
-        let (_, input_commitment_trace) = commit(
-            &payer_secret.secret_key.clone().into_keypair().get_pk(),
-            payer_secret.blind,
-            payer_secret.amount,
-            payer_secret.asset_type,
-        )?;
+        let cs_size = core::cmp::max(secp256k1_cs.size(), ed25519_cs.size());
+        let pcs = load_srs_params(cs_size)?;
+        let lagrange_pcs = load_lagrange_params(cs_size);
 
-        let (cs, _) = build_abar_to_ar_cs(
-            payer_secret,
-            &nullifier_trace,
-            &input_commitment_trace,
-            &folding_witness,
-        );
-
-        let pcs = load_srs_params(cs.size())?;
-        let lagrange_pcs = load_lagrange_params(cs.size());
-        let verifier = if tree_depth == TREE_DEPTH {
-            VerifierParams::abar_to_ar_params_prepare()
-                .map(|v| v.verifier_params)
-                .ok()
+        let (secp256k1_verifier_params, ed25519_verifier_params) = if tree_depth == TREE_DEPTH {
+            match VerifierParams::abar_to_ar_params_prepare().ok() {
+                Some(v) => (
+                    Some(v.secp256k1_verifier_params),
+                    Some(v.ed25519_verifier_params),
+                ),
+                None => (None, None),
+            }
         } else {
-            None
+            (None, None)
         };
 
-        let prover_params =
-            indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), verifier).unwrap();
+        let secp256k1_prover_params = indexer_with_lagrange(
+            &secp256k1_cs,
+            &pcs,
+            lagrange_pcs.as_ref(),
+            secp256k1_verifier_params,
+        )
+        .unwrap();
+
+        let ed25519_prover_params = indexer_with_lagrange(
+            &ed25519_cs,
+            &pcs,
+            lagrange_pcs.as_ref(),
+            ed25519_verifier_params,
+        )
+        .unwrap();
 
         Ok(ProverParams {
             pcs,
             lagrange_pcs,
-            cs,
-            prover_params,
+            secp256k1_cs,
+            secp256k1_prover_params,
+            ed25519_cs,
+            ed25519_prover_params,
         })
     }
 }
@@ -528,28 +868,13 @@ impl ProverParams {
 fn load_lagrange_params(size: usize) -> Option<KZGCommitmentSchemeBLS> {
     match LAGRANGE_BASES.get(&size) {
         None => None,
-        Some(bytes) => {
-            let mut len_bytes = [0u8; 4];
-            len_bytes.copy_from_slice(&bytes[0..4]);
-            let len = u32::from_le_bytes(len_bytes) as usize;
-
-            let n = BLSG1::unchecked_size();
-
-            let mut v = vec![];
-            for i in 0..len {
-                v.push(BLSG1::from_unchecked_bytes(&bytes[(4 + n * i)..(4 + n * (i + 1))]).ok()?);
-            }
-
-            Some(KZGCommitmentSchemeBLS {
-                public_parameter_group_1: v,
-                public_parameter_group_2: vec![],
-            })
-        }
+        Some(bytes) => KZGCommitmentSchemeBLS::from_unchecked_bytes(&bytes).ok(),
     }
 }
 
 fn load_srs_params(size: usize) -> Result<KZGCommitmentSchemeBLS> {
     let srs = SRS.c(d!(NoahError::MissingSRSError))?;
+
     let KZGCommitmentSchemeBLS {
         public_parameter_group_1,
         public_parameter_group_2,
@@ -578,6 +903,23 @@ fn load_srs_params(size: usize) -> Result<KZGCommitmentSchemeBLS> {
 }
 
 impl VerifierParams {
+    /// Choose secp256k1 or ed25519 cs and prover_params
+    pub fn cs_params(
+        &self,
+        witness: Option<&AXfrAddressFoldingInstance>,
+    ) -> (TurboPlonkCS, &PlonkVK<KZGCommitmentSchemeBLS>) {
+        match witness {
+            None | Some(AXfrAddressFoldingInstance::Secp256k1(_)) => (
+                self.secp256k1_cs.clone().into(),
+                &self.secp256k1_verifier_params,
+            ),
+            Some(AXfrAddressFoldingInstance::Ed25519(_)) => (
+                self.ed25519_cs.clone().into(),
+                &self.ed25519_verifier_params,
+            ),
+        }
+    }
+
     /// Create the verifier parameters for a given number of inputs and a given number of outputs.
     pub fn create(
         n_payers: usize,
@@ -616,8 +958,10 @@ impl VerifierParams {
                         .c(d!(NoahError::DeserializationError))?;
                 Ok(VerifierParams {
                     pcs: common.pcs,
-                    cs: special.cs,
-                    verifier_params: special.verifier_params,
+                    secp256k1_cs: special.secp256k1_cs,
+                    ed25519_cs: special.ed25519_cs,
+                    secp256k1_verifier_params: special.secp256k1_verifier_params,
+                    ed25519_verifier_params: special.ed25519_verifier_params,
                 })
             }
             _ => Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into()),
@@ -658,7 +1002,9 @@ impl VerifierParams {
     /// Obtain the parameters for confidential to anonymous from prepare.
     pub fn bar_to_abar_params_prepare() -> Result<VerifierParams> {
         if let Some(bytes) = BAR_TO_ABAR_VERIFIER_PARAMS {
-            bincode::deserialize(bytes).c(d!(NoahError::DeserializationError))
+            bincode::deserialize::<VerifierParamsCommon>(bytes)
+                .map(|v| v.to_full())
+                .c(d!(NoahError::DeserializationError))
         } else {
             Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
         }
@@ -678,7 +1024,9 @@ impl VerifierParams {
     /// Obtain the parameters for transparent to anonymous from prepare.
     pub fn ar_to_abar_params_prepare() -> Result<VerifierParams> {
         if let Some(bytes) = AR_TO_ABAR_VERIFIER_PARAMS {
-            bincode::deserialize(bytes).c(d!(NoahError::DeserializationError))
+            bincode::deserialize::<VerifierParamsCommon>(bytes)
+                .map(|v| v.to_full())
+                .c(d!(NoahError::DeserializationError))
         } else {
             Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
         }
@@ -708,8 +1056,10 @@ impl VerifierParams {
     pub fn shrink(self) -> Result<VerifierParams> {
         Ok(VerifierParams {
             pcs: self.pcs.shrink_to_verifier_only()?,
-            cs: self.cs.shrink_to_verifier_only()?,
-            verifier_params: self.verifier_params,
+            secp256k1_cs: self.secp256k1_cs.into(),
+            secp256k1_verifier_params: self.secp256k1_verifier_params,
+            ed25519_cs: self.ed25519_cs.into(),
+            ed25519_verifier_params: self.ed25519_verifier_params,
         })
     }
 
@@ -720,8 +1070,10 @@ impl VerifierParams {
                 pcs: self.pcs.shrink_to_verifier_only()?,
             },
             VerifierParamsSplitSpecific {
-                cs: self.cs.shrink_to_verifier_only()?,
-                verifier_params: self.verifier_params,
+                secp256k1_cs: self.secp256k1_cs.into(),
+                secp256k1_verifier_params: self.secp256k1_verifier_params,
+                ed25519_cs: self.ed25519_cs.into(),
+                ed25519_verifier_params: self.ed25519_verifier_params,
             },
         ))
     }
@@ -731,8 +1083,10 @@ impl From<ProverParams> for VerifierParams {
     fn from(params: ProverParams) -> Self {
         VerifierParams {
             pcs: params.pcs,
-            cs: params.cs,
-            verifier_params: params.prover_params.get_verifier_params(),
+            secp256k1_cs: params.secp256k1_cs.into(),
+            secp256k1_verifier_params: params.secp256k1_prover_params.get_verifier_params(),
+            ed25519_cs: params.ed25519_cs.into(),
+            ed25519_verifier_params: params.ed25519_prover_params.get_verifier_params(),
         }
     }
 }

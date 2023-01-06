@@ -5,16 +5,11 @@ authors = ['Findora <engineering@findora.org>']
 edition = '2021'
 description = 'Noah smoke tests'
 
-[dependencies.noah]
-path = '../api'
-
 [dependencies]
 aes = '0.8.1'
 aes-gcm = '0.10.1'
 bincode = '1.3.1'
-bulletproofs = { git = "https://github.com/FindoraNetwork/bulletproofs", tag = "v1.0.2-f"  }
 digest = '0.10'
-ed25519-dalek = { git = "https://github.com/FindoraNetwork/ed25519-dalek", tag = "v1.0.1-f" }
 lazy_static = "1.4.0"
 libsecp256k1 = '0.7'
 linear-map = '1.2.0'
@@ -28,9 +23,8 @@ serde_str = '0.1.0'
 sha2 = '0.10'
 sha3 = '0.10'
 
-[dependencies.ark-serialize]
-version = '^0.3.0'
-default-features = false
+[dependencies.noah]
+path = '../api'
 
 [dependencies.noah-algebra]
 path = '../algebra'
@@ -42,9 +36,31 @@ path = '../crypto'
 path = '../plonk'
 
 [dependencies.curve25519-dalek]
-git = "https://github.com/FindoraNetwork/curve25519-dalek"
-tag = "v3.2.0-f"
+package = "noah-curve25519-dalek"
+version = "4.0.0"
+default-features = false
 features = ['serde']
+
+[dependencies.ed25519-dalek]
+package = "noah-ed25519-dalek"
+version = "4.0.0"
+
+[dependencies.bulletproofs]
+package = "noah-bulletproofs"
+version = "4.0.0"
+
+[dependencies.ark-serialize]
+version = '0.4.0-alpha'
+default-features = false
+
+[dependencies.ark-std]
+version = '0.4.0-alpha'
+default-features = false
+
+[dependencies.ark-bulletproofs]
+version = '4.0.0'
+default-features = false
+features = ['yoloproofs']
 
 [dependencies.rand_core]
 version = '0.6'
@@ -82,16 +98,8 @@ serde_json = '1.0'
 typenum = '1.11.2'
 parking_lot = '0.12'
 
-[dependencies.ark-std]
-version = '^0.3.0'
-default-features = false
-
 [dev-dependencies.noah-accumulators]
 path = '../accumulators'
-
-[dev-dependencies.rand]
-version = '0.8'
-default-features = false
 
 [dev-dependencies.storage]
 git = 'https://github.com/FindoraNetwork/storage.git'
@@ -101,11 +109,9 @@ tag = 'v1.1.4'
 git = 'https://github.com/FindoraNetwork/storage.git'
 tag = 'v1.1.4'
 
-[dependencies.ark-bulletproofs]
-git = "https://github.com/FindoraNetwork/ark-bulletproofs"
-tag = "v2.0.5-f"
+[dev-dependencies.rand]
+version = '0.8'
 default-features = false
-features = ['yoloproofs']
 
 [features]
 default = [

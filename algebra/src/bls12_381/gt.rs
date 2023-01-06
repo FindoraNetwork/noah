@@ -2,10 +2,10 @@ use crate::bls12_381::{BLSPairingEngine, BLSScalar, BLSG1, BLSG2};
 use crate::errors::AlgebraError;
 use crate::prelude::{derive_prng_from_hash, *};
 use crate::traits::Pairing;
-use ark_bls12_381::Fq12Parameters;
-use ark_ec::PairingEngine;
+use ark_bls12_381::{Bls12_381, Fq12Config};
+use ark_ec::pairing::PairingOutput;
 use ark_ff::{BigInteger, Fp12, PrimeField};
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use ark_std::UniformRand;
 use digest::{consts::U64, Digest};
 use ruc::*;
@@ -15,14 +15,14 @@ use wasm_bindgen::prelude::*;
 /// which is the pairing result
 #[wasm_bindgen]
 #[derive(Copy, Default, Clone, PartialEq, Eq, Debug)]
-pub struct BLSGt(pub(crate) Fp12<Fq12Parameters>);
+pub struct BLSGt(pub(crate) Fp12<Fq12Config>);
 
 impl Neg for BLSGt {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
         let mut v = self.0;
-        v.conjugate();
+        v.conjugate_in_place();
         Self(v)
     }
 }
@@ -42,7 +42,7 @@ impl<'a> Sub<&'a BLSGt> for BLSGt {
     #[inline]
     fn sub(self, rhs: &'a BLSGt) -> Self::Output {
         let mut rhs_inverse = rhs.0.clone();
-        rhs_inverse.conjugate();
+        rhs_inverse.conjugate_in_place();
 
         Self(self.0.mul(&rhs_inverse))
     }
@@ -62,7 +62,7 @@ impl<'a> Mul<&'a BLSScalar> for BLSGt {
         // elements.
         for bit in rhs
             .0
-            .into_repr()
+            .into_bigint()
             .to_bytes_le()
             .iter()
             .rev()
@@ -90,7 +90,7 @@ impl<'a> SubAssign<&'a BLSGt> for BLSGt {
     #[inline]
     fn sub_assign(&mut self, rhs: &'a BLSGt) {
         let mut rhs_inverse = rhs.0.clone();
-        rhs_inverse.conjugate();
+        rhs_inverse.conjugate_in_place();
 
         self.0.mul_assign(&rhs_inverse)
     }
@@ -108,7 +108,7 @@ impl Group for BLSGt {
 
     #[inline]
     fn get_identity() -> Self {
-        Self(Fp12::<Fq12Parameters>::one())
+        Self(Fp12::<Fq12Config>::one())
     }
 
     #[inline]
@@ -118,16 +118,14 @@ impl Group for BLSGt {
 
     #[inline]
     fn random<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
-        Self(
-            ark_bls12_381::Bls12_381::final_exponentiation(&Fp12::<Fq12Parameters>::rand(prng))
-                .unwrap(),
-        )
+        let g: PairingOutput<Bls12_381> = prng.gen();
+        Self(g.0)
     }
 
     #[inline]
     fn to_compressed_bytes(&self) -> Vec<u8> {
         let mut buf = Vec::new();
-        self.0.serialize(&mut buf).unwrap();
+        self.0.serialize_with_mode(&mut buf, Compress::Yes).unwrap();
 
         buf
     }
@@ -135,7 +133,7 @@ impl Group for BLSGt {
     #[inline]
     fn to_unchecked_bytes(&self) -> Vec<u8> {
         let mut buf = Vec::new();
-        self.0.serialize_unchecked(&mut buf).unwrap();
+        self.0.serialize_with_mode(&mut buf, Compress::No).unwrap();
 
         buf
     }
@@ -144,7 +142,8 @@ impl Group for BLSGt {
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
         let mut reader = ark_std::io::BufReader::new(bytes);
 
-        let res = Fp12::<Fq12Parameters>::deserialize(&mut reader);
+        let res =
+            Fp12::<Fq12Config>::deserialize_with_mode(&mut reader, Compress::Yes, Validate::Yes);
 
         if res.is_ok() {
             Ok(Self(res.unwrap()))
@@ -157,7 +156,8 @@ impl Group for BLSGt {
     fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
         let mut reader = ark_std::io::BufReader::new(bytes);
 
-        let res = Fp12::<Fq12Parameters>::deserialize_unchecked(&mut reader);
+        let res =
+            Fp12::<Fq12Config>::deserialize_with_mode(&mut reader, Compress::No, Validate::No);
 
         if res.is_ok() {
             Ok(Self(res.unwrap()))
@@ -169,7 +169,7 @@ impl Group for BLSGt {
     #[inline]
     fn unchecked_size() -> usize {
         let g = Self::get_base().0;
-        g.uncompressed_size()
+        g.serialized_size(Compress::No)
     }
 
     #[inline]
@@ -178,6 +178,6 @@ impl Group for BLSGt {
         D: Digest<OutputSize = U64> + Default,
     {
         let mut prng = derive_prng_from_hash::<D>(hash);
-        Self(Fp12::<Fq12Parameters>::rand(&mut prng))
+        Self(Fp12::<Fq12Config>::rand(&mut prng))
     }
 }

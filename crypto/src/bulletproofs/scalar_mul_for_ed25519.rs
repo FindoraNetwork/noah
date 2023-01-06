@@ -1,19 +1,18 @@
 //! Module for the Bulletproof scalar mul proof scheme
 //!
 use ark_bulletproofs::{
-    curve::ed25519::{Fq, FrParameters, G1Affine},
     curve::zorro::G1Affine as G1AffineBig,
     r1cs::{LinearCombination, Prover, RandomizableConstraintSystem, Variable, Verifier},
 };
 use ark_bulletproofs::{BulletproofGens, PedersenGens};
-use ark_ec::{AffineCurve, ProjectiveCurve};
-use ark_ff::{BigInteger, Field, FpParameters, PrimeField};
+use ark_ec::{AffineRepr, CurveGroup, Group as ArkGroup};
+use ark_ed25519::{EdwardsAffine, EdwardsProjective, Fq};
+use ark_ff::{BigInteger, Field, PrimeField};
 use digest::Digest;
 use merlin::Transcript;
-use noah_algebra::ed25519::get_ed25519_d;
 use noah_algebra::zorro::{PedersenCommitmentZorro, ZorroProof, ZorroScalar};
 use noah_algebra::{
-    ed25519::{Ed25519Point, Ed25519Scalar},
+    ed25519::{get_ed25519_d, Ed25519Fq, Ed25519Point},
     prelude::*,
     zorro::ZorroG1,
 };
@@ -66,7 +65,7 @@ impl ScalarMulProof {
         cs: &mut CS,
         public_key_var: &PointVar,
         secret_key_var: &ScalarVar,
-        public_key: &Option<G1Affine>,
+        public_key: &Option<EdwardsAffine>,
         secret_key: &Option<Fq>,
     ) -> Result<()> {
         assert_eq!(public_key.is_some(), secret_key.is_some());
@@ -81,7 +80,7 @@ impl ScalarMulProof {
             res.copy_from_slice(&h[..32]);
 
             let mut prng = ChaChaRng::from_seed(res);
-            G1Affine::rand(&mut prng)
+            EdwardsAffine::rand(&mut prng)
         };
 
         let mut cur = if public_key.is_some() {
@@ -105,10 +104,10 @@ impl ScalarMulProof {
 
         // 2. Compute the bit decomposition of `secret_key`.
         let (bits, bits_var) = if let Some(secret_key) = secret_key {
-            let mut bits = secret_key.into_repr().to_bits_le();
+            let mut bits = secret_key.into_bigint().to_bits_le();
             let mut bits_var = Vec::new();
 
-            bits.truncate(FrParameters::MODULUS_BITS as usize);
+            bits.truncate(Fq::MODULUS_BIT_SIZE as usize);
 
             for bit in bits.iter() {
                 let (bit_var, one_minus_bit_var, product) = cs
@@ -126,7 +125,7 @@ impl ScalarMulProof {
             let mut wrapped_bits = Vec::new();
             let mut bits_var = Vec::new();
 
-            for _ in 0..FrParameters::MODULUS_BITS {
+            for _ in 0..Fq::MODULUS_BIT_SIZE {
                 let (bit_var, one_minus_bit_var, product) = cs
                     .allocate_multiplier(None)
                     .c(d!(NoahError::R1CSProofError))?;
@@ -153,10 +152,10 @@ impl ScalarMulProof {
         // 4. Generate the points.
         let points = {
             let mut v = Vec::new();
-            let mut cur = Ed25519Point::get_base().get_raw().into_projective();
-            for _ in 0..FrParameters::MODULUS_BITS {
+            let mut cur = Ed25519Point::get_base().get_raw().into_group();
+            for _ in 0..Fq::MODULUS_BIT_SIZE {
                 v.push(cur.into_affine());
-                ProjectiveCurve::double_in_place(&mut cur);
+                EdwardsProjective::double_in_place(&mut cur);
             }
             v
         };
@@ -182,11 +181,11 @@ impl ScalarMulProof {
     fn point_add_constant<CS: RandomizableConstraintSystem<Fq>>(
         cs: &mut CS,
         left_var: &PointVar,
-        left: &Option<G1Affine>,
-        right: &G1Affine,
-    ) -> Result<(Option<G1Affine>, PointVar)> {
+        left: &Option<EdwardsAffine>,
+        right: &EdwardsAffine,
+    ) -> Result<(Option<EdwardsAffine>, PointVar)> {
         let (res_var, res) = if let Some(left) = left {
-            let res = left.add(right);
+            let res = left.add(right).into_affine();
             let res_var = PointVar::allocate(cs, &Some(res.x), &Some(res.y))?;
             (res_var, Some(res))
         } else {
@@ -219,10 +218,10 @@ impl ScalarMulProof {
         bit_var: &Variable<Fq>,
         bit: &Option<bool>,
         yes_var: &PointVar,
-        yes: &Option<G1Affine>,
+        yes: &Option<EdwardsAffine>,
         no_var: &PointVar,
-        no: &Option<G1Affine>,
-    ) -> Result<(Option<G1Affine>, PointVar)> {
+        no: &Option<EdwardsAffine>,
+    ) -> Result<(Option<EdwardsAffine>, PointVar)> {
         let (res, res_var) = if let Some(bit) = bit {
             let res = if *bit { yes.unwrap() } else { no.unwrap() };
             let res_var = PointVar::allocate(cs, &Some(res.x), &Some(res.y))?;
@@ -253,17 +252,19 @@ impl ScalarMulProof {
         bp_gens: &'b BulletproofGens<G1AffineBig>,
         transcript: &'a mut Transcript,
         public_key: &Ed25519Point,
-        secret_key: &Ed25519Scalar,
+        secret_key: &Ed25519Fq,
     ) -> Result<(ScalarMulProof, Vec<ZorroG1>, Vec<ZorroScalar>)> {
         let pc_gens = PedersenCommitmentZorro::default();
 
         let public_key = public_key.get_raw();
         let secret_key = secret_key.get_raw();
-
         let base = Ed25519Point::get_base();
 
         // 1. Sanity-check if the statement is valid.
-        assert_eq!(base.get_raw().mul(secret_key.into_repr()), public_key);
+        assert_eq!(
+            base.get_raw().mul_bigint(&secret_key.into_bigint()),
+            public_key
+        );
 
         // 2. Apply a domain separator to the transcript.
         transcript.append_message(b"dom-sep", b"ScalarMulProof");
@@ -275,18 +276,13 @@ impl ScalarMulProof {
         // 4. Allocate `public_key`.
         let x_blinding = Fq::rand(prng);
         let y_blinding = Fq::rand(prng);
-        let (x_comm, x_var) = prover.commit(public_key.x, x_blinding.clone());
-        let (y_comm, y_var) = prover.commit(public_key.y, y_blinding.clone());
+        let (x_comm, x_var) = prover.commit(public_key.x, x_blinding);
+        let (y_comm, y_var) = prover.commit(public_key.y, y_blinding);
 
         let public_key_var = PointVar::new(x_var, y_var);
 
-        // 5. Allocate `secret_key`.
-        // We can do this because Fq is larger than Fr.
-        let secret_key_fq = Fq::from_le_bytes_mod_order(&secret_key.into_repr().to_bytes_le());
-
         let secret_key_blinding = Fq::rand(prng);
-        let (secret_key_comm, secret_key_var) =
-            prover.commit(secret_key_fq, secret_key_blinding.clone());
+        let (secret_key_comm, secret_key_var) = prover.commit(secret_key, secret_key_blinding);
 
         let secret_key_var = ScalarVar(secret_key_var);
 
@@ -294,8 +290,8 @@ impl ScalarMulProof {
             &mut prover,
             &public_key_var,
             &secret_key_var,
-            &Some(public_key.clone()),
-            &Some(secret_key_fq.clone()),
+            &Some(public_key),
+            &Some(secret_key),
         )?;
 
         let proof = prover
@@ -305,9 +301,9 @@ impl ScalarMulProof {
         Ok((
             ScalarMulProof(proof),
             vec![
-                ZorroG1::from_raw(x_comm.clone()),
-                ZorroG1::from_raw(y_comm.clone()),
-                ZorroG1::from_raw(secret_key_comm.clone()),
+                ZorroG1::from_raw(x_comm),
+                ZorroG1::from_raw(y_comm),
+                ZorroG1::from_raw(secret_key_comm),
             ],
             vec![
                 ZorroScalar::from_raw(x_blinding),
@@ -363,15 +359,13 @@ impl ScalarMulProof {
 
 #[test]
 fn scalar_mul_test() {
-    use ark_bulletproofs::curve::ed25519::Fr;
-
     let bp_gens = BulletproofGens::new(2048, 1);
 
     let mut rng = rand::thread_rng();
 
-    let secert_key = Fr::rand(&mut rng);
-    let public_key = G1Affine::prime_subgroup_generator()
-        .mul(secert_key.into_repr())
+    let secert_key = Fq::rand(&mut rng);
+    let public_key = EdwardsAffine::generator()
+        .mul_bigint(secert_key.into_bigint())
         .into_affine();
 
     let (proof, commitments, _) = {
@@ -381,15 +375,15 @@ fn scalar_mul_test() {
             &bp_gens,
             &mut prover_transcript,
             &Ed25519Point::from_raw(public_key),
-            &Ed25519Scalar::from_raw(secert_key),
+            &Ed25519Fq::from_raw(secert_key),
         )
         .unwrap()
     };
 
     {
         let mut verifier_transcript = Transcript::new(b"ScalarMulProofTest");
-        assert!(proof
-            .verify(&bp_gens, &mut verifier_transcript, &commitments,)
-            .is_ok());
+        proof
+            .verify(&bp_gens, &mut verifier_transcript, &commitments)
+            .unwrap();
     }
 }

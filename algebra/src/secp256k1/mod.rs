@@ -17,8 +17,8 @@ mod secp256k1_groups_test {
         secp256k1::{SECP256K1Scalar, SECP256K1G1},
         traits::group_tests::{test_scalar_operations, test_scalar_serialization},
     };
-    use ark_bulletproofs::curve::secp256k1::G1Affine;
-    use ark_ec::ProjectiveCurve;
+    use ark_ec::CurveGroup;
+    use ark_secp256k1::Affine;
 
     #[test]
     fn test_scalar_ops() {
@@ -60,16 +60,16 @@ mod secp256k1_groups_test {
         let g1_prime_projective = g1_prime.0;
 
         // This is the affine representation of g1_prime
-        let g1_prime_affine = G1Affine::from(g1_prime_projective);
+        let g1_prime_affine = Affine::from(g1_prime_projective);
 
         let g1_pr_plus_g1_prime_pr = g1_projective.add(&g1_prime_projective);
 
         // These two operations correspond to summation of points,
         // one in projective form and the other in affine form
-        let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_affine);
+        let g1_pr_plus_g1_prime_af = g1_projective.add(&g1_prime_affine);
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
 
-        let g1_pr_plus_g1_prime_af = g1_projective.add_mixed(&g1_prime_projective.into_affine());
+        let g1_pr_plus_g1_prime_af = g1_projective.add(&g1_prime_projective.into_affine());
         assert_eq!(g1_pr_plus_g1_prime_pr, g1_pr_plus_g1_prime_af);
     }
 

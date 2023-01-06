@@ -62,10 +62,10 @@ mod smoke_xfr_tracing {
         let amount_out1 = 100u64;
         let amount_out2 = 25u64;
 
-        let sender1 = KeyPair::generate(&mut prng);
-        let sender2 = KeyPair::generate(&mut prng);
-        let receiver1 = KeyPair::generate(&mut prng);
-        let receiver2 = KeyPair::generate(&mut prng);
+        let sender1 = KeyPair::generate_secp256k1(&mut prng);
+        let sender2 = KeyPair::generate_secp256k1(&mut prng);
+        let receiver1 = KeyPair::generate_secp256k1(&mut prng);
+        let receiver2 = KeyPair::generate_secp256k1(&mut prng);
 
         // setup policy
         let tracer_keys = AssetTracerKeyPair::generate(&mut prng);
@@ -178,9 +178,9 @@ mod smoke_xfr_tracing {
         let amount_out1 = 30u64;
         let amount_out2 = 20u64;
 
-        let sender1 = KeyPair::generate(&mut prng);
-        let receiver1 = KeyPair::generate(&mut prng);
-        let receiver2 = KeyPair::generate(&mut prng);
+        let sender1 = KeyPair::generate_secp256k1(&mut prng);
+        let receiver1 = KeyPair::generate_secp256k1(&mut prng);
+        let receiver2 = KeyPair::generate_secp256k1(&mut prng);
 
         // instantiate issuer with public keys
         let asset_tracing_key_pair = AssetTracerKeyPair::generate(&mut prng);

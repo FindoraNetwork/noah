@@ -6,13 +6,16 @@
 )]
 
 use ark_bulletproofs::BulletproofGens as BulletproofGensOverSecq256k1;
-use ark_serialize::{CanonicalDeserialize, CanonicalSerialize};
+use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use bulletproofs::BulletproofGens;
+use noah::parameters::SRS;
 use noah::setup::{
-    BulletproofParams, BulletproofURS, ProverParams, VerifierParams, ANON_XFR_BP_GENS_LEN,
+    BulletproofParams, BulletproofURS, ProverParams, VerifierParams, VerifierParamsCommon,
+    VerifierParamsSplitCommon, ANON_XFR_BP_GENS_LEN,
     MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER,
     MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER, MAX_ANONYMOUS_RECORD_NUMBER_STANDARD,
 };
+use noah_algebra::bls12_381::BLSG1;
 use noah_algebra::secq256k1::{PedersenCommitmentSecq256k1, Secq256k1BulletproofGens};
 use noah_algebra::utils::save_to_file;
 use noah_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS;
@@ -55,6 +58,9 @@ enum Actions {
     /// Generates the uniform reference string for Bulletproof (over the Zorro curve),
     BULLETPROOF_OVER_ZORRO { directory: PathBuf },
 
+    /// Cut the SRS, adapt to Lagrange, and only save the minimum 2^11, 2^12, and 2^13 padding
+    CUT_SRS { directory: PathBuf },
+
     /// Generates all necessary parameters
     ALL { directory: PathBuf },
 }
@@ -88,6 +94,8 @@ fn main() {
         BULLETPROOF_OVER_SECQ256K1 { directory } => gen_bulletproof_secq256k1_urs(directory),
 
         BULLETPROOF_OVER_ZORRO { directory } => gen_bulletproof_zorro_urs(directory),
+
+        CUT_SRS { directory } => cut_srs(directory),
 
         ALL { directory } => gen_all(directory),
     };
@@ -124,7 +132,7 @@ fn gen_transfer_vk(directory: PathBuf) {
                     let node_params = VerifierParams::create(*i, *j, Some(TREE_DEPTH)).unwrap();
                     println!(
                         "the size of the constraint system for {} payers & {} payees: {}",
-                        i, j, node_params.cs.size
+                        i, j, node_params.ed25519_cs.size
                     );
                     let (_, special) = node_params.split().unwrap();
                     (*j, bincode::serialize(&special).unwrap())
@@ -160,7 +168,7 @@ fn gen_transfer_vk(directory: PathBuf) {
                     let node_params = VerifierParams::create(*i, *j, Some(TREE_DEPTH)).unwrap();
                     println!(
                         "the size of the constraint system for {} payers & {} payees: {}",
-                        i, j, node_params.cs.size
+                        i, j, node_params.ed25519_cs.size
                     );
                     let (_, special) = node_params.split().unwrap();
                     (*j, bincode::serialize(&special).unwrap())
@@ -194,7 +202,7 @@ fn gen_abar_to_bar_vk(mut path: PathBuf) {
     let node_params = VerifierParams::from(user_params).shrink().unwrap();
     println!(
         "the size of the constraint system for ABAR TO BAR: {}",
-        node_params.cs.size
+        node_params.ed25519_cs.size
     );
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("abar-to-bar-vk.bin");
@@ -211,7 +219,8 @@ fn gen_bar_to_abar_vk(mut path: PathBuf) {
     println!("Generating the verifying key for BAR TO ABAR ...");
 
     let user_params = ProverParams::bar_to_abar_params().unwrap();
-    let node_params = VerifierParams::from(user_params).shrink().unwrap();
+    let node_params =
+        VerifierParamsCommon::from_full(VerifierParams::from(user_params).shrink().unwrap());
     println!(
         "the size of the constraint system for BAR TO ABAR: {}",
         node_params.cs.size
@@ -221,7 +230,7 @@ fn gen_bar_to_abar_vk(mut path: PathBuf) {
     save_to_file(&bytes, path);
 
     let start = std::time::Instant::now();
-    let _n: VerifierParams = bincode::deserialize(&bytes).unwrap();
+    let _n: VerifierParamsCommon = bincode::deserialize(&bytes).unwrap();
     let elapsed = start.elapsed();
     println!("Deserialize time: {:.2?}", elapsed);
 }
@@ -231,7 +240,8 @@ fn gen_ar_to_abar_vk(mut path: PathBuf) {
     println!("Generating the verifying key for AR TO ABAR ...");
 
     let user_params = ProverParams::ar_to_abar_params().unwrap();
-    let node_params = VerifierParams::from(user_params).shrink().unwrap();
+    let node_params =
+        VerifierParamsCommon::from_full(VerifierParams::from(user_params).shrink().unwrap());
     println!(
         "the size of the constraint system for AR TO ABAR: {}",
         node_params.cs.size
@@ -241,7 +251,7 @@ fn gen_ar_to_abar_vk(mut path: PathBuf) {
     save_to_file(&bytes, path);
 
     let start = std::time::Instant::now();
-    let _n: VerifierParams = bincode::deserialize(&bytes).unwrap();
+    let _n: VerifierParamsCommon = bincode::deserialize(&bytes).unwrap();
     let elapsed = start.elapsed();
     println!("Deserialize time: {:.2?}", elapsed);
 }
@@ -254,7 +264,7 @@ fn gen_abar_to_ar_vk(mut path: PathBuf) {
     let node_params = VerifierParams::from(user_params).shrink().unwrap();
     println!(
         "the size of the constraint system for ABAR TO AR: {}",
-        node_params.cs.size
+        node_params.ed25519_cs.size
     );
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("abar-to-ar-vk.bin");
@@ -287,13 +297,17 @@ fn gen_bulletproof_secq256k1_urs(mut path: PathBuf) {
 
     let bp_gens = Secq256k1BulletproofGens::new(ANON_XFR_BP_GENS_LEN, 1);
     let mut bytes = Vec::new();
-    bp_gens.serialize_unchecked(&mut bytes).unwrap();
+    bp_gens
+        .serialize_with_mode(&mut bytes, Compress::No)
+        .unwrap();
     path.push("bulletproof-secq256k1-urs.bin");
     save_to_file(&bytes, path);
 
     let start = std::time::Instant::now();
     let reader = ark_std::io::BufReader::new(bytes.as_slice());
-    let _bp_gens = Secq256k1BulletproofGens::deserialize_unchecked(reader).unwrap();
+    let _bp_gens =
+        Secq256k1BulletproofGens::deserialize_with_mode(reader, Compress::No, Validate::No)
+            .unwrap();
     println!("Deserialize time: {:.2?}", start.elapsed());
 }
 
@@ -303,14 +317,45 @@ fn gen_bulletproof_zorro_urs(mut path: PathBuf) {
 
     let bp_gens = ZorroBulletproofGens::new(ANON_XFR_BP_GENS_LEN, 1);
     let mut bytes = Vec::new();
-    bp_gens.serialize_unchecked(&mut bytes).unwrap();
+    bp_gens
+        .serialize_with_mode(&mut bytes, Compress::No)
+        .unwrap();
     path.push("bulletproof-zorro-urs.bin");
     save_to_file(&bytes, path);
 
     let start = std::time::Instant::now();
     let reader = ark_std::io::BufReader::new(bytes.as_slice());
-    let _bp_gens = ZorroBulletproofGens::deserialize_unchecked(reader).unwrap();
+    let _bp_gens =
+        ZorroBulletproofGens::deserialize_with_mode(reader, Compress::No, Validate::No).unwrap();
     println!("Deserialize time: {:.2?}", start.elapsed());
+}
+
+// cargo run --release --features="gen no_vk" --bin gen-params cut-srs "./parameters"
+fn cut_srs(mut path: PathBuf) {
+    let srs = SRS.unwrap();
+    let KZGCommitmentSchemeBLS {
+        public_parameter_group_1,
+        public_parameter_group_2,
+    } = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs).unwrap();
+
+    if public_parameter_group_1.len() == 2057 {
+        println!("Already complete");
+        return;
+    }
+
+    let mut new_group_1 = vec![BLSG1::default(); 2057];
+    new_group_1[0..2051].copy_from_slice(&public_parameter_group_1[0..2051]);
+    new_group_1[2051..2054].copy_from_slice(&public_parameter_group_1[4096..4099]);
+    new_group_1[2054..2057].copy_from_slice(&public_parameter_group_1[8192..8195]);
+
+    let new_srs = KZGCommitmentSchemeBLS {
+        public_parameter_group_2,
+        public_parameter_group_1: new_group_1,
+    };
+
+    let bytes = new_srs.to_unchecked_bytes().unwrap();
+    path.push("srs-padding.bin");
+    save_to_file(&bytes, path);
 }
 
 // cargo run --release --features="gen no_vk" --bin gen-params all "./parameters"

@@ -11,17 +11,14 @@ crate-type = ['rlib']
 
 [dependencies]
 aes = '0.8.1'
-bulletproofs = { git = "https://github.com/FindoraNetwork/bulletproofs", tag = "v1.0.2-f"  }
 ctr = '0.9.1'
 digest = '0.10'
-ed25519-dalek = { git = "https://github.com/FindoraNetwork/ed25519-dalek", tag = "v1.0.1-f" }
 itertools = '0.10.3'
 merlin = '3.0'
 rand_chacha = '0.3'
 serde = '1.0'
 serde_derive = '1.0'
 sha2 = '0.10'
-x25519-dalek = { git = "https://github.com/FindoraNetwork/x25519-dalek", tag = "v1.2.2-f" }
 ruc = '1.0'
 sha3 = { version = "0.10", default-features = false }
 
@@ -29,9 +26,48 @@ sha3 = { version = "0.10", default-features = false }
 path = '../algebra'
 
 [dependencies.curve25519-dalek]
-git = "https://github.com/FindoraNetwork/curve25519-dalek"
-tag = "v3.2.0-f"
+package = "noah-curve25519-dalek"
+version = "4.0.0"
+default-features = false
 features = ['serde']
+
+[dependencies.x25519-dalek]
+package = "noah-x25519-dalek"
+version = "4.0.0"
+
+[dependencies.ed25519-dalek]
+package = "noah-ed25519-dalek"
+version = "4.0.0"
+
+[dependencies.bulletproofs]
+package = "noah-bulletproofs"
+version = "4.0.0"
+
+[dependencies.ark-ec]
+version = '0.4.0-alpha'
+default-features = false
+
+[dependencies.ark-ff]
+version = '0.4.0-alpha'
+default-features = false
+features = ['asm']
+
+[dependencies.ark-ed25519]
+version = '0.4.0-alpha'
+default-features = false
+
+[dependencies.ark-secp256k1]
+version = '0.4.0-alpha'
+default-features = false
+
+[dependencies.ark-secq256k1]
+version = '0.4.0-alpha'
+default-features = false
+
+[dependencies.ark-bulletproofs]
+version = '4.0.0'
+default-features = false
+features = ['yoloproofs']
 
 [dependencies.rand_core]
 version = '0.6'
@@ -56,21 +92,6 @@ version = '0.2.12'
 version = '0.4.0'
 features = ['rand']
 
-[dependencies.ark-ec]
-version = '^0.3.0'
-default-features = false
-
-[dependencies.ark-ff]
-version = '^0.3.0'
-default-features = false
-features = ['asm']
-
-[dependencies.ark-bulletproofs]
-git = "https://github.com/FindoraNetwork/ark-bulletproofs"
-tag = "v2.0.5-f"
-default-features = false
-features = ['yoloproofs']
-
 [dev-dependencies]
 bit-array = '0.4.3'
 lazy_static = '1.4.0'
@@ -79,7 +100,7 @@ serde_json = '1.0'
 typenum = '1.11.2'
 
 [dev-dependencies.ark-std]
-version = '^0.3.0'
+version = '0.4.0-alpha'
 default-features = false
 
 [features]
@@ -87,7 +108,14 @@ default = [
     'std',
     'u64_backend',
 ]
-std = ['curve25519-dalek/std', 'ark-bulletproofs/std', 'ark-std/std']
+std = [
+    'curve25519-dalek/std',
+    'ark-bulletproofs/std',
+    'ark-std/std',
+    'ark-ed25519/std',
+    'ark-secp256k1/std',
+    'ark-secq256k1/std'
+]
 alloc = ['curve25519-dalek/alloc']
 nightly = [
     'curve25519-dalek/nightly',

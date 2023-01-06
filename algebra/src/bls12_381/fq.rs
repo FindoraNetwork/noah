@@ -1,7 +1,7 @@
 use crate::errors::AlgebraError;
 use crate::prelude::{derive_prng_from_hash, *};
-use ark_bls12_381::{Fq, FqParameters};
-use ark_ff::{BigInteger, BigInteger384, FftField, Field, FpParameters, PrimeField};
+use ark_bls12_381::Fq;
+use ark_ff::{BigInteger, BigInteger384, FftField, Field, PrimeField};
 use ark_std::{
     fmt::{Debug, Formatter},
     result::Result as StdResult,
@@ -20,7 +20,7 @@ pub struct BLSFq(pub(crate) Fq);
 impl Debug for BLSFq {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         <BigUint as Debug>::fmt(
-            &<BigInteger384 as Into<BigUint>>::into(self.0.into_repr()),
+            &<BigInteger384 as Into<BigUint>>::into(self.0.into_bigint()),
             f,
         )
     }
@@ -43,7 +43,7 @@ impl FromStr for BLSFq {
 impl Into<BigUint> for BLSFq {
     #[inline]
     fn into(self) -> BigUint {
-        self.0.into_repr().into()
+        self.0.into_bigint().into()
     }
 }
 
@@ -193,12 +193,12 @@ impl Scalar for BLSFq {
 
     #[inline]
     fn capacity() -> usize {
-        FqParameters::CAPACITY as usize
+        (Fq::MODULUS_BIT_SIZE - 1) as usize
     }
 
     #[inline]
     fn multiplicative_generator() -> Self {
-        Self(Fq::multiplicative_generator())
+        Self(Fq::GENERATOR)
     }
 
     #[inline]
@@ -223,7 +223,7 @@ impl Scalar for BLSFq {
 
     #[inline]
     fn get_little_endian_u64(&self) -> Vec<u64> {
-        let a = self.0.into_repr().to_bytes_le();
+        let a = self.0.into_bigint().to_bytes_le();
         let a1 = u8_le_slice_to_u64(&a[0..8]);
         let a2 = u8_le_slice_to_u64(&a[8..16]);
         let a3 = u8_le_slice_to_u64(&a[16..24]);
@@ -240,7 +240,7 @@ impl Scalar for BLSFq {
 
     #[inline]
     fn to_bytes(&self) -> Vec<u8> {
-        self.0.into_repr().to_bytes_le()
+        self.0.into_bigint().to_bytes_le()
     }
 
     #[inline]

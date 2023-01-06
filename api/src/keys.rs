@@ -1,5 +1,6 @@
 use aes_gcm::{aead::Aead, KeyInit};
-use ark_serialize::{Flags, SWFlags};
+use ark_ff::{BigInteger, PrimeField};
+use curve25519_dalek::edwards::CompressedEdwardsY;
 use digest::consts::U64;
 use digest::{generic_array::GenericArray, Digest};
 use ed25519_dalek::{
@@ -15,14 +16,15 @@ use libsecp256k1::{
 use noah_algebra::{
     bls12_381::BLSScalar,
     cmp::Ordering,
+    ed25519::{Ed25519Fq, Ed25519Point, Ed25519Scalar},
     hash::{Hash, Hasher},
     prelude::*,
     secp256k1::{SECP256K1Scalar, SECP256K1G1},
-    zorro::{ZorroG1, ZorroScalar},
 };
 use noah_crypto::basic::hybrid_encryption::{
     hybrid_decrypt_with_ed25519_secret_key, hybrid_encrypt_ed25519, NoahHybridCiphertext,
 };
+use serde::Serialize;
 use sha3::Keccak256;
 use wasm_bindgen::prelude::*;
 
@@ -81,14 +83,6 @@ pub enum PublicKeyInner {
     Secp256k1(Secp256k1PublicKey),
     /// Hash of the secp256k1 public key.
     EthAddress([u8; 20]),
-}
-
-impl Default for PublicKey {
-    fn default() -> Self {
-        let sk = Secp256k1SecretKey::default();
-        let pk = Secp256k1PublicKey::from_secret_key(&sk);
-        PublicKey(PublicKeyInner::Secp256k1(pk))
-    }
 }
 
 impl Eq for PublicKey {}
@@ -177,6 +171,16 @@ impl NoahFromToBytes for PublicKey {
 }
 
 impl PublicKey {
+    /// Default secp256k1 public key
+    pub fn default_secp256k1() -> Self {
+        SecretKey::default_secp256k1().into_keypair().pub_key
+    }
+
+    /// Default ed25519 public key
+    pub fn default_ed25519() -> Self {
+        SecretKey::default_ed25519().into_keypair().pub_key
+    }
+
     /// Get the reference of the inner type
     pub fn inner(&self) -> &PublicKeyInner {
         &self.0
@@ -197,20 +201,15 @@ impl PublicKey {
     /// Change to algebra secp256k1 Point
     pub fn to_secp256k1(&self) -> Result<SECP256K1G1> {
         match self.inner() {
-            PublicKeyInner::Secp256k1(pk) => {
-                let pk_bytes = convert_point_libsecp256k1_to_algebra(&pk);
-                SECP256K1G1::from_compressed_bytes(&pk_bytes)
-            }
+            PublicKeyInner::Secp256k1(pk) => convert_point_libsecp256k1_to_algebra(&pk),
             _ => Err(eg!(NoahError::ParameterError)),
         }
     }
 
     /// Change to algebra Ristretto Point
-    pub fn to_zorro(&self) -> Result<ZorroG1> {
+    pub fn to_ed25519(&self) -> Result<Ed25519Point> {
         match self.inner() {
-            PublicKeyInner::Ed25519(_pk) => {
-                unimplemented!()
-            }
+            PublicKeyInner::Ed25519(pk) => convert_ed25519_pk_to_algebra(&pk),
             _ => Err(eg!(NoahError::ParameterError)),
         }
     }
@@ -220,15 +219,21 @@ impl PublicKey {
         let bytes = match self.inner() {
             PublicKeyInner::Secp256k1(_) => {
                 let pk = self.to_secp256k1()?;
-                pk.get_x()
-                    .to_bytes()
-                    .iter()
-                    .chain(pk.get_y().to_bytes().iter())
-                    .copied()
-                    .collect::<Vec<u8>>()
+                let affine = pk.get_raw();
+                let mut bytes = Vec::new();
+                bytes.extend(affine.x.into_bigint().to_bytes_le());
+                bytes.extend(affine.y.into_bigint().to_bytes_le());
+
+                bytes
             }
             PublicKeyInner::Ed25519(_) => {
-                unimplemented!()
+                let pk = self.to_ed25519()?;
+                let affine = pk.get_raw();
+                let mut bytes = Vec::new();
+                bytes.extend(affine.x.into_bigint().to_bytes_le());
+                bytes.extend(affine.y.into_bigint().to_bytes_le());
+
+                bytes
             }
             _ => return Err(eg!(NoahError::ParameterError)),
         };
@@ -247,7 +252,7 @@ impl PublicKey {
     ) -> (KeyType, Vec<u8>, Vec<u8>) {
         match self.0 {
             PublicKeyInner::Ed25519(_) => {
-                let (s, p) = ZorroScalar::random_scalar_with_compressed_point(prng);
+                let (s, p) = Ed25519Scalar::random_scalar_with_compressed_point(prng);
                 (KeyType::Ed25519, s.to_bytes(), p.to_compressed_bytes())
             }
             PublicKeyInner::Secp256k1(_) | PublicKeyInner::EthAddress(_) => {
@@ -258,10 +263,14 @@ impl PublicKey {
     }
 
     /// Convert into the point format.
-    pub fn as_compressed_point(&self) -> Vec<u8> {
+    pub fn as_compressed_point(&self) -> Result<Vec<u8>> {
         match self.0 {
-            PublicKeyInner::Ed25519(pk) => pk.as_bytes().to_vec(),
-            PublicKeyInner::Secp256k1(pk) => convert_point_libsecp256k1_to_algebra(&pk),
+            PublicKeyInner::Ed25519(pk) => {
+                Ok(convert_ed25519_pk_to_algebra(&pk)?.to_compressed_bytes())
+            }
+            PublicKeyInner::Secp256k1(pk) => {
+                Ok(convert_point_libsecp256k1_to_algebra(&pk)?.to_compressed_bytes())
+            }
             PublicKeyInner::EthAddress(_) => panic!("EthAddress not supported"),
         }
     }
@@ -373,12 +382,6 @@ pub enum SecretKey {
     Secp256k1(Secp256k1SecretKey),
 }
 
-impl Default for SecretKey {
-    fn default() -> Self {
-        SecretKey::Secp256k1(Secp256k1SecretKey::default())
-    }
-}
-
 impl Clone for SecretKey {
     fn clone(&self) -> Self {
         Self::noah_from_bytes(&self.noah_to_bytes()).unwrap()
@@ -457,24 +460,32 @@ impl NoahFromToBytes for SecretKey {
 }
 
 impl SecretKey {
+    /// Default secp256k1 secret key
+    pub fn default_secp256k1() -> Self {
+        SecretKey::Secp256k1(Secp256k1SecretKey::default())
+    }
+
+    /// Default ed25519 secret key
+    pub fn default_ed25519() -> Self {
+        let default_bytes = [0u8; 32];
+        SecretKey::Ed25519(Ed25519SecretKey::from_bytes(&default_bytes).unwrap())
+    }
+
     /// Change to algebra secp256k1 Point
     pub fn to_secp256k1(&self) -> Result<SECP256K1Scalar> {
         match self {
             SecretKey::Secp256k1(sk) => {
                 let s: LibSecp256k1Scalar = (*sk).into();
-                let bytes = convert_scalar_libsecp256k1_to_algebra(&s.0);
-                SECP256K1Scalar::from_bytes(&bytes)
+                convert_scalar_libsecp256k1_to_algebra(&s.0)
             }
             _ => Err(eg!(NoahError::ParameterError)),
         }
     }
 
     /// Change to algebra Ristretto Point
-    pub fn to_zorro(&self) -> Result<ZorroScalar> {
+    pub fn to_ed25519(&self) -> Result<Ed25519Fq> {
         match self {
-            SecretKey::Ed25519(_pk) => {
-                unimplemented!()
-            }
+            SecretKey::Ed25519(sk) => convert_ed25519_sk_to_algebra(&sk),
             _ => Err(eg!(NoahError::ParameterError)),
         }
     }
@@ -487,7 +498,7 @@ impl SecretKey {
                 sk.to_bytes()
             }
             SecretKey::Ed25519(_) => {
-                let sk = self.to_zorro()?;
+                let sk = self.to_ed25519()?;
                 sk.to_bytes()
             }
         };
@@ -586,20 +597,19 @@ impl SecretKey {
     }
 
     /// Convert into scalar bytes.
-    pub fn as_scalar_bytes(&self) -> (KeyType, Vec<u8>) {
+    pub fn as_scalar_bytes(&self) -> Result<(KeyType, Vec<u8>)> {
         match self {
-            SecretKey::Ed25519(sk) => {
-                let expanded: ExpandedSecretKey = (sk).into();
-                let mut key_bytes = vec![];
-                key_bytes.extend_from_slice(&expanded.to_bytes()[0..32]); //1st 32 bytes are key
-                (KeyType::Ed25519, key_bytes)
-            }
+            SecretKey::Ed25519(sk) => Ok((
+                KeyType::Ed25519,
+                convert_ed25519_sk_to_algebra(sk)?.to_bytes(),
+            )),
+
             SecretKey::Secp256k1(sk) => {
                 let s: LibSecp256k1Scalar = (*sk).into();
-                (
+                Ok((
                     KeyType::Secp256k1,
-                    convert_scalar_libsecp256k1_to_algebra(&s.0),
-                )
+                    convert_scalar_libsecp256k1_to_algebra(&s.0)?.to_bytes(),
+                ))
             }
         }
     }
@@ -653,19 +663,14 @@ impl NoahFromToBytes for KeyPair {
 impl KeyPair {
     /// Default secp256k1 keypair
     pub fn default_secp256k1() -> Self {
-        Self {
-            sec_key: SecretKey::default(),
-            pub_key: PublicKey::default(),
-        }
+        let sk = SecretKey::default_secp256k1();
+        sk.into_keypair()
     }
 
     /// Default ed25519 keypair
     pub fn default_ed25519() -> Self {
-        let sk = Ed25519SecretKey::from_bytes(&[0u8; 32]).unwrap();
-        Self {
-            sec_key: SecretKey::Ed25519(sk),
-            pub_key: PublicKey(PublicKeyInner::Ed25519(Default::default())),
-        }
+        let sk = SecretKey::default_ed25519();
+        sk.into_keypair()
     }
 
     /// Change to algebra Secp256k1 keypair
@@ -679,18 +684,13 @@ impl KeyPair {
     }
 
     /// Change to algebra Ristretto keypair
-    pub fn to_zorro(&self) -> Result<(ZorroScalar, ZorroG1)> {
+    pub fn to_ed25519(&self) -> Result<(Ed25519Fq, Ed25519Point)> {
         match (&self.sec_key, &self.pub_key) {
             (SecretKey::Ed25519(_), PublicKey(PublicKeyInner::Ed25519(_))) => {
-                Ok((self.sec_key.to_zorro()?, self.pub_key.to_zorro()?))
+                Ok((self.sec_key.to_ed25519()?, self.pub_key.to_ed25519()?))
             }
             _ => Err(eg!(NoahError::ParameterError)),
         }
-    }
-
-    /// Default generate a key pair.
-    pub fn generate<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
-        Self::generate_secp256k1(prng)
     }
 
     /// Generate a Ed25519 key pair.
@@ -895,25 +895,25 @@ pub fn convert_libsecp256k1_public_key_to_address(pk: &Secp256k1PublicKey) -> [u
     bytes
 }
 
-fn convert_point_libsecp256k1_to_algebra(pk: &Secp256k1PublicKey) -> Vec<u8> {
+fn convert_point_libsecp256k1_to_algebra(pk: &Secp256k1PublicKey) -> Result<SECP256K1G1> {
     let p: LibSecp256k1G1 = (*pk).into();
     let (mut x, mut y) = (p.x, p.y);
     x.normalize();
     y.normalize();
-    let f: FieldStorage = (x).into();
-    let mut bytes = convert_scalar_libsecp256k1_to_algebra(&f.0);
-    let mut y_neg = y.neg(1);
-    y_neg.normalize();
-    let flag = if y >= y_neg {
-        SWFlags::PositiveY.u8_bitmask()
-    } else {
-        SWFlags::NegativeY.u8_bitmask()
-    };
-    bytes.push(flag);
-    bytes
+    let xf: FieldStorage = (x).into();
+    let yf: FieldStorage = (y).into();
+    let mut bytes = from_u32_slice_to_u8_slice(&xf.0).to_vec();
+    bytes.extend(from_u32_slice_to_u8_slice(&yf.0));
+    bytes.push(0); // fill the uncompressed size.
+    SECP256K1G1::from_unchecked_bytes(&bytes)
 }
 
-fn convert_scalar_libsecp256k1_to_algebra(b: &[u32; 8]) -> Vec<u8> {
+fn convert_scalar_libsecp256k1_to_algebra(b: &[u32; 8]) -> Result<SECP256K1Scalar> {
+    let bytes = from_u32_slice_to_u8_slice(b);
+    SECP256K1Scalar::from_bytes(&bytes)
+}
+
+fn from_u32_slice_to_u8_slice(b: &[u32; 8]) -> [u8; 32] {
     let mut bytes = [0u8; 32];
     bytes[0..4].copy_from_slice(&b[0].to_le_bytes());
     bytes[4..8].copy_from_slice(&b[1].to_le_bytes());
@@ -923,12 +923,31 @@ fn convert_scalar_libsecp256k1_to_algebra(b: &[u32; 8]) -> Vec<u8> {
     bytes[20..24].copy_from_slice(&b[5].to_le_bytes());
     bytes[24..28].copy_from_slice(&b[6].to_le_bytes());
     bytes[28..32].copy_from_slice(&b[7].to_le_bytes());
-    bytes.to_vec()
+    bytes
+}
+
+fn convert_ed25519_sk_to_algebra(sk: &Ed25519SecretKey) -> Result<Ed25519Fq> {
+    let esk = ExpandedSecretKey::from(sk);
+    Ed25519Fq::from_bytes(&esk.to_bytes()[..32])
+}
+
+fn convert_ed25519_pk_to_algebra(pk: &Ed25519PublicKey) -> Result<Ed25519Point> {
+    let y = CompressedEdwardsY(pk.to_bytes());
+    let p = y.decompress().unwrap();
+
+    let recip = p.Z.invert();
+    let x = &p.X * &recip;
+    let y = &p.Y * &recip;
+
+    let mut bytes = x.to_bytes().to_vec();
+    bytes.extend(y.to_bytes());
+    Ed25519Point::from_unchecked_bytes(&bytes)
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
+    use ark_ec::{AffineRepr, CurveGroup};
     use ark_std::env;
 
     #[test]
@@ -1001,6 +1020,30 @@ mod test {
         }
         let sign = kp.sign(b"message").unwrap();
         kp.pub_key.verify(b"message", &sign).unwrap();
+    }
+
+    #[test]
+    fn convert_secp256k1_key() {
+        let mut prng = test_rng();
+        let kp = KeyPair::generate_secp256k1(&mut prng);
+        let (s, p) = kp.to_secp256k1().unwrap();
+        assert_eq!(SECP256K1G1::get_base().mul(&s), p);
+    }
+
+    #[test]
+    fn convert_ed25519_key() {
+        env::set_var("DETERMINISTIC_TEST_RNG", "0");
+        let mut prng = test_rng();
+        let kp = KeyPair::generate_ed25519(&mut prng);
+        let (s, p) = kp.to_ed25519().unwrap();
+        let ss = s.get_raw();
+
+        let new_p = Ed25519Point::get_base()
+            .get_raw()
+            .mul_bigint(ss.into_bigint())
+            .into_affine();
+
+        assert_eq!(new_p, p.get_raw());
     }
 
     #[test]
