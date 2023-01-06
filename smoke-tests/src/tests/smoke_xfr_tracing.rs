@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod smoke_xfr_tracing {
-    use noah::{
+    use noah_api::{
         keys::{KeyPair, PublicKey},
         setup::BulletproofParams,
         xfr::{

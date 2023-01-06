@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod smoke_xfr_secp256k1_address {
-    use noah::{
+    use noah_api::{
         keys::{KeyPair, PublicKey, PublicKeyInner, SecretKey},
         setup::BulletproofParams,
         xfr::{

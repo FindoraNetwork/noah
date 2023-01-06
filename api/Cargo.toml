@@ -32,7 +32,7 @@ edition = '2021'
 description = 'Noah Platform Interface'
 
 [lib]
-name = 'noah'
+name = 'noah-api'
 crate-type = ['rlib']
 
 [dependencies]

@@ -23,7 +23,7 @@ serde_str = '0.1.0'
 sha2 = '0.10'
 sha3 = '0.10'
 
-[dependencies.noah]
+[dependencies.noah-api]
 path = '../api'
 
 [dependencies.noah-algebra]

@@ -1,4 +1,4 @@
-use noah::{
+use noah_api::{
     anon_creds::{self, ac_commit, ac_sign, ac_verify_commitment, Attr, Credential},
     keys::{KeyPair, PublicKey},
     setup::BulletproofParams,

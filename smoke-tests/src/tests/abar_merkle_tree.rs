@@ -1,6 +1,6 @@
 use mem_db::MemoryDB;
-use noah::anon_xfr::structs::AccElemVars;
-use noah::anon_xfr::{
+use noah_api::anon_xfr::structs::AccElemVars;
+use noah_api::anon_xfr::{
     add_merkle_path_variables, compute_merkle_root_variables,
     structs::{AnonAssetRecord, MTNode, MTPath, OpenAnonAssetRecord},
 };

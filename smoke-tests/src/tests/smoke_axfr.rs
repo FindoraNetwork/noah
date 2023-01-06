@@ -2,7 +2,7 @@
 mod smoke_axfr {
     use digest::Digest;
     use mem_db::MemoryDB;
-    use noah::{
+    use noah_api::{
         anon_xfr::{
             abar_to_abar::*,
             abar_to_ar::*,
