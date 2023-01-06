@@ -367,5 +367,6 @@ fn gen_all(directory: PathBuf) {
     gen_abar_to_ar_vk(directory.clone());
     gen_bulletproof_curve25519_urs(directory.clone());
     gen_bulletproof_secq256k1_urs(directory.clone());
-    gen_bulletproof_zorro_urs(directory)
+    gen_bulletproof_zorro_urs(directory.clone());
+    cut_srs(directory)
 }

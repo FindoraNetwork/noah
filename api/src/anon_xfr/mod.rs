@@ -1,5 +1,5 @@
 use crate::anon_xfr::structs::Commitment;
-use crate::keys::{KeyPair, PublicKey};
+use crate::keys::{KeyPair, PublicKey, PublicKeyInner, SecretKey};
 use crate::{
     anon_xfr::structs::{
         AccElemVars, AnonAssetRecord, AxfrOwnerMemo, MTPath, MerkleNodeVars, MerklePathVars,
@@ -218,11 +218,16 @@ pub fn nullify(
 
     let zero = BLSScalar::zero();
 
+    let address_format_number = match key_pair.get_sk() {
+        SecretKey::Ed25519(_) => BLSScalar::one(),
+        SecretKey::Secp256k1(_) => BLSScalar::zero(),
+    };
+
     let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
         zero,                  /* protocol version number */
         uid_amount,            /* uid and amount */
         asset_type_scalar,     /* asset type */
-        zero,                  /* address format number */
+        address_format_number, /* address format number */
         public_key_scalars[0], /* public key */
         public_key_scalars[1], /* public key */
         public_key_scalars[2], /* public key */
@@ -239,13 +244,13 @@ pub(crate) const AMOUNT_LEN: usize = 64;
 /// Depth of the Merkle Tree circuit.
 pub const TREE_DEPTH: usize = 20;
 
-/// Add the commitment constraints to the constraint system:
-/// comm = hash(hash(blinding, amount, asset_type, 0), pubkey_x, 0, 0).
+/// Add the commitment constraints to the constraint system
 pub fn commit_in_cs(
     cs: &mut TurboPlonkCS,
     blinding_var: VarIndex,
     amount_var: VarIndex,
     asset_var: VarIndex,
+    public_key_type_var: VarIndex,
     public_key_scalars: &[VarIndex; 3],
     trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
 ) -> VarIndex {
@@ -259,7 +264,7 @@ pub fn commit_in_cs(
             blinding_var,
             amount_var,
             asset_var,
-            zero_var,
+            public_key_type_var,
             public_key_scalars[0],
             public_key_scalars[1],
             public_key_scalars[2],
@@ -276,6 +281,19 @@ pub fn commit(
     amount: u64,
     asset_type_scalar: BLSScalar,
 ) -> Result<(Commitment, AnemoiVLHTrace<BLSScalar, 2, 12>)> {
+    let address_format_number: BLSScalar;
+    match public_key.0 {
+        PublicKeyInner::Ed25519(_) => {
+            address_format_number = BLSScalar::one();
+        }
+        PublicKeyInner::Secp256k1(_) => {
+            address_format_number = BLSScalar::zero();
+        }
+        PublicKeyInner::EthAddress(_) => {
+            return Err(eg!(NoahError::ParameterError));
+        }
+    };
+
     let zero = BLSScalar::zero();
     let public_key_scalars = public_key.to_bls_scalars()?;
 
@@ -284,7 +302,7 @@ pub fn commit(
         blind,
         BLSScalar::from(amount),
         asset_type_scalar,
-        zero,                  /* address format number */
+        address_format_number, /* address format number */
         public_key_scalars[0], /* public key */
         public_key_scalars[1], /* public key */
         public_key_scalars[2], /* public key */
@@ -299,6 +317,7 @@ pub(crate) fn nullify_in_cs(
     secret_key_scalars: &[VarIndex; 2],
     uid_amount: VarIndex,
     asset_type: VarIndex,
+    secret_key_type: VarIndex,
     public_key_scalars: &[VarIndex; 3],
     trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
 ) -> VarIndex {
@@ -311,7 +330,7 @@ pub(crate) fn nullify_in_cs(
             zero_var,
             uid_amount,
             asset_type,
-            zero_var,
+            secret_key_type,
             public_key_scalars[0],
             public_key_scalars[1],
             public_key_scalars[2],

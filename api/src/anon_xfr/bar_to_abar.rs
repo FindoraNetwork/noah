@@ -3,7 +3,7 @@ use crate::anon_xfr::{
     structs::{AnonAssetRecord, AxfrOwnerMemo, OpenAnonAssetRecord, OpenAnonAssetRecordBuilder},
     AXfrPlonkPf, TurboPlonkCS, TWO_POW_32,
 };
-use crate::keys::{KeyPair, PublicKey, Signature};
+use crate::keys::{KeyPair, PublicKey, PublicKeyInner, Signature};
 use crate::setup::{ProverParams, VerifierParams};
 use crate::xfr::{
     asset_record::AssetRecordType,
@@ -607,12 +607,20 @@ pub(crate) fn build_bar_to_abar_cs(
         cs.equal(y_in_bls12_381, at_var);
     }
 
+    let public_key_type = match pubkey.0 {
+        PublicKeyInner::Ed25519(_) => cs.new_variable(BLSScalar::one()),
+        PublicKeyInner::Secp256k1(_) => cs.new_variable(BLSScalar::zero()),
+        PublicKeyInner::EthAddress(_) => unimplemented!(),
+    };
+    cs.insert_boolean_gate(public_key_type);
+
     // 7. Coin commitment
     let coin_comm_var = commit_in_cs(
         &mut cs,
         blind_var,
         amount_var,
         at_var,
+        public_key_type,
         &public_key_scalars_vars,
         comm_trace,
     );

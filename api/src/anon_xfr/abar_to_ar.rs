@@ -392,12 +392,18 @@ pub fn build_abar_to_ar_cs(
     let zero_var = cs.zero_var();
     let mut root_var: Option<VarIndex> = None;
 
+    let key_type = match keypair.get_sk() {
+        SecretKey::Ed25519(_) => cs.new_variable(BLSScalar::one()),
+        SecretKey::Secp256k1(_) => cs.new_variable(BLSScalar::zero()),
+    };
+
     // commitments
     let com_abar_in_var = commit_in_cs(
         &mut cs,
         payer_witness_var.blind,
         payer_witness_var.amount,
         payer_witness_var.asset_type,
+        key_type,
         &public_key_scalars_vars,
         input_commitment_trace,
     );
@@ -421,6 +427,7 @@ pub fn build_abar_to_ar_cs(
         &secret_key_scalars_vars,
         uid_amount,
         payer_witness_var.asset_type,
+        key_type,
         &public_key_scalars_vars,
         &nullifier_trace,
     );

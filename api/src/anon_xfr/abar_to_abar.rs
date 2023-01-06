@@ -17,7 +17,7 @@ use crate::anon_xfr::{
     FEE_TYPE,
 };
 use crate::errors::NoahError;
-use crate::keys::{KeyPair, PublicKey, SecretKey};
+use crate::keys::{KeyPair, PublicKey, PublicKeyInner, SecretKey};
 use crate::setup::{ProverParams, VerifierParams};
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
@@ -651,6 +651,13 @@ pub(crate) fn build_multi_xfr_cs(
     let zero_var = cs.zero_var();
     let mut root_var: Option<VarIndex> = None;
 
+    let secret_key_type = match keypair.get_sk_ref() {
+        SecretKey::Ed25519(_) => BLSScalar::one(),
+        SecretKey::Secp256k1(_) => BLSScalar::zero(),
+    };
+    let secret_key_type_var = cs.new_variable(secret_key_type);
+    cs.insert_boolean_gate(secret_key_type_var);
+
     for (((payer_witness_var, input_commitment_trace), nullifier_trace), payer_witness) in
         payers_secrets
             .iter()
@@ -664,6 +671,7 @@ pub(crate) fn build_multi_xfr_cs(
             payer_witness_var.blind,
             payer_witness_var.amount,
             payer_witness_var.asset_type,
+            secret_key_type_var,
             &public_key_scalars_vars,
             &input_commitment_trace,
         );
@@ -687,6 +695,7 @@ pub(crate) fn build_multi_xfr_cs(
             &secret_key_scalars_vars,
             uid_amount,
             payer_witness_var.asset_type,
+            secret_key_type_var,
             &public_key_scalars_vars,
             nullifier_trace,
         );
@@ -747,6 +756,7 @@ pub(crate) fn build_multi_xfr_cs(
             payee.blind,
             payee.amount,
             payee.asset_type,
+            payee.public_key_type,
             &payee.public_key_scalars,
             &output_commitment_trace,
         );
@@ -971,10 +981,17 @@ pub(crate) fn add_payees_witnesses(
                 cs.new_variable(public_key_scalars[2]),
             ];
 
+            let public_key_type = match secret.public_key.0 {
+                PublicKeyInner::Ed25519(_) => cs.new_variable(BLSScalar::one()),
+                PublicKeyInner::Secp256k1(_) => cs.new_variable(BLSScalar::zero()),
+                PublicKeyInner::EthAddress(_) => unimplemented!(),
+            };
+
             PayeeWitnessVars {
                 amount,
                 blind,
                 asset_type,
+                public_key_type,
                 public_key_scalars: public_key_scalars_vars,
             }
         })
@@ -2111,11 +2128,13 @@ mod tests {
         let amount_var = cs.new_variable(amount);
         let asset_var = cs.new_variable(asset_type);
         let blind_var = cs.new_variable(blind);
+        let key_type = cs.new_variable(BLSScalar::zero());
         let comm_var = commit_in_cs(
             &mut cs,
             blind_var,
             amount_var,
             asset_var,
+            key_type,
             &public_key_scalars_vars,
             &input_commitment_trace,
         );
@@ -2176,11 +2195,14 @@ mod tests {
         let uid_amount_var = cs.new_variable(uid_amount);
         let asset_var = cs.new_variable(asset_type);
 
+        let secret_key_type = cs.new_variable(BLSScalar::zero());
+
         let nullifier_var = nullify_in_cs(
             &mut cs,
             &secret_key_scalars_vars,
             uid_amount_var,
             asset_var,
+            secret_key_type,
             &public_key_scalars_vars,
             &trace,
         );
