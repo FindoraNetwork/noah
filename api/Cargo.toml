@@ -26,6 +26,7 @@ harness = false
 [package]
 name = 'noah'
 version = '0.4.0'
+license = 'BUSL-1.1'
 authors = ['Findora <engineering@findora.org>']
 edition = '2021'
 description = 'Noah Platform Interface'
@@ -54,13 +55,13 @@ sha3 = '0.10'
 
 
 [dependencies.noah-algebra]
-path = '../algebra'
+version = "0.4.0"
 
 [dependencies.noah-crypto]
-path = '../crypto'
+version = "0.4.0"
 
 [dependencies.noah-plonk]
-path = '../plonk'
+version = "0.4.0"
 
 [dependencies.curve25519-dalek]
 package = "noah-curve25519-dalek"
