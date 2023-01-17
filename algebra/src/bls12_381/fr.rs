@@ -185,6 +185,13 @@ impl From<u64> for BLSScalar {
     }
 }
 
+impl From<u128> for BLSScalar {
+    #[inline]
+    fn from(value: u128) -> Self {
+        Self(Fr::from(value))
+    }
+}
+
 impl Scalar for BLSScalar {
     #[inline]
     fn random<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
