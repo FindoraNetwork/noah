@@ -3,9 +3,13 @@ use crate::prelude::{derive_prng_from_hash, *};
 use ark_bls12_381::Fq;
 use ark_ff::{BigInteger, BigInteger384, FftField, Field, PrimeField};
 use ark_std::{
+    boxed::Box,
     fmt::{Debug, Formatter},
+    format,
     result::Result as StdResult,
     str::FromStr,
+    vec,
+    vec::Vec,
 };
 use digest::{consts::U64, Digest};
 use num_bigint::BigUint;
@@ -18,7 +22,7 @@ use wasm_bindgen::prelude::*;
 pub struct BLSFq(pub(crate) Fq);
 
 impl Debug for BLSFq {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> ark_std::fmt::Result {
         <BigUint as Debug>::fmt(
             &<BigInteger384 as Into<BigUint>>::into(self.0.into_bigint()),
             f,

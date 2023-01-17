@@ -3,9 +3,15 @@ use crate::prelude::*;
 use crate::secp256k1::{SECP256K1G1, SECP256K1_SCALAR_LEN};
 use ark_ff::{BigInteger, BigInteger256, FftField, Field, PrimeField};
 use ark_secp256k1::Fr;
-use ark_std::fmt::{Debug, Formatter};
-use ark_std::result::Result as StdResult;
-use ark_std::str::FromStr;
+use ark_std::{
+    boxed::Box,
+    fmt::{Debug, Formatter},
+    format,
+    result::Result as StdResult,
+    str::FromStr,
+    vec,
+    vec::Vec,
+};
 use digest::consts::U64;
 use digest::Digest;
 use num_bigint::BigUint;
@@ -18,7 +24,7 @@ use wasm_bindgen::prelude::*;
 pub struct SECP256K1Scalar(pub(crate) Fr);
 
 impl Debug for SECP256K1Scalar {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> ark_std::fmt::Result {
         <BigUint as Debug>::fmt(
             &<BigInteger256 as Into<BigUint>>::into(self.0.into_bigint()),
             f,

@@ -4,7 +4,12 @@ use crate::prelude::{derive_prng_from_hash, *};
 use ark_bls12_381::{G1Affine, G1Projective};
 use ark_ec::{CurveGroup, Group as ArkGroup, VariableBaseMSM};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
-use ark_std::fmt::{Debug, Display, Formatter};
+use ark_std::{
+    boxed::Box,
+    fmt::{Debug, Display, Formatter},
+    format,
+    vec::Vec,
+};
 use digest::{consts::U64, Digest};
 use wasm_bindgen::prelude::*;
 
@@ -14,7 +19,7 @@ use wasm_bindgen::prelude::*;
 pub struct BLSG1(pub(crate) G1Projective);
 
 impl Debug for BLSG1 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> ark_std::fmt::Result {
         <G1Affine as Display>::fmt(&self.0.into_affine(), f)
     }
 }
@@ -63,9 +68,7 @@ impl Group for BLSG1 {
 
     #[inline]
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
-        let mut reader = ark_std::io::BufReader::new(bytes);
-
-        let affine = G1Affine::deserialize_with_mode(&mut reader, Compress::Yes, Validate::Yes);
+        let affine = G1Affine::deserialize_with_mode(bytes, Compress::Yes, Validate::Yes);
 
         if affine.is_ok() {
             Ok(Self(G1Projective::from(affine.unwrap()))) // safe unwrap
@@ -76,9 +79,7 @@ impl Group for BLSG1 {
 
     #[inline]
     fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
-        let mut reader = ark_std::io::BufReader::new(bytes);
-
-        let affine = G1Affine::deserialize_with_mode(&mut reader, Compress::No, Validate::No);
+        let affine = G1Affine::deserialize_with_mode(bytes, Compress::No, Validate::No);
 
         if affine.is_ok() {
             Ok(Self(G1Projective::from(affine.unwrap()))) // safe unwrap

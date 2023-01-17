@@ -1,6 +1,7 @@
 use crate::fmt::{Debug, Formatter};
 use crate::traits::PedersenCommitment;
 use crate::{errors::AlgebraError, prelude::*};
+use ark_std::{boxed::Box, format, vec, vec::Vec};
 use byteorder::ByteOrder;
 use curve25519_dalek::traits::MultiscalarMul;
 use curve25519_dalek::{
@@ -33,7 +34,7 @@ pub struct CompressedEdwardsY(pub curve25519_dalek::edwards::CompressedEdwardsY)
 pub struct RistrettoPoint(pub RPoint);
 
 impl Debug for RistrettoScalar {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> ark_std::fmt::Result {
         <curve25519_dalek::scalar::Scalar as Debug>::fmt(&self.0, f)
     }
 }

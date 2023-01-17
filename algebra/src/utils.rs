@@ -1,7 +1,8 @@
 #![deny(warnings)]
 #![allow(clippy::upper_case_acronyms)]
 
-use crate::{fs::File, io::Write, path::PathBuf, prelude::*, rand::SeedableRng};
+use crate::{prelude::*, rand::SeedableRng};
+use ark_std::{format, string::String, vec, vec::Vec};
 use base64::engine::fast_portable::{FastPortable, FastPortableConfig};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
@@ -120,11 +121,13 @@ pub fn u64_limbs_from_bytes(slice: &[u8]) -> Vec<u64> {
 }
 
 /// Save parameters to a file
-pub fn save_to_file(params_ser: &[u8], out_filename: PathBuf) {
+#[cfg(feature = "std")]
+pub fn save_to_file(params_ser: &[u8], out_filename: ark_std::path::PathBuf) {
+    use ark_std::io::Write;
+
     let filename = out_filename.to_str().unwrap();
-    let mut f = File::create(&filename).expect("Unable to create file");
+    let mut f = ark_std::fs::File::create(&filename).expect("Unable to create file");
     f.write_all(params_ser).expect("Unable to write data");
-    println!("Public parameters written in file {}.", filename);
 }
 
 /// A short-hand macro for not matching an expression
@@ -140,6 +143,8 @@ macro_rules! not_matches {
 
 #[cfg(test)]
 mod test {
+    use ark_std::vec;
+
     #[test]
     fn test_shift_u8_vec() {
         let mut v = vec![0];

@@ -3,6 +3,7 @@ use crate::prelude::*;
 use crate::zorro::{ZorroG1, ZORRO_SCALAR_LEN};
 use ark_bulletproofs::curve::zorro::Fr;
 use ark_ff::{BigInteger, FftField, Field, PrimeField};
+use ark_std::{boxed::Box, format, vec, vec::Vec};
 use digest::consts::U64;
 use digest::Digest;
 use num_bigint::BigUint;

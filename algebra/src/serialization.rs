@@ -10,7 +10,7 @@ use crate::{
     zorro::{ZorroFq, ZorroG1, ZorroProof, ZorroScalar},
 };
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
-use ark_std::io::Cursor;
+use ark_std::{boxed::Box, format, io::Cursor, vec, vec::Vec};
 use bulletproofs::RangeProof;
 use serde::Serializer;
 
@@ -211,6 +211,7 @@ impl NoahFromToBytes for x25519_dalek::StaticSecret {
 pub mod noah_obj_serde {
     use crate::serialization::NoahFromToBytes;
     use crate::utils::{b64dec, b64enc};
+    use ark_std::{vec, vec::Vec};
     use serde::de::SeqAccess;
     use serde::de::Visitor;
     use serde::Deserializer;

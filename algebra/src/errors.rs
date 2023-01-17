@@ -38,6 +38,7 @@ impl fmt::Display for AlgebraError {
 }
 
 impl error::Error for AlgebraError {
+    #[cfg(feature = "std")]
     fn description(&self) -> &str {
         use AlgebraError::*;
         match self {

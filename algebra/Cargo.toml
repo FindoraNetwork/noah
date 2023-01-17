@@ -32,10 +32,15 @@ features = ['serde']
 [dependencies.x25519-dalek]
 package = "noah-x25519-dalek"
 version = "4.0.0"
+default-features = false
 
 [dependencies.bulletproofs]
 package = "noah-bulletproofs"
-version = "4.0.0"
+#version = "4.0.0"
+git = "https://github.com/FindoraNetwork/bulletproofs"
+branch = "no-std"
+default-features = false
+features = ['yoloproofs']
 
 [dependencies.ark-ec]
 version = '0.4.0-alpha'
@@ -78,7 +83,7 @@ default-features = false
 [dependencies.ark-bulletproofs]
 #version = '4.0.0'
 git = "https://github.com/FindoraNetwork/ark-bulletproofs"
-branch = "fix-dev-deps"
+branch = "no-std"
 default-features = false
 features = ['yoloproofs']
 
@@ -111,6 +116,7 @@ default = [
 ]
 std = [
     'curve25519-dalek/std',
+    'bulletproofs/std',
     'ark-ed-on-bls12-381/std',
     'ark-bls12-381/std',
     'ark-secp256k1/std',

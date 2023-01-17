@@ -2,6 +2,7 @@ use crate::jubjub::JUBJUB_SCALAR_LEN;
 use crate::{errors::AlgebraError, hash::Hash, prelude::*};
 use ark_ed_on_bls12_381::Fr;
 use ark_ff::{BigInteger, FftField, Field, PrimeField};
+use ark_std::{boxed::Box, format, vec, vec::Vec};
 use digest::{generic_array::typenum::U64, Digest};
 use num_bigint::BigUint;
 use num_traits::Num;

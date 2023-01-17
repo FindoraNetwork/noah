@@ -6,7 +6,7 @@ use ark_bls12_381::{Bls12_381, Fq12Config};
 use ark_ec::pairing::PairingOutput;
 use ark_ff::{BigInteger, Fp12, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
-use ark_std::UniformRand;
+use ark_std::{boxed::Box, format, vec::Vec, UniformRand};
 use digest::{consts::U64, Digest};
 use ruc::*;
 use wasm_bindgen::prelude::*;
@@ -140,10 +140,7 @@ impl Group for BLSGt {
 
     #[inline]
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
-        let mut reader = ark_std::io::BufReader::new(bytes);
-
-        let res =
-            Fp12::<Fq12Config>::deserialize_with_mode(&mut reader, Compress::Yes, Validate::Yes);
+        let res = Fp12::<Fq12Config>::deserialize_with_mode(bytes, Compress::Yes, Validate::Yes);
 
         if res.is_ok() {
             Ok(Self(res.unwrap()))
@@ -154,10 +151,7 @@ impl Group for BLSGt {
 
     #[inline]
     fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
-        let mut reader = ark_std::io::BufReader::new(bytes);
-
-        let res =
-            Fp12::<Fq12Config>::deserialize_with_mode(&mut reader, Compress::No, Validate::No);
+        let res = Fp12::<Fq12Config>::deserialize_with_mode(bytes, Compress::No, Validate::No);
 
         if res.is_ok() {
             Ok(Self(res.unwrap()))

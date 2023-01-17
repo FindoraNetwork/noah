@@ -5,9 +5,13 @@ use crate::traits::Domain;
 use ark_bls12_381::Fr;
 use ark_ff::{BigInteger, BigInteger256, FftField, Field, PrimeField};
 use ark_std::{
+    boxed::Box,
     fmt::{Debug, Formatter},
+    format,
     result::Result as StdResult,
     str::FromStr,
+    vec,
+    vec::Vec,
 };
 use digest::{consts::U64, Digest};
 use num_bigint::BigUint;
@@ -20,7 +24,7 @@ use wasm_bindgen::prelude::*;
 pub struct BLSScalar(pub(crate) Fr);
 
 impl Debug for BLSScalar {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> ark_std::fmt::Result {
         <BigUint as Debug>::fmt(
             &<BigInteger256 as Into<BigUint>>::into(self.0.into_bigint()),
             f,

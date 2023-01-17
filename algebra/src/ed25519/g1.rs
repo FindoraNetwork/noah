@@ -9,6 +9,7 @@ use crate::{
 use ark_ec::{AffineRepr, CurveGroup, Group as ArkGroup};
 use ark_ed25519::{EdwardsAffine, EdwardsProjective};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
+use ark_std::{boxed::Box, format, string::ToString, vec::Vec};
 use digest::consts::U64;
 use digest::Digest;
 use wasm_bindgen::prelude::*;
@@ -101,10 +102,7 @@ impl Group for Ed25519Point {
 
     #[inline]
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
-        let mut reader = ark_std::io::BufReader::new(bytes);
-
-        let affine =
-            EdwardsAffine::deserialize_with_mode(&mut reader, Compress::Yes, Validate::Yes);
+        let affine = EdwardsAffine::deserialize_with_mode(bytes, Compress::Yes, Validate::Yes);
 
         if let Ok(affine) = affine {
             Ok(Self(EdwardsProjective::from(affine))) // safe unwrap
@@ -115,9 +113,7 @@ impl Group for Ed25519Point {
 
     #[inline]
     fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
-        let mut reader = ark_std::io::BufReader::new(bytes);
-
-        let affine = EdwardsAffine::deserialize_with_mode(&mut reader, Compress::No, Validate::No);
+        let affine = EdwardsAffine::deserialize_with_mode(bytes, Compress::No, Validate::No);
 
         if let Ok(affine) = affine {
             Ok(Self(EdwardsProjective::from(affine))) // safe unwrap
