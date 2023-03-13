@@ -23,6 +23,13 @@ use noah_plonk::{
     poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS,
 };
 
+
+#[cfg(target_arch = "wasm32")]
+use {
+    noah_plonk::plonk::prover::init_prover,
+    wasm_bindgen::prelude::*
+};
+
 /// Module for general-purpose anonymous payment.
 pub mod abar_to_abar;
 /// Module for converting anonymous assets to transparent assets.
@@ -468,4 +475,9 @@ pub fn compute_merkle_root_variables(
         );
     }
     node_var
+}
+
+#[cfg(target_arch = "wasm32")]
+pub async fn init_anon_xfr() -> core::result::Result<(), JsValue> {
+    init_prover().await
 }

@@ -141,6 +141,7 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
 
     let (cs, prover_params) = params.cs_params(None);
 
+    wasm_bindgen_test::console_log!("before prover_with_lagrange");
     let proof = prover_with_lagrange(
         prng,
         &mut transcript,
@@ -151,6 +152,8 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
         &witness,
     )
     .c(d!(NoahError::AXfrProofError))?;
+
+    wasm_bindgen_test::console_log!("after prover_with_lagrange");
 
     let body = ArToAbarBody {
         input: obar.blind_asset_record.clone(),

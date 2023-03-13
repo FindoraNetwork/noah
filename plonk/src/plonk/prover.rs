@@ -20,6 +20,13 @@ use ark_std::{end_timer, start_timer};
 use merlin::Transcript;
 use noah_algebra::{prelude::*, traits::Domain};
 
+
+#[cfg(target_arch = "wasm32")]
+use {
+    noah_algebra::bls12_381::init_fast_msm_wasm,
+    wasm_bindgen::prelude::*
+};
+
 /// PLONK Prover: it produces a proof that `witness` satisfies the constraint system `cs`,
 /// Proof verifier must use a transcript with same state as prover and match the public parameters,
 /// It returns [PlonkError] if an error occurs in computing proof commitments, meaning parameters of the polynomial
@@ -150,6 +157,7 @@ pub fn prover_with_lagrange<
     let mut w_polys = vec![];
     let mut cm_w_vec = vec![];
 
+    wasm_bindgen_test::console_log!("before lagrange_pcs");
     let w_timer = start_timer!(|| "Round 1: witness polynomials");
     if let Some(lagrange_pcs) = lagrange_pcs {
         for i in 0..n_wires_per_gate {
@@ -169,9 +177,12 @@ pub fn prover_with_lagrange<
             end_timer!(this_w_poly_timer);
 
             let this_w_comm_timer = start_timer!(|| "Commit the polynomial");
+
+            wasm_bindgen_test::console_log!("before kzg commit {}", i);
             let cm_w = lagrange_pcs
                 .commit(&f_eval)
                 .c(d!(PlonkError::CommitmentError))?;
+            wasm_bindgen_test::console_log!("after kzg commit");
             let cm_w = pcs.apply_blind_factors(&cm_w, &blinds, n_constraints);
             transcript.append_commitment::<PCS::Commitment>(&cm_w);
             end_timer!(this_w_comm_timer);
@@ -204,6 +215,7 @@ pub fn prover_with_lagrange<
             end_timer!(this_w_timer);
         }
     }
+    wasm_bindgen_test::console_log!("after lagrange_pcs");
     end_timer!(w_timer);
 
     // 2. get challenges beta and gamma
@@ -400,4 +412,10 @@ pub fn prover_with_lagrange<
         opening_witness_zeta,
         opening_witness_zeta_omega,
     })
+}
+
+
+#[cfg(target_arch = "wasm32")]
+pub async fn init_prover() -> core::result::Result<(), JsValue> {
+    init_fast_msm_wasm().await
 }
