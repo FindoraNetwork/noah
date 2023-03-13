@@ -8,6 +8,41 @@ use ark_std::fmt::{Debug, Display, Formatter};
 use digest::{consts::U64, Digest};
 use wasm_bindgen::prelude::*;
 
+
+#[cfg(target_arch = "wasm32")]
+use {
+    ark_bls12_381::Fq,
+    ark_ff::{
+        BigInteger, BigInteger384, FpConfig, MontBackend, PrimeField
+    },
+    js_sys::{Array, Function, Object, Reflect, Uint8Array, WebAssembly::{
+        instantiate_buffer, Instance, Memory
+    }},
+    wasm_bindgen_futures::JsFuture,
+    wasm_bindgen::{
+        JsCast, prelude::*
+    },
+    std::sync::{Mutex, MutexGuard},
+    std::io::Cursor,
+    wasm_bindgen_test::console_log
+};
+
+#[cfg(target_arch = "wasm32")]
+const WASM: &[u8] = include_bytes!("./fastmsm.wasm");
+#[cfg(target_arch = "wasm32")]
+static mut WASM_INSTANCE: Option<Instance> = None;
+
+#[cfg(target_arch = "wasm32")]
+pub async fn init_fast_msm_wasm() -> core::result::Result<(), JsValue> {
+    unsafe {
+        let a: JsValue = JsFuture::from(instantiate_buffer(WASM, &Object::new())).await?;
+        WASM_INSTANCE = Some(Reflect::get(&a, &"instance".into())?.dyn_into()?);
+    }
+
+    Ok(())
+}
+
+
 /// The wrapped struct for ark_bls12_381::G1Projective
 #[wasm_bindgen]
 #[derive(Copy, Default, Clone, PartialEq, Eq)]
@@ -102,6 +137,7 @@ impl Group for BLSG1 {
     }
 
     #[inline]
+    #[cfg(not(target_arch = "wasm32"))]
     fn multi_exp(scalars: &[&Self::ScalarType], points: &[&Self]) -> Self {
         let scalars_raw: Vec<_> = scalars.iter().map(|r| r.0).collect();
         let points_raw = G1Projective::normalize_batch(
@@ -110,6 +146,129 @@ impl Group for BLSG1 {
 
         Self(G1Projective::msm(&points_raw, scalars_raw.as_ref()).unwrap())
     }
+
+    #[cfg(target_arch = "wasm32")]
+    fn multi_exp(scalars: &[&Self::ScalarType], points: &[&Self]) -> Self {
+
+        let scalars_raw: Vec<_> = scalars.iter().map(|r| r.0).collect();
+        let points_raw = G1Projective::normalize_batch(
+            &points.iter().map(|r| r.0).collect::<Vec<G1Projective>>(),
+        );
+
+        let p = Self(G1Projective::msm(&points_raw, scalars_raw.as_ref()).unwrap());
+        let affine = G1Affine::from(p.0);
+
+        let mut r: Vec<u8> = Vec::new();
+
+        // unsafe for mutable static access is not a problem here because WASM runtime is single threaded
+        let mut c: js_sys::Object =  js_sys::Object::new();
+        unsafe {
+            c = WASM_INSTANCE.clone().expect("FastMSM WASM not initialized").exports();
+        }
+        let scalars_vec: Vec<_> = scalars.iter().map(|r| r.0).collect();
+        let points_vec = G1Projective::normalize_batch(
+            &points.iter().map(|r| r.0).collect::<Vec<G1Projective>>(),
+        );
+
+        let size = scalars_vec.len();
+        let window_bits = if size > 128 * 1024 {
+            16
+        } else if size > 96 * 1024 {
+            15
+        } else {
+            13
+        };
+
+        macro_rules! load_wasm_obj {
+            ($a:expr, $b:ty)=>{
+                {
+                    Reflect::get(c.as_ref(), &$a.into())
+                    .unwrap()
+                    .dyn_into::<$b>()
+                    .expect("$a export wasn't a function")
+                }
+            }
+        }
+
+        let msm_initialize = load_wasm_obj!("msmInitialize", Function);
+        let msm_scalars_offset = load_wasm_obj!("msmScalarsOffset", Function);
+        let msm_points_offset = load_wasm_obj!("msmPointsOffset", Function);
+        let msm_run = load_wasm_obj!("msmRun", Function);
+
+        // initialize fast msm
+        let size_u32 = size as u32;
+        let args = Array::new_with_length(4);
+        args.set(0, size_u32.into());
+        args.set(1, window_bits.into());
+        args.set(2, 1024.into());
+        args.set(3, 128.into());
+        msm_initialize.apply(&JsValue::undefined(), &args).unwrap();
+
+        // get fast msm Memory
+        let mem: Memory = load_wasm_obj!("memory", Memory);
+        let buffer = &mem.buffer();
+
+        // write scalars to WASM Memory
+        let scalar_offset: JsValue = msm_scalars_offset.call0(&JsValue::undefined()).unwrap();
+        let scalar_mem: Uint8Array = Uint8Array::new_with_byte_offset_and_length(
+            &buffer,
+            scalar_offset.as_f64().unwrap() as u32,
+            size_u32 * 32
+        );
+        let mut ptr = 0;
+        for scalar in scalars_vec.into_iter() {
+            for s in scalar.into_bigint().to_bytes_le() {
+                Uint8Array::set_index(&scalar_mem, ptr, s);
+                ptr += 1;
+            }
+        }
+
+        // write points to WASM Memory
+        let point_offset: JsValue = msm_points_offset.call0(&JsValue::undefined()).unwrap();
+        let point_mem: Uint8Array = Uint8Array::new_with_byte_offset_and_length(
+            &buffer,
+            point_offset.as_f64().unwrap() as u32,
+            size_u32 * 96,
+        );
+        ptr = 0;
+        for point in points_vec.into_iter() {
+            let affine = G1Affine::from(point);
+            for s in affine.x.into_bigint().to_bytes_le() {
+                Uint8Array::set_index(&point_mem, ptr, s);
+                ptr += 1;
+            }
+            for s in affine.y.into_bigint().to_bytes_le() {
+                Uint8Array::set_index(&point_mem, ptr, s);
+                ptr += 1;
+            }
+        }
+
+        // Run fast MSM multiplication
+        let result_offset: JsValue = msm_run.call0(&JsValue::undefined()).unwrap();
+
+        // Read result point from WASM Memory
+        let result_mem: Uint8Array = Uint8Array::new_with_byte_offset_and_length(
+            &buffer,
+            result_offset.as_f64().unwrap() as u32,
+            96
+        );
+
+        r = result_mem.to_vec();
+
+        let a1 = r[0..48].to_vec();
+        let a2 = r[48..96].to_vec();
+
+        let affine = G1Affine::new(fq_from_bytes(a1), fq_from_bytes(a2));
+        Self(G1Projective::from(affine))
+    }
+}
+
+#[inline]
+#[cfg(target_arch = "wasm32")]
+fn fq_from_bytes(bytes: Vec<u8>) -> Fq {
+    let buffer = Cursor::new(bytes.clone());
+    let b = BigInteger384::deserialize_uncompressed(buffer).unwrap();
+    MontBackend::from_bigint(b).unwrap()
 }
 
 impl<'a> Add<&'a BLSG1> for BLSG1 {
