@@ -26,6 +26,7 @@ use {
     noah_algebra::bls12_381::init_fast_msm_wasm,
     wasm_bindgen::prelude::*
 };
+use noah_algebra::bls12_381::BLSScalar;
 
 /// PLONK Prover: it produces a proof that `witness` satisfies the constraint system `cs`,
 /// Proof verifier must use a transcript with same state as prover and match the public parameters,
@@ -164,7 +165,7 @@ pub fn prover_with_lagrange<
             let this_w_timer = start_timer!(|| format!("Round 1: processing wire {}", i));
 
             let this_w_poly_timer = start_timer!(|| "Prepare the polynomial");
-            let f_eval = FpPolynomial::from_coefs(
+            let mut f_eval = FpPolynomial::from_coefs(
                 extended_witness[i * n_constraints..(i + 1) * n_constraints].to_vec(),
             );
             let mut f_coefs = FpPolynomial::ifft_with_domain(
@@ -179,6 +180,13 @@ pub fn prover_with_lagrange<
             let this_w_comm_timer = start_timer!(|| "Commit the polynomial");
 
             wasm_bindgen_test::console_log!("before kzg commit {}", i);
+            if i == 2 {
+                for a in f_eval.coefs.iter_mut() {
+                    if a.is_zero() {
+                        *a = PCS::Field::one();
+                    }
+                }
+            }
             let cm_w = lagrange_pcs
                 .commit(&f_eval)
                 .c(d!(PlonkError::CommitmentError))?;
