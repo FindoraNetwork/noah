@@ -19,10 +19,7 @@ use {
         instantiate_buffer, Instance, Memory
     }},
     wasm_bindgen_futures::JsFuture,
-    wasm_bindgen::{
-        JsCast, prelude::*
-    },
-    std::sync::{Mutex, MutexGuard},
+    wasm_bindgen::JsCast,
     std::io::Cursor,
     wasm_bindgen_test::console_log
 };
@@ -33,6 +30,7 @@ const WASM: &[u8] = include_bytes!("./submission.wasm");
 static mut WASM_INSTANCE: Option<Instance> = None;
 
 #[cfg(target_arch = "wasm32")]
+/// Init fast msm
 pub async fn init_fast_msm_wasm() -> core::result::Result<(), JsValue> {
     unsafe {
         let a: JsValue = JsFuture::from(instantiate_buffer(WASM, &Object::new())).await?;
@@ -159,7 +157,7 @@ impl Group for BLSG1 {
         let p = Self(G1Projective::msm(&points_raw, scalars_raw.as_ref()).unwrap());
         let affine = G1Affine::from(p.0);
         console_log!("multi_exp_orig x : {:?}", affine.x.into_bigint().to_bytes_le());
-        console_log!("multi_exp_orig x : {:?}", affine.y.into_bigint().to_bytes_le());
+        console_log!("multi_exp_orig y : {:?}", affine.y.into_bigint().to_bytes_le());
 
         let mut r: Vec<u8> = Vec::new();
 

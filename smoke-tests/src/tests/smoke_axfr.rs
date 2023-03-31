@@ -1,5 +1,6 @@
 #[cfg(test)]
 mod smoke_axfr {
+    use std::path::PathBuf;
     use digest::Digest;
     use mem_db::MemoryDB;
     use noah::{
@@ -237,6 +238,64 @@ mod smoke_axfr {
         let sender = KeyPair::generate_ed25519(&mut prng);
         let receiver = KeyPair::generate_ed25519(&mut prng);
         abar_to_ar(sender, receiver);
+    }
+
+    use rand_chacha::ChaChaRng;
+    use rand_chacha::rand_core::SeedableRng;
+    use wasm_bindgen_test::*;
+    use noah::anon_xfr::init_anon_xfr;
+
+    #[wasm_bindgen_test]
+    async fn wasm_msm() {
+
+        init_anon_xfr().await.unwrap();
+
+        let mut seed: [u8;32] = [0u8;32];
+        let _ = getrandom::getrandom(&mut seed).unwrap();
+
+        let mut prng =
+            ChaChaRng::from_seed(seed);
+        let sender = KeyPair::generate_ed25519(&mut prng);
+        let receiver = KeyPair::generate_ed25519(&mut prng);
+        let params = ProverParams::abar_to_ar_params(TREE_DEPTH).unwrap();
+        let verify_params = VerifierParams::abar_to_ar_params().unwrap();
+
+
+        let path = PathBuf::from("/tmp");
+        let fdb = MemoryDB::open(path).unwrap();
+        let cs = Arc::new(RwLock::new(ChainState::new(fdb, "abar_ar".to_owned(), 0)));
+        let mut state = State::new(cs, false);
+        let store = PrefixedStore::new("my_store", &mut state);
+        let mut mt = PersistentMerkleTree::new(store).unwrap();
+
+        let mut oabar = build_oabar(&mut prng, AMOUNT, ASSET, &sender);
+        let abar = AnonAssetRecord::from_oabar(&oabar);
+        mt.add_commitment_hash(hash_abar(0, &abar)).unwrap();
+        mt.commit().unwrap();
+        let proof = mt.generate_proof(0).unwrap();
+        oabar.update_mt_leaf_info(build_mt_leaf_info_from_proof(proof.clone(), 0));
+
+        let pre_note =
+            init_abar_to_ar_note(&mut prng, &oabar, &sender, &receiver.get_pk()).unwrap();
+        let hash = random_hasher(&mut prng);
+        let note = finish_abar_to_ar_note(&mut prng, &params, pre_note, hash.clone()).unwrap();
+
+        verify_abar_to_ar_note(&verify_params, &note, &proof.root, hash.clone()).unwrap();
+
+        let err_root = BLSScalar::random(&mut prng);
+        assert!(verify_abar_to_ar_note(&verify_params, &note, &err_root, hash.clone()).is_err());
+
+        let err_hash = random_hasher(&mut prng);
+        assert!(
+            verify_abar_to_ar_note(&verify_params, &note, &proof.root, err_hash.clone()).is_err()
+        );
+
+        let mut err_nullifier = note.clone();
+        err_nullifier.body.input = BLSScalar::random(&mut prng);
+        assert!(
+            verify_abar_to_ar_note(&verify_params, &err_nullifier, &proof.root, hash.clone())
+                .is_err()
+        );
     }
 
     fn abar_to_ar(sender: KeyPair, receiver: KeyPair) {

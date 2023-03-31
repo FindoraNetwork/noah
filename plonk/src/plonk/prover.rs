@@ -416,6 +416,7 @@ pub fn prover_with_lagrange<
 
 
 #[cfg(target_arch = "wasm32")]
+/// Init prover
 pub async fn init_prover() -> core::result::Result<(), JsValue> {
     init_fast_msm_wasm().await
 }

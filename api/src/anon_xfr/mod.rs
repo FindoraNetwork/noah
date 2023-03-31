@@ -478,6 +478,7 @@ pub fn compute_merkle_root_variables(
 }
 
 #[cfg(target_arch = "wasm32")]
+/// Init anon xfr
 pub async fn init_anon_xfr() -> core::result::Result<(), JsValue> {
     init_prover().await
 }
