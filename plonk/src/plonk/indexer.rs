@@ -268,7 +268,6 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
     let l1_coefs = FpPolynomial::ifft_with_domain(&domain, &l1_evals.coefs);
     let l1_coset_evals = l1_coefs.coset_fft_with_domain(&domain_m, &k[1]);
 
-
     // Step 4: compute the Lagrange interpolation constants.
     let mut lagrange_constants = vec![];
     if no_verifier {

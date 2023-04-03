@@ -247,16 +247,19 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
         .c(d!(PlonkError::GroupNotFound(n)))?;
     let k = &prover_params.verifier_params.k;
 
-    let mut z_h_inv_coset_evals:Vec<<PCS::Field as Domain>::Field>  = Vec::with_capacity(factor);
+    let mut z_h_inv_coset_evals: Vec<<PCS::Field as Domain>::Field> = Vec::with_capacity(factor);
     let k_pow_n = k[1].get_field().pow(&[n as u64]);
     for i in 0..factor {
         let mut z_h_inv_coset_eval = domain_m.group_gen.pow(&[(n * i) as u64]);
         z_h_inv_coset_eval.mul_assign(&k_pow_n);
         z_h_inv_coset_eval.sub_assign(&<PCS::Field as Domain>::Field::one());
-       z_h_inv_coset_evals.push(z_h_inv_coset_eval);
+        z_h_inv_coset_evals.push(z_h_inv_coset_eval);
     }
     batch_inversion(&mut z_h_inv_coset_evals);
-    let z_h_inv_coset_evals = z_h_inv_coset_evals.iter().map(|x|PCS::Field::from_field(*x)).collect::<Vec<_>>();
+    let z_h_inv_coset_evals = z_h_inv_coset_evals
+        .iter()
+        .map(|x| PCS::Field::from_field(*x))
+        .collect::<Vec<_>>();
 
     // Compute the evaluations of w/pi/z polynomials on the coset k[1] * <root_m>.
     let w_polys_coset_evals: Vec<Vec<PCS::Field>> = w_polys
@@ -413,7 +416,7 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
                 .sub(&term9)
                 .sub(&term10)
                 .sub(&term11);
-            numerator.mul(&z_h_inv_coset_evals[point%factor])
+            numerator.mul(&z_h_inv_coset_evals[point % factor])
         })
         .collect::<Vec<PCS::Field>>();
 
