@@ -249,11 +249,13 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
 
     let mut z_h_inv_coset_evals: Vec<<PCS::Field as Domain>::Field> = Vec::with_capacity(factor);
     let k_pow_n = k[1].get_field().pow(&[n as u64]);
-    for i in 0..factor {
-        let mut z_h_inv_coset_eval = domain_m.group_gen.pow(&[(n * i) as u64]);
-        z_h_inv_coset_eval.mul_assign(&k_pow_n);
-        z_h_inv_coset_eval.sub_assign(&<PCS::Field as Domain>::Field::one());
-        z_h_inv_coset_evals.push(z_h_inv_coset_eval);
+    let group_gen_pow_n = domain_m.group_gen.pow(&[n as u64]);
+    let mut multiplier = <PCS::Field as Domain>::Field::one();
+    for _ in 0..factor {
+        let mut eval = multiplier.mul(&k_pow_n);
+        eval.sub_assign(&<PCS::Field as Domain>::Field::one());
+        z_h_inv_coset_evals.push(eval);
+        multiplier.mul_assign(&group_gen_pow_n);
     }
     batch_inversion(&mut z_h_inv_coset_evals);
     let z_h_inv_coset_evals = z_h_inv_coset_evals
