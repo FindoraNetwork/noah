@@ -43,6 +43,8 @@ pub mod serialization;
 pub mod setup;
 /// Module for confidential transfer.
 pub mod xfr;
+/// Module for traceable confidential transfer.
+pub mod t_anon_xfr;
 
 pub use noah_algebra::errors;
 pub use noah_algebra::ristretto;
