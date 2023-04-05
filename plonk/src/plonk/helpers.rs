@@ -248,12 +248,10 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
     let k = &prover_params.verifier_params.k;
 
     let mut z_h_inv_coset_evals: Vec<<PCS::Field as Domain>::Field> = Vec::with_capacity(factor);
-    let k_pow_n = k[1].get_field().pow(&[n as u64]);
     let group_gen_pow_n = domain_m.group_gen.pow(&[n as u64]);
-    let mut multiplier = <PCS::Field as Domain>::Field::one();
+    let mut multiplier = k[1].get_field().pow(&[n as u64]);
     for _ in 0..factor {
-        let mut eval = multiplier.mul(&k_pow_n);
-        eval.sub_assign(&<PCS::Field as Domain>::Field::one());
+        let eval = multiplier.sub(&<PCS::Field as Domain>::Field::one());
         z_h_inv_coset_evals.push(eval);
         multiplier.mul_assign(&group_gen_pow_n);
     }
