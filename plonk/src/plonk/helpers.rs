@@ -7,7 +7,7 @@ use crate::poly_commit::{
     field_polynomial::FpPolynomial,
     pcs::{HomomorphicPolyComElem, PolyComScheme},
 };
-use ark_ff::batch_inversion;
+use ark_ff::{batch_inversion, Field};
 use ark_poly::EvaluationDomain;
 use noah_algebra::cfg_into_iter;
 use noah_algebra::prelude::*;
@@ -247,6 +247,20 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
         .c(d!(PlonkError::GroupNotFound(n)))?;
     let k = &prover_params.verifier_params.k;
 
+    let mut z_h_inv_coset_evals: Vec<<PCS::Field as Domain>::Field> = Vec::with_capacity(factor);
+    let group_gen_pow_n = domain_m.group_gen.pow(&[n as u64]);
+    let mut multiplier = k[1].get_field().pow(&[n as u64]);
+    for _ in 0..factor {
+        let eval = multiplier.sub(&<PCS::Field as Domain>::Field::one());
+        z_h_inv_coset_evals.push(eval);
+        multiplier.mul_assign(&group_gen_pow_n);
+    }
+    batch_inversion(&mut z_h_inv_coset_evals);
+    let z_h_inv_coset_evals = z_h_inv_coset_evals
+        .iter()
+        .map(|x| PCS::Field::from_field(*x))
+        .collect::<Vec<_>>();
+
     // Compute the evaluations of w/pi/z polynomials on the coset k[1] * <root_m>.
     let w_polys_coset_evals: Vec<Vec<PCS::Field>> = w_polys
         .iter()
@@ -402,7 +416,7 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
                 .sub(&term9)
                 .sub(&term10)
                 .sub(&term11);
-            numerator.mul(&prover_params.z_h_inv_coset_evals[point])
+            numerator.mul(&z_h_inv_coset_evals[point % factor])
         })
         .collect::<Vec<PCS::Field>>();
 
