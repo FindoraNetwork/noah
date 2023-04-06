@@ -1,7 +1,6 @@
 #[cfg(test)]
 mod smoke_axfr_compatibility {
     use std::sync::Arc;
-
     use digest::Digest;
     use ed25519_dalek::Sha512;
     use mem_db::MemoryDB;
