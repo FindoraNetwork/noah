@@ -1,3 +1,4 @@
+use crate::anon_xfr::abar_to_abar::AXfrWitness;
 use crate::anon_xfr::address_folding_ed25519::{
     create_address_folding_ed25519, prepare_verifier_input_ed25519,
     prove_address_folding_in_cs_ed25519, verify_address_folding_ed25519,
@@ -10,14 +11,14 @@ use crate::anon_xfr::{
     add_merkle_path_variables, check_asset_amount, check_inputs, check_roots, commit, commit_in_cs,
     compute_merkle_root_variables, nullify, nullify_in_cs,
     structs::{
-        AccElemVars, AnonAssetRecord, AxfrOwnerMemo, Commitment, MTNode, MTPath, Nullifier,
-        OpenAnonAssetRecord, PayeeWitness, PayeeWitnessVars, PayerWitness, PayerWitnessVars,
+        AccElemVars, AnonAssetRecord, AxfrOwnerMemo, Commitment, Nullifier, OpenAnonAssetRecord,
+        PayeeWitness, PayeeWitnessVars, PayerWitness, PayerWitnessVars,
     },
     AXfrAddressFoldingInstance, AXfrAddressFoldingWitness, AXfrPlonkPf, TurboPlonkCS, AMOUNT_LEN,
     FEE_TYPE,
 };
 use crate::errors::NoahError;
-use crate::keys::{KeyPair, PublicKey, PublicKeyInner, SecretKey};
+use crate::keys::{KeyPair, PublicKeyInner, SecretKey};
 use crate::setup::{ProverParams, VerifierParams};
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
@@ -61,7 +62,7 @@ pub struct TAXfrPreNote {
     /// The traceable anonymous transfer body.
     pub body: TAXfrBody,
     /// Witness.
-    pub witness: TAXfrWitness,
+    pub witness: AXfrWitness,
     /// The traces of the input commitments.
     pub input_commitments_traces: Vec<AnemoiVLHTrace<BLSScalar, 2, 12>>,
     /// The traces of the output commitments.
@@ -73,7 +74,7 @@ pub struct TAXfrPreNote {
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
-/// Traceable anonymous transfer body. 
+/// Traceable anonymous transfer body.
 pub struct TAXfrBody {
     /// The inputs, in terms of nullifiers.
     pub inputs: Vec<Nullifier>,
@@ -87,8 +88,8 @@ pub struct TAXfrBody {
     pub fee: u32,
     /// The owner memos.
     pub owner_memos: Vec<AxfrOwnerMemo>,
-    // /// The auditor memos.
-    // pub auditor_memos: Vec<TAxfrAuditorMemo>,
+    /// The auditor memos.
+    pub auditor_memos: Vec<TAxfrAuditorMemo>,
 }
 
 /// Build a traceable anonymous transfer note without generating the proof.
@@ -198,6 +199,7 @@ pub fn init_t_anon_xfr_note(
         merkle_root_version: mt_info_temp.root_version,
         fee,
         owner_memos: out_memos.c(d!())?,
+        auditor_memos: vec![], //todo
     };
 
     Ok(TAXfrPreNote {
@@ -314,7 +316,7 @@ pub fn verify_t_anon_xfr_note<D: Digest<OutputSize = U64> + Default>(
 /// Batch verify the anonymous transfer notes.
 /// Note: this function assumes that the correctness of the Merkle roots has been checked outside.
 #[cfg(feature = "parallel")]
-pub fn batch_verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default + Sync + Send>(
+pub fn batch_verify_t_anon_xfr_note<D: Digest<OutputSize = U64> + Default + Sync + Send>(
     params: &[&VerifierParams],
     notes: &[&AXfrNote],
     merkle_roots: &[&BLSScalar],
@@ -382,7 +384,7 @@ pub fn batch_verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default + Sync +
 pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
-    secret_inputs: &TAXfrWitness,
+    secret_inputs: &AXfrWitness,
     nullifiers_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
     input_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
     output_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
@@ -452,87 +454,6 @@ pub(crate) fn verify_xfr(
         proof,
     )
     .c(d!(NoahError::ZKProofVerificationError))
-}
-
-/// The witness of a traceable anonymous transfer.
-#[derive(Debug, Clone)]
-pub struct TAXfrWitness {
-    /// The payers' witnesses.
-    pub payers_witnesses: Vec<PayerWitness>,
-    /// The payees' witnesses.
-    pub payees_witnesses: Vec<PayeeWitness>,
-    /// The fee.
-    pub fee: u32,
-}
-
-impl TAXfrWitness {
-    /// Create a fake `TAXfrWitness` for testing.
-    pub fn fake_secp256k1(n_payers: usize, n_payees: usize, tree_depth: usize, fee: u32) -> Self {
-        let bls_zero = BLSScalar::zero();
-
-        let node = MTNode {
-            left: bls_zero,
-            mid: bls_zero,
-            right: bls_zero,
-            is_left_child: 0,
-            is_mid_child: 0,
-            is_right_child: 0,
-        };
-        let payer_witness = PayerWitness {
-            secret_key: SecretKey::default_secp256k1(),
-            uid: 0,
-            amount: 0,
-            asset_type: bls_zero,
-            path: MTPath::new(vec![node; tree_depth]),
-            blind: bls_zero,
-        };
-        let payee_witness = PayeeWitness {
-            amount: 0,
-            blind: bls_zero,
-            asset_type: bls_zero,
-            public_key: PublicKey::default_secp256k1(),
-        };
-
-        TAXfrWitness {
-            payers_witnesses: vec![payer_witness; n_payers],
-            payees_witnesses: vec![payee_witness; n_payees],
-            fee,
-        }
-    }
-
-    /// Create a fake `TAXfrWitness` for testing.
-    pub fn fake_ed25519(n_payers: usize, n_payees: usize, tree_depth: usize, fee: u32) -> Self {
-        let bls_zero = BLSScalar::zero();
-
-        let node = MTNode {
-            left: bls_zero,
-            mid: bls_zero,
-            right: bls_zero,
-            is_left_child: 0,
-            is_mid_child: 0,
-            is_right_child: 0,
-        };
-        let payer_witness = PayerWitness {
-            secret_key: SecretKey::default_ed25519(),
-            uid: 0,
-            amount: 0,
-            asset_type: bls_zero,
-            path: MTPath::new(vec![node; tree_depth]),
-            blind: bls_zero,
-        };
-        let payee_witness = PayeeWitness {
-            amount: 0,
-            blind: bls_zero,
-            asset_type: bls_zero,
-            public_key: PublicKey::default_ed25519(),
-        };
-
-        TAXfrWitness {
-            payers_witnesses: vec![payer_witness; n_payers],
-            payees_witnesses: vec![payee_witness; n_payees],
-            fee,
-        }
-    }
 }
 
 /// Public inputs of a traceable anonymous transfer.
@@ -617,7 +538,7 @@ impl AXfrPubInputs {
 
 /// Instantiate the constraint system for traceable anonymous transfer.
 pub(crate) fn build_multi_xfr_cs(
-    witness: &TAXfrWitness,
+    witness: &AXfrWitness,
     fee_type: BLSScalar,
     nullifiers_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],
     input_commitments_traces: &[AnemoiVLHTrace<BLSScalar, 2, 12>],

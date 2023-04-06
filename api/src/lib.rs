@@ -41,10 +41,10 @@ pub mod parameters;
 pub mod serialization;
 /// Module for generating parameters.
 pub mod setup;
-/// Module for confidential transfer.
-pub mod xfr;
 /// Module for traceable confidential transfer.
 pub mod t_anon_xfr;
+/// Module for confidential transfer.
+pub mod xfr;
 
 pub use noah_algebra::errors;
 pub use noah_algebra::ristretto;
