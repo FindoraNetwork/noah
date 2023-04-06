@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod smoke_axfr_compatibility {
-    use std::sync::Arc;
     use digest::Digest;
     use ed25519_dalek::Sha512;
     use mem_db::MemoryDB;
@@ -39,6 +38,7 @@ mod smoke_axfr_compatibility {
     use parking_lot::RwLock;
     use rand::Rng;
     use rand_core::{CryptoRng, RngCore};
+    use std::sync::Arc;
     use storage::{
         state::{ChainState, State},
         store::PrefixedStore,
