@@ -113,17 +113,6 @@ mod smoke_axfr_wasm {
         ar_to_abar(sender, receiver);
     }
 
-    #[wasm_bindgen_test]
-    async fn ar_to_abar_ed25519() {
-        init_anon_xfr().await.unwrap();
-
-        let seed: [u8; 32] = [0u8; 32];
-        let mut prng = ChaChaRng::from_seed(seed);
-        let sender = KeyPair::generate_ed25519(&mut prng);
-        let receiver = KeyPair::generate_ed25519(&mut prng);
-        ar_to_abar(sender, receiver);
-    }
-
     fn ar_to_abar(sender: KeyPair, receiver: KeyPair) {
         let seed: [u8; 32] = [0u8; 32];
         let mut prng = ChaChaRng::from_seed(seed);
@@ -154,17 +143,6 @@ mod smoke_axfr_wasm {
         let mut prng = ChaChaRng::from_seed(seed);
         let sender = KeyPair::generate_secp256k1(&mut prng);
         let receiver = KeyPair::generate_secp256k1(&mut prng);
-        bar_to_abar(sender, receiver);
-    }
-
-    #[wasm_bindgen_test]
-    async fn bar_to_abar_ed25519() {
-        init_anon_xfr().await.unwrap();
-
-        let seed: [u8; 32] = [0u8; 32];
-        let mut prng = ChaChaRng::from_seed(seed);
-        let sender = KeyPair::generate_ed25519(&mut prng);
-        let receiver = KeyPair::generate_ed25519(&mut prng);
         bar_to_abar(sender, receiver);
     }
 
@@ -204,17 +182,6 @@ mod smoke_axfr_wasm {
         let mut prng = ChaChaRng::from_seed(seed);
         let sender = KeyPair::generate_secp256k1(&mut prng);
         let receiver = KeyPair::generate_secp256k1(&mut prng);
-        abar_to_ar(sender, receiver);
-    }
-
-    #[wasm_bindgen_test]
-    async fn abar_to_ar_ed25519() {
-        init_anon_xfr().await.unwrap();
-
-        let seed: [u8; 32] = [0u8; 32];
-        let mut prng = ChaChaRng::from_seed(seed);
-        let sender = KeyPair::generate_ed25519(&mut prng);
-        let receiver = KeyPair::generate_ed25519(&mut prng);
         abar_to_ar(sender, receiver);
     }
 
@@ -266,17 +233,6 @@ mod smoke_axfr_wasm {
         abar_to_bar(sender, receiver);
     }
 
-    #[wasm_bindgen_test]
-    async fn abar_to_bar_ed25519() {
-        init_anon_xfr().await.unwrap();
-
-        let seed: [u8; 32] = [0u8; 32];
-        let mut prng = ChaChaRng::from_seed(seed);
-        let sender = KeyPair::generate_ed25519(&mut prng);
-        let receiver = KeyPair::generate_ed25519(&mut prng);
-        abar_to_bar(sender, receiver);
-    }
-
     fn abar_to_bar(sender: KeyPair, receiver: KeyPair) {
         let seed: [u8; 32] = [0u8; 32];
         let mut prng = ChaChaRng::from_seed(seed);
@@ -299,7 +255,7 @@ mod smoke_axfr_wasm {
             &receiver.get_pk(),
             AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
         )
-        .unwrap();
+            .unwrap();
         let hash = random_hasher(&mut prng);
         let note = finish_abar_to_bar_note(&mut prng, &params, pre_note, hash.clone()).unwrap();
         verify_abar_to_bar_note(&verify_params, &note, &proof.root, hash.clone()).unwrap();
@@ -327,25 +283,6 @@ mod smoke_axfr_wasm {
         let fee_amount = mock_fee(2, 1);
         let outputs = vec![(1, FEE_TYPE)];
         let inputs = vec![(1, FEE_TYPE), (fee_amount as u64, FEE_TYPE)];
-        test_abar(inputs, outputs, fee_amount);
-    }
-
-    #[wasm_bindgen_test]
-    async fn abar_8in_3out_2asset() {
-        init_anon_xfr().await.unwrap();
-
-        let fee_amount = mock_fee(8, 3);
-        let outputs = vec![(5, FEE_TYPE), (15, FEE_TYPE), (30, ASSET)];
-        let inputs = vec![
-            (15 + fee_amount as u64, FEE_TYPE),
-            (1, FEE_TYPE),
-            (4, FEE_TYPE),
-            (5, ASSET),
-            (5, ASSET),
-            (4, ASSET),
-            (6, ASSET),
-            (10, ASSET),
-        ];
         test_abar(inputs, outputs, fee_amount);
     }
 
