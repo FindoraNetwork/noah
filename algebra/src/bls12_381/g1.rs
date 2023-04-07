@@ -122,8 +122,8 @@ impl Group for BLSG1 {
 
     #[inline]
     fn from_hash<D>(hash: D) -> Self
-    where
-        D: Digest<OutputSize = U64> + Default,
+        where
+            D: Digest<OutputSize=U64> + Default,
     {
         let mut prng = derive_prng_from_hash::<D>(hash);
         Self(G1Projective::rand(&mut prng))
@@ -132,6 +132,8 @@ impl Group for BLSG1 {
     #[inline]
     #[cfg(not(target_arch = "wasm32"))]
     fn multi_exp(scalars: &[&Self::ScalarType], points: &[&Self]) -> Self {
+        use ark_ec::VariableBaseMSM;
+
         let scalars_raw: Vec<_> = scalars.iter().map(|r| r.0).collect();
         let points_raw = G1Projective::normalize_batch(
             &points.iter().map(|r| r.0).collect::<Vec<G1Projective>>(),
