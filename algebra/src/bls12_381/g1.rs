@@ -1,7 +1,7 @@
 use crate::bls12_381::{BLSFq, BLSScalar};
 use crate::errors::AlgebraError;
 use crate::prelude::{derive_prng_from_hash, *};
-use ark_bls12_381::{G1Affine, G1Projective};
+use ark_bls12_381::{Fq, G1Affine, G1Projective};
 use ark_ec::{CurveGroup, Group as ArkGroup};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use ark_std::fmt::{Debug, Display, Formatter};
@@ -10,7 +10,6 @@ use wasm_bindgen::prelude::*;
 
 #[cfg(target_arch = "wasm32")]
 use {
-    ark_bls12_381::Fq,
     ark_ff::{BigInteger, BigInteger384, FpConfig, MontBackend, PrimeField},
     js_sys::{
         Array, Function, Object, Reflect, Uint8Array,
