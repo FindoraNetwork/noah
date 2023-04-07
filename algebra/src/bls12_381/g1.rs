@@ -122,8 +122,8 @@ impl Group for BLSG1 {
 
     #[inline]
     fn from_hash<D>(hash: D) -> Self
-        where
-            D: Digest<OutputSize=U64> + Default,
+    where
+        D: Digest<OutputSize = U64> + Default,
     {
         let mut prng = derive_prng_from_hash::<D>(hash);
         Self(G1Projective::rand(&mut prng))
