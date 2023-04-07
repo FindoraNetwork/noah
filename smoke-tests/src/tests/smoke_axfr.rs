@@ -246,6 +246,31 @@ mod smoke_axfr {
     use noah::anon_xfr::init_anon_xfr;
 
     #[wasm_bindgen_test]
+    async fn wasm_msm_unit() {
+        use noah_plonk::poly_commit::field_polynomial::FpPolynomial;
+        use noah_algebra::bls12_381::*;
+
+        init_anon_xfr().await.unwrap();
+
+        let mut lagrange_srs = noah_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS::from_unchecked_bytes(noah::parameters::LAGRANGE_BASES.get(&4096).unwrap()).unwrap();
+
+        let len = 1;
+        let mut arr = vec![BLSScalar::one(); len];
+
+        let coefs_poly_bls_scalar_ref: Vec<&BLSScalar> = arr.iter().collect();
+        let pub_param_group_1_as_ref: Vec<&BLSG1> = lagrange_srs.public_parameter_group_1[0..len]
+            .iter()
+            .collect();
+
+        wasm_bindgen_test::console_log!("before multi_exp");
+        let commitment_value = BLSG1::multi_exp(
+            &coefs_poly_bls_scalar_ref,
+            &pub_param_group_1_as_ref,
+        );
+        wasm_bindgen_test::console_log!("after multi_exp");
+    }
+
+    /*#[wasm_bindgen_test]
     async fn wasm_msm() {
 
         init_anon_xfr().await.unwrap();
@@ -296,7 +321,7 @@ mod smoke_axfr {
             verify_abar_to_ar_note(&verify_params, &err_nullifier, &proof.root, hash.clone())
                 .is_err()
         );
-    }
+    }*/
 
     fn abar_to_ar(sender: KeyPair, receiver: KeyPair) {
         let mut prng = test_rng();

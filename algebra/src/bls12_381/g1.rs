@@ -1,4 +1,4 @@
-use crate::bls12_381::BLSScalar;
+use crate::bls12_381::{BLSFq, BLSScalar};
 use crate::errors::AlgebraError;
 use crate::prelude::{derive_prng_from_hash, *};
 use ark_bls12_381::{G1Affine, G1Projective};
@@ -159,6 +159,8 @@ impl Group for BLSG1 {
         console_log!("multi_exp_orig x : {:?}", affine.x.into_bigint().to_bytes_le());
         console_log!("multi_exp_orig y : {:?}", affine.y.into_bigint().to_bytes_le());
 
+        wasm_bindgen_test::console_log!("x = {:?}, y = {:?}", p.get_x(), p.get_y());
+
         let mut r: Vec<u8> = Vec::new();
 
         // unsafe here is alright because WASM is single threaded
@@ -193,6 +195,7 @@ impl Group for BLSG1 {
             let msm_scalars_offset = load_wasm_func!("msmScalarsOffset", Function);
             let msm_points_offset = load_wasm_func!("msmPointsOffset", Function);
             let msm_run = load_wasm_func!("msmRun", Function);
+            let msm_log = load_wasm_func!("logOutput", Function);
 
             let size_u32 = size as u32;
             let args = Array::new_with_length(4);
@@ -250,6 +253,16 @@ impl Group for BLSG1 {
                 96
             );
 
+            let log_offset: JsValue = msm_log.call0(&JsValue::undefined()).unwrap();
+            let log_mem: Uint8Array = Uint8Array::new_with_byte_offset(&buffer, log_offset.as_f64().unwrap() as u32);
+
+            let log = log_mem.to_vec();
+            let mut counter = 0;
+            while log[counter] != 0 {
+                counter +=1;
+            }
+            console_log!("log = {}", String::from_utf8_lossy(&log[..counter]));
+
             r = result_mem.to_vec();
         }
 
@@ -257,7 +270,9 @@ impl Group for BLSG1 {
         let a2 = r[48..96].to_vec();
         console_log!("fast_msm: {:?}", r);
 
+        wasm_bindgen_test::console_log!("x = {:?}, y = {:?}", BLSFq(fq_from_bytes(a1.clone())), BLSFq(fq_from_bytes(a2.clone())));
         let affine = G1Affine::new(fq_from_bytes(a1), fq_from_bytes(a2));
+
         Self(G1Projective::from(affine))
     }
 }
@@ -323,5 +338,22 @@ impl Neg for BLSG1 {
 
     fn neg(self) -> Self::Output {
         Self(self.0.neg())
+    }
+}
+
+impl BLSG1 {
+    /// Get the x-coordinate of the Jubjub affine point.
+    #[inline]
+    pub fn get_x(&self) -> BLSFq {
+        BLSFq(self.0.x)
+    }
+    /// Get the y-coordinate of the Jubjub affine point.
+    #[inline]
+    pub fn get_y(&self) -> BLSFq {
+        BLSFq(self.0.y)
+    }
+    /// Construct from the x-coordinate and y-coordinate
+    pub fn from_xy(x: BLSFq, y: BLSFq) -> Self {
+        Self(G1Projective::new(x.0, y.0, Fq::one()))
     }
 }

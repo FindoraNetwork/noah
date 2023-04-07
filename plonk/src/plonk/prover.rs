@@ -180,13 +180,17 @@ pub fn prover_with_lagrange<
             let this_w_comm_timer = start_timer!(|| "Commit the polynomial");
 
             wasm_bindgen_test::console_log!("before kzg commit {}", i);
-            if i == 2 {
-                for a in f_eval.coefs.iter_mut() {
-                    if a.is_zero() {
-                        *a = PCS::Field::one();
-                    }
+
+            let mut count_zero = 0;
+            let coefs_len = f_eval.coefs.len();
+            wasm_bindgen_test::console_log!("number of elements {}", coefs_len);
+            for i in 0..3185 {
+                if f_eval.coefs[i].is_zero() {
+                    count_zero += 1;
                 }
             }
+            wasm_bindgen_test::console_log!("number of zeroes {}", count_zero);
+
             let cm_w = lagrange_pcs
                 .commit(&f_eval)
                 .c(d!(PlonkError::CommitmentError))?;
