@@ -2,7 +2,7 @@ use crate::bls12_381::{BLSFq, BLSScalar};
 use crate::errors::AlgebraError;
 use crate::prelude::{derive_prng_from_hash, *};
 use ark_bls12_381::{G1Affine, G1Projective};
-use ark_ec::{CurveGroup, Group as ArkGroup, VariableBaseMSM};
+use ark_ec::{CurveGroup, Group as ArkGroup};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use ark_std::fmt::{Debug, Display, Formatter};
 use digest::{consts::U64, Digest};
@@ -13,19 +13,18 @@ use wasm_bindgen::prelude::*;
 use {
     ark_bls12_381::Fq,
     ark_ff::{
-        BigInteger, BigInteger384, FpConfig, MontBackend, PrimeField
+        BigInteger, BigInteger384, FpConfig, MontBackend, PrimeField,
     },
     js_sys::{Array, Function, Object, Reflect, Uint8Array, WebAssembly::{
-        instantiate_buffer, Instance, Memory
+        instantiate_buffer, Instance, Memory,
     }},
     wasm_bindgen_futures::JsFuture,
     wasm_bindgen::JsCast,
     std::io::Cursor,
-    wasm_bindgen_test::console_log
 };
 
 #[cfg(target_arch = "wasm32")]
-const WASM: &[u8] = include_bytes!("./submission.wasm");
+const WASM: &[u8] = include_bytes!("./fastmsm.wasm");
 #[cfg(target_arch = "wasm32")]
 static mut WASM_INSTANCE: Option<Instance> = None;
 
@@ -127,8 +126,8 @@ impl Group for BLSG1 {
 
     #[inline]
     fn from_hash<D>(hash: D) -> Self
-    where
-        D: Digest<OutputSize = U64> + Default,
+        where
+            D: Digest<OutputSize=U64> + Default,
     {
         let mut prng = derive_prng_from_hash::<D>(hash);
         Self(G1Projective::rand(&mut prng))
@@ -148,20 +147,7 @@ impl Group for BLSG1 {
     #[inline]
     #[cfg(target_arch = "wasm32")]
     fn multi_exp(scalars: &[&Self::ScalarType], points: &[&Self]) -> Self {
-
-        let scalars_raw: Vec<_> = scalars.iter().map(|r| r.0).collect();
-        let points_raw = G1Projective::normalize_batch(
-            &points.iter().map(|r| r.0).collect::<Vec<G1Projective>>(),
-        );
-
-        let p = Self(G1Projective::msm(&points_raw, scalars_raw.as_ref()).unwrap());
-        let affine = G1Affine::from(p.0);
-        console_log!("multi_exp_orig x : {:?}", affine.x.into_bigint().to_bytes_le());
-        console_log!("multi_exp_orig y : {:?}", affine.y.into_bigint().to_bytes_le());
-
-        wasm_bindgen_test::console_log!("x = {:?}, y = {:?}", p.get_x(), p.get_y());
-
-        let mut r: Vec<u8> = Vec::new();
+        let r: Vec<u8>;
 
         // unsafe here is alright because WASM is single threaded
         unsafe {
@@ -172,15 +158,9 @@ impl Group for BLSG1 {
             );
 
             let size = scalars_vec.len();
-            let window_bits = if size > 128 * 1024 {
-                16
-            } else if size > 96 * 1024 {
-                15
-            } else {
-                13
-            };
+            let window_bits = 13;
 
-            macro_rules! load_wasm_func{
+            macro_rules! load_wasm_func {
                 ($a:expr, $b:ty)=>{
                     {
                         Reflect::get(c.as_ref(), &$a.into())
@@ -195,7 +175,6 @@ impl Group for BLSG1 {
             let msm_scalars_offset = load_wasm_func!("msmScalarsOffset", Function);
             let msm_points_offset = load_wasm_func!("msmPointsOffset", Function);
             let msm_run = load_wasm_func!("msmRun", Function);
-            let msm_log = load_wasm_func!("logOutput", Function);
 
             let size_u32 = size as u32;
             let args = Array::new_with_length(4);
@@ -212,7 +191,7 @@ impl Group for BLSG1 {
             let scalar_mem: Uint8Array = Uint8Array::new_with_byte_offset_and_length(
                 &buffer,
                 scalar_offset.as_f64().unwrap() as u32,
-                size_u32 * 32
+                size_u32 * 32,
             );
 
             let mut ptr = 0;
@@ -229,9 +208,6 @@ impl Group for BLSG1 {
                 point_offset.as_f64().unwrap() as u32,
                 size_u32 * 96,
             );
-
-
-            console_log!("{:?}", points_vec.len());
 
             ptr = 0;
             for point in points_vec.into_iter() {
@@ -250,30 +226,15 @@ impl Group for BLSG1 {
             let result_mem: Uint8Array = Uint8Array::new_with_byte_offset_and_length(
                 &buffer,
                 result_offset.as_f64().unwrap() as u32,
-                96
+                96,
             );
-
-            let log_offset: JsValue = msm_log.call0(&JsValue::undefined()).unwrap();
-            let log_mem: Uint8Array = Uint8Array::new_with_byte_offset(&buffer, log_offset.as_f64().unwrap() as u32);
-
-            let log = log_mem.to_vec();
-            let mut counter = 0;
-            while log[counter] != 0 {
-                counter +=1;
-            }
-            console_log!("log = {}", String::from_utf8_lossy(&log[..counter]));
 
             r = result_mem.to_vec();
         }
 
         let a1 = r[0..48].to_vec();
         let a2 = r[48..96].to_vec();
-        console_log!("fast_msm: {:?}", r);
-
-        wasm_bindgen_test::console_log!("x = {:?}, y = {:?}", BLSFq(fq_from_bytes(a1.clone())), BLSFq(fq_from_bytes(a2.clone())));
-        let affine = G1Affine::new(fq_from_bytes(a1), fq_from_bytes(a2));
-
-        Self(G1Projective::from(affine))
+        Self::from_xy(BLSFq(fq_from_bytes(a1)), BLSFq(fq_from_bytes(a2)))
     }
 }
 
@@ -354,6 +315,10 @@ impl BLSG1 {
     }
     /// Construct from the x-coordinate and y-coordinate
     pub fn from_xy(x: BLSFq, y: BLSFq) -> Self {
-        Self(G1Projective::new(x.0, y.0, Fq::one()))
+        if x.is_zero() && y.is_zero() {
+            Self(G1Projective::zero())
+        } else {
+            Self(G1Projective::new(x.0, y.0, Fq::one()))
+        }
     }
 }

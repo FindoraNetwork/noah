@@ -24,9 +24,8 @@ use noah_algebra::{prelude::*, traits::Domain};
 #[cfg(target_arch = "wasm32")]
 use {
     noah_algebra::bls12_381::init_fast_msm_wasm,
-    wasm_bindgen::prelude::*
+    wasm_bindgen::prelude::*,
 };
-use noah_algebra::bls12_381::BLSScalar;
 
 /// PLONK Prover: it produces a proof that `witness` satisfies the constraint system `cs`,
 /// Proof verifier must use a transcript with same state as prover and match the public parameters,
@@ -83,7 +82,7 @@ use noah_algebra::bls12_381::BLSScalar;
 pub fn prover<
     R: CryptoRng + RngCore,
     PCS: PolyComScheme,
-    CS: ConstraintSystem<Field = PCS::Field>,
+    CS: ConstraintSystem<Field=PCS::Field>,
 >(
     prng: &mut R,
     transcript: &mut Transcript,
@@ -99,7 +98,7 @@ pub fn prover<
 pub fn prover_with_lagrange<
     R: CryptoRng + RngCore,
     PCS: PolyComScheme,
-    CS: ConstraintSystem<Field = PCS::Field>,
+    CS: ConstraintSystem<Field=PCS::Field>,
 >(
     prng: &mut R,
     transcript: &mut Transcript,
@@ -158,14 +157,13 @@ pub fn prover_with_lagrange<
     let mut w_polys = vec![];
     let mut cm_w_vec = vec![];
 
-    wasm_bindgen_test::console_log!("before lagrange_pcs");
     let w_timer = start_timer!(|| "Round 1: witness polynomials");
     if let Some(lagrange_pcs) = lagrange_pcs {
         for i in 0..n_wires_per_gate {
             let this_w_timer = start_timer!(|| format!("Round 1: processing wire {}", i));
 
             let this_w_poly_timer = start_timer!(|| "Prepare the polynomial");
-            let mut f_eval = FpPolynomial::from_coefs(
+            let f_eval = FpPolynomial::from_coefs(
                 extended_witness[i * n_constraints..(i + 1) * n_constraints].to_vec(),
             );
             let mut f_coefs = FpPolynomial::ifft_with_domain(
@@ -179,22 +177,9 @@ pub fn prover_with_lagrange<
 
             let this_w_comm_timer = start_timer!(|| "Commit the polynomial");
 
-            wasm_bindgen_test::console_log!("before kzg commit {}", i);
-
-            let mut count_zero = 0;
-            let coefs_len = f_eval.coefs.len();
-            wasm_bindgen_test::console_log!("number of elements {}", coefs_len);
-            for i in 0..3185 {
-                if f_eval.coefs[i].is_zero() {
-                    count_zero += 1;
-                }
-            }
-            wasm_bindgen_test::console_log!("number of zeroes {}", count_zero);
-
             let cm_w = lagrange_pcs
                 .commit(&f_eval)
                 .c(d!(PlonkError::CommitmentError))?;
-            wasm_bindgen_test::console_log!("after kzg commit");
             let cm_w = pcs.apply_blind_factors(&cm_w, &blinds, n_constraints);
             transcript.append_commitment::<PCS::Commitment>(&cm_w);
             end_timer!(this_w_comm_timer);
@@ -227,7 +212,6 @@ pub fn prover_with_lagrange<
             end_timer!(this_w_timer);
         }
     }
-    wasm_bindgen_test::console_log!("after lagrange_pcs");
     end_timer!(w_timer);
 
     // 2. get challenges beta and gamma
@@ -289,7 +273,7 @@ pub fn prover_with_lagrange<
         n_wires_per_gate,
         n_constraints + 2,
     )
-    .c(d!())?;
+        .c(d!())?;
     end_timer!(t_comm_timer);
     end_timer!(t_timer);
 

@@ -16,8 +16,8 @@ use noah_algebra::{
 pub struct KZGCommitment<G>(pub G);
 
 impl<'a, G> ToBytes for KZGCommitment<G>
-where
-    G: Group,
+    where
+        G: Group,
 {
     fn to_bytes(&self) -> Vec<u8> {
         self.0.to_compressed_bytes()
@@ -227,13 +227,10 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
             .iter()
             .collect();
 
-
-        wasm_bindgen_test::console_log!("before multi_exp");
         let commitment_value = BLSG1::multi_exp(
             &coefs_poly_bls_scalar_ref[..],
             &pub_param_group_1_as_ref[..],
         );
-        wasm_bindgen_test::console_log!("after multi_exp");
 
         Ok(KZGCommitment(commitment_value))
     }
