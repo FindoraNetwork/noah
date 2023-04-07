@@ -41,6 +41,8 @@ pub mod parameters;
 pub mod serialization;
 /// Module for generating parameters.
 pub mod setup;
+/// Module for traceable confidential transfer.
+pub mod t_anon_xfr;
 /// Module for confidential transfer.
 pub mod xfr;
 
