@@ -255,7 +255,7 @@ mod smoke_axfr_wasm {
             &receiver.get_pk(),
             AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
         )
-            .unwrap();
+        .unwrap();
         let hash = random_hasher(&mut prng);
         let note = finish_abar_to_bar_note(&mut prng, &params, pre_note, hash.clone()).unwrap();
         verify_abar_to_bar_note(&verify_params, &note, &proof.root, hash.clone()).unwrap();
