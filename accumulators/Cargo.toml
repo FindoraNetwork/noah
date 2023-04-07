@@ -21,9 +21,9 @@ path = '../algebra'
 path = '../crypto'
 
 [dependencies.storage]
-git = 'https://github.com/harshadptl/storage.git'
-branch = 'msm_test'
+git = 'https://github.com/FindoraNetwork/storage.git'
+tag = 'v1.1.4'
 
 [dev-dependencies.mem_db]
-git = 'https://github.com/harshadptl/storage.git'
-branch = 'msm_test'
+git = 'https://github.com/FindoraNetwork/storage.git'
+tag = 'v1.1.4'
