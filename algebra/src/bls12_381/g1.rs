@@ -1,12 +1,40 @@
-use crate::bls12_381::BLSScalar;
+use crate::bls12_381::{BLSFq, BLSScalar};
 use crate::errors::AlgebraError;
 use crate::prelude::{derive_prng_from_hash, *};
-use ark_bls12_381::{G1Affine, G1Projective};
-use ark_ec::{CurveGroup, Group as ArkGroup, VariableBaseMSM};
+use ark_bls12_381::{Fq, G1Affine, G1Projective};
+use ark_ec::{CurveGroup, Group as ArkGroup};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use ark_std::fmt::{Debug, Display, Formatter};
 use digest::{consts::U64, Digest};
 use wasm_bindgen::prelude::*;
+
+#[cfg(target_arch = "wasm32")]
+use {
+    ark_ff::{BigInteger, BigInteger384, FpConfig, MontBackend, PrimeField},
+    js_sys::{
+        Array, Function, Object, Reflect, Uint8Array,
+        WebAssembly::{instantiate_buffer, Instance, Memory},
+    },
+    std::io::Cursor,
+    wasm_bindgen::JsCast,
+    wasm_bindgen_futures::JsFuture,
+};
+
+#[cfg(target_arch = "wasm32")]
+const WASM: &[u8] = include_bytes!("./fastmsm.wasm");
+#[cfg(target_arch = "wasm32")]
+static mut WASM_INSTANCE: Option<Instance> = None;
+
+#[cfg(target_arch = "wasm32")]
+/// Init fast msm
+pub async fn init_fast_msm_wasm() -> core::result::Result<(), JsValue> {
+    unsafe {
+        let a: JsValue = JsFuture::from(instantiate_buffer(WASM, &Object::new())).await?;
+        WASM_INSTANCE = Some(Reflect::get(&a, &"instance".into())?.dyn_into()?);
+    }
+
+    Ok(())
+}
 
 /// The wrapped struct for ark_bls12_381::G1Projective
 #[wasm_bindgen]
@@ -102,7 +130,10 @@ impl Group for BLSG1 {
     }
 
     #[inline]
+    #[cfg(not(target_arch = "wasm32"))]
     fn multi_exp(scalars: &[&Self::ScalarType], points: &[&Self]) -> Self {
+        use ark_ec::VariableBaseMSM;
+
         let scalars_raw: Vec<_> = scalars.iter().map(|r| r.0).collect();
         let points_raw = G1Projective::normalize_batch(
             &points.iter().map(|r| r.0).collect::<Vec<G1Projective>>(),
@@ -110,6 +141,108 @@ impl Group for BLSG1 {
 
         Self(G1Projective::msm(&points_raw, scalars_raw.as_ref()).unwrap())
     }
+
+    #[inline]
+    #[cfg(target_arch = "wasm32")]
+    fn multi_exp(scalars: &[&Self::ScalarType], points: &[&Self]) -> Self {
+        let r: Vec<u8>;
+
+        // unsafe here is alright because WASM is single threaded
+        unsafe {
+            let c = WASM_INSTANCE
+                .clone()
+                .expect("FastMSM WASM not initialized")
+                .exports();
+            let scalars_vec: Vec<_> = scalars.iter().map(|r| r.0).collect();
+            let points_vec = G1Projective::normalize_batch(
+                &points.iter().map(|r| r.0).collect::<Vec<G1Projective>>(),
+            );
+
+            let size = scalars_vec.len();
+            let window_bits = 13;
+
+            macro_rules! load_wasm_func {
+                ($a:expr, $b:ty) => {{
+                    Reflect::get(c.as_ref(), &$a.into())
+                        .unwrap()
+                        .dyn_into::<$b>()
+                        .expect("$a export wasn't a function")
+                }};
+            }
+
+            let msm_initialize = load_wasm_func!("msmInitialize", Function);
+            let msm_scalars_offset = load_wasm_func!("msmScalarsOffset", Function);
+            let msm_points_offset = load_wasm_func!("msmPointsOffset", Function);
+            let msm_run = load_wasm_func!("msmRun", Function);
+
+            let size_u32 = size as u32;
+            let args = Array::new_with_length(4);
+            args.set(0, size_u32.into());
+            args.set(1, window_bits.into());
+            args.set(2, 1024.into());
+            args.set(3, 128.into());
+            msm_initialize.apply(&JsValue::undefined(), &args).unwrap();
+
+            let mem: Memory = load_wasm_func!("memory", Memory);
+            let buffer = &mem.buffer();
+
+            let scalar_offset: JsValue = msm_scalars_offset.call0(&JsValue::undefined()).unwrap();
+            let scalar_mem: Uint8Array = Uint8Array::new_with_byte_offset_and_length(
+                &buffer,
+                scalar_offset.as_f64().unwrap() as u32,
+                size_u32 * 32,
+            );
+
+            let mut ptr = 0;
+            for scalar in scalars_vec.into_iter() {
+                for s in scalar.into_bigint().to_bytes_le() {
+                    Uint8Array::set_index(&scalar_mem, ptr, s);
+                    ptr += 1;
+                }
+            }
+
+            let point_offset: JsValue = msm_points_offset.call0(&JsValue::undefined()).unwrap();
+            let point_mem: Uint8Array = Uint8Array::new_with_byte_offset_and_length(
+                &buffer,
+                point_offset.as_f64().unwrap() as u32,
+                size_u32 * 96,
+            );
+
+            ptr = 0;
+            for point in points_vec.into_iter() {
+                let affine = G1Affine::from(point);
+                for s in affine.x.into_bigint().to_bytes_le() {
+                    Uint8Array::set_index(&point_mem, ptr, s);
+                    ptr += 1;
+                }
+                for s in affine.y.into_bigint().to_bytes_le() {
+                    Uint8Array::set_index(&point_mem, ptr, s);
+                    ptr += 1;
+                }
+            }
+
+            let result_offset: JsValue = msm_run.call0(&JsValue::undefined()).unwrap();
+            let result_mem: Uint8Array = Uint8Array::new_with_byte_offset_and_length(
+                &buffer,
+                result_offset.as_f64().unwrap() as u32,
+                96,
+            );
+
+            r = result_mem.to_vec();
+        }
+
+        let a1 = r[0..48].to_vec();
+        let a2 = r[48..96].to_vec();
+        Self::from_xy(BLSFq(fq_from_bytes(a1)), BLSFq(fq_from_bytes(a2)))
+    }
+}
+
+#[inline]
+#[cfg(target_arch = "wasm32")]
+fn fq_from_bytes(bytes: Vec<u8>) -> Fq {
+    let buffer = Cursor::new(bytes.clone());
+    let b = BigInteger384::deserialize_uncompressed(buffer).unwrap();
+    MontBackend::from_bigint(b).unwrap()
 }
 
 impl<'a> Add<&'a BLSG1> for BLSG1 {
@@ -165,5 +298,26 @@ impl Neg for BLSG1 {
 
     fn neg(self) -> Self::Output {
         Self(self.0.neg())
+    }
+}
+
+impl BLSG1 {
+    /// Get the x-coordinate of the Jubjub affine point.
+    #[inline]
+    pub fn get_x(&self) -> BLSFq {
+        BLSFq(self.0.x)
+    }
+    /// Get the y-coordinate of the Jubjub affine point.
+    #[inline]
+    pub fn get_y(&self) -> BLSFq {
+        BLSFq(self.0.y)
+    }
+    /// Construct from the x-coordinate and y-coordinate
+    pub fn from_xy(x: BLSFq, y: BLSFq) -> Self {
+        if x.is_zero() && y.is_zero() {
+            Self(G1Projective::zero())
+        } else {
+            Self(G1Projective::new(x.0, y.0, Fq::one()))
+        }
     }
 }

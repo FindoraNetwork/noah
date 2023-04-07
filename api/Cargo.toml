@@ -51,6 +51,7 @@ serde_derive = '1.0'
 serde_str = '0.1.0'
 sha2 = '0.10'
 sha3 = '0.10'
+wasm-bindgen-test = "^0.3"
 
 
 [dependencies.noah-algebra]

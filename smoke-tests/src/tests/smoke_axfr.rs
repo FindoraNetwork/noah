@@ -291,7 +291,7 @@ mod smoke_axfr {
                 &verify_params,
                 &notes,
                 &merkle_roots,
-                hashes.clone()
+                hashes.clone(),
             )
             .is_err());
 
@@ -301,7 +301,7 @@ mod smoke_axfr {
                 &verify_params,
                 &notes,
                 &merkle_roots,
-                hashes.clone()
+                hashes.clone(),
             )
             .is_err());
 
@@ -311,7 +311,7 @@ mod smoke_axfr {
                 &verify_params,
                 &notes,
                 &merkle_roots,
-                hashes.clone()
+                hashes.clone(),
             )
             .is_err());
             notes[5] = &note;
@@ -319,7 +319,7 @@ mod smoke_axfr {
                 &verify_params,
                 &notes,
                 &merkle_roots,
-                hashes.clone()
+                hashes.clone(),
             )
             .is_ok());
         }
@@ -405,7 +405,7 @@ mod smoke_axfr {
                 &verify_params,
                 &notes,
                 &merkle_roots,
-                hashes.clone()
+                hashes.clone(),
             )
             .is_err());
 
@@ -415,7 +415,7 @@ mod smoke_axfr {
                 &verify_params,
                 &notes,
                 &merkle_roots,
-                hashes.clone()
+                hashes.clone(),
             )
             .is_err());
 
@@ -425,7 +425,7 @@ mod smoke_axfr {
                 &verify_params,
                 &notes,
                 &merkle_roots,
-                hashes.clone()
+                hashes.clone(),
             )
             .is_err());
             notes[5] = &note;

@@ -8,7 +8,6 @@
 #![deny(unused_comparisons, bare_trait_objects, unused_must_use)]
 #![doc(html_logo_url = "https://avatars.githubusercontent.com/u/74745723?s=200&v=4")]
 #![doc(html_playground_url = "https://play.rust-lang.org")]
-#![forbid(unsafe_code)]
 #![warn(
     unused,
     future_incompatible,
