@@ -191,6 +191,13 @@ jobs:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@nightly
       - uses: taiki-e/install-action@nextest
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-dangling-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Dangling test
         run: |
           cd smoke-tests/
@@ -213,6 +220,13 @@ jobs:
         with:
           # Optional version of wasm-pack to install(eg. 'v0.9.1', 'latest')
           version: 'latest'
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-wasm-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: WASM test
         run: |
           wasm-pack test --node smoke-tests
@@ -229,6 +243,13 @@ jobs:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@nextest
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-parallel-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Parallel test
         run: |
           cd smoke-tests/
@@ -245,6 +266,14 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-consistency-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Build verifier parameters
         run: cargo run --release -p noah --features=gen,no_vk --bin gen-params all ./api/parameters
