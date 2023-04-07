@@ -8,19 +8,17 @@ use ark_std::fmt::{Debug, Display, Formatter};
 use digest::{consts::U64, Digest};
 use wasm_bindgen::prelude::*;
 
-
 #[cfg(target_arch = "wasm32")]
 use {
     ark_bls12_381::Fq,
-    ark_ff::{
-        BigInteger, BigInteger384, FpConfig, MontBackend, PrimeField,
+    ark_ff::{BigInteger, BigInteger384, FpConfig, MontBackend, PrimeField},
+    js_sys::{
+        Array, Function, Object, Reflect, Uint8Array,
+        WebAssembly::{instantiate_buffer, Instance, Memory},
     },
-    js_sys::{Array, Function, Object, Reflect, Uint8Array, WebAssembly::{
-        instantiate_buffer, Instance, Memory,
-    }},
-    wasm_bindgen_futures::JsFuture,
-    wasm_bindgen::JsCast,
     std::io::Cursor,
+    wasm_bindgen::JsCast,
+    wasm_bindgen_futures::JsFuture,
 };
 
 #[cfg(target_arch = "wasm32")]
@@ -38,7 +36,6 @@ pub async fn init_fast_msm_wasm() -> core::result::Result<(), JsValue> {
 
     Ok(())
 }
-
 
 /// The wrapped struct for ark_bls12_381::G1Projective
 #[wasm_bindgen]
@@ -126,8 +123,8 @@ impl Group for BLSG1 {
 
     #[inline]
     fn from_hash<D>(hash: D) -> Self
-        where
-            D: Digest<OutputSize=U64> + Default,
+    where
+        D: Digest<OutputSize = U64> + Default,
     {
         let mut prng = derive_prng_from_hash::<D>(hash);
         Self(G1Projective::rand(&mut prng))
@@ -151,7 +148,10 @@ impl Group for BLSG1 {
 
         // unsafe here is alright because WASM is single threaded
         unsafe {
-            let c = WASM_INSTANCE.clone().expect("FastMSM WASM not initialized").exports();
+            let c = WASM_INSTANCE
+                .clone()
+                .expect("FastMSM WASM not initialized")
+                .exports();
             let scalars_vec: Vec<_> = scalars.iter().map(|r| r.0).collect();
             let points_vec = G1Projective::normalize_batch(
                 &points.iter().map(|r| r.0).collect::<Vec<G1Projective>>(),
@@ -161,14 +161,12 @@ impl Group for BLSG1 {
             let window_bits = 13;
 
             macro_rules! load_wasm_func {
-                ($a:expr, $b:ty)=>{
-                    {
-                        Reflect::get(c.as_ref(), &$a.into())
+                ($a:expr, $b:ty) => {{
+                    Reflect::get(c.as_ref(), &$a.into())
                         .unwrap()
                         .dyn_into::<$b>()
                         .expect("$a export wasn't a function")
-                    }
-                }
+                }};
             }
 
             let msm_initialize = load_wasm_func!("msmInitialize", Function);

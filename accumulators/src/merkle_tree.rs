@@ -500,8 +500,10 @@ impl EphemeralMerkleTree {
         }
 
         self.entry_count += 1;
-        self.store
-            .insert(ENTRY_COUNT_KEY.to_vec(), self.entry_count.to_be_bytes().to_vec());
+        self.store.insert(
+            ENTRY_COUNT_KEY.to_vec(),
+            self.entry_count.to_be_bytes().to_vec(),
+        );
         Ok(uid)
     }
 
@@ -592,7 +594,11 @@ impl EphemeralMerkleTree {
     }
 
     /// get tree root by depth and version.
-    pub fn get_root_with_depth_and_version(&self, _depth: usize, _version: u64) -> Result<BLSScalar> {
+    pub fn get_root_with_depth_and_version(
+        &self,
+        _depth: usize,
+        _version: u64,
+    ) -> Result<BLSScalar> {
         unimplemented!()
     }
 

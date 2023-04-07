@@ -20,12 +20,8 @@ use ark_std::{end_timer, start_timer};
 use merlin::Transcript;
 use noah_algebra::{prelude::*, traits::Domain};
 
-
 #[cfg(target_arch = "wasm32")]
-use {
-    noah_algebra::bls12_381::init_fast_msm_wasm,
-    wasm_bindgen::prelude::*,
-};
+use {noah_algebra::bls12_381::init_fast_msm_wasm, wasm_bindgen::prelude::*};
 
 /// PLONK Prover: it produces a proof that `witness` satisfies the constraint system `cs`,
 /// Proof verifier must use a transcript with same state as prover and match the public parameters,
@@ -82,7 +78,7 @@ use {
 pub fn prover<
     R: CryptoRng + RngCore,
     PCS: PolyComScheme,
-    CS: ConstraintSystem<Field=PCS::Field>,
+    CS: ConstraintSystem<Field = PCS::Field>,
 >(
     prng: &mut R,
     transcript: &mut Transcript,
@@ -98,7 +94,7 @@ pub fn prover<
 pub fn prover_with_lagrange<
     R: CryptoRng + RngCore,
     PCS: PolyComScheme,
-    CS: ConstraintSystem<Field=PCS::Field>,
+    CS: ConstraintSystem<Field = PCS::Field>,
 >(
     prng: &mut R,
     transcript: &mut Transcript,
@@ -273,7 +269,7 @@ pub fn prover_with_lagrange<
         n_wires_per_gate,
         n_constraints + 2,
     )
-        .c(d!())?;
+    .c(d!())?;
     end_timer!(t_comm_timer);
     end_timer!(t_timer);
 
@@ -409,7 +405,6 @@ pub fn prover_with_lagrange<
         opening_witness_zeta_omega,
     })
 }
-
 
 #[cfg(target_arch = "wasm32")]
 /// Init prover

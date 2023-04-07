@@ -16,8 +16,8 @@ use noah_algebra::{
 pub struct KZGCommitment<G>(pub G);
 
 impl<'a, G> ToBytes for KZGCommitment<G>
-    where
-        G: Group,
+where
+    G: Group,
 {
     fn to_bytes(&self) -> Vec<u8> {
         self.0.to_compressed_bytes()

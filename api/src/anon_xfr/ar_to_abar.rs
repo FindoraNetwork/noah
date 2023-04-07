@@ -133,7 +133,7 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
         oabar.amount,
         oabar.asset_type.as_scalar(),
     )
-        .unwrap();
+    .unwrap();
 
     let mut transcript = Transcript::new(AR_TO_ABAR_PLONK_PROOF_TRANSCRIPT);
     let (mut cs, _) = build_ar_to_abar_cs(payee_witness, &output_trace);
@@ -150,7 +150,7 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
         prover_params,
         &witness,
     )
-        .c(d!(NoahError::AXfrProofError))?;
+    .c(d!(NoahError::AXfrProofError))?;
 
     let body = ArToAbarBody {
         input: obar.blind_asset_record.clone(),
@@ -186,7 +186,7 @@ pub fn verify_ar_to_abar_body(params: &VerifierParams, body: &ArToAbarBody) -> R
         &online_inputs,
         &body.proof,
     )
-        .c(d!(NoahError::AXfrVerificationError))
+    .c(d!(NoahError::AXfrVerificationError))
 }
 
 /// Construct the transparent-to-anonymous constraint system.

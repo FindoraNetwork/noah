@@ -293,7 +293,7 @@ mod smoke_axfr {
                 &merkle_roots,
                 hashes.clone(),
             )
-                .is_err());
+            .is_err());
 
             merkle_roots[5] = &proof.root;
             hashes[5] = err_hash;
@@ -303,7 +303,7 @@ mod smoke_axfr {
                 &merkle_roots,
                 hashes.clone(),
             )
-                .is_err());
+            .is_err());
 
             hashes[5] = hash.clone();
             notes[5] = &err_nullifier;
@@ -313,7 +313,7 @@ mod smoke_axfr {
                 &merkle_roots,
                 hashes.clone(),
             )
-                .is_err());
+            .is_err());
             notes[5] = &note;
             assert!(batch_verify_abar_to_ar_note(
                 &verify_params,
@@ -321,7 +321,7 @@ mod smoke_axfr {
                 &merkle_roots,
                 hashes.clone(),
             )
-                .is_ok());
+            .is_ok());
         }
 
         // check open AR
@@ -372,7 +372,7 @@ mod smoke_axfr {
             &receiver.get_pk(),
             AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
         )
-            .unwrap();
+        .unwrap();
         let hash = random_hasher(&mut prng);
         let note = finish_abar_to_bar_note(&mut prng, &params, pre_note, hash.clone()).unwrap();
         verify_abar_to_bar_note(&verify_params, &note, &proof.root, hash.clone()).unwrap();
@@ -407,7 +407,7 @@ mod smoke_axfr {
                 &merkle_roots,
                 hashes.clone(),
             )
-                .is_err());
+            .is_err());
 
             merkle_roots[5] = &proof.root;
             hashes[5] = err_hash;
@@ -417,7 +417,7 @@ mod smoke_axfr {
                 &merkle_roots,
                 hashes.clone(),
             )
-                .is_err());
+            .is_err());
 
             hashes[5] = hash;
             notes[5] = &err_nullifier;
@@ -427,7 +427,7 @@ mod smoke_axfr {
                 &merkle_roots,
                 hashes.clone(),
             )
-                .is_err());
+            .is_err());
             notes[5] = &note;
             assert!(
                 batch_verify_abar_to_bar_note(&verify_params, &notes, &merkle_roots, hashes)
@@ -632,9 +632,9 @@ mod smoke_axfr {
                 note.body.owner_memos[i].clone(),
                 &receivers[i],
             )
-                .unwrap()
-                .build()
-                .unwrap();
+            .unwrap()
+            .build()
+            .unwrap();
             assert_eq!(oabars_out[i].get_amount(), oabar.get_amount());
             assert_eq!(oabars_out[i].get_asset_type(), oabar.get_asset_type());
         }

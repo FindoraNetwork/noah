@@ -23,12 +23,8 @@ use noah_plonk::{
     poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS,
 };
 
-
 #[cfg(target_arch = "wasm32")]
-use {
-    noah_plonk::plonk::prover::init_prover,
-    wasm_bindgen::prelude::*
-};
+use {noah_plonk::plonk::prover::init_prover, wasm_bindgen::prelude::*};
 
 /// Module for general-purpose anonymous payment.
 pub mod abar_to_abar;
