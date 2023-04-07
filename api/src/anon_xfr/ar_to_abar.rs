@@ -152,7 +152,6 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
     )
     .c(d!(NoahError::AXfrProofError))?;
 
-
     let body = ArToAbarBody {
         input: obar.blind_asset_record.clone(),
         output: AnonAssetRecord::from_oabar(&oabar),
