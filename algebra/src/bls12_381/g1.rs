@@ -122,8 +122,8 @@ impl Group for BLSG1 {
 
     #[inline]
     fn from_hash<D>(hash: D) -> Self
-    where
-        D: Digest<OutputSize = U64> + Default,
+        where
+            D: Digest<OutputSize=U64> + Default,
     {
         let mut prng = derive_prng_from_hash::<D>(hash);
         Self(G1Projective::rand(&mut prng))
@@ -154,7 +154,7 @@ impl Group for BLSG1 {
                 .expect("FastMSM WASM not initialized")
                 .exports();
 
-            let scalars_and_points_iter = scalars.iter().zip(points).filter(|(s, _)| s.is_zero());
+            let scalars_and_points_iter = scalars.iter().zip(points).filter(|(s, _)| !s.is_zero());
 
             let scalars_vec: Vec<_> = scalars_and_points_iter.clone().map(|(r, _)| r.0).collect();
             let points_vec = G1Projective::normalize_batch(
