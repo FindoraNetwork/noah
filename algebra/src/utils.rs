@@ -1,12 +1,17 @@
 #![deny(warnings)]
 #![allow(clippy::upper_case_acronyms)]
 
+use base64::alphabet::URL_SAFE;
 use crate::{fs::File, io::Write, path::PathBuf, prelude::*, rand::SeedableRng};
-use base64::engine::general_purpose::URL_SAFE;
 use base64::Engine;
+use base64::engine::{DecodePaddingMode, GeneralPurpose, GeneralPurposeConfig};
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use rand_chacha::ChaCha20Rng;
+
+const BASE64_PADDING_CONFIG: GeneralPurposeConfig = GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent);
+
+const BASE64_ENGINE: GeneralPurpose = GeneralPurpose::new(&URL_SAFE, BASE64_PADDING_CONFIG);
 
 /// Convert an 8 byte array (big-endian) into a u64
 pub fn u8_be_slice_to_u64(slice: &[u8]) -> u64 {
@@ -48,18 +53,18 @@ pub fn u64_to_u32_pair(x: u64) -> (u32, u32) {
 
 /// Convert the input into the base64 encoding
 pub fn b64enc<T: ?Sized + AsRef<[u8]>>(input: &T) -> String {
-    URL_SAFE.encode(input)
+    BASE64_ENGINE.encode(input)
 }
 
 /// Reconstruct from the base64 encoding
 pub fn b64dec<T: ?Sized + AsRef<[u8]>>(input: &T) -> Result<Vec<u8>> {
-    URL_SAFE.decode(input).c(d!())
+    BASE64_ENGINE.decode(input).c(d!())
 }
 
 /// Derive a ChaCha20Rng PRNG from a digest from a hash function
 pub fn derive_prng_from_hash<D>(hash: D) -> ChaCha20Rng
-where
-    D: Digest<OutputSize = U64> + Default,
+    where
+        D: Digest<OutputSize=U64> + Default,
 {
     const SEED_SIZE: usize = 32;
     let mut seed: [u8; SEED_SIZE] = [0; SEED_SIZE];
