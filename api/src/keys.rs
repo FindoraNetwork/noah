@@ -116,8 +116,8 @@ impl NoahFromToBytes for PublicKey {
         let mut bytes = vec![0u8; PUBLIC_KEY_LENGTH];
         match self.0 {
             PublicKeyInner::Ed25519(pk) => {
-                bytes[0] = KeyType::Ed25519.to_byte();
-                bytes[1..PUBLIC_KEY_LENGTH - 1].copy_from_slice(pk.as_bytes());
+                bytes = vec![0u8; PUBLIC_KEY_LENGTH - 2];
+                bytes.copy_from_slice(pk.as_bytes());
             }
             PublicKeyInner::Secp256k1(pk) => {
                 bytes[0] = KeyType::Secp256k1.to_byte();

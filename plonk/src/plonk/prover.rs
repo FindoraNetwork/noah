@@ -20,6 +20,9 @@ use ark_std::{end_timer, start_timer};
 use merlin::Transcript;
 use noah_algebra::{prelude::*, traits::Domain};
 
+#[cfg(target_arch = "wasm32")]
+use {noah_algebra::bls12_381::init_fast_msm_wasm, wasm_bindgen::prelude::*};
+
 /// PLONK Prover: it produces a proof that `witness` satisfies the constraint system `cs`,
 /// Proof verifier must use a transcript with same state as prover and match the public parameters,
 /// It returns [PlonkError] if an error occurs in computing proof commitments, meaning parameters of the polynomial
@@ -169,6 +172,7 @@ pub fn prover_with_lagrange<
             end_timer!(this_w_poly_timer);
 
             let this_w_comm_timer = start_timer!(|| "Commit the polynomial");
+
             let cm_w = lagrange_pcs
                 .commit(&f_eval)
                 .c(d!(PlonkError::CommitmentError))?;
@@ -400,4 +404,10 @@ pub fn prover_with_lagrange<
         opening_witness_zeta,
         opening_witness_zeta_omega,
     })
+}
+
+#[cfg(target_arch = "wasm32")]
+/// Init prover
+pub async fn init_prover() -> core::result::Result<(), JsValue> {
+    init_fast_msm_wasm().await
 }

@@ -60,10 +60,6 @@ pub struct PlonkProverParams<O, C, F> {
     pub l1_coefs: FpPolynomial<F>,
     /// The l1's FFT of the polynomial of unity root set.
     pub l1_coset_evals: Vec<F>,
-    /// Initialize [one.neg, zero, zero, ... zero, one] polynomial.
-    pub z_h_coefs: FpPolynomial<F>,
-    /// The z_h's FFT of the polynomial of unity root set.
-    pub z_h_inv_coset_evals: Vec<F>,
     /// The selector polynomials' FFT of the polynomial of unity root set.
     pub q_coset_evals: Vec<Vec<F>>,
     /// The permutation polynomials' FFT of the polynomial of unity root set.
@@ -272,18 +268,6 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
     let l1_coefs = FpPolynomial::ifft_with_domain(&domain, &l1_evals.coefs);
     let l1_coset_evals = l1_coefs.coset_fft_with_domain(&domain_m, &k[1]);
 
-    let z_h_coefs = {
-        let mut v = vec![PCS::Field::zero(); n + 1];
-        v[0] = PCS::Field::one().neg();
-        v[n] = PCS::Field::one();
-        FpPolynomial::from_coefs(v)
-    };
-    let z_h_inv_coset_evals = z_h_coefs
-        .coset_fft_with_domain(&domain_m, &k[1])
-        .into_iter()
-        .map(|x| x.inv().unwrap())
-        .collect();
-
     // Step 4: compute the Lagrange interpolation constants.
     let mut lagrange_constants = vec![];
     if no_verifier {
@@ -366,8 +350,6 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
         coset_quotient,
         l1_coefs,
         l1_coset_evals,
-        z_h_coefs,
-        z_h_inv_coset_evals,
         q_coset_evals,
         s_coset_evals,
         qb_coset_eval,

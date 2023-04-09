@@ -19,7 +19,8 @@ pub const TREE_DEPTH: usize = 20;
 const LEAF_START: u64 = 1743392200;
 
 const KEY_PAD: [u8; 4] = [0, 0, 0, 0];
-const ROOT_KEY: [u8; 12] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // KEY_PAD + 0u64
+const ROOT_KEY: [u8; 12] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+// KEY_PAD + 0u64
 const ENTRY_COUNT_KEY: [u8; 4] = [0, 0, 0, 1];
 
 ///
@@ -418,6 +419,208 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
     /// get the tree version
     pub fn version(&self) -> u64 {
         self.store.height().unwrap_or(0)
+    }
+
+    /// get the number of entries
+    pub fn entry_count(&self) -> u64 {
+        self.entry_count
+    }
+}
+
+/// An ephemeral version of the Merkle tree used for testing
+pub struct EphemeralMerkleTree {
+    entry_count: u64,
+    store: HashMap<Vec<u8>, Vec<u8>>,
+}
+
+impl EphemeralMerkleTree {
+    /// Generates a new EphemeralMerkleTree
+    pub fn new() -> Result<EphemeralMerkleTree> {
+        let entry_count = 0;
+        let mut store = HashMap::<Vec<u8>, Vec<u8>>::new();
+
+        store.insert(ROOT_KEY.to_vec(), BLSScalar::zero().noah_to_bytes());
+        store.insert(ENTRY_COUNT_KEY.to_vec(), 0u64.to_be_bytes().to_vec());
+
+        Ok(EphemeralMerkleTree { entry_count, store })
+    }
+
+    /// add a new leaf and return the leaf uid.
+    pub fn add_commitment_hash(&mut self, hash: BLSScalar) -> Result<u64> {
+        let mut cache = Cache::new();
+        // 1. generate keys of ancestors for update in tree
+        let keys = get_path_keys(self.entry_count);
+        let leaf = keys.first().unwrap();
+
+        // 2. Hash ABAR and save leaf node
+        let uid = self.entry_count;
+        cache.set(leaf.0, hash.noah_to_bytes());
+
+        // 3. update hash of all ancestors of the new leaf
+        for (index, (node_key, path)) in keys[0..TREE_DEPTH].iter().enumerate() {
+            let parse_hash = |key: u64| -> Result<BLSScalar> {
+                if let Some(b) = cache.get(&key) {
+                    return BLSScalar::noah_from_bytes(b.as_slice());
+                }
+                let mut store_key = KEY_PAD.to_vec();
+                store_key.extend(key.to_be_bytes());
+                match self.store.get(&store_key) {
+                    Some(b) => BLSScalar::noah_from_bytes(b.as_slice()),
+                    None => Ok(BLSScalar::zero()),
+                }
+            };
+
+            let (left, mid, right) = match path {
+                TreePath::Left => (
+                    parse_hash(*node_key)?,
+                    parse_hash(node_key + 1)?,
+                    parse_hash(node_key + 2)?,
+                ),
+                TreePath::Middle => (
+                    parse_hash(node_key - 1)?,
+                    parse_hash(*node_key)?,
+                    parse_hash(node_key + 1)?,
+                ),
+                TreePath::Right => (
+                    parse_hash(node_key - 2)?,
+                    parse_hash(node_key - 1)?,
+                    parse_hash(*node_key)?,
+                ),
+            };
+
+            let hash =
+                AnemoiJive381::eval_jive(&[left, mid], &[right, ANEMOI_JIVE_381_SALTS[index]]);
+            cache.set(keys[index + 1].0, BLSScalar::noah_to_bytes(&hash));
+        }
+
+        for (k, v) in cache.iter() {
+            let mut store_key = KEY_PAD.to_vec();
+            store_key.extend(k.to_be_bytes());
+            self.store.insert(store_key, v.to_vec());
+        }
+
+        self.entry_count += 1;
+        self.store.insert(
+            ENTRY_COUNT_KEY.to_vec(),
+            self.entry_count.to_be_bytes().to_vec(),
+        );
+        Ok(uid)
+    }
+
+    /// generate leaf's merkle proof by uid.
+    pub fn generate_proof(&self, id: u64) -> Result<Proof> {
+        self.generate_proof_with_depth(id, TREE_DEPTH)
+    }
+
+    /// generate leaf's merkle proof by uid and the depth.
+    pub fn generate_proof_with_depth(&self, id: u64, depth: usize) -> Result<Proof> {
+        if depth > TREE_DEPTH || id > 3u64.pow(depth as u32) {
+            return Err(eg!("tree depth is invalid for generate proof"));
+        }
+
+        let keys = get_path_keys(id);
+
+        let nodes: Vec<ProofNode> = keys[0..depth]
+            .iter()
+            .map(|(key_id, path)| {
+                let (left_key_id, mid_key_id, right_key_id) = match path {
+                    TreePath::Left => (*key_id, key_id + 1, key_id + 2),
+                    TreePath::Middle => (key_id - 1, *key_id, key_id + 1),
+                    TreePath::Right => (key_id - 2, key_id - 1, *key_id),
+                };
+
+                let mut node = ProofNode {
+                    left: Default::default(),
+                    mid: Default::default(),
+                    right: Default::default(),
+                    path: *path,
+                };
+
+                // if current node is not present in store then it is not a valid uid to generate
+                let mut cur_key = KEY_PAD.to_vec();
+                cur_key.extend(key_id.to_be_bytes());
+                if !self.store.contains_key(&cur_key) {
+                    return Err(eg!("uid not found in tree, cannot generate proof"));
+                }
+
+                let mut left_key = KEY_PAD.to_vec();
+                left_key.extend(left_key_id.to_be_bytes());
+                if let Some(b) = self.store.get(&left_key) {
+                    node.left = BLSScalar::noah_from_bytes(b.as_slice())?;
+                }
+
+                let mut mid_key = KEY_PAD.to_vec();
+                mid_key.extend(mid_key_id.to_be_bytes());
+                if let Some(b) = self.store.get(&mid_key) {
+                    node.mid = BLSScalar::noah_from_bytes(b.as_slice())?;
+                }
+
+                let mut right_key = KEY_PAD.to_vec();
+                right_key.extend(right_key_id.to_be_bytes());
+                if let Some(b) = self.store.get(&right_key) {
+                    node.right = BLSScalar::noah_from_bytes(b.as_slice())?;
+                }
+
+                Ok(node)
+            })
+            .collect::<Result<Vec<ProofNode>>>()?;
+
+        Ok(Proof {
+            nodes: nodes,
+            root: self.get_root_with_depth(depth)?,
+            root_version: 0,
+            uid: id,
+        })
+    }
+
+    /// get tree current root
+    pub fn get_root(&self) -> Result<BLSScalar> {
+        self.get_root_with_depth(TREE_DEPTH)
+    }
+
+    /// get tree root by depth
+    pub fn get_root_with_depth(&self, depth: usize) -> Result<BLSScalar> {
+        let mut pos = 0u64;
+        for i in 0..(TREE_DEPTH - depth) {
+            pos += 3u64.pow(i as u32);
+        }
+        let mut store_key = KEY_PAD.to_vec();
+        store_key.extend(pos.to_be_bytes());
+
+        match self.store.get(&store_key) {
+            Some(hash) => BLSScalar::noah_from_bytes(hash.as_slice()),
+            None => Err(eg!("root hash key not found at this depth")),
+        }
+    }
+
+    /// get tree root by depth and version.
+    pub fn get_root_with_depth_and_version(
+        &self,
+        _depth: usize,
+        _version: u64,
+    ) -> Result<BLSScalar> {
+        unimplemented!()
+    }
+
+    /// commit to store and add the tree version.
+    pub fn commit(&mut self) -> Result<u64> {
+        unimplemented!()
+    }
+
+    /// get leaf hash by uid
+    pub fn get_leaf(&self, uid: u64) -> Result<Option<BLSScalar>> {
+        let mut store_key = KEY_PAD.to_vec();
+        store_key.extend(uid.to_be_bytes());
+
+        match self.store.get(&store_key) {
+            Some(hash) => Ok(Some(BLSScalar::noah_from_bytes(hash.as_slice())?)),
+            None => Ok(None),
+        }
+    }
+
+    /// get the tree version
+    pub fn version(&self) -> u64 {
+        unimplemented!()
     }
 
     /// get the number of entries

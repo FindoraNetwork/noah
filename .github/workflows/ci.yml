@@ -179,74 +179,123 @@ jobs:
           cargo test --doc
 
   dangling_check:
-      name: Check dangling
-      runs-on: ubuntu-latest
-      env:
-        RUSTFLAGS: -Dwarnings
-        CARGO_TERM_COLOR: always
-        RUST_BACKTRACE: 1
-      strategy:
-        fail-fast: true
-      steps:
-        - uses: actions/checkout@v3
-        - uses: dtolnay/rust-toolchain@nightly
-        - uses: taiki-e/install-action@nextest
-        - name: Dangling test
-          run: | 
-            cd smoke-tests/
-            cargo nextest run --features=debug
-            cargo test --doc
+    name: Check dangling
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -Dwarnings
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+    strategy:
+      fail-fast: true
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: taiki-e/install-action@nextest
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-dangling-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Dangling test
+        run: |
+          cd smoke-tests/
+          cargo nextest run --features=debug
+          cargo test --doc
+
+  wasm_check:
+    name: Check WASM
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -Dwarnings
+      CARGO_TERM_COLOR: always
+      RUST_BACKTRACE: 1
+    strategy:
+      fail-fast: true
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@nightly
+      - uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          # Optional version of wasm-pack to install(eg. 'v0.9.1', 'latest')
+          version: 'latest'
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-wasm-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: WASM test
+        run: |
+          wasm-pack test --node smoke-tests
 
   parallel_check:
-      name: Check parallel
-      runs-on: ubuntu-latest
-      env:
-        RUSTFLAGS: -Dwarnings
-        CARGO_TERM_COLOR: always
-      strategy:
-        fail-fast: true
-      steps:
-        - uses: actions/checkout@v3
-        - uses: dtolnay/rust-toolchain@stable
-        - uses: taiki-e/install-action@nextest
-        - name: Parallel test
-          run: |
-            cd smoke-tests/
-            cargo nextest run --features=parallel
-            cargo test --doc
+    name: Check parallel
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -Dwarnings
+      CARGO_TERM_COLOR: always
+    strategy:
+      fail-fast: true
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@nextest
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-parallel-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Parallel test
+        run: |
+          cd smoke-tests/
+          cargo nextest run --features=parallel
+          cargo test --doc
 
   consistency_check:
-      name: Check verifier parameters
-      runs-on: ubuntu-latest
-      env:
-        RUSTFLAGS: -Dwarnings
-      strategy:
-        fail-fast: true
-      steps:
-        - uses: actions/checkout@v3
-        - uses: dtolnay/rust-toolchain@stable
+    name: Check verifier parameters
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -Dwarnings
+    strategy:
+      fail-fast: true
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
 
-        - name: Build verifier parameters
-          run: cargo run --release -p noah --features=gen,no_vk --bin gen-params all ./api/parameters
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-consistency-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-        - name: Check changed files in the parameters folder1
-          id: verify-changed-files
-          uses: tj-actions/verify-changed-files@v12
-          with:
-            files: |
-              api/parameters/**
+      - name: Build verifier parameters
+        run: cargo run --release -p noah --features=gen,no_vk --bin gen-params all ./api/parameters
 
-        - name: Get changed files in the parameters folder2
-          id: changed-files-specific
-          uses: tj-actions/changed-files@v34
-          with:
-            files: |
-              api/parameters/**
+      - name: Check changed files in the parameters folder1
+        id: verify-changed-files
+        uses: tj-actions/verify-changed-files@v12
+        with:
+          files: |
+            api/parameters/**
 
-        - name: Break if any file(s) change
-          if: steps.verify-changed-files.outputs.files_changed == 'true' && steps.changed-files-specific.outputs.any_modified != 'true'
-          run: |
-            for file in ${{ steps.verify-changed-files.outputs.changed_files }}; do
-              echo "$file was changed"
-            done
-            exit 1
+      - name: Get changed files in the parameters folder2
+        id: changed-files-specific
+        uses: tj-actions/changed-files@v34
+        with:
+          files: |
+            api/parameters/**
+
+      - name: Break if any file(s) change
+        if: steps.verify-changed-files.outputs.files_changed == 'true' && steps.changed-files-specific.outputs.any_modified != 'true'
+        run: |
+          for file in ${{ steps.verify-changed-files.outputs.changed_files }}; do
+            echo "$file was changed"
+          done
+          exit 1
