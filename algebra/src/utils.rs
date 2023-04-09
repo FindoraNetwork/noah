@@ -1,15 +1,16 @@
 #![deny(warnings)]
 #![allow(clippy::upper_case_acronyms)]
 
-use base64::alphabet::URL_SAFE;
 use crate::{fs::File, io::Write, path::PathBuf, prelude::*, rand::SeedableRng};
-use base64::Engine;
+use base64::alphabet::URL_SAFE;
 use base64::engine::{DecodePaddingMode, GeneralPurpose, GeneralPurposeConfig};
+use base64::Engine;
 use digest::generic_array::typenum::U64;
 use digest::Digest;
 use rand_chacha::ChaCha20Rng;
 
-const BASE64_PADDING_CONFIG: GeneralPurposeConfig = GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent);
+const BASE64_PADDING_CONFIG: GeneralPurposeConfig =
+    GeneralPurposeConfig::new().with_decode_padding_mode(DecodePaddingMode::Indifferent);
 
 const BASE64_ENGINE: GeneralPurpose = GeneralPurpose::new(&URL_SAFE, BASE64_PADDING_CONFIG);
 
@@ -63,8 +64,8 @@ pub fn b64dec<T: ?Sized + AsRef<[u8]>>(input: &T) -> Result<Vec<u8>> {
 
 /// Derive a ChaCha20Rng PRNG from a digest from a hash function
 pub fn derive_prng_from_hash<D>(hash: D) -> ChaCha20Rng
-    where
-        D: Digest<OutputSize=U64> + Default,
+where
+    D: Digest<OutputSize = U64> + Default,
 {
     const SEED_SIZE: usize = 32;
     let mut seed: [u8; SEED_SIZE] = [0; SEED_SIZE];
