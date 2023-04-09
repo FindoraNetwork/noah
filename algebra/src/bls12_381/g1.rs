@@ -153,9 +153,14 @@ impl Group for BLSG1 {
                 .clone()
                 .expect("FastMSM WASM not initialized")
                 .exports();
-            let scalars_vec: Vec<_> = scalars.iter().map(|r| r.0).collect();
+
+            let scalars_and_points_iter = scalars.iter().zip(points).filter(|(s, _)| s.is_zero());
+
+            let scalars_vec: Vec<_> = scalars_and_points_iter.clone().map(|(r, _)| r.0).collect();
             let points_vec = G1Projective::normalize_batch(
-                &points.iter().map(|r| r.0).collect::<Vec<G1Projective>>(),
+                &scalars_and_points_iter
+                    .map(|(_, r)| r.0)
+                    .collect::<Vec<G1Projective>>(),
             );
 
             let size = scalars_vec.len();
