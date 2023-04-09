@@ -19,7 +19,7 @@ rand_chacha = '0.3'
 serde = '1.0'
 serde_derive = '1.0'
 sha2 = '0.10'
-ruc = '1.0'
+ruc = '4.1'
 sha3 = { version = "0.10", default-features = false }
 
 [dependencies.noah-algebra]
