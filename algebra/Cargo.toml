@@ -15,7 +15,7 @@ name = 'noah_algebra'
 crate-type = ['rlib']
 
 [dependencies]
-base64 = "0.20"
+base64 = "0.21"
 digest = '0.10'
 itertools = '0.10.0'
 ruc = '1.0'
