@@ -25,7 +25,7 @@ use {
 };
 
 #[cfg(target_arch = "wasm32")]
-const WASM: &[u8] = include_bytes!("./submission.wasm");
+const WASM: &[u8] = include_bytes!("./fastmsm.wasm");
 #[cfg(target_arch = "wasm32")]
 static mut WASM_INSTANCE: Option<Instance> = None;
 

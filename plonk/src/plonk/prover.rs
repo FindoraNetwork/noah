@@ -180,13 +180,6 @@ pub fn prover_with_lagrange<
             let this_w_comm_timer = start_timer!(|| "Commit the polynomial");
 
             wasm_bindgen_test::console_log!("before kzg commit {}", i);
-            if i == 2 {
-                for a in f_eval.coefs.iter_mut() {
-                    if a.is_zero() {
-                        *a = PCS::Field::one();
-                    }
-                }
-            }
             let cm_w = lagrange_pcs
                 .commit(&f_eval)
                 .c(d!(PlonkError::CommitmentError))?;
