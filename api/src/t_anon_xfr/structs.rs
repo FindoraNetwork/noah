@@ -38,11 +38,22 @@ pub struct TAxfrAuditorMemo(Vec<u8>);
 
 /// The secret key for auditor.
 #[derive(Debug)]
-pub struct AuditorSecretKey(JubjubScalar);
+pub struct AuditorSecretKey(pub JubjubScalar);
 
 /// The public key for auditor.
 #[derive(Clone, Copy, Debug)]
-pub struct AuditorPublicKey(JubjubPoint);
+pub struct AuditorPublicKey(pub JubjubPoint);
+
+impl AuditorSecretKey {
+    /// Generate an auditor secret key and public key.
+    pub fn generate_keypair<R: CryptoRng + RngCore>(
+        prng: &mut R,
+    ) -> (AuditorSecretKey, AuditorPublicKey) {
+        let sk = JubjubScalar::random(prng);
+        let pk = JubjubPoint::get_base().mul(&sk);
+        (AuditorSecretKey(sk), AuditorPublicKey(pk))
+    }
+}
 
 impl TAxfrAuditorMemo {
     /// Encrypt struct data to memo bytes
@@ -50,11 +61,11 @@ impl TAxfrAuditorMemo {
         prng: &mut R,
         pk: &AuditorPublicKey,
         plaintext: &[u8],
-    ) -> Result<Self> {
+    ) -> Result<(Self, JubjubPoint)> {
         // TODO convert struct data to bytes
 
         let output = ecies_encrypt(prng, &pk.0, plaintext)?;
-        Ok(TAxfrAuditorMemo(output.to_bytes()?))
+        Ok((TAxfrAuditorMemo(output.0.to_bytes()?), output.1))
     }
 
     /// Try to decryp memo bytes to struct data
@@ -62,7 +73,7 @@ impl TAxfrAuditorMemo {
         let output = EciesOutput::from_bytes(ciphertext)?;
         let plaintext = ecies_decrypt(&sk.0, &output)?;
 
-        // TODO convert bytes struct data
+        // TODO convert bytes to struct data
         Ok(plaintext)
     }
 }
@@ -101,7 +112,7 @@ fn ecies_encrypt<R: CryptoRng + RngCore>(
     prng: &mut R,
     pk: &JubjubPoint,
     plaintext: &[u8],
-) -> Result<EciesOutput> {
+) -> Result<(EciesOutput, JubjubPoint)> {
     let ephemeral_sk = JubjubScalar::random(prng);
     let ephemeral = JubjubPoint::get_base().mul(&ephemeral_sk);
 
@@ -130,7 +141,7 @@ fn ecies_encrypt<R: CryptoRng + RngCore>(
         res.unwrap()
     };
 
-    Ok(EciesOutput { ephemeral, ctext })
+    Ok((EciesOutput { ephemeral, ctext }, dh))
 }
 
 /// ECIES decrypt function
