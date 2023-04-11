@@ -1,5 +1,3 @@
-use noah_algebra::bls12_381::BLSScalar;
-use noah_algebra::new_bls12_381;
 use noah_algebra::prelude::*;
 
 /// The module for the AnemoiJive381 data structure.
@@ -21,8 +19,8 @@ pub use traces::{AnemoiVLHTrace, JiveTrace};
 
 /// The trait for the Anemoi-Jive parameters.
 pub trait AnemoiJive<F: Scalar, const N: usize, const NUM_ROUNDS: usize>
-where
-    MDSMatrix<F, N>: ApplicableMDSMatrix<F, N>,
+    where
+        MDSMatrix<F, N>: ApplicableMDSMatrix<F, N>,
 {
     /// The S-Box alpha value.
     const ALPHA: u32;
