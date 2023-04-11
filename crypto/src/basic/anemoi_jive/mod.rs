@@ -15,12 +15,12 @@ mod traces;
 pub use bls12_381::AnemoiJive381;
 pub use mds::{ApplicableMDSMatrix, MDSMatrix};
 pub use salts::ANEMOI_JIVE_381_SALTS;
-pub use traces::{AnemoiVLHTrace, JiveTrace};
+pub use traces::{AnemoiStreamCipherTrace, AnemoiVLHTrace, JiveTrace};
 
 /// The trait for the Anemoi-Jive parameters.
 pub trait AnemoiJive<F: Scalar, const N: usize, const NUM_ROUNDS: usize>
-    where
-        MDSMatrix<F, N>: ApplicableMDSMatrix<F, N>,
+where
+    MDSMatrix<F, N>: ApplicableMDSMatrix<F, N>,
 {
     /// The S-Box alpha value.
     const ALPHA: u32;

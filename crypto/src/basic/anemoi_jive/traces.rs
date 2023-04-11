@@ -9,7 +9,7 @@ pub struct AnemoiVLHTrace<F: Scalar, const N: usize, const NUM_ROUNDS: usize> {
     pub before_permutation: Vec<([F; N], [F; N])>,
     /// The intermediate values for each permutation.
     pub intermediate_values_before_constant_additions:
-    Vec<([[F; N]; NUM_ROUNDS], [[F; N]; NUM_ROUNDS])>,
+        Vec<([[F; N]; NUM_ROUNDS], [[F; N]; NUM_ROUNDS])>,
     /// The state after each permutation.
     pub after_permutation: Vec<([F; N], [F; N])>,
     /// The output.
@@ -17,7 +17,7 @@ pub struct AnemoiVLHTrace<F: Scalar, const N: usize, const NUM_ROUNDS: usize> {
 }
 
 impl<F: Scalar, const N: usize, const NUM_ROUNDS: usize> Default
-for AnemoiVLHTrace<F, N, NUM_ROUNDS>
+    for AnemoiVLHTrace<F, N, NUM_ROUNDS>
 {
     fn default() -> Self {
         Self {
@@ -31,7 +31,7 @@ for AnemoiVLHTrace<F, N, NUM_ROUNDS>
 }
 
 impl<F: Scalar, const N: usize, const NUM_ROUNDS: usize> noah_algebra::fmt::Debug
-for AnemoiVLHTrace<F, N, NUM_ROUNDS>
+    for AnemoiVLHTrace<F, N, NUM_ROUNDS>
 {
     fn fmt(&self, f: &mut noah_algebra::fmt::Formatter<'_>) -> noah_algebra::fmt::Result {
         f.write_str("input:\n")?;
@@ -119,7 +119,7 @@ impl<F: Scalar, const N: usize, const NUM_ROUNDS: usize> Default for JiveTrace<F
 }
 
 impl<F: Scalar, const N: usize, const NUM_ROUNDS: usize> noah_algebra::fmt::Debug
-for JiveTrace<F, N, NUM_ROUNDS>
+    for JiveTrace<F, N, NUM_ROUNDS>
 {
     fn fmt(&self, f: &mut noah_algebra::fmt::Formatter<'_>) -> noah_algebra::fmt::Result {
         f.write_str("input_x:\n")?;
@@ -173,7 +173,7 @@ pub struct AnemoiStreamCipherTrace<F: Scalar, const N: usize, const NUM_ROUNDS: 
     pub before_permutation: Vec<([F; N], [F; N])>,
     /// The intermediate values for each permutation.
     pub intermediate_values_before_constant_additions:
-    Vec<([[F; N]; NUM_ROUNDS], [[F; N]; NUM_ROUNDS])>,
+        Vec<([[F; N]; NUM_ROUNDS], [[F; N]; NUM_ROUNDS])>,
     /// The state after each permutation.
     pub after_permutation: Vec<([F; N], [F; N])>,
     /// The output.
