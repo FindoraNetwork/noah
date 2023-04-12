@@ -247,7 +247,7 @@ where
 
         output.push(x[0]);
 
-        for _ in 0..output_len - 1 {
+        for _ in 1..output_len {
             Self::anemoi_permutation(&mut x, &mut y);
             output.push(x[0]);
         }
