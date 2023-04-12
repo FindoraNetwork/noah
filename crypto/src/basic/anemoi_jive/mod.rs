@@ -245,11 +245,30 @@ where
         }
         y[N - 1] += &sigma;
 
-        output.push(x[0]);
+        if output_len <= N {
+            output.extend_from_slice(&x[..output_len])
+        } else if output_len > N && output_len <= (2 * N - 1) {
+            output.extend_from_slice(&x);
+            output.extend_from_slice(&y[..output_len - N])
+        } else if output_len > (2 * N - 1) {
+            output.extend_from_slice(&x);
+            output.extend_from_slice(&y[..N - 1]);
 
-        for _ in 1..output_len {
-            Self::anemoi_permutation(&mut x, &mut y);
-            output.push(x[0]);
+            let squeezing_times = output_len / (2 * N - 1) - 1;
+            let remaining = output_len % (2 * N - 1);
+
+            for _ in 0..squeezing_times {
+                Self::anemoi_permutation(&mut x, &mut y);
+                output.extend_from_slice(&x);
+                output.extend_from_slice(&y[..N - 1]);
+            }
+
+            if remaining > 0 {
+                Self::anemoi_permutation(&mut x, &mut y);
+                let mut x = x.to_vec();
+                x.extend_from_slice(&y);
+                output.extend_from_slice(&x[..remaining]);
+            }
         }
 
         output
@@ -284,6 +303,37 @@ where
         // after the previous step, the length of input must be multiplies of `2 * N - 1`.
         assert_eq!(input.len() % (2 * N - 1), 0);
 
+        // applies an Anemoi permutation with trace to the state
+        let mut anemoi_permutation_with_trace = |x: &mut [F; N], y: &mut [F; N]| {
+            trace.before_permutation.push((x.clone(), y.clone()));
+
+            let mut intermediate_values_before_constant_additions =
+                ([[F::zero(); N]; NUM_ROUNDS], [[F::zero(); N]; NUM_ROUNDS]);
+            for r in 0..NUM_ROUNDS {
+                for i in 0..N {
+                    x[i] += &Self::ROUND_KEYS_X[r][i];
+                    y[i] += &Self::ROUND_KEYS_Y[r][i];
+                }
+                mds.permute_in_place(x, y);
+                for i in 0..N {
+                    x[i] -= &(Self::GENERATOR * &(y[i].square()));
+                    y[i] -= &x[i].pow(&alpha_inv);
+                    x[i] += &(Self::GENERATOR * &(y[i].square()) + Self::GENERATOR_INV);
+                }
+
+                intermediate_values_before_constant_additions.0[r] = x.clone();
+                intermediate_values_before_constant_additions.1[r] = y.clone();
+            }
+
+            mds.permute_in_place(x, y);
+
+            trace
+                .intermediate_values_before_constant_additions
+                .push(intermediate_values_before_constant_additions);
+
+            trace.after_permutation.push((x.clone(), y.clone()));
+        };
+
         // initialize the internal state.
         let mut x = [F::zero(); N];
         let mut y = [F::zero(); N];
@@ -295,74 +345,42 @@ where
                 y[i] += &chunk[N + i];
             }
 
-            trace.before_permutation.push((x.clone(), y.clone()));
-
-            let mut intermediate_values_before_constant_additions =
-                ([[F::zero(); N]; NUM_ROUNDS], [[F::zero(); N]; NUM_ROUNDS]);
-            for r in 0..NUM_ROUNDS {
-                for i in 0..N {
-                    x[i] += &Self::ROUND_KEYS_X[r][i];
-                    y[i] += &Self::ROUND_KEYS_Y[r][i];
-                }
-                mds.permute_in_place(&mut x, &mut y);
-                for i in 0..N {
-                    x[i] -= &(Self::GENERATOR * &(y[i].square()));
-                    y[i] -= &x[i].pow(&alpha_inv);
-                    x[i] += &(Self::GENERATOR * &(y[i].square()) + Self::GENERATOR_INV);
-                }
-
-                intermediate_values_before_constant_additions.0[r] = x.clone();
-                intermediate_values_before_constant_additions.1[r] = y.clone();
-            }
-
-            mds.permute_in_place(&mut x, &mut y);
-
-            trace
-                .intermediate_values_before_constant_additions
-                .push(intermediate_values_before_constant_additions);
-
-            trace.after_permutation.push((x.clone(), y.clone()));
+            anemoi_permutation_with_trace(&mut x, &mut y);
         }
         y[N - 1] += &sigma;
 
-        trace.output.push(x[0]);
+        if output_len <= N {
+            trace.output.extend_from_slice(&x[..output_len])
+        } else if output_len > N && output_len <= (2 * N - 1) {
+            trace.output.extend_from_slice(&x);
+            trace.output.extend_from_slice(&y[..output_len - N])
+        } else if output_len > (2 * N - 1) {
+            trace.output.extend_from_slice(&x);
+            trace.output.extend_from_slice(&y[..N - 1]);
 
-        for _ in 1..output_len {
-            trace.before_permutation.push((x.clone(), y.clone()));
+            let squeezing_times = output_len / (2 * N - 1) - 1;
+            let remaining = output_len % (2 * N - 1);
 
-            let mut intermediate_values_before_constant_additions =
-                ([[F::zero(); N]; NUM_ROUNDS], [[F::zero(); N]; NUM_ROUNDS]);
-            for r in 0..NUM_ROUNDS {
-                for i in 0..N {
-                    x[i] += &Self::ROUND_KEYS_X[r][i];
-                    y[i] += &Self::ROUND_KEYS_Y[r][i];
-                }
-                mds.permute_in_place(&mut x, &mut y);
-                for i in 0..N {
-                    x[i] -= &(Self::GENERATOR * &(y[i].square()));
-                    y[i] -= &x[i].pow(&alpha_inv);
-                    x[i] += &(Self::GENERATOR * &(y[i].square()) + Self::GENERATOR_INV);
-                }
+            for _ in 0..squeezing_times {
+                anemoi_permutation_with_trace(&mut x, &mut y);
 
-                intermediate_values_before_constant_additions.0[r] = x.clone();
-                intermediate_values_before_constant_additions.1[r] = y.clone();
+                trace.output.extend_from_slice(&x);
+                trace.output.extend_from_slice(&y[..N - 1]);
             }
 
-            mds.permute_in_place(&mut x, &mut y);
+            if remaining > 0 {
+                anemoi_permutation_with_trace(&mut x, &mut y);
 
-            trace
-                .intermediate_values_before_constant_additions
-                .push(intermediate_values_before_constant_additions);
-
-            trace.after_permutation.push((x.clone(), y.clone()));
-
-            trace.output.push(x[0]);
+                let mut x = x.to_vec();
+                x.extend_from_slice(&y);
+                trace.output.extend_from_slice(&x[..remaining]);
+            }
         }
 
         trace
     }
 
-    /// Applies an Anemoi permutation to the internal state
+    /// Applies an Anemoi permutation to the state
     fn anemoi_permutation(x: &mut [F; N], y: &mut [F; N]) {
         let mds = MDSMatrix::<F, N>(Self::MDS_MATRIX);
         let alpha_inv = Self::get_alpha_inv();
