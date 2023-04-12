@@ -179,3 +179,77 @@ pub struct AnemoiStreamCipherTrace<F: Scalar, const N: usize, const NUM_ROUNDS: 
     /// The output.
     pub output: Vec<F>,
 }
+
+impl<F: Scalar, const N: usize, const NUM_ROUNDS: usize> Default
+    for AnemoiStreamCipherTrace<F, N, NUM_ROUNDS>
+{
+    fn default() -> Self {
+        Self {
+            input: vec![],
+            before_permutation: vec![],
+            intermediate_values_before_constant_additions: vec![],
+            after_permutation: vec![],
+            output: vec![],
+        }
+    }
+}
+
+impl<F: Scalar, const N: usize, const NUM_ROUNDS: usize> noah_algebra::fmt::Debug
+    for AnemoiStreamCipherTrace<F, N, NUM_ROUNDS>
+{
+    fn fmt(&self, f: &mut noah_algebra::fmt::Formatter<'_>) -> noah_algebra::fmt::Result {
+        f.write_str("input:\n")?;
+        for (i, elem) in self.input.iter().enumerate() {
+            f.write_fmt(format_args!("\r x[{}] = {:?}\n", i, elem))?;
+        }
+
+        for r in 0..NUM_ROUNDS {
+            f.write_fmt(format_args!("round {}:\n", r))?;
+
+            f.write_str("\r before permutation:")?;
+
+            for (i, elem) in self.before_permutation[r].0.iter().enumerate() {
+                f.write_fmt(format_args!("\r\r x[{}] = {:?}\n", i, elem))?;
+            }
+
+            for (i, elem) in self.before_permutation[r].1.iter().enumerate() {
+                f.write_fmt(format_args!("\r \r y[{}] = {:?}\n", i, elem))?;
+            }
+
+            f.write_str("\r intermediate permutation:")?;
+
+            for (i, elem) in self.intermediate_values_before_constant_additions[r]
+                .0
+                .iter()
+                .enumerate()
+            {
+                f.write_fmt(format_args!("\r\r x[{}] = {:?}\n", i, elem))?;
+            }
+
+            for (i, elem) in self.intermediate_values_before_constant_additions[r]
+                .1
+                .iter()
+                .enumerate()
+            {
+                f.write_fmt(format_args!("\r\r y[{}] = {:?}\n", i, elem))?;
+            }
+
+            f.write_str("\r after permutation:")?;
+
+            for (i, elem) in self.after_permutation[r].0.iter().enumerate() {
+                f.write_fmt(format_args!("\r\r x[{}] = {:?}\n", i, elem))?;
+            }
+
+            for (i, elem) in self.after_permutation[r].1.iter().enumerate() {
+                f.write_fmt(format_args!("\r \r y[{}] = {:?}\n", i, elem))?;
+            }
+        }
+
+        f.write_str("output:\n")?;
+        for (i, elem) in self.output.iter().enumerate() {
+            f.write_fmt(format_args!("\r x[{}] = {:?}\n", i, elem))?;
+        }
+
+        Ok(())
+    }
+}

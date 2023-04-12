@@ -284,3 +284,320 @@ fn test_anemoi_variable_length_hash_flatten() {
 
     assert_eq!(trace.output, x[0]);
 }
+
+#[test]
+fn test_eval_stream_cipher() {
+    type F = BLSScalar;
+
+    let input = [F::from(1u64), F::from(2u64), F::from(3u64), F::from(4u64)];
+
+    let res = AnemoiJive381::eval_stream_cipher(&input, 6);
+    assert_eq!(
+        res,
+        vec![
+            new_bls12_381!(
+                "17913626440896376279858183231538520765146521393387279167163788217724133906091"
+            ),
+            new_bls12_381!(
+                "128933536200405882247940224412197398867767114327852757460179676316357563269"
+            ),
+            new_bls12_381!(
+                "2350377255947715518656472684633767529020826112660644861786637039916779504126"
+            ),
+            new_bls12_381!(
+                "20604800189419943977989558101026577704655577026403733926307555313132378508216"
+            ),
+            new_bls12_381!(
+                "10200350623865441010944075314998020039176566691337662963129673774921061545845"
+            ),
+            new_bls12_381!(
+                "24017929386901988359852639490633983720005033283236529050885365237696032152540"
+            )
+        ]
+    );
+}
+
+#[test]
+fn test_eval_stream_cipher_flatten() {
+    type F = BLSScalar;
+
+    let input = [F::from(1u64), F::from(2u64), F::from(3u64), F::from(4u64)];
+    let output_len = 6;
+    let mut output = Vec::with_capacity(output_len);
+    let mut sponge_rounds = 0;
+
+    let trace = AnemoiJive381::eval_stream_cipher_with_trace(&input, output_len);
+
+    assert_eq!(trace.input, input.to_vec());
+
+    let mut input = input.to_vec();
+
+    let mds = MDSMatrix::<F, 2>(AnemoiJive381::MDS_MATRIX);
+
+    if input.len() % (2 * 2 - 1) != 0 || input.is_empty() {
+        input.push(F::one());
+        if input.len() % (2 * 2 - 1) != 0 {
+            input.extend_from_slice(&[F::zero()].repeat(2 * 2 - 1 - (input.len() % (2 * 2 - 1))));
+        }
+    }
+
+    // after the previous step, the length of input must be multiplies of `2 * N - 1`.
+    assert_eq!(input.len() % (2 * 2 - 1), 0);
+
+    let g = AnemoiJive381::GENERATOR;
+    let g2 = AnemoiJive381::GENERATOR_SQUARE_PLUS_ONE;
+
+    let mut x = [F::zero(); 2];
+    let mut y = [F::zero(); 2];
+    for (rr, chuck) in input.chunks_exact(2 * 2 - 1).enumerate() {
+        sponge_rounds += 1;
+
+        for i in 0..2 {
+            x[i] += &chuck[i];
+        }
+        for i in 0..(2 - 1) {
+            y[i] += &chuck[2 + i];
+        }
+
+        assert_eq!(x, trace.before_permutation[rr].0);
+        assert_eq!(y, trace.before_permutation[rr].1);
+
+        // first round
+        {
+            let a_i_minus_1 = trace.before_permutation[rr].0[0].clone();
+            let b_i_minus_1 = trace.before_permutation[rr].0[1].clone();
+            let c_i_minus_1 = trace.before_permutation[rr].1[0].clone();
+            let d_i_minus_1 = trace.before_permutation[rr].1[1].clone();
+
+            let a_i = trace.intermediate_values_before_constant_additions[rr].0[0][0].clone();
+            let b_i = trace.intermediate_values_before_constant_additions[rr].0[0][1].clone();
+            let c_i = trace.intermediate_values_before_constant_additions[rr].1[0][0].clone();
+            let d_i = trace.intermediate_values_before_constant_additions[rr].1[0][1].clone();
+
+            let prk_i_a = AnemoiJive381::PREPROCESSED_ROUND_KEYS_X[0][0].clone();
+            let prk_i_b = AnemoiJive381::PREPROCESSED_ROUND_KEYS_X[0][1].clone();
+            let prk_i_c = AnemoiJive381::PREPROCESSED_ROUND_KEYS_Y[0][0].clone();
+            let prk_i_d = AnemoiJive381::PREPROCESSED_ROUND_KEYS_Y[0][1].clone();
+
+            // equation 1
+            let left = (d_i_minus_1 + g * c_i_minus_1 + prk_i_c - &c_i).pow(&[5u64])
+                + g * (d_i_minus_1 + g * c_i_minus_1 + prk_i_c).square();
+            let right = a_i_minus_1 + g * b_i_minus_1 + prk_i_a;
+            assert_eq!(left, right);
+
+            // equation 2
+            let left = (g * d_i_minus_1 + g2 * c_i_minus_1 + prk_i_d - &d_i).pow(&[5u64])
+                + g * (g * d_i_minus_1 + g2 * c_i_minus_1 + prk_i_d).square();
+            let right = g * a_i_minus_1 + g2 * b_i_minus_1 + prk_i_b;
+            assert_eq!(left, right);
+
+            // equation 3
+            let left = (d_i_minus_1 + g * c_i_minus_1 + prk_i_c - &c_i).pow(&[5u64])
+                + g * c_i.square()
+                + AnemoiJive381::GENERATOR_INV;
+            let right = a_i;
+            assert_eq!(left, right);
+
+            // equation 4
+            let left = (g * d_i_minus_1 + g2 * c_i_minus_1 + prk_i_d - &d_i).pow(&[5u64])
+                + g * d_i.square()
+                + AnemoiJive381::GENERATOR_INV;
+            let right = b_i;
+            assert_eq!(left, right);
+        }
+
+        // remaining rounds
+        for r in 1..12 {
+            let a_i_minus_1 =
+                trace.intermediate_values_before_constant_additions[rr].0[r - 1][0].clone();
+            let b_i_minus_1 =
+                trace.intermediate_values_before_constant_additions[rr].0[r - 1][1].clone();
+            let c_i_minus_1 =
+                trace.intermediate_values_before_constant_additions[rr].1[r - 1][0].clone();
+            let d_i_minus_1 =
+                trace.intermediate_values_before_constant_additions[rr].1[r - 1][1].clone();
+
+            let a_i = trace.intermediate_values_before_constant_additions[rr].0[r][0].clone();
+            let b_i = trace.intermediate_values_before_constant_additions[rr].0[r][1].clone();
+            let c_i = trace.intermediate_values_before_constant_additions[rr].1[r][0].clone();
+            let d_i = trace.intermediate_values_before_constant_additions[rr].1[r][1].clone();
+
+            let prk_i_a = AnemoiJive381::PREPROCESSED_ROUND_KEYS_X[r][0].clone();
+            let prk_i_b = AnemoiJive381::PREPROCESSED_ROUND_KEYS_X[r][1].clone();
+            let prk_i_c = AnemoiJive381::PREPROCESSED_ROUND_KEYS_Y[r][0].clone();
+            let prk_i_d = AnemoiJive381::PREPROCESSED_ROUND_KEYS_Y[r][1].clone();
+
+            // equation 1
+            let left = (d_i_minus_1 + g * c_i_minus_1 + prk_i_c - &c_i).pow(&[5u64])
+                + g * (d_i_minus_1 + g * c_i_minus_1 + prk_i_c).square();
+            let right = a_i_minus_1 + g * b_i_minus_1 + prk_i_a;
+            assert_eq!(left, right);
+
+            // equation 2
+            let left = (g * d_i_minus_1 + g2 * c_i_minus_1 + prk_i_d - &d_i).pow(&[5u64])
+                + g * (g * d_i_minus_1 + g2 * c_i_minus_1 + prk_i_d).square();
+            let right = g * a_i_minus_1 + g2 * b_i_minus_1 + prk_i_b;
+            assert_eq!(left, right);
+
+            // equation 3
+            let left = (d_i_minus_1 + g * c_i_minus_1 + prk_i_c - &c_i).pow(&[5u64])
+                + g * c_i.square()
+                + AnemoiJive381::GENERATOR_INV;
+            let right = a_i;
+            assert_eq!(left, right);
+
+            // equation 4
+            let left = (g * d_i_minus_1 + g2 * c_i_minus_1 + prk_i_d - &d_i).pow(&[5u64])
+                + g * d_i.square()
+                + AnemoiJive381::GENERATOR_INV;
+            let right = b_i;
+            assert_eq!(left, right);
+        }
+
+        x = trace.intermediate_values_before_constant_additions[rr].0[12 - 1].clone();
+        y = trace.intermediate_values_before_constant_additions[rr].1[12 - 1].clone();
+        mds.permute_in_place(&mut x, &mut y);
+
+        assert_eq!(x, trace.after_permutation[rr].0);
+        assert_eq!(y, trace.after_permutation[rr].1);
+    }
+
+    output.push(x[0]);
+
+    for i in 1..output_len {
+        // first round
+        {
+            let a_i_minus_1 = trace.before_permutation[sponge_rounds + i - 1].0[0].clone();
+            let b_i_minus_1 = trace.before_permutation[sponge_rounds + i - 1].0[1].clone();
+            let c_i_minus_1 = trace.before_permutation[sponge_rounds + i - 1].1[0].clone();
+            let d_i_minus_1 = trace.before_permutation[sponge_rounds + i - 1].1[1].clone();
+
+            let a_i = trace.intermediate_values_before_constant_additions[sponge_rounds + i - 1].0
+                [0][0]
+                .clone();
+            let b_i = trace.intermediate_values_before_constant_additions[sponge_rounds + i - 1].0
+                [0][1]
+                .clone();
+            let c_i = trace.intermediate_values_before_constant_additions[sponge_rounds + i - 1].1
+                [0][0]
+                .clone();
+            let d_i = trace.intermediate_values_before_constant_additions[sponge_rounds + i - 1].1
+                [0][1]
+                .clone();
+
+            let prk_i_a = AnemoiJive381::PREPROCESSED_ROUND_KEYS_X[0][0].clone();
+            let prk_i_b = AnemoiJive381::PREPROCESSED_ROUND_KEYS_X[0][1].clone();
+            let prk_i_c = AnemoiJive381::PREPROCESSED_ROUND_KEYS_Y[0][0].clone();
+            let prk_i_d = AnemoiJive381::PREPROCESSED_ROUND_KEYS_Y[0][1].clone();
+
+            let g = AnemoiJive381::GENERATOR;
+            let g2 = AnemoiJive381::GENERATOR_SQUARE_PLUS_ONE;
+
+            // equation 1
+            let left = (d_i_minus_1 + g * c_i_minus_1 + prk_i_c - &c_i).pow(&[5u64])
+                + g * (d_i_minus_1 + g * c_i_minus_1 + prk_i_c).square();
+            let right = a_i_minus_1 + g * b_i_minus_1 + prk_i_a;
+            assert_eq!(left, right);
+
+            // equation 2
+            let left = (g * d_i_minus_1 + g2 * c_i_minus_1 + prk_i_d - &d_i).pow(&[5u64])
+                + g * (g * d_i_minus_1 + g2 * c_i_minus_1 + prk_i_d).square();
+            let right = g * a_i_minus_1 + g2 * b_i_minus_1 + prk_i_b;
+            assert_eq!(left, right);
+
+            // equation 3
+            let left = (d_i_minus_1 + g * c_i_minus_1 + prk_i_c - &c_i).pow(&[5u64])
+                + g * c_i.square()
+                + AnemoiJive381::GENERATOR_INV;
+            let right = a_i;
+            assert_eq!(left, right);
+
+            // equation 4
+            let left = (g * d_i_minus_1 + g2 * c_i_minus_1 + prk_i_d - &d_i).pow(&[5u64])
+                + g * d_i.square()
+                + AnemoiJive381::GENERATOR_INV;
+            let right = b_i;
+            assert_eq!(left, right);
+        }
+
+        // remaining rounds
+        for r in 1..12 {
+            let a_i_minus_1 = trace.intermediate_values_before_constant_additions
+                [sponge_rounds + i - 1]
+                .0[r - 1][0]
+                .clone();
+            let b_i_minus_1 = trace.intermediate_values_before_constant_additions
+                [sponge_rounds + i - 1]
+                .0[r - 1][1]
+                .clone();
+            let c_i_minus_1 = trace.intermediate_values_before_constant_additions
+                [sponge_rounds + i - 1]
+                .1[r - 1][0]
+                .clone();
+            let d_i_minus_1 = trace.intermediate_values_before_constant_additions
+                [sponge_rounds + i - 1]
+                .1[r - 1][1]
+                .clone();
+
+            let a_i = trace.intermediate_values_before_constant_additions[sponge_rounds + i - 1].0
+                [r][0]
+                .clone();
+            let b_i = trace.intermediate_values_before_constant_additions[sponge_rounds + i - 1].0
+                [r][1]
+                .clone();
+            let c_i = trace.intermediate_values_before_constant_additions[sponge_rounds + i - 1].1
+                [r][0]
+                .clone();
+            let d_i = trace.intermediate_values_before_constant_additions[sponge_rounds + i - 1].1
+                [r][1]
+                .clone();
+
+            let prk_i_a = AnemoiJive381::PREPROCESSED_ROUND_KEYS_X[r][0].clone();
+            let prk_i_b = AnemoiJive381::PREPROCESSED_ROUND_KEYS_X[r][1].clone();
+            let prk_i_c = AnemoiJive381::PREPROCESSED_ROUND_KEYS_Y[r][0].clone();
+            let prk_i_d = AnemoiJive381::PREPROCESSED_ROUND_KEYS_Y[r][1].clone();
+
+            let g = AnemoiJive381::GENERATOR;
+            let g2 = AnemoiJive381::GENERATOR_SQUARE_PLUS_ONE;
+
+            // equation 1
+            let left = (d_i_minus_1 + g * c_i_minus_1 + prk_i_c - &c_i).pow(&[5u64])
+                + g * (d_i_minus_1 + g * c_i_minus_1 + prk_i_c).square();
+            let right = a_i_minus_1 + g * b_i_minus_1 + prk_i_a;
+            assert_eq!(left, right);
+
+            // equation 2
+            let left = (g * d_i_minus_1 + g2 * c_i_minus_1 + prk_i_d - &d_i).pow(&[5u64])
+                + g * (g * d_i_minus_1 + g2 * c_i_minus_1 + prk_i_d).square();
+            let right = g * a_i_minus_1 + g2 * b_i_minus_1 + prk_i_b;
+            assert_eq!(left, right);
+
+            // equation 3
+            let left = (d_i_minus_1 + g * c_i_minus_1 + prk_i_c - &c_i).pow(&[5u64])
+                + g * c_i.square()
+                + AnemoiJive381::GENERATOR_INV;
+            let right = a_i;
+            assert_eq!(left, right);
+
+            // equation 4
+            let left = (g * d_i_minus_1 + g2 * c_i_minus_1 + prk_i_d - &d_i).pow(&[5u64])
+                + g * d_i.square()
+                + AnemoiJive381::GENERATOR_INV;
+            let right = b_i;
+            assert_eq!(left, right);
+        }
+
+        x = trace.intermediate_values_before_constant_additions[sponge_rounds + i - 1].0[12 - 1]
+            .clone();
+        y = trace.intermediate_values_before_constant_additions[sponge_rounds + i - 1].1[12 - 1]
+            .clone();
+        mds.permute_in_place(&mut x, &mut y);
+
+        assert_eq!(x, trace.after_permutation[sponge_rounds + i - 1].0);
+        assert_eq!(y, trace.after_permutation[sponge_rounds + i - 1].1);
+
+        output.push(x[0]);
+    }
+
+    assert_eq!(trace.output, output);
+}
