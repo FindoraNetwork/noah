@@ -2,7 +2,9 @@ use crate::plonk::constraint_system::{TurboCS, VarIndex};
 use noah_algebra::bls12_381::BLSScalar;
 use noah_algebra::ops::Neg;
 use noah_algebra::{One, Zero};
-use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, AnemoiVLHTrace, JiveTrace};
+use noah_crypto::basic::anemoi_jive::{
+    AnemoiJive, AnemoiJive381, AnemoiStreamCipherTrace, AnemoiVLHTrace, JiveTrace,
+};
 
 impl TurboCS<BLSScalar> {
     /// Create constraints for the Anemoi permutation.
@@ -358,6 +360,230 @@ impl TurboCS<BLSScalar> {
 
         wire_out
     }
+
+    /// Create constraints for the Anemoi stream cipher
+    pub fn anemoi_stream_cipher(
+        &mut self,
+        trace: &AnemoiStreamCipherTrace<BLSScalar, 2, 12>,
+        input_var: &[VarIndex],
+        output_var: &[VarIndex],
+    ) {
+        assert_eq!(input_var.len(), trace.input.len());
+        assert_eq!(output_var.len(), trace.output.len());
+
+        let mut input_var = input_var.to_vec();
+        let mut output_var = output_var.iter().map(|x| Some(*x)).collect::<Vec<_>>();
+        let one_var = self.one_var();
+        let zero_var = self.zero_var();
+
+        if output_var.len() % (2 * 2 - 1) != 0 {
+            output_var
+                .extend_from_slice(&[None].repeat(2 * 2 - 1 - (output_var.len() % (2 * 2 - 1))));
+        }
+        let output_chunks = output_var
+            .chunks_exact(2 * 2 - 1)
+            .map(|x| x.to_vec())
+            .collect::<Vec<Vec<_>>>();
+        let num_output_chunks: usize = output_chunks.len();
+
+        let sigma_var = if input_var.len() % (2 * 2 - 1) == 0 && !input_var.is_empty() {
+            one_var
+        } else {
+            input_var.push(one_var);
+            if input_var.len() % (2 * 2 - 1) != 0 {
+                input_var.extend_from_slice(
+                    &[zero_var].repeat(2 * 2 - 1 - (input_var.len() % (2 * 2 - 1))),
+                );
+            }
+            zero_var
+        };
+
+        assert_eq!(
+            input_var.len() + output_var.len() - (2 * 2 - 1),
+            trace.before_permutation.len() * (2 * 2 - 1)
+        );
+
+        // initialize the internal state.
+        let input_chunks = input_var
+            .chunks_exact(2 * 2 - 1)
+            .map(|x| x.to_vec())
+            .collect::<Vec<Vec<VarIndex>>>();
+        let num_input_chunks = input_chunks.len();
+
+        let mut x_var = [input_chunks[0][0], input_chunks[0][1]];
+        let mut y_var = [input_chunks[0][2], zero_var];
+
+        if num_input_chunks == 1 && num_output_chunks == 1 {
+            self.anemoi_permutation_round(
+                &(x_var, y_var),
+                &([output_var[0], output_var[1]], [output_var[2], None]),
+                &trace.intermediate_values_before_constant_additions[0],
+                None,
+                None,
+            );
+        } else if num_input_chunks == 1 && num_output_chunks > 1 {
+            self.anemoi_permutation_round(
+                &(x_var, y_var),
+                &(
+                    [output_chunks[0][0], output_chunks[0][1]],
+                    [output_chunks[0][2], None],
+                ),
+                &trace.intermediate_values_before_constant_additions[0],
+                None,
+                None,
+            );
+
+            let mut new_x_var = [
+                self.new_variable(trace.after_permutation[0].0[0]),
+                self.new_variable(trace.after_permutation[0].0[1]),
+            ];
+
+            let mut new_y_var = [
+                self.new_variable(trace.after_permutation[0].1[0]),
+                self.new_variable(trace.after_permutation[0].1[1]),
+            ];
+            new_y_var[1] = self.add(new_y_var[1], sigma_var);
+
+            // the squeezing round
+            for rr in 1..num_output_chunks {
+                x_var = new_x_var;
+                y_var = new_y_var;
+
+                new_x_var = [
+                    self.new_variable(trace.after_permutation[rr].0[0]),
+                    self.new_variable(trace.after_permutation[rr].0[1]),
+                ];
+
+                new_y_var = [
+                    self.new_variable(trace.after_permutation[rr].1[0]),
+                    self.new_variable(trace.after_permutation[rr].1[1]),
+                ];
+
+                self.anemoi_permutation_round(
+                    &(x_var, y_var),
+                    &(
+                        [output_chunks[rr][0], output_chunks[rr][1]],
+                        [output_chunks[rr][2], None],
+                    ),
+                    &trace.intermediate_values_before_constant_additions[rr],
+                    None,
+                    None,
+                );
+            }
+        } else if num_input_chunks > 1 && num_output_chunks > 1 {
+            let mut new_x_var = [
+                self.new_variable(trace.after_permutation[0].0[0]),
+                self.new_variable(trace.after_permutation[0].0[1]),
+            ];
+
+            let mut new_y_var = [
+                self.new_variable(trace.after_permutation[0].1[0]),
+                self.new_variable(trace.after_permutation[0].1[1]),
+            ];
+
+            self.anemoi_permutation_round(
+                &(x_var, y_var),
+                &(
+                    [Some(new_x_var[0]), Some(new_x_var[1])],
+                    [Some(new_y_var[0]), Some(new_y_var[1])],
+                ),
+                &trace.intermediate_values_before_constant_additions[0],
+                None,
+                None,
+            );
+
+            for rr in 1..num_input_chunks - 1 {
+                x_var = new_x_var;
+                y_var = new_y_var;
+
+                x_var[0] = self.add(x_var[0], input_chunks[rr][0]);
+                x_var[1] = self.add(x_var[1], input_chunks[rr][1]);
+                y_var[0] = self.add(y_var[0], input_chunks[rr][2]);
+
+                new_x_var = [
+                    self.new_variable(trace.after_permutation[rr].0[0]),
+                    self.new_variable(trace.after_permutation[rr].0[1]),
+                ];
+
+                new_y_var = [
+                    self.new_variable(trace.after_permutation[rr].1[0]),
+                    self.new_variable(trace.after_permutation[rr].1[1]),
+                ];
+
+                self.anemoi_permutation_round(
+                    &(x_var, y_var),
+                    &(
+                        [Some(new_x_var[0]), Some(new_x_var[1])],
+                        [Some(new_y_var[0]), Some(new_y_var[1])],
+                    ),
+                    &trace.intermediate_values_before_constant_additions[rr],
+                    None,
+                    None,
+                );
+            }
+
+            // last round of absorption
+            {
+                x_var = new_x_var;
+                y_var = new_y_var;
+
+                x_var[0] = self.add(x_var[0], input_chunks[num_input_chunks - 1][0]);
+                x_var[1] = self.add(x_var[1], input_chunks[num_input_chunks - 1][1]);
+                y_var[0] = self.add(y_var[0], input_chunks[num_input_chunks - 1][2]);
+
+                new_x_var = [
+                    self.new_variable(trace.after_permutation[num_input_chunks - 1].0[0]),
+                    self.new_variable(trace.after_permutation[num_input_chunks - 1].0[1]),
+                ];
+
+                new_y_var = [
+                    self.new_variable(trace.after_permutation[num_input_chunks - 1].1[0]),
+                    self.new_variable(trace.after_permutation[num_input_chunks - 1].1[1]),
+                ];
+                new_y_var[1] = self.add(new_y_var[1], sigma_var);
+
+                self.anemoi_permutation_round(
+                    &(x_var, y_var),
+                    &(
+                        [output_chunks[0][0], output_chunks[0][1]],
+                        [output_chunks[0][2], None],
+                    ),
+                    &trace.intermediate_values_before_constant_additions[num_input_chunks - 1],
+                    None,
+                    None,
+                );
+            }
+
+            // the rounds of squeezing
+            for rr in 1..num_output_chunks {
+                x_var = new_x_var;
+                y_var = new_y_var;
+
+                if rr != num_output_chunks - 1 {
+                    new_x_var = [
+                        self.new_variable(trace.after_permutation[rr - 1 + num_input_chunks].0[0]),
+                        self.new_variable(trace.after_permutation[rr - 1 + num_input_chunks].0[1]),
+                    ];
+
+                    new_y_var = [
+                        self.new_variable(trace.after_permutation[rr - 1 + num_input_chunks].1[0]),
+                        self.new_variable(trace.after_permutation[rr - 1 + num_input_chunks].1[1]),
+                    ];
+                }
+
+                self.anemoi_permutation_round(
+                    &(x_var, y_var),
+                    &(
+                        [output_chunks[rr][0], output_chunks[rr][1]],
+                        [output_chunks[rr][2], None],
+                    ),
+                    &trace.intermediate_values_before_constant_additions[rr - 1 + num_input_chunks],
+                    None,
+                    None,
+                );
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -412,6 +638,36 @@ mod test {
         let witness = cs.get_and_clear_witness();
         cs.verify_witness(&witness, &[]).unwrap();
     }
+
+    #[test]
+    fn test_anemoi_stream_cipher() {
+        for output_len in 1..7 {
+            for input_len in 1..7u64 {
+                let mut input = vec![];
+                for i in 0..input_len {
+                    input.push(BLSScalar::from(i + 1));
+                }
+                let trace = AnemoiJive381::eval_stream_cipher_with_trace(&input, output_len);
+
+                let mut cs = TurboCS::new();
+                cs.load_anemoi_jive_parameters::<AnemoiJive381>();
+
+                let mut input_var = vec![];
+                for i in input {
+                    input_var.push(cs.new_variable(i))
+                }
+
+                let mut output_var = vec![];
+                for output in trace.output.iter() {
+                    output_var.push(cs.new_variable(output.clone()))
+                }
+
+                let _ = cs.anemoi_stream_cipher(&trace, &input_var, &output_var);
+                let witness = cs.get_and_clear_witness();
+                cs.verify_witness(&witness, &[]).unwrap();
+            }
+        }
+    }
 }
 
 #[cfg(test)]
@@ -432,6 +688,7 @@ mod kzg_test {
         let pcs = KZGCommitmentScheme::new(260, &mut prng);
         test_turbo_plonk_anemoi_variable_length_hash(&pcs, &mut prng);
         test_turbo_plonk_jive_crh(&pcs, &mut prng);
+        test_turbo_plonk_anemoi_stream_cipher(&pcs, &mut prng);
     }
 
     fn test_turbo_plonk_anemoi_variable_length_hash<
@@ -485,6 +742,45 @@ mod kzg_test {
         let three = cs.new_variable(BLSScalar::from(3u64));
 
         let _ = cs.jive_crh(&trace, &[one, two, three], salt);
+        cs.pad();
+
+        let witness = cs.get_and_clear_witness();
+        cs.verify_witness(&witness, &[]).unwrap();
+        check_turbo_plonk_proof(pcs, prng, &cs, &witness[..], &[]);
+    }
+
+    fn test_turbo_plonk_anemoi_stream_cipher<
+        PCS: PolyComScheme<Field = BLSScalar>,
+        R: CryptoRng + RngCore,
+    >(
+        pcs: &PCS,
+        prng: &mut R,
+    ) {
+        let output_len = 7;
+        let trace = AnemoiJive381::eval_stream_cipher_with_trace(
+            &[
+                BLSScalar::from(1u64),
+                BLSScalar::from(2u64),
+                BLSScalar::from(3u64),
+                BLSScalar::from(4u64),
+            ],
+            output_len,
+        );
+
+        let mut cs = TurboCS::new();
+        cs.load_anemoi_jive_parameters::<AnemoiJive381>();
+
+        let one = cs.new_variable(BLSScalar::from(1u64));
+        let two = cs.new_variable(BLSScalar::from(2u64));
+        let three = cs.new_variable(BLSScalar::from(3u64));
+        let four = cs.new_variable(BLSScalar::from(4u64));
+
+        let mut output_var = vec![];
+        for output in trace.output.iter() {
+            output_var.push(cs.new_variable(output.clone()))
+        }
+
+        let _ = cs.anemoi_stream_cipher(&trace, &[one, two, three, four], &output_var);
         cs.pad();
 
         let witness = cs.get_and_clear_witness();
