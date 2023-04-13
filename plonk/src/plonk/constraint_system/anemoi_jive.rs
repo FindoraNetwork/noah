@@ -416,7 +416,10 @@ impl TurboCS<BLSScalar> {
         if num_input_chunks == 1 && num_output_chunks == 1 {
             self.anemoi_permutation_round(
                 &(x_var, y_var),
-                &([output_var[0], output_var[1]], [output_var[2], None]),
+                &(
+                    [output_chunks[0][0], output_chunks[0][1]],
+                    [output_chunks[0][2], None],
+                ),
                 &trace.intermediate_values_before_constant_additions[0],
                 None,
                 None,
@@ -470,7 +473,7 @@ impl TurboCS<BLSScalar> {
                     None,
                 );
             }
-        } else if num_input_chunks > 1 && num_output_chunks > 1 {
+        } else if num_input_chunks > 1 {
             let mut new_x_var = [
                 self.new_variable(trace.after_permutation[0].0[0]),
                 self.new_variable(trace.after_permutation[0].0[1]),
@@ -531,16 +534,18 @@ impl TurboCS<BLSScalar> {
                 x_var[1] = self.add(x_var[1], input_chunks[num_input_chunks - 1][1]);
                 y_var[0] = self.add(y_var[0], input_chunks[num_input_chunks - 1][2]);
 
-                new_x_var = [
-                    self.new_variable(trace.after_permutation[num_input_chunks - 1].0[0]),
-                    self.new_variable(trace.after_permutation[num_input_chunks - 1].0[1]),
-                ];
+                if num_output_chunks > 1 {
+                    new_x_var = [
+                        self.new_variable(trace.after_permutation[num_input_chunks - 1].0[0]),
+                        self.new_variable(trace.after_permutation[num_input_chunks - 1].0[1]),
+                    ];
 
-                new_y_var = [
-                    self.new_variable(trace.after_permutation[num_input_chunks - 1].1[0]),
-                    self.new_variable(trace.after_permutation[num_input_chunks - 1].1[1]),
-                ];
-                new_y_var[1] = self.add(new_y_var[1], sigma_var);
+                    new_y_var = [
+                        self.new_variable(trace.after_permutation[num_input_chunks - 1].1[0]),
+                        self.new_variable(trace.after_permutation[num_input_chunks - 1].1[1]),
+                    ];
+                    new_y_var[1] = self.add(new_y_var[1], sigma_var);
+                }
 
                 self.anemoi_permutation_round(
                     &(x_var, y_var),
@@ -554,7 +559,7 @@ impl TurboCS<BLSScalar> {
                 );
             }
 
-            // the rounds of squeezing
+            // the squeezing round
             for rr in 1..num_output_chunks {
                 x_var = new_x_var;
                 y_var = new_y_var;
@@ -642,7 +647,10 @@ mod test {
     #[test]
     fn test_anemoi_stream_cipher() {
         for output_len in 1..7 {
-            for input_len in 1..7u64 {
+            // There are two main test cases for input:
+            // The first one is when the input length is 3 and sigma is equal to 1,
+            // The second one is when the input length is 4 and sigma is equal to 0.
+            for input_len in [3, 4u64] {
                 let mut input = vec![];
                 for i in 0..input_len {
                     input.push(BLSScalar::from(i + 1));
@@ -658,8 +666,8 @@ mod test {
                 }
 
                 let mut output_var = vec![];
-                for output in trace.output.iter() {
-                    output_var.push(cs.new_variable(output.clone()))
+                for o in &trace.output {
+                    output_var.push(cs.new_variable(o.clone()))
                 }
 
                 let _ = cs.anemoi_stream_cipher(&trace, &input_var, &output_var);
