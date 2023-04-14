@@ -452,15 +452,17 @@ impl TurboCS<BLSScalar> {
                 x_var = new_x_var;
                 y_var = new_y_var;
 
-                new_x_var = [
-                    self.new_variable(trace.after_permutation[rr].0[0]),
-                    self.new_variable(trace.after_permutation[rr].0[1]),
-                ];
+                if rr != num_output_chunks - 1 {
+                    new_x_var = [
+                        self.new_variable(trace.after_permutation[rr].0[0]),
+                        self.new_variable(trace.after_permutation[rr].0[1]),
+                    ];
 
-                new_y_var = [
-                    self.new_variable(trace.after_permutation[rr].1[0]),
-                    self.new_variable(trace.after_permutation[rr].1[1]),
-                ];
+                    new_y_var = [
+                        self.new_variable(trace.after_permutation[rr].1[0]),
+                        self.new_variable(trace.after_permutation[rr].1[1]),
+                    ];
+                }
 
                 self.anemoi_permutation_round(
                     &(x_var, y_var),
@@ -646,7 +648,7 @@ mod test {
 
     #[test]
     fn test_anemoi_stream_cipher() {
-        for output_len in 1..7 {
+        for output_len in 1..=7 {
             // There are two main test cases for input:
             // The first one is when the input length is 3 and sigma is equal to 1,
             // The second one is when the input length is 4 and sigma is equal to 0.
