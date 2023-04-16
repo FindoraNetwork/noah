@@ -772,6 +772,3 @@ fn test_eval_stream_cipher_flatten() {
 
     assert_eq!(trace.output, output);
 }
-
-/*
- */
