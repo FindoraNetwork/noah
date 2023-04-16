@@ -6,13 +6,14 @@ use ark_bulletproofs::{
 };
 use ark_bulletproofs::{BulletproofGens, PedersenGens};
 use ark_ec::{AffineRepr, CurveGroup, Group as ArkGroup};
-use ark_ed25519::{EdwardsAffine, EdwardsProjective, Fq};
+use ark_ed25519::{EdwardsAffine, EdwardsProjective, Fq, Fr};
 use ark_ff::{BigInteger, Field, PrimeField};
 use digest::Digest;
 use merlin::Transcript;
+use noah_algebra::ed25519::Ed25519Scalar;
 use noah_algebra::zorro::{PedersenCommitmentZorro, ZorroProof, ZorroScalar};
 use noah_algebra::{
-    ed25519::{get_ed25519_d, Ed25519Fq, Ed25519Point},
+    ed25519::{get_ed25519_d, Ed25519Point},
     prelude::*,
     zorro::ZorroG1,
 };
@@ -66,7 +67,7 @@ impl ScalarMulProof {
         public_key_var: &PointVar,
         secret_key_var: &ScalarVar,
         public_key: &Option<EdwardsAffine>,
-        secret_key: &Option<Fq>,
+        secret_key: &Option<Fr>,
     ) -> Result<()> {
         assert_eq!(public_key.is_some(), secret_key.is_some());
 
@@ -252,7 +253,7 @@ impl ScalarMulProof {
         bp_gens: &'b BulletproofGens<G1AffineBig>,
         transcript: &'a mut Transcript,
         public_key: &Ed25519Point,
-        secret_key: &Ed25519Fq,
+        secret_key: &Ed25519Scalar,
     ) -> Result<(ScalarMulProof, Vec<ZorroG1>, Vec<ZorroScalar>)> {
         let pc_gens = PedersenCommitmentZorro::default();
 
@@ -281,8 +282,12 @@ impl ScalarMulProof {
 
         let public_key_var = PointVar::new(x_var, y_var);
 
+        // 5. Allocate `secret_key`.
+        // We can do this because Fq is larger than Fr.
+        let secret_key_fq = Fq::from_le_bytes_mod_order(&secret_key.into_bigint().to_bytes_le());
+
         let secret_key_blinding = Fq::rand(prng);
-        let (secret_key_comm, secret_key_var) = prover.commit(secret_key, secret_key_blinding);
+        let (secret_key_comm, secret_key_var) = prover.commit(secret_key_fq, secret_key_blinding);
 
         let secret_key_var = ScalarVar(secret_key_var);
 

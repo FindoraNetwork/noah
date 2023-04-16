@@ -7,6 +7,7 @@ use crate::xfr::{
     asset_mixer::AssetMixProof,
     asset_record::AssetRecordType,
     asset_tracer::{RecordDataCiphertext, RecordDataDecKey, RecordDataEncKey},
+    xfr_hybrid_decrypt, xfr_hybrid_encrypt,
 };
 use bulletproofs::RangeProof;
 use digest::Digest;
@@ -407,7 +408,7 @@ impl OwnerMemo {
             OwnerMemo::derive_shared_point(&key_type, &r, &pub_key.as_compressed_point()?)?;
         let amount_blinds = OwnerMemo::calc_amount_blinds(&shared_point);
 
-        let lock_bytes = pub_key.hybrid_encrypt(prng, &amount.to_be_bytes())?;
+        let lock_bytes = xfr_hybrid_encrypt(&pub_key, prng, &amount.to_be_bytes())?;
         Ok((
             OwnerMemo {
                 key_type,
@@ -429,7 +430,7 @@ impl OwnerMemo {
             OwnerMemo::derive_shared_point(&key_type, &r, &pub_key.as_compressed_point()?)?;
         let asset_type_blind = OwnerMemo::calc_asset_type_blind(&shared_point);
 
-        let lock_bytes = pub_key.hybrid_encrypt(prng, &asset_type.0)?;
+        let lock_bytes = xfr_hybrid_encrypt(&pub_key, prng, &asset_type.0)?;
         Ok((
             OwnerMemo {
                 key_type,
@@ -456,7 +457,7 @@ impl OwnerMemo {
         let mut amount_asset_type_plaintext = vec![];
         amount_asset_type_plaintext.extend_from_slice(&amount.to_be_bytes()[..]);
         amount_asset_type_plaintext.extend_from_slice(&asset_type.0[..]);
-        let lock_bytes = pub_key.hybrid_encrypt(prng, &amount_asset_type_plaintext)?;
+        let lock_bytes = xfr_hybrid_encrypt(&pub_key, prng, &amount_asset_type_plaintext)?;
         Ok((
             OwnerMemo {
                 key_type,
@@ -532,7 +533,7 @@ impl OwnerMemo {
 impl OwnerMemo {
     // Decrypt the lock.
     fn decrypt(&self, keypair: &KeyPair) -> Result<Vec<u8>> {
-        keypair.hybrid_decrypt(&self.lock_bytes)
+        xfr_hybrid_decrypt(&keypair.sec_key, &self.lock_bytes)
     }
 
     // Given a shared point, calculate the amount blinds.

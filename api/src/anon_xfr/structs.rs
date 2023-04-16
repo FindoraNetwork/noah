@@ -1,4 +1,4 @@
-use crate::anon_xfr::{commit, decrypt_memo};
+use crate::anon_xfr::{axfr_hybrid_decrypt, axfr_hybrid_encrypt, commit, decrypt_memo};
 use crate::keys::{KeyPair, PublicKey, SecretKey};
 use crate::xfr::structs::AssetType;
 use noah_algebra::{bls12_381::BLSScalar, prelude::*};
@@ -334,13 +334,13 @@ impl AxfrOwnerMemo {
         pub_key: &PublicKey,
         msg: &[u8],
     ) -> Result<Self> {
-        let ctext = pub_key.hybrid_encrypt(prng, msg)?;
+        let ctext = axfr_hybrid_encrypt(pub_key, prng, msg)?;
         Ok(Self(ctext))
     }
 
     /// Decrypt a memo using the viewing key.
     pub fn decrypt(&self, secret_key: &SecretKey) -> Result<Vec<u8>> {
-        secret_key.hybrid_decrypt(&self.0)
+        axfr_hybrid_decrypt(secret_key, &self.0)
     }
 }
 
