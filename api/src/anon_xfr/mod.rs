@@ -7,6 +7,8 @@ use crate::{
     },
     xfr::structs::{AssetType, ASSET_TYPE_LENGTH},
 };
+use aes_gcm::aead::Aead;
+use digest::{generic_array::GenericArray, Digest, KeyInit};
 use noah_algebra::{
     bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN},
     collections::HashMap,
@@ -23,6 +25,8 @@ use noah_plonk::{
     poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS,
 };
 
+use noah_algebra::ed25519::{Ed25519Point, Ed25519Scalar};
+use noah_algebra::secp256k1::{SECP256K1Scalar, SECP256K1G1};
 #[cfg(target_arch = "wasm32")]
 use {noah_plonk::plonk::prover::init_prover, wasm_bindgen::prelude::*};
 
@@ -477,4 +481,130 @@ pub fn compute_merkle_root_variables(
 /// Init anon xfr
 pub async fn init_anon_xfr() -> core::result::Result<(), JsValue> {
     init_prover().await
+}
+
+/// Hybrid encryption
+pub fn axfr_hybrid_encrypt<R: CryptoRng + RngCore>(
+    pk: &PublicKey,
+    prng: &mut R,
+    msg: &[u8],
+) -> Result<Vec<u8>> {
+    let (mut bytes, hasher) = match pk.0 {
+        PublicKeyInner::Ed25519(_) => {
+            let pk = pk.to_ed25519()?;
+
+            let share_scalar = Ed25519Scalar::random(prng);
+            let share = Ed25519Point::get_base().mul(&share_scalar);
+
+            let bytes = share.to_compressed_bytes();
+
+            let dh = pk.mul(&share_scalar);
+
+            let mut hasher = sha2::Sha512::new();
+            hasher.update(&dh.to_compressed_bytes());
+            (bytes, hasher)
+        }
+        PublicKeyInner::Secp256k1(_) => {
+            let pk = pk.to_secp256k1()?;
+
+            let share_scalar = SECP256K1Scalar::random(prng);
+            let share = SECP256K1G1::get_base().mul(&share_scalar);
+
+            let bytes = share.to_compressed_bytes();
+            let dh = pk.mul(&share_scalar);
+
+            let mut hasher = sha2::Sha512::new();
+            hasher.update(&dh.to_compressed_bytes());
+            (bytes, hasher)
+        }
+        PublicKeyInner::EthAddress(_) => panic!("EthAddress not supported"),
+    };
+
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&hasher.finalize().as_slice()[0..32]);
+
+    let nonce = GenericArray::from_slice(&[0u8; 12]);
+
+    let gcm = {
+        let res = aes_gcm::Aes256Gcm::new_from_slice(key.as_slice());
+
+        if res.is_err() {
+            return Err(eg!(NoahError::EncryptionError));
+        }
+
+        res.unwrap()
+    };
+
+    let mut ctext = {
+        let res = gcm.encrypt(nonce, msg);
+
+        if res.is_err() {
+            return Err(eg!(NoahError::EncryptionError));
+        }
+
+        res.unwrap()
+    };
+
+    bytes.append(&mut ctext);
+    Ok(bytes)
+}
+
+/// Hybrid decryption
+pub fn axfr_hybrid_decrypt(sk: &SecretKey, ctext: &[u8]) -> Result<Vec<u8>> {
+    let (share_len, hasher) = match sk {
+        SecretKey::Ed25519(_) => {
+            let sk = sk.to_ed25519()?;
+
+            let share_len = Ed25519Point::COMPRESSED_LEN;
+            if ctext.len() < share_len {
+                return Err(eg!(NoahError::DecryptionError));
+            }
+            let share = Ed25519Point::from_compressed_bytes(&ctext[..share_len])?;
+            let dh = share.mul(&sk);
+
+            let mut hasher = sha2::Sha512::new();
+            hasher.update(&dh.to_compressed_bytes());
+            (share_len, hasher)
+        }
+        SecretKey::Secp256k1(_) => {
+            let sk = sk.to_secp256k1()?;
+
+            let share_len = SECP256K1G1::COMPRESSED_LEN;
+            if ctext.len() < share_len {
+                return Err(eg!(NoahError::DecryptionError));
+            }
+            let share = SECP256K1G1::from_compressed_bytes(&ctext[..share_len])?;
+            let dh = share.mul(&sk);
+
+            let mut hasher = sha2::Sha512::new();
+            hasher.update(&dh.to_compressed_bytes());
+            (share_len, hasher)
+        }
+    };
+
+    let mut key = [0u8; 32];
+    key.copy_from_slice(&hasher.finalize().as_slice()[0..32]);
+
+    let nonce = GenericArray::from_slice(&[0u8; 12]);
+
+    let gcm = {
+        let res = aes_gcm::Aes256Gcm::new_from_slice(key.as_slice());
+
+        if res.is_err() {
+            return Err(eg!(NoahError::DecryptionError));
+        }
+
+        res.unwrap()
+    };
+
+    let res = {
+        let res = gcm.decrypt(nonce, &ctext[share_len..]);
+
+        if res.is_err() {
+            return Err(eg!(NoahError::DecryptionError));
+        }
+
+        res.unwrap()
+    };
+    Ok(res)
 }

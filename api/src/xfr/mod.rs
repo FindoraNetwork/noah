@@ -1,8 +1,14 @@
+use aes_gcm::aead::Aead;
+use digest::{generic_array::GenericArray, Digest, KeyInit};
+use noah_algebra::secp256k1::{SECP256K1Scalar, SECP256K1G1};
 use noah_algebra::{
     collections::HashMap,
     prelude::*,
     ristretto::{CompressedRistretto, PedersenCommitmentRistretto, RistrettoScalar},
     traits::PedersenCommitment,
+};
+use noah_crypto::basic::hybrid_encryption::{
+    hybrid_decrypt_with_ed25519_secret_key, hybrid_encrypt_ed25519, NoahHybridCiphertext,
 };
 use serde::ser::Serialize;
 
@@ -21,7 +27,7 @@ pub mod structs;
 pub(crate) mod tests;
 
 use crate::anon_creds::{ACCommitment, Attr};
-use crate::keys::{KeyPair, MultiSig, PublicKey};
+use crate::keys::{KeyPair, MultiSig, PublicKey, PublicKeyInner, SecretKey};
 use crate::setup::BulletproofParams;
 
 use self::{
@@ -854,6 +860,107 @@ fn batch_verify_asset_mix<R: CryptoRng + RngCore>(
     }
 
     batch_verify_asset_mixing(prng, params, &asset_mix_instances).c(d!())
+}
+
+/// Hybrid encryption
+pub fn xfr_hybrid_encrypt<R: CryptoRng + RngCore>(
+    pk: &PublicKey,
+    prng: &mut R,
+    msg: &[u8],
+) -> Result<Vec<u8>> {
+    match pk.0 {
+        PublicKeyInner::Ed25519(pk) => Ok(hybrid_encrypt_ed25519(prng, &pk, msg).noah_to_bytes()),
+        PublicKeyInner::Secp256k1(_) => {
+            let pk = pk.to_secp256k1()?;
+
+            let share_scalar = SECP256K1Scalar::random(prng);
+            let share = SECP256K1G1::get_base().mul(&share_scalar);
+
+            let mut bytes = share.to_compressed_bytes();
+
+            let dh = pk.mul(&share_scalar);
+
+            let mut hasher = sha2::Sha512::new();
+            hasher.update(&dh.to_compressed_bytes());
+
+            let mut key = [0u8; 32];
+            key.copy_from_slice(&hasher.finalize().as_slice()[0..32]);
+
+            let nonce = GenericArray::from_slice(&[0u8; 12]);
+
+            let gcm = {
+                let res = aes_gcm::Aes256Gcm::new_from_slice(key.as_slice());
+
+                if res.is_err() {
+                    return Err(eg!(NoahError::EncryptionError));
+                }
+
+                res.unwrap()
+            };
+
+            let mut ctext = {
+                let res = gcm.encrypt(nonce, msg);
+
+                if res.is_err() {
+                    return Err(eg!(NoahError::EncryptionError));
+                }
+
+                res.unwrap()
+            };
+            bytes.append(&mut ctext);
+            Ok(bytes)
+        }
+        PublicKeyInner::EthAddress(_) => panic!("EthAddress not supported"),
+    }
+}
+
+/// Hybrid decryption
+pub fn xfr_hybrid_decrypt(sk: &SecretKey, ctext: &[u8]) -> Result<Vec<u8>> {
+    match sk {
+        SecretKey::Ed25519(sk) => {
+            let ctext = NoahHybridCiphertext::noah_from_bytes(ctext)?;
+            Ok(hybrid_decrypt_with_ed25519_secret_key(&ctext, sk))
+        }
+        SecretKey::Secp256k1(_) => {
+            let sk = sk.to_secp256k1()?;
+
+            let share_len = SECP256K1G1::COMPRESSED_LEN;
+            if ctext.len() < share_len {
+                return Err(eg!(NoahError::DecryptionError));
+            }
+            let share = SECP256K1G1::from_compressed_bytes(&ctext[..share_len])?;
+            let dh = share.mul(&sk);
+
+            let mut hasher = sha2::Sha512::new();
+            hasher.update(&dh.to_compressed_bytes());
+
+            let mut key = [0u8; 32];
+            key.copy_from_slice(&hasher.finalize().as_slice()[0..32]);
+
+            let nonce = GenericArray::from_slice(&[0u8; 12]);
+
+            let gcm = {
+                let res = aes_gcm::Aes256Gcm::new_from_slice(key.as_slice());
+
+                if res.is_err() {
+                    return Err(eg!(NoahError::DecryptionError));
+                }
+
+                res.unwrap()
+            };
+
+            let res = {
+                let res = gcm.decrypt(nonce, &ctext[share_len..]);
+
+                if res.is_err() {
+                    return Err(eg!(NoahError::DecryptionError));
+                }
+
+                res.unwrap()
+            };
+            Ok(res)
+        }
+    }
 }
 
 /// Find the tracer memo corresponding to the encryption keys.

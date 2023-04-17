@@ -533,7 +533,7 @@ mod smoke_axfr {
             (6, ASSET),
             (10, ASSET),
         ];
-        test_abar(inputs, outputs, fee_amount, "abar-9-2-2");
+        test_abar(inputs, outputs, fee_amount, "abar-8-2-2");
     }
 
     #[test]
@@ -550,7 +550,7 @@ mod smoke_axfr {
             (6, ASSET),
             (10, ASSET),
         ];
-        test_abar(inputs, outputs, fee_amount, "abar-9-3-2");
+        test_abar(inputs, outputs, fee_amount, "abar-8-3-2");
     }
 
     fn test_abar(

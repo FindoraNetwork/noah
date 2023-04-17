@@ -1,8 +1,7 @@
-use aes_gcm::{aead::Aead, KeyInit};
 use ark_ff::{BigInteger, PrimeField};
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use digest::consts::U64;
-use digest::{generic_array::GenericArray, Digest};
+use digest::Digest;
 use ed25519_dalek::{
     ExpandedSecretKey, PublicKey as Ed25519PublicKey, SecretKey as Ed25519SecretKey,
     Signature as Ed25519Signature, Signer, Verifier,
@@ -16,13 +15,10 @@ use libsecp256k1::{
 use noah_algebra::{
     bls12_381::BLSScalar,
     cmp::Ordering,
-    ed25519::{Ed25519Fq, Ed25519Point, Ed25519Scalar},
+    ed25519::{Ed25519Point, Ed25519Scalar},
     hash::{Hash, Hasher},
     prelude::*,
     secp256k1::{SECP256K1Scalar, SECP256K1G1},
-};
-use noah_crypto::basic::hybrid_encryption::{
-    hybrid_decrypt_with_ed25519_secret_key, hybrid_encrypt_ed25519, NoahHybridCiphertext,
 };
 use serde::Serialize;
 use sha3::Keccak256;
@@ -275,60 +271,6 @@ impl PublicKey {
         }
     }
 
-    /// Hybrid encryption
-    pub fn hybrid_encrypt<R: CryptoRng + RngCore>(
-        &self,
-        prng: &mut R,
-        msg: &[u8],
-    ) -> Result<Vec<u8>> {
-        match self.0 {
-            PublicKeyInner::Ed25519(pk) => {
-                Ok(hybrid_encrypt_ed25519(prng, &pk, msg).noah_to_bytes())
-            }
-            PublicKeyInner::Secp256k1(_) => {
-                let pk = self.to_secp256k1()?;
-
-                let share_scalar = SECP256K1Scalar::random(prng);
-                let share = SECP256K1G1::get_base().mul(&share_scalar);
-
-                let mut bytes = share.to_compressed_bytes();
-
-                let dh = pk.mul(&share_scalar);
-
-                let mut hasher = sha2::Sha512::new();
-                hasher.update(&dh.to_compressed_bytes());
-
-                let mut key = [0u8; 32];
-                key.copy_from_slice(&hasher.finalize().as_slice()[0..32]);
-
-                let nonce = GenericArray::from_slice(&[0u8; 12]);
-
-                let gcm = {
-                    let res = aes_gcm::Aes256Gcm::new_from_slice(key.as_slice());
-
-                    if res.is_err() {
-                        return Err(eg!(NoahError::EncryptionError));
-                    }
-
-                    res.unwrap()
-                };
-
-                let mut ctext = {
-                    let res = gcm.encrypt(nonce, msg);
-
-                    if res.is_err() {
-                        return Err(eg!(NoahError::EncryptionError));
-                    }
-
-                    res.unwrap()
-                };
-                bytes.append(&mut ctext);
-                Ok(bytes)
-            }
-            PublicKeyInner::EthAddress(_) => panic!("EthAddress not supported"),
-        }
-    }
-
     /// Verify a signature.
     pub fn verify(&self, message: &[u8], signature: &Signature) -> Result<()> {
         match (self.0, signature) {
@@ -483,7 +425,7 @@ impl SecretKey {
     }
 
     /// Change to algebra Ristretto Point
-    pub fn to_ed25519(&self) -> Result<Ed25519Fq> {
+    pub fn to_ed25519(&self) -> Result<Ed25519Scalar> {
         match self {
             SecretKey::Ed25519(sk) => convert_ed25519_sk_to_algebra(&sk),
             _ => Err(eg!(NoahError::ParameterError)),
@@ -521,55 +463,6 @@ impl SecretKey {
         KeyPair {
             pub_key: pk,
             sec_key: self,
-        }
-    }
-
-    /// Hybrid decryption
-    pub fn hybrid_decrypt(&self, ctext: &[u8]) -> Result<Vec<u8>> {
-        match self {
-            SecretKey::Ed25519(sk) => {
-                let ctext = NoahHybridCiphertext::noah_from_bytes(ctext)?;
-                Ok(hybrid_decrypt_with_ed25519_secret_key(&ctext, sk))
-            }
-            SecretKey::Secp256k1(_) => {
-                let sk = self.to_secp256k1()?;
-
-                let share_len = SECP256K1G1::COMPRESSED_LEN;
-                if ctext.len() < share_len {
-                    return Err(eg!(NoahError::DecryptionError));
-                }
-                let share = SECP256K1G1::from_compressed_bytes(&ctext[..share_len])?;
-                let dh = share.mul(&sk);
-
-                let mut hasher = sha2::Sha512::new();
-                hasher.update(&dh.to_compressed_bytes());
-
-                let mut key = [0u8; 32];
-                key.copy_from_slice(&hasher.finalize().as_slice()[0..32]);
-
-                let nonce = GenericArray::from_slice(&[0u8; 12]);
-
-                let gcm = {
-                    let res = aes_gcm::Aes256Gcm::new_from_slice(key.as_slice());
-
-                    if res.is_err() {
-                        return Err(eg!(NoahError::DecryptionError));
-                    }
-
-                    res.unwrap()
-                };
-
-                let res = {
-                    let res = gcm.decrypt(nonce, &ctext[share_len..]);
-
-                    if res.is_err() {
-                        return Err(eg!(NoahError::DecryptionError));
-                    }
-
-                    res.unwrap()
-                };
-                Ok(res)
-            }
         }
     }
 
@@ -684,7 +577,7 @@ impl KeyPair {
     }
 
     /// Change to algebra Ristretto keypair
-    pub fn to_ed25519(&self) -> Result<(Ed25519Fq, Ed25519Point)> {
+    pub fn to_ed25519(&self) -> Result<(Ed25519Scalar, Ed25519Point)> {
         match (&self.sec_key, &self.pub_key) {
             (SecretKey::Ed25519(_), PublicKey(PublicKeyInner::Ed25519(_))) => {
                 Ok((self.sec_key.to_ed25519()?, self.pub_key.to_ed25519()?))
@@ -740,11 +633,6 @@ impl KeyPair {
             pub_key: self.pub_key.to_eth_address()?,
             sec_key: self.sec_key.clone(),
         })
-    }
-
-    /// Hybrid decryption
-    pub fn hybrid_decrypt(&self, lock: &[u8]) -> Result<Vec<u8>> {
-        self.sec_key.hybrid_decrypt(lock)
     }
 
     /// Sign a message.
@@ -926,9 +814,9 @@ fn from_u32_slice_to_u8_slice(b: &[u32; 8]) -> [u8; 32] {
     bytes
 }
 
-fn convert_ed25519_sk_to_algebra(sk: &Ed25519SecretKey) -> Result<Ed25519Fq> {
+fn convert_ed25519_sk_to_algebra(sk: &Ed25519SecretKey) -> Result<Ed25519Scalar> {
     let esk = ExpandedSecretKey::from(sk);
-    Ed25519Fq::from_bytes(&esk.to_bytes()[..32])
+    Ed25519Scalar::from_bytes(&esk.to_bytes()[..32])
 }
 
 fn convert_ed25519_pk_to_algebra(pk: &Ed25519PublicKey) -> Result<Ed25519Point> {

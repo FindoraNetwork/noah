@@ -798,7 +798,11 @@ pub(crate) fn build_multi_xfr_cs(
         .unwrap(),
     }
 
-    asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
+    if inputs.len() == 1 {
+        asset_summing(&mut cs, &inputs, &outputs, fee_type, fee_var);
+    } else {
+        asset_mixing(&mut cs, &inputs, &outputs, fee_type, fee_var);
+    }
 
     // pad the number of constraints to power of two.
     cs.pad();
@@ -807,15 +811,89 @@ pub(crate) fn build_multi_xfr_cs(
     (cs, n_constraints)
 }
 
-/// Enforce asset_mixing_with_fees constraints:
+/// Enforce asset_summing constraints:
+/// Input = [(type, v_in)], `values {v_in}` is guaranteed to be positive.
+/// Outputs = [(type, v_out_1), ..., (type, v_out_m)], `values {v_out_j}` are guaranteed to be positive.
+/// Fee parameters = `fee_type` and `fee_calculating func`
+///
+/// Goal:
+/// - Prove that all the types are the same.
+/// - If the asset type is not `fee_type`, the input = the outputs sum, and the `fee` is zero.
+/// - Otherwise, the input = the outputs sum + fee.
+///
+pub fn asset_summing(
+    cs: &mut TurboPlonkCS,
+    inputs: &[(VarIndex, VarIndex)],
+    outputs: &[(VarIndex, VarIndex)],
+    fee_type: BLSScalar,
+    fee_var: VarIndex,
+) {
+    assert_eq!(inputs.len(), 1);
+    assert!(outputs.len() >= 1);
+
+    // Prove that all the types are the same.
+    for output in outputs.iter() {
+        cs.equal(inputs[0].0, output.0);
+    }
+
+    // Compute the sum of the outputs.
+    let zero_var = cs.zero_var();
+    let zero = BLSScalar::zero();
+    let one = BLSScalar::one();
+
+    let mut acc = outputs[0].1;
+    for chunk in outputs[1..].chunks(3) {
+        let len = chunk.len();
+        if len == 1 {
+            acc = cs.linear_combine(&[acc, chunk[0].1, zero_var, zero_var], one, one, zero, zero);
+        } else if len == 2 {
+            acc = cs.linear_combine(
+                &[acc, chunk[0].1, chunk[1].1, zero_var],
+                one,
+                one,
+                one,
+                zero,
+            );
+        } else if len == 3 {
+            acc = cs.linear_combine(
+                &[acc, chunk[0].1, chunk[1].1, chunk[2].1],
+                one,
+                one,
+                one,
+                one,
+            );
+        }
+    }
+
+    // Check that either the fee type is the type, or that the fee is zero
+    // (fee_type - type) * fee = 0
+    // i.e., type * fee = fee_type * fee
+    cs.push_add_selectors(fee_type.neg(), zero, zero, zero);
+    cs.push_mul_selectors(one, zero);
+    cs.push_constant_selector(zero);
+    cs.push_ecc_selector(zero);
+    cs.push_out_selector(zero);
+
+    cs.wiring[0].push(fee_var);
+    cs.wiring[1].push(inputs[0].0);
+    cs.wiring[2].push(zero_var);
+    cs.wiring[3].push(zero_var);
+    cs.wiring[4].push(zero_var);
+    cs.finish_new_gate();
+
+    // Check that input = output + fee
+    cs.insert_add_gate(fee_var, acc, inputs[0].1);
+}
+
+/// Enforce asset_mixing constraints:
 /// Inputs = [(type_in_1, v_in_1), ..., (type_in_n, v_in_n)], `values {v_in_i}` are guaranteed to be positive.
 /// Outputs = [(type_out_1, v_out_1), ..., (type_out_m, v_out_m)], `values {v_out_j}` are guaranteed to be positive.
-/// Fee parameters = `fee_type` and `fee_calculating func`
+/// Fee parameters = `fee_type` and `fee`
 ///
 /// Goal:
 /// - Prove that for every asset type except `fee_type`, the corresponding inputs sum equals the corresponding outputs sum.
 /// - Prove that for every asset type that equals `fee_type`, the inputs sum = the outputs sum + fee
-/// - Prove that at least one input is of type `fee_type`
+/// - Prove that either at least one input is of type `fee_type`, or the `fee` is zero.
 ///
 /// The circuit:
 /// 1. Compute [sum_in_1, ..., sum_in_n] from inputs, where `sum_in_i = \sum_{j : type_in_j == type_in_i} v_in_j`
@@ -828,6 +906,8 @@ pub(crate) fn build_multi_xfr_cs(
 /// 5. Ensure that for the fee type, if there is no output fee type, then the input must provide the exact fee.
 ///
 /// This function assumes that the inputs and outputs have been correctly bounded.
+/// This function does not scale well with large amounts of asset types.
+///
 pub fn asset_mixing(
     cs: &mut TurboPlonkCS,
     inputs: &[(VarIndex, VarIndex)],
@@ -913,7 +993,9 @@ pub fn asset_mixing(
         let condition = cs.mul(is_fee_type, flag_no_matching_output);
         cs.insert_mul_gate(condition, input_minus_fee, zero_var)
     }
-    cs.insert_constant_gate(flag_no_fee_type, BLSScalar::zero());
+
+    let zero_var = cs.zero_var();
+    cs.insert_mul_gate(flag_no_fee_type, fee_var, zero_var);
 
     // check that every output type appears in the set of input types.
     for &(output_type, _) in outputs {
