@@ -13,7 +13,8 @@ use noah::setup::{
     BulletproofParams, BulletproofURS, ProverParams, VerifierParams, VerifierParamsCommon,
     VerifierParamsSplitCommon, ANON_XFR_BP_GENS_LEN,
     MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER,
-    MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER, MAX_ANONYMOUS_RECORD_NUMBER_STANDARD,
+    MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER, MAX_ANONYMOUS_RECORD_NUMBER_ONE_INPUT,
+    MAX_ANONYMOUS_RECORD_NUMBER_STANDARD,
 };
 use noah_algebra::bls12_381::BLSG1;
 use noah_algebra::secq256k1::{PedersenCommitmentSecq256k1, Secq256k1BulletproofGens};
@@ -122,9 +123,13 @@ fn gen_transfer_vk(directory: PathBuf) {
     let mut bytes: HashMap<usize, Vec<Vec<u8>>> = is
         .par_iter()
         .map(|i| {
-            let js: Vec<usize> = (1..=MAX_ANONYMOUS_RECORD_NUMBER_STANDARD)
-                .map(|j| j)
-                .collect();
+            let max_receiver = if *i == 1 {
+                MAX_ANONYMOUS_RECORD_NUMBER_ONE_INPUT
+            } else {
+                MAX_ANONYMOUS_RECORD_NUMBER_STANDARD
+            };
+
+            let js: Vec<usize> = (1..=max_receiver).map(|j| j).collect();
             let mut bytes: HashMap<usize, Vec<u8>> = js
                 .par_iter()
                 .map(|j| {
@@ -139,7 +144,7 @@ fn gen_transfer_vk(directory: PathBuf) {
                 })
                 .collect();
             let mut ordered = vec![];
-            for i in 1..=MAX_ANONYMOUS_RECORD_NUMBER_STANDARD {
+            for i in 1..=max_receiver {
                 ordered.push(bytes.remove(&i).unwrap())
             }
             (*i, ordered)
