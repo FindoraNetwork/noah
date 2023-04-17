@@ -368,7 +368,7 @@ fn scalar_mul_test() {
 
     let mut rng = rand::thread_rng();
 
-    let secert_key = Fq::rand(&mut rng);
+    let secert_key = Fr::rand(&mut rng);
     let public_key = EdwardsAffine::generator()
         .mul_bigint(secert_key.into_bigint())
         .into_affine();
@@ -380,7 +380,7 @@ fn scalar_mul_test() {
             &bp_gens,
             &mut prover_transcript,
             &Ed25519Point::from_raw(public_key),
-            &Ed25519Fq::from_raw(secert_key),
+            &Ed25519Scalar::from_raw(secert_key),
         )
         .unwrap()
     };
