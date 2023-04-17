@@ -158,6 +158,8 @@ pub const MAX_ANONYMOUS_RECORD_NUMBER_STANDARD: usize = 6;
 pub const MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER: usize = 8;
 /// The maximal number of outputs supported by this setup program, for consolidation.
 pub const MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER: usize = 3;
+/// The maximal number of outputs supported by this setup program, for airport.
+pub const MAX_ANONYMOUS_RECORD_NUMBER_ONE_INPUT: usize = 20;
 /// The default number of Bulletproofs generators
 pub const DEFAULT_BP_NUM_GENS: usize = 256;
 /// The number of the Bulletproofs(over the Secq256k1 curve) generators needed for anonymous transfer.
@@ -936,6 +938,7 @@ impl VerifierParams {
             || n_payers > MAX_ANONYMOUS_RECORD_NUMBER_STANDARD)
             && (n_payers > MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER
                 || n_payees > MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER)
+            && (n_payers > 1 || n_payees > MAX_ANONYMOUS_RECORD_NUMBER_ONE_INPUT)
         {
             Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
         } else {
