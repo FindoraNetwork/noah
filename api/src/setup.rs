@@ -68,11 +68,11 @@ pub struct BulletproofParams {
 pub struct ProverParams {
     /// The full SRS for the polynomial commitment scheme.
     pub pcs: KZGCommitmentSchemeBLS,
-    /// The secp256k1 lagrange basis format of SRS.
+    /// The secp256k1 Lagrange basis format of SRS.
     pub secp256k1_lagrange_pcs: Option<KZGCommitmentSchemeBLS>,
-    /// The ed25519 lagrange basis format of SRS.
+    /// The ed25519 Lagrange basis format of SRS.
     pub ed25519_lagrange_pcs: Option<KZGCommitmentSchemeBLS>,
-    /// The default(secp256k1) constraint system.
+    /// The default (secp256k1) constraint system.
     pub secp256k1_cs: TurboPlonkCS,
     /// The ed25519 constraint system.
     pub ed25519_cs: TurboPlonkCS,
