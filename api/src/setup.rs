@@ -68,8 +68,10 @@ pub struct BulletproofParams {
 pub struct ProverParams {
     /// The full SRS for the polynomial commitment scheme.
     pub pcs: KZGCommitmentSchemeBLS,
-    /// The Lagrange basis format of SRS.
-    pub lagrange_pcs: Option<KZGCommitmentSchemeBLS>,
+    /// The secp256k1 lagrange basis format of SRS.
+    pub secp256k1_lagrange_pcs: Option<KZGCommitmentSchemeBLS>,
+    /// The ed25519 lagrange basis format of SRS.
+    pub ed25519_lagrange_pcs: Option<KZGCommitmentSchemeBLS>,
     /// The default(secp256k1) constraint system.
     pub secp256k1_cs: TurboPlonkCS,
     /// The ed25519 constraint system.
@@ -234,14 +236,22 @@ impl ProverParams {
     pub fn cs_params(
         &self,
         witness: Option<&AXfrAddressFoldingWitness>,
-    ) -> (&TurboPlonkCS, &PlonkPK<KZGCommitmentSchemeBLS>) {
+    ) -> (
+        &TurboPlonkCS,
+        &PlonkPK<KZGCommitmentSchemeBLS>,
+        Option<&KZGCommitmentSchemeBLS>,
+    ) {
         match witness {
-            None | Some(AXfrAddressFoldingWitness::Secp256k1(_)) => {
-                (&self.secp256k1_cs, &self.secp256k1_prover_params)
-            }
-            Some(AXfrAddressFoldingWitness::Ed25519(_)) => {
-                (&self.ed25519_cs, &self.ed25519_prover_params)
-            }
+            None | Some(AXfrAddressFoldingWitness::Secp256k1(_)) => (
+                &self.secp256k1_cs,
+                &self.secp256k1_prover_params,
+                self.secp256k1_lagrange_pcs.as_ref(),
+            ),
+            Some(AXfrAddressFoldingWitness::Ed25519(_)) => (
+                &self.ed25519_cs,
+                &self.ed25519_prover_params,
+                self.ed25519_lagrange_pcs.as_ref(),
+            ),
         }
     }
 
@@ -361,7 +371,9 @@ impl ProverParams {
 
         let cs_size = core::cmp::max(secp256k1_cs.size(), ed25519_cs.size());
         let pcs = load_srs_params(cs_size)?;
-        let lagrange_pcs = load_lagrange_params(cs_size);
+        let secp256k1_lagrange_pcs = load_lagrange_params(secp256k1_cs.size());
+        let ed25519_lagrange_pcs = load_lagrange_params(ed25519_cs.size());
+
         let (secp256k1_verifier_params, ed25519_verifier_params) = if depth == TREE_DEPTH {
             match VerifierParams::load_prepare(n_payers, n_payees).ok() {
                 Some(v) => (
@@ -377,7 +389,7 @@ impl ProverParams {
         let secp256k1_prover_params = indexer_with_lagrange(
             &secp256k1_cs,
             &pcs,
-            lagrange_pcs.as_ref(),
+            secp256k1_lagrange_pcs.as_ref(),
             secp256k1_verifier_params,
         )
         .unwrap();
@@ -385,14 +397,15 @@ impl ProverParams {
         let ed25519_prover_params = indexer_with_lagrange(
             &ed25519_cs,
             &pcs,
-            lagrange_pcs.as_ref(),
+            ed25519_lagrange_pcs.as_ref(),
             ed25519_verifier_params,
         )
         .unwrap();
 
         Ok(ProverParams {
             pcs,
-            lagrange_pcs,
+            secp256k1_lagrange_pcs,
+            ed25519_lagrange_pcs,
             secp256k1_cs,
             ed25519_cs,
             secp256k1_prover_params,
@@ -467,7 +480,8 @@ impl ProverParams {
 
         let cs_size = core::cmp::max(secp256k1_cs.size(), ed25519_cs.size());
         let pcs = load_srs_params(cs_size)?;
-        let lagrange_pcs = load_lagrange_params(cs_size);
+        let secp256k1_lagrange_pcs = load_lagrange_params(secp256k1_cs.size());
+        let ed25519_lagrange_pcs = load_lagrange_params(ed25519_cs.size());
 
         let (secp256k1_verifier_params, ed25519_verifier_params) =
             match VerifierParams::bar_to_abar_params_prepare().ok() {
@@ -481,7 +495,7 @@ impl ProverParams {
         let secp256k1_prover_params = indexer_with_lagrange(
             &secp256k1_cs,
             &pcs,
-            lagrange_pcs.as_ref(),
+            secp256k1_lagrange_pcs.as_ref(),
             secp256k1_verifier_params,
         )
         .unwrap();
@@ -489,14 +503,15 @@ impl ProverParams {
         let ed25519_prover_params = indexer_with_lagrange(
             &ed25519_cs,
             &pcs,
-            lagrange_pcs.as_ref(),
+            ed25519_lagrange_pcs.as_ref(),
             ed25519_verifier_params,
         )
         .unwrap();
 
         Ok(ProverParams {
             pcs,
-            lagrange_pcs,
+            secp256k1_lagrange_pcs,
+            ed25519_lagrange_pcs,
             secp256k1_cs,
             secp256k1_prover_params,
             ed25519_cs,
@@ -622,7 +637,8 @@ impl ProverParams {
 
         let cs_size = core::cmp::max(secp256k1_cs.size(), ed25519_cs.size());
         let pcs = load_srs_params(cs_size)?;
-        let lagrange_pcs = load_lagrange_params(cs_size);
+        let secp256k1_lagrange_pcs = load_lagrange_params(secp256k1_cs.size());
+        let ed25519_lagrange_pcs = load_lagrange_params(ed25519_cs.size());
 
         let (secp256k1_verifier_params, ed25519_verifier_params) = if tree_depth == TREE_DEPTH {
             match VerifierParams::abar_to_bar_params_prepare().ok() {
@@ -639,7 +655,7 @@ impl ProverParams {
         let secp256k1_prover_params = indexer_with_lagrange(
             &secp256k1_cs,
             &pcs,
-            lagrange_pcs.as_ref(),
+            secp256k1_lagrange_pcs.as_ref(),
             secp256k1_verifier_params,
         )
         .unwrap();
@@ -647,14 +663,15 @@ impl ProverParams {
         let ed25519_prover_params = indexer_with_lagrange(
             &ed25519_cs,
             &pcs,
-            lagrange_pcs.as_ref(),
+            ed25519_lagrange_pcs.as_ref(),
             ed25519_verifier_params,
         )
         .unwrap();
 
         Ok(ProverParams {
             pcs,
-            lagrange_pcs,
+            secp256k1_lagrange_pcs,
+            ed25519_lagrange_pcs,
             secp256k1_cs,
             secp256k1_prover_params,
             ed25519_cs,
@@ -707,7 +724,9 @@ impl ProverParams {
 
         let cs_size = core::cmp::max(secp256k1_cs.size(), ed25519_cs.size());
         let pcs = load_srs_params(cs_size)?;
-        let lagrange_pcs = load_lagrange_params(cs_size);
+        let secp256k1_lagrange_pcs = load_lagrange_params(secp256k1_cs.size());
+        let ed25519_lagrange_pcs = load_lagrange_params(ed25519_cs.size());
+
         let (secp256k1_verifier_params, ed25519_verifier_params) =
             match VerifierParams::ar_to_abar_params_prepare().ok() {
                 Some(v) => (
@@ -720,7 +739,7 @@ impl ProverParams {
         let secp256k1_prover_params = indexer_with_lagrange(
             &secp256k1_cs,
             &pcs,
-            lagrange_pcs.as_ref(),
+            secp256k1_lagrange_pcs.as_ref(),
             secp256k1_verifier_params,
         )
         .unwrap();
@@ -728,14 +747,15 @@ impl ProverParams {
         let ed25519_prover_params = indexer_with_lagrange(
             &ed25519_cs,
             &pcs,
-            lagrange_pcs.as_ref(),
+            ed25519_lagrange_pcs.as_ref(),
             ed25519_verifier_params,
         )
         .unwrap();
 
         Ok(ProverParams {
             pcs,
-            lagrange_pcs,
+            secp256k1_lagrange_pcs,
+            ed25519_lagrange_pcs,
             secp256k1_cs,
             secp256k1_prover_params,
             ed25519_cs,
@@ -826,7 +846,8 @@ impl ProverParams {
 
         let cs_size = core::cmp::max(secp256k1_cs.size(), ed25519_cs.size());
         let pcs = load_srs_params(cs_size)?;
-        let lagrange_pcs = load_lagrange_params(cs_size);
+        let secp256k1_lagrange_pcs = load_lagrange_params(secp256k1_cs.size());
+        let ed25519_lagrange_pcs = load_lagrange_params(ed25519_cs.size());
 
         let (secp256k1_verifier_params, ed25519_verifier_params) = if tree_depth == TREE_DEPTH {
             match VerifierParams::abar_to_ar_params_prepare().ok() {
@@ -843,7 +864,7 @@ impl ProverParams {
         let secp256k1_prover_params = indexer_with_lagrange(
             &secp256k1_cs,
             &pcs,
-            lagrange_pcs.as_ref(),
+            secp256k1_lagrange_pcs.as_ref(),
             secp256k1_verifier_params,
         )
         .unwrap();
@@ -851,14 +872,15 @@ impl ProverParams {
         let ed25519_prover_params = indexer_with_lagrange(
             &ed25519_cs,
             &pcs,
-            lagrange_pcs.as_ref(),
+            ed25519_lagrange_pcs.as_ref(),
             ed25519_verifier_params,
         )
         .unwrap();
 
         Ok(ProverParams {
             pcs,
-            lagrange_pcs,
+            secp256k1_lagrange_pcs,
+            ed25519_lagrange_pcs,
             secp256k1_cs,
             secp256k1_prover_params,
             ed25519_cs,

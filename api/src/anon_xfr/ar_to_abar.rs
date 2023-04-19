@@ -139,13 +139,13 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
     let (mut cs, _) = build_ar_to_abar_cs(payee_witness, &output_trace);
     let witness = cs.get_and_clear_witness();
 
-    let (cs, prover_params) = params.cs_params(None);
+    let (cs, prover_params, lagrange_pcs) = params.cs_params(None);
 
     let proof = prover_with_lagrange(
         prng,
         &mut transcript,
         &params.pcs,
-        params.lagrange_pcs.as_ref(),
+        lagrange_pcs,
         cs,
         prover_params,
         &witness,

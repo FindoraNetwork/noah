@@ -319,13 +319,13 @@ pub(crate) fn prove_bar_to_abar_cs<R: CryptoRng + RngCore>(
     );
     let witness = cs.get_and_clear_witness();
 
-    let (cs, prover_params) = params.cs_params(None);
+    let (cs, prover_params, lagrange_pcs) = params.cs_params(None);
 
     prover_with_lagrange(
         rng,
         &mut transcript,
         &params.pcs,
-        params.lagrange_pcs.as_ref(),
+        lagrange_pcs,
         cs,
         prover_params,
         &witness,
