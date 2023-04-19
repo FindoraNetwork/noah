@@ -913,6 +913,7 @@ fn load_srs_params(size: usize) -> Result<KZGCommitmentSchemeBLS> {
     }
 
     if size == 8192 {
+        new_group_1[4096..4099].copy_from_slice(&public_parameter_group_1[2051..2054]);
         new_group_1[8192..8195].copy_from_slice(&public_parameter_group_1[2054..2057]);
     }
 
