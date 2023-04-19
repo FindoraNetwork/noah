@@ -609,7 +609,7 @@ mod smoke_axfr {
                 _ => unimplemented!(),
             }
         } else if input_key_type.is_none() && prng.gen() {
-            KeyPair::generate_ed25519(&mut prng)
+            KeyPair::generate_secp256k1(&mut prng)
         } else {
             KeyPair::generate_ed25519(&mut prng)
         };
