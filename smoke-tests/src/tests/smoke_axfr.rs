@@ -15,7 +15,7 @@ mod smoke_axfr {
             },
             FEE_TYPE, TREE_DEPTH,
         },
-        keys::{KeyPair, PublicKey},
+        keys::{KeyPair, KeyType, PublicKey},
         setup::{ProverParams, VerifierParams},
         xfr::{
             asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
@@ -446,7 +446,13 @@ mod smoke_axfr {
         let fee_amount = mock_fee(1, 1);
         let outputs = vec![(1, FEE_TYPE)];
         let inputs = vec![(fee_amount as u64 + 1, FEE_TYPE)];
-        test_abar(inputs, outputs, fee_amount, "abar-1-1-1");
+        test_abar(
+            inputs,
+            outputs,
+            fee_amount,
+            "abar-1-1-1",
+            Some(KeyType::Ed25519),
+        );
     }
 
     #[test]
@@ -454,7 +460,13 @@ mod smoke_axfr {
         let fee_amount = mock_fee(1, 2);
         let outputs = vec![(1, FEE_TYPE), (0, FEE_TYPE)];
         let inputs = vec![(fee_amount as u64 + 1, FEE_TYPE)];
-        test_abar(inputs, outputs, fee_amount, "abar-1-2-1");
+        test_abar(
+            inputs,
+            outputs,
+            fee_amount,
+            "abar-1-2-1",
+            Some(KeyType::Ed25519),
+        );
     }
 
     #[test]
@@ -462,7 +474,7 @@ mod smoke_axfr {
         let fee_amount = mock_fee(2, 1);
         let outputs = vec![(1, FEE_TYPE)];
         let inputs = vec![(1, FEE_TYPE), (fee_amount as u64, FEE_TYPE)];
-        test_abar(inputs, outputs, fee_amount, "abar-2-1-1");
+        test_abar(inputs, outputs, fee_amount, "abar-2-1-1", None);
     }
 
     #[test]
@@ -485,7 +497,7 @@ mod smoke_axfr {
             (55555, FEE_TYPE),
             (666666 + fee_amount as u64, FEE_TYPE),
         ];
-        test_abar(inputs, outputs, fee_amount, "abar-6-6-1");
+        test_abar(inputs, outputs, fee_amount, "abar-6-6-1", None);
     }
 
     #[test]
@@ -493,7 +505,7 @@ mod smoke_axfr {
         let fee_amount = mock_fee(2, 3);
         let outputs = vec![(5, FEE_TYPE), (15, FEE_TYPE), (30, ASSET)];
         let inputs = vec![(20 + fee_amount as u64, FEE_TYPE), (30, ASSET)];
-        test_abar(inputs, outputs, fee_amount, "abar-2-3-2");
+        test_abar(inputs, outputs, fee_amount, "abar-2-3-2", None);
     }
 
     #[test]
@@ -516,7 +528,7 @@ mod smoke_axfr {
             (55555, ASSET5),
             (666666, ASSET6),
         ];
-        test_abar(inputs, outputs, fee_amount, "abar-6-6-6");
+        test_abar(inputs, outputs, fee_amount, "abar-6-6-6", None);
     }
 
     #[test]
@@ -533,7 +545,7 @@ mod smoke_axfr {
             (6, ASSET),
             (10, ASSET),
         ];
-        test_abar(inputs, outputs, fee_amount, "abar-8-2-2");
+        test_abar(inputs, outputs, fee_amount, "abar-8-2-2", None);
     }
 
     #[test]
@@ -550,29 +562,33 @@ mod smoke_axfr {
             (6, ASSET),
             (10, ASSET),
         ];
-        test_abar(inputs, outputs, fee_amount, "abar-8-3-2");
+        test_abar(inputs, outputs, fee_amount, "abar-8-3-2", None);
     }
 
     #[test]
-    fn abar_1in_12out_1asset() {
-        let fee_amount = mock_fee(1, 12);
-        let inputs = vec![(100 + fee_amount as u64, FEE_TYPE)];
+    fn abar_1in_xout_1asset() {
+        for output_len in 1..=20 {
+            let fee_amount = mock_fee(1, output_len);
 
-        let outputs = vec![
-            (1, FEE_TYPE),
-            (2, FEE_TYPE),
-            (3, FEE_TYPE),
-            (4, FEE_TYPE),
-            (5, FEE_TYPE),
-            (6, FEE_TYPE),
-            (7, FEE_TYPE),
-            (8, FEE_TYPE),
-            (9, FEE_TYPE),
-            (10, FEE_TYPE),
-            (11, FEE_TYPE),
-            (34, FEE_TYPE),
-        ];
-        test_abar(inputs, outputs, fee_amount, "abar-1-12-1");
+            let fee_t = FEE_TYPE;
+            let inputs = vec![(100 + fee_amount as u64, fee_t)];
+
+            let mut outputs = Vec::with_capacity(output_len);
+            outputs.push(((100 - output_len + 1) as u64, fee_t));
+            for _ in 0..output_len - 1 {
+                outputs.push((1, fee_t));
+            }
+
+            assert_eq!(outputs.len(), output_len);
+
+            test_abar(
+                inputs,
+                outputs,
+                fee_amount,
+                format!("abar-1-{}-1", output_len).as_str(),
+                Some(KeyType::Secp256k1),
+            );
+        }
     }
 
     fn test_abar(
@@ -580,16 +596,24 @@ mod smoke_axfr {
         outputs: Vec<(u64, AssetType)>,
         fee: u32,
         name: &str,
+        input_key_type: Option<KeyType>,
     ) {
         let mut prng = test_rng();
         let params = ProverParams::new(inputs.len(), outputs.len(), None).unwrap();
         let verifier_params = VerifierParams::load(inputs.len(), outputs.len()).unwrap();
 
-        let sender = if prng.gen() {
-            KeyPair::generate_secp256k1(&mut prng)
+        let sender = if input_key_type.is_some() {
+            match input_key_type.unwrap() {
+                KeyType::Ed25519 => KeyPair::generate_ed25519(&mut prng),
+                KeyType::Secp256k1 => KeyPair::generate_secp256k1(&mut prng),
+                _ => unimplemented!(),
+            }
+        } else if input_key_type.is_none() && prng.gen() {
+            KeyPair::generate_ed25519(&mut prng)
         } else {
             KeyPair::generate_ed25519(&mut prng)
         };
+
         let receivers: Vec<KeyPair> = (0..outputs.len())
             .map(|_| {
                 if prng.gen() {
