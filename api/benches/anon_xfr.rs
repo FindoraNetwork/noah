@@ -82,8 +82,8 @@ fn abar_to_abar(
     fee: u32,
 ) {
     let mut prng = test_rng();
-    let params = ProverParams::new(inputs.len(), outputs.len(), None).unwrap();
-    let verifier_params = VerifierParams::load(inputs.len(), outputs.len()).unwrap();
+    let params = ProverParams::gen_abar_to_abar(inputs.len(), outputs.len(), None).unwrap();
+    let verifier_params = VerifierParams::load_abar_to_abar(inputs.len(), outputs.len()).unwrap();
 
     let sender = KeyPair::generate_secp256k1(&mut prng);
     let receivers: Vec<KeyPair> = (0..outputs.len())
@@ -159,8 +159,8 @@ fn abar_to_abar(
 
 fn abar_to_ar(c: &mut Criterion) {
     let mut prng = test_rng();
-    let params = ProverParams::abar_to_ar_params(TREE_DEPTH).unwrap();
-    let verify_params = VerifierParams::abar_to_ar_params().unwrap();
+    let params = ProverParams::gen_abar_to_ar(TREE_DEPTH).unwrap();
+    let verify_params = VerifierParams::get_abar_to_ar().unwrap();
 
     let sender = KeyPair::generate_secp256k1(&mut prng);
     let receiver = KeyPair::generate_secp256k1(&mut prng);
@@ -220,8 +220,8 @@ fn abar_to_ar(c: &mut Criterion) {
 
 fn abar_to_bar(c: &mut Criterion) {
     let mut prng = test_rng();
-    let params = ProverParams::abar_to_bar_params(TREE_DEPTH).unwrap();
-    let verify_params = VerifierParams::abar_to_bar_params().unwrap();
+    let params = ProverParams::gen_abar_to_bar(TREE_DEPTH).unwrap();
+    let verify_params = VerifierParams::get_abar_to_bar().unwrap();
 
     let sender = KeyPair::generate_secp256k1(&mut prng);
     let receiver = KeyPair::generate_secp256k1(&mut prng);
@@ -289,8 +289,8 @@ fn abar_to_bar(c: &mut Criterion) {
 fn ar_to_abar(c: &mut Criterion) {
     let mut prng = test_rng();
     let pc_gens = PedersenCommitmentRistretto::default();
-    let params = ProverParams::ar_to_abar_params().unwrap();
-    let verify_params = VerifierParams::ar_to_abar_params().unwrap();
+    let params = ProverParams::gen_ar_to_abar().unwrap();
+    let verify_params = VerifierParams::get_ar_to_abar().unwrap();
 
     let sender = KeyPair::generate_secp256k1(&mut prng);
     let receiver = KeyPair::generate_secp256k1(&mut prng);
@@ -335,8 +335,8 @@ fn ar_to_abar(c: &mut Criterion) {
 fn bar_to_abar(c: &mut Criterion) {
     let mut prng = test_rng();
     let pc_gens = PedersenCommitmentRistretto::default();
-    let params = ProverParams::bar_to_abar_params().unwrap();
-    let verify_params = VerifierParams::bar_to_abar_params().unwrap();
+    let params = ProverParams::gen_bar_to_abar().unwrap();
+    let verify_params = VerifierParams::get_bar_to_abar().unwrap();
 
     let sender = KeyPair::generate_secp256k1(&mut prng);
     let receiver = KeyPair::generate_secp256k1(&mut prng);

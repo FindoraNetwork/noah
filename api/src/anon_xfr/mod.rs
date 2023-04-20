@@ -56,6 +56,7 @@ pub const TWO_POW_32: u64 = 1 << 32;
 
 pub(crate) type TurboPlonkCS = TurboCS<BLSScalar>;
 
+use crate::setup::AddressFormat;
 pub(crate) use noah_plonk::plonk::constraint_system::turbo::TurboVerifyCS;
 
 /// The Plonk proof type.
@@ -79,6 +80,17 @@ pub enum AXfrAddressFoldingWitness {
 }
 
 impl AXfrAddressFoldingWitness {
+    pub fn default(address_format: AddressFormat) -> Self {
+        match address_format {
+            AddressFormat::SECP256K1 => Self::Secp256k1(
+                address_folding_secp256k1::AXfrAddressFoldingWitnessSecp256k1::default(),
+            ),
+            AddressFormat::ED25519 => {
+                Self::Ed25519(address_folding_ed25519::AXfrAddressFoldingWitnessEd25519::default())
+            }
+        }
+    }
+
     pub(crate) fn keypair(&self) -> KeyPair {
         match self {
             AXfrAddressFoldingWitness::Secp256k1(a) => a.keypair.clone(),

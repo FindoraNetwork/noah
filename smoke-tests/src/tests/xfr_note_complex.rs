@@ -1,7 +1,7 @@
+use noah::parameters::bulletproofs::BulletproofParams;
 use noah::{
     anon_creds::{self, ac_commit, ac_sign, ac_verify_commitment, Attr, Credential},
     keys::{KeyPair, PublicKey},
-    setup::BulletproofParams,
     xfr::{
         asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
         gen_xfr_note,

@@ -245,7 +245,7 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
 
     verifier(
         &mut transcript,
-        &params.pcs,
+        &params.shrunk_vk,
         &cs,
         verifier_params,
         &online_inputs,
@@ -312,7 +312,7 @@ pub fn batch_verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default + Sync
 
             verifier(
                 &mut transcript,
-                &params.pcs,
+                &params.shrunk_vk,
                 &cs,
                 verifier_params,
                 &online_inputs,

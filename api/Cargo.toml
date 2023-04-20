@@ -1,6 +1,6 @@
 [[bin]]
 name = 'gen-params'
-path = 'src/gen-params.rs'
+path = 'src/parameters/setup.rs'
 required-features = ['gen']
 
 [[bench]]

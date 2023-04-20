@@ -1,6 +1,7 @@
 use crate::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
-use crate::field_simulation::{SimFr, SimFrParams};
+use crate::field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto};
 use merlin::Transcript;
+use noah_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 use noah_algebra::traits::PedersenCommitment;
 use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 use num_bigint::BigUint;
@@ -21,6 +22,9 @@ pub struct DelegatedSchnorrProof<S, G, P> {
     pub params_phantom: PhantomData<P>,
 }
 
+pub type DelegatedSchnorrProofRistretto =
+    DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>;
+
 #[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone)]
 /// The state of the inspector.
 pub struct DelegatedSchnorrInspection<S, G, P> {
@@ -33,6 +37,9 @@ pub struct DelegatedSchnorrInspection<S, G, P> {
     /// PhantomData for the group.
     pub group_phantom: PhantomData<G>,
 }
+
+pub type DelegatedSchnorrInspectionRistretto =
+    DelegatedSchnorrInspection<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>;
 
 impl<S: Scalar, G: Group<ScalarType = S>, P: SimFrParams> DelegatedSchnorrInspection<S, G, P> {
     /// Create a dummy new one.

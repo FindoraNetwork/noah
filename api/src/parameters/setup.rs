@@ -10,9 +10,8 @@ use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate
 use bulletproofs::BulletproofGens;
 use noah::parameters::SRS;
 use noah::setup::{
-    BulletproofParams, BulletproofURS, ProverParams, VerifierParams, VerifierParamsCommon,
-    VerifierParamsSplitCommon, ANON_XFR_BP_GENS_LEN,
-    MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER,
+    ProverParams, VerifierParams, VerifierParamsCommon, VerifierParamsSplitCommon,
+    ANON_XFR_BP_GENS_LEN, MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER,
     MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER, MAX_ANONYMOUS_RECORD_NUMBER_ONE_INPUT,
     MAX_ANONYMOUS_RECORD_NUMBER_STANDARD,
 };
@@ -26,6 +25,7 @@ use std::{collections::HashMap, path::PathBuf};
 use structopt::StructOpt;
 
 use noah::anon_xfr::TREE_DEPTH;
+use noah::parameters::bulletproofs::{BulletproofParams, BulletproofURS};
 use noah_algebra::zorro::ZorroBulletproofGens;
 use rayon::prelude::*;
 
@@ -203,7 +203,7 @@ fn gen_transfer_vk(directory: PathBuf) {
 fn gen_abar_to_bar_vk(mut path: PathBuf) {
     println!("Generating the verifying key for ABAR TO BAR ...");
 
-    let user_params = ProverParams::abar_to_bar_params(TREE_DEPTH).unwrap();
+    let user_params = ProverParams::gen_abar_to_bar(TREE_DEPTH).unwrap();
     let node_params = VerifierParams::from(user_params).shrink().unwrap();
     println!(
         "the size of the constraint system for ABAR TO BAR: {}",
@@ -223,7 +223,7 @@ fn gen_abar_to_bar_vk(mut path: PathBuf) {
 fn gen_bar_to_abar_vk(mut path: PathBuf) {
     println!("Generating the verifying key for BAR TO ABAR ...");
 
-    let user_params = ProverParams::bar_to_abar_params().unwrap();
+    let user_params = ProverParams::gen_bar_to_abar().unwrap();
     let node_params =
         VerifierParamsCommon::from_full(VerifierParams::from(user_params).shrink().unwrap());
     println!(
@@ -244,7 +244,7 @@ fn gen_bar_to_abar_vk(mut path: PathBuf) {
 fn gen_ar_to_abar_vk(mut path: PathBuf) {
     println!("Generating the verifying key for AR TO ABAR ...");
 
-    let user_params = ProverParams::ar_to_abar_params().unwrap();
+    let user_params = ProverParams::gen_ar_to_abar().unwrap();
     let node_params =
         VerifierParamsCommon::from_full(VerifierParams::from(user_params).shrink().unwrap());
     println!(
@@ -265,7 +265,7 @@ fn gen_ar_to_abar_vk(mut path: PathBuf) {
 fn gen_abar_to_ar_vk(mut path: PathBuf) {
     println!("Generating the verifying key for ABAR TO AR ...");
 
-    let user_params = ProverParams::abar_to_ar_params(TREE_DEPTH).unwrap();
+    let user_params = ProverParams::gen_abar_to_ar(TREE_DEPTH).unwrap();
     let node_params = VerifierParams::from(user_params).shrink().unwrap();
     println!(
         "the size of the constraint system for ABAR TO AR: {}",

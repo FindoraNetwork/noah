@@ -104,8 +104,8 @@ mod smoke_axfr_secp256k1_address {
     fn secp256k1_to_abar() {
         let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
-        let params = ProverParams::bar_to_abar_params().unwrap();
-        let verify_params = VerifierParams::bar_to_abar_params().unwrap();
+        let params = ProverParams::gen_bar_to_abar().unwrap();
+        let verify_params = VerifierParams::get_bar_to_abar().unwrap();
 
         let sender = KeyPair::generate_secp256k1(&mut prng);
         let receiver = KeyPair::generate_secp256k1(&mut prng);
@@ -143,10 +143,10 @@ mod smoke_axfr_secp256k1_address {
     fn address_to_abar() {
         let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
-        let params = ProverParams::ar_to_abar_params().unwrap();
-        let verify_params = VerifierParams::ar_to_abar_params().unwrap();
+        let params = ProverParams::gen_ar_to_abar().unwrap();
+        let verify_params = VerifierParams::get_ar_to_abar().unwrap();
 
-        let sender = KeyPair::generate_address(&mut prng);
+        let sender = KeyPair::sample_address(&mut prng);
         let receiver = KeyPair::generate_secp256k1(&mut prng);
 
         let (bar, memo) = build_bar(
@@ -176,11 +176,11 @@ mod smoke_axfr_secp256k1_address {
     #[test]
     fn abar_to_address() {
         let mut prng = test_rng();
-        let params = ProverParams::abar_to_ar_params(TREE_DEPTH).unwrap();
-        let verify_params = VerifierParams::abar_to_ar_params().unwrap();
+        let params = ProverParams::gen_abar_to_ar(TREE_DEPTH).unwrap();
+        let verify_params = VerifierParams::get_abar_to_ar().unwrap();
 
         let sender = KeyPair::generate_secp256k1(&mut prng);
-        let receiver = KeyPair::generate_address(&mut prng);
+        let receiver = KeyPair::sample_address(&mut prng);
 
         let fdb = MemoryDB::new();
         let cs = Arc::new(RwLock::new(ChainState::new(
@@ -224,8 +224,8 @@ mod smoke_axfr_secp256k1_address {
     #[test]
     fn abar_to_secp256k1() {
         let mut prng = test_rng();
-        let params = ProverParams::abar_to_bar_params(TREE_DEPTH).unwrap();
-        let verify_params = VerifierParams::abar_to_bar_params().unwrap();
+        let params = ProverParams::gen_abar_to_bar(TREE_DEPTH).unwrap();
+        let verify_params = VerifierParams::get_abar_to_bar().unwrap();
 
         let sender = KeyPair::generate_secp256k1(&mut prng);
         let receiver = KeyPair::generate_secp256k1(&mut prng);

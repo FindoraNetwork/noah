@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
+use noah::parameters::bulletproofs::BulletproofParams;
 use noah::{
     keys::KeyPair,
-    setup::BulletproofParams,
     xfr::{
         asset_record::AssetRecordType,
         batch_verify_xfr_notes, gen_xfr_note,

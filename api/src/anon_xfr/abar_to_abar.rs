@@ -14,11 +14,11 @@ use crate::anon_xfr::{
         OpenAnonAssetRecord, PayeeWitness, PayeeWitnessVars, PayerWitness, PayerWitnessVars,
     },
     AXfrAddressFoldingInstance, AXfrAddressFoldingWitness, AXfrPlonkPf, TurboPlonkCS, AMOUNT_LEN,
-    FEE_TYPE,
+    FEE_TYPE, TREE_DEPTH,
 };
 use crate::errors::NoahError;
 use crate::keys::{KeyPair, PublicKey, PublicKeyInner, SecretKey};
-use crate::setup::{ProverParams, VerifierParams};
+use crate::setup::{AddressFormat, ProverParams, VerifierParams};
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
 use noah_algebra::{bls12_381::BLSScalar, prelude::*};
@@ -441,7 +441,7 @@ pub(crate) fn verify_xfr(
 
     verifier(
         &mut transcript,
-        &params.pcs,
+        &params.shrunk_vk,
         &cs,
         verifier_params,
         &online_inputs,
@@ -463,7 +463,7 @@ pub struct AXfrWitness {
 
 impl AXfrWitness {
     /// Create a fake `AXfrWitness` for testing.
-    pub fn fake_secp256k1(n_payers: usize, n_payees: usize, tree_depth: usize, fee: u32) -> Self {
+    pub fn fake(n_payers: usize, n_payees: usize, fee: u32, address_format: AddressFormat) -> Self {
         let bls_zero = BLSScalar::zero();
 
         let node = MTNode {
@@ -474,53 +474,21 @@ impl AXfrWitness {
             is_mid_child: 0,
             is_right_child: 0,
         };
+
         let payer_witness = PayerWitness {
-            secret_key: SecretKey::default_secp256k1(),
+            secret_key: SecretKey::default(address_format),
             uid: 0,
             amount: 0,
             asset_type: bls_zero,
-            path: MTPath::new(vec![node; tree_depth]),
+            path: MTPath::new(vec![node; TREE_DEPTH]),
             blind: bls_zero,
         };
+
         let payee_witness = PayeeWitness {
             amount: 0,
             blind: bls_zero,
             asset_type: bls_zero,
-            public_key: PublicKey::default_secp256k1(),
-        };
-
-        AXfrWitness {
-            payers_witnesses: vec![payer_witness; n_payers],
-            payees_witnesses: vec![payee_witness; n_payees],
-            fee,
-        }
-    }
-
-    /// Create a fake `AXfrWitness` for testing.
-    pub fn fake_ed25519(n_payers: usize, n_payees: usize, tree_depth: usize, fee: u32) -> Self {
-        let bls_zero = BLSScalar::zero();
-
-        let node = MTNode {
-            left: bls_zero,
-            mid: bls_zero,
-            right: bls_zero,
-            is_left_child: 0,
-            is_mid_child: 0,
-            is_right_child: 0,
-        };
-        let payer_witness = PayerWitness {
-            secret_key: SecretKey::default_ed25519(),
-            uid: 0,
-            amount: 0,
-            asset_type: bls_zero,
-            path: MTPath::new(vec![node; tree_depth]),
-            blind: bls_zero,
-        };
-        let payee_witness = PayeeWitness {
-            amount: 0,
-            blind: bls_zero,
-            asset_type: bls_zero,
-            public_key: PublicKey::default_ed25519(),
+            public_key: PublicKey::default(address_format),
         };
 
         AXfrWitness {
@@ -1257,353 +1225,6 @@ mod tests {
             },
             input_keypair,
         )
-    }
-
-    #[test]
-    fn test_anon_xfr() {
-        let mut prng = test_rng();
-
-        let user_params = ProverParams::new(1, 1, Some(1)).unwrap();
-        let one = BLSScalar::one();
-        let two = one.add(&one);
-
-        let asset_type = FEE_TYPE;
-        let fee_amount = 65u32;
-
-        let output_amount = 1 + prng.next_u64() % 100;
-        let input_amount = output_amount + fee_amount as u64;
-
-        let keypair = KeyPair::generate_secp256k1(&mut prng);
-
-        // sample an input anonymous asset record for testing.
-        let oabar = gen_oabar_with_key(&mut prng, input_amount, asset_type, &keypair);
-        let abar = AnonAssetRecord::from_oabar(&oabar);
-        assert_eq!(keypair.get_pk(), *oabar.pub_key_ref());
-
-        let leaf = AnemoiJive381::eval_variable_length_hash(&[/*uid=*/ two, abar.commitment]);
-
-        // simulate Merkle tree state with that input record for testing.
-        let node = MTNode {
-            left: one,
-            mid: two,
-            right: leaf,
-            is_left_child: 0u8,
-            is_mid_child: 0u8,
-            is_right_child: 1u8,
-        };
-
-        let merkle_root = AnemoiJive381::eval_jive(
-            &[/*sib1[0]=*/ one, /*sib2[0]=*/ two],
-            &[leaf, ANEMOI_JIVE_381_SALTS[0]],
-        );
-
-        let mt_leaf_info = MTLeafInfo {
-            path: MTPath::new(vec![node]),
-            root: merkle_root,
-            uid: 2,
-            root_version: 0,
-        };
-
-        // sample output keys for testing.
-        let keypair_out = KeyPair::generate_secp256k1(&mut prng);
-
-        let test_hash = {
-            let mut hasher = Sha512::new();
-            let mut random_bytes = [0u8; 32];
-            prng.fill_bytes(&mut random_bytes);
-            hasher.update(&random_bytes);
-            hasher
-        };
-
-        let (note, merkle_root) = {
-            // prover scope
-            let owner_memo = oabar.get_owner_memo().unwrap();
-            let oabar_in = OpenAnonAssetRecordBuilder::from_abar(&abar, owner_memo, &keypair)
-                .unwrap()
-                .mt_leaf_info(mt_leaf_info)
-                .build()
-                .unwrap();
-            assert_eq!(input_amount, oabar_in.get_amount());
-            assert_eq!(asset_type, oabar_in.get_asset_type());
-            assert_eq!(keypair.get_pk(), oabar_in.pub_key);
-
-            let oabar_out = OpenAnonAssetRecordBuilder::new()
-                .amount(output_amount)
-                .asset_type(asset_type)
-                .pub_key(&keypair_out.get_pk())
-                .finalize(&mut prng)
-                .unwrap()
-                .build()
-                .unwrap();
-
-            let note = gen_anon_xfr_note(
-                &mut prng,
-                &user_params,
-                &[oabar_in],
-                &[oabar_out],
-                fee_amount,
-                &keypair,
-                test_hash.clone(),
-            )
-            .unwrap();
-            (note, merkle_root)
-        };
-        {
-            // owner scope
-            let oabar = OpenAnonAssetRecordBuilder::from_abar(
-                &note.body.outputs[0],
-                note.body.owner_memos[0].clone(),
-                &keypair_out,
-            )
-            .unwrap()
-            .build()
-            .unwrap();
-            assert_eq!(output_amount, oabar.get_amount());
-            assert_eq!(asset_type, oabar.get_asset_type());
-        }
-        {
-            // verifier scope
-            let verifier_params = VerifierParams::from(user_params);
-            assert!(
-                verify_anon_xfr_note(&verifier_params, &note, &merkle_root, test_hash.clone())
-                    .is_ok()
-            );
-        }
-    }
-
-    #[test]
-    fn test_anon_xfr_multi_assets() {
-        let mut prng = test_rng();
-        let n_payers = 3;
-        let n_payees = 3;
-        let user_params = ProverParams::new(n_payers, n_payees, Some(1)).unwrap();
-
-        let zero = BLSScalar::zero();
-        let one = BLSScalar::one();
-
-        let fee_amount = 15;
-
-        // generate some input records for testing.
-        let amounts_in = vec![10u64 + fee_amount, 20u64, 30u64];
-        let asset_types_in = vec![
-            FEE_TYPE,
-            AssetType::from_identical_byte(1),
-            AssetType::from_identical_byte(1),
-        ];
-        let mut in_abars = vec![];
-        let in_keypair = KeyPair::generate_secp256k1(&mut prng);
-        let mut in_owner_memos = vec![];
-        for i in 0..n_payers {
-            let oabar =
-                gen_oabar_with_key(&mut prng, amounts_in[i], asset_types_in[i], &in_keypair);
-            let abar = AnonAssetRecord::from_oabar(&oabar);
-            let owner_memo = oabar.get_owner_memo().unwrap();
-            in_abars.push(abar);
-            in_owner_memos.push(owner_memo);
-        }
-
-        let test_hash = {
-            let mut hasher = Sha512::new();
-            let mut random_bytes = [0u8; 32];
-            prng.fill_bytes(&mut random_bytes);
-            hasher.update(&random_bytes);
-            hasher
-        };
-
-        // simulate Merkle tree state with these inputs for testing.
-        let leafs: Vec<BLSScalar> = in_abars
-            .iter()
-            .enumerate()
-            .map(|(uid, in_abar)| {
-                AnemoiJive381::eval_variable_length_hash(&[
-                    BLSScalar::from(uid as u32),
-                    in_abar.commitment,
-                ])
-            })
-            .collect();
-        let node0 = MTNode {
-            left: leafs[0],
-            mid: leafs[1],
-            right: leafs[2],
-            is_left_child: 1u8,
-            is_mid_child: 0u8,
-            is_right_child: 0u8,
-        };
-        let node1 = MTNode {
-            left: leafs[0],
-            mid: leafs[1],
-            right: leafs[2],
-            is_left_child: 0u8,
-            is_mid_child: 1u8,
-            is_right_child: 0u8,
-        };
-        let node2 = MTNode {
-            left: leafs[0],
-            mid: leafs[1],
-            right: leafs[2],
-            is_left_child: 0u8,
-            is_mid_child: 0u8,
-            is_right_child: 1u8,
-        };
-        let nodes = vec![node0, node1, node2];
-        let merkle_root =
-            AnemoiJive381::eval_jive(&[leafs[0], leafs[1]], &[leafs[2], ANEMOI_JIVE_381_SALTS[0]]);
-
-        // generate some output records for testing.
-        let keypairs_out = gen_keys(&mut prng, n_payees);
-        let amounts_out = vec![5u64, 5u64, 50u64];
-        let asset_types_out = vec![FEE_TYPE, FEE_TYPE, AssetType::from_identical_byte(1)];
-        let mut outputs = vec![];
-        for i in 0..n_payees {
-            outputs.push(
-                OpenAnonAssetRecordBuilder::new()
-                    .amount(amounts_out[i])
-                    .asset_type(asset_types_out[i])
-                    .pub_key(&keypairs_out[i].get_pk())
-                    .finalize(&mut prng)
-                    .unwrap()
-                    .build()
-                    .unwrap(),
-            );
-        }
-
-        let (note, merkle_root) = {
-            // prover scope
-            let mut open_abars_in: Vec<OpenAnonAssetRecord> = (0..n_payers)
-                .map(|uid| {
-                    let mt_leaf_info = MTLeafInfo {
-                        path: MTPath {
-                            nodes: vec![nodes[uid].clone()],
-                        },
-                        root: merkle_root,
-                        uid: uid as u64,
-                        root_version: 0,
-                    };
-                    let open_abar_in = OpenAnonAssetRecordBuilder::from_abar(
-                        &in_abars[uid],
-                        in_owner_memos[uid].clone(),
-                        &in_keypair,
-                    )
-                    .unwrap()
-                    .mt_leaf_info(mt_leaf_info)
-                    .build()
-                    .unwrap();
-                    assert_eq!(amounts_in[uid], open_abar_in.amount);
-                    assert_eq!(asset_types_in[uid], open_abar_in.asset_type);
-                    open_abar_in
-                })
-                .collect();
-
-            let open_abars_out = (0..n_payees)
-                .map(|i| {
-                    OpenAnonAssetRecordBuilder::new()
-                        .amount(amounts_out[i])
-                        .asset_type(asset_types_out[i])
-                        .pub_key(&keypairs_out[i].get_pk())
-                        .finalize(&mut prng)
-                        .unwrap()
-                        .build()
-                        .unwrap()
-                })
-                .collect_vec();
-
-            // empty inputs/outputs
-            msg_eq!(
-                NoahError::AXfrProverParamsError,
-                gen_anon_xfr_note(
-                    &mut prng,
-                    &user_params,
-                    &[],
-                    &open_abars_out,
-                    15,
-                    &in_keypair,
-                    test_hash.clone()
-                )
-                .unwrap_err(),
-            );
-            msg_eq!(
-                NoahError::AXfrProverParamsError,
-                gen_anon_xfr_note(
-                    &mut prng,
-                    &user_params,
-                    &open_abars_in,
-                    &[],
-                    15,
-                    &in_keypair,
-                    test_hash.clone()
-                )
-                .unwrap_err(),
-            );
-            // invalid inputs/outputs
-            open_abars_in[0].amount += 1;
-            assert!(gen_anon_xfr_note(
-                &mut prng,
-                &user_params,
-                &open_abars_in,
-                &open_abars_out,
-                15,
-                &in_keypair,
-                test_hash.clone()
-            )
-            .is_err());
-            open_abars_in[0].amount -= 1;
-            // inconsistent roots
-            let mut mt_info = open_abars_in[0].mt_leaf_info.clone().unwrap();
-            mt_info.root.add_assign(&one);
-            open_abars_in[0].mt_leaf_info = Some(mt_info);
-            assert!(gen_anon_xfr_note(
-                &mut prng,
-                &user_params,
-                &open_abars_in,
-                &open_abars_out,
-                15,
-                &in_keypair,
-                test_hash.clone()
-            )
-            .is_err());
-            let mut mt_info = open_abars_in[0].mt_leaf_info.clone().unwrap();
-            mt_info.root.sub_assign(&one);
-            open_abars_in[0].mt_leaf_info = Some(mt_info);
-
-            let note = gen_anon_xfr_note(
-                &mut prng,
-                &user_params,
-                &open_abars_in,
-                &open_abars_out,
-                15,
-                &in_keypair,
-                test_hash.clone(),
-            )
-            .unwrap();
-            (note, merkle_root)
-        };
-        {
-            // owner scope
-            for i in 0..n_payees {
-                let oabar_out = OpenAnonAssetRecordBuilder::from_abar(
-                    &note.body.outputs[i],
-                    note.body.owner_memos[i].clone(),
-                    &keypairs_out[i],
-                )
-                .unwrap()
-                .build()
-                .unwrap();
-                assert_eq!(amounts_out[i], oabar_out.amount);
-                assert_eq!(asset_types_out[i], oabar_out.asset_type);
-            }
-        }
-        {
-            // verifier scope
-            let verifier_params = VerifierParams::from(user_params);
-            assert!(
-                verify_anon_xfr_note(&verifier_params, &note, &merkle_root, test_hash.clone())
-                    .is_ok()
-            );
-            // inconsistent merkle roots
-            assert!(
-                verify_anon_xfr_note(&verifier_params, &note, &zero, test_hash.clone()).is_err()
-            );
-        }
     }
 
     #[test]

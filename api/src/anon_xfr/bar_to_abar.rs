@@ -369,7 +369,7 @@ pub(crate) fn verify_inspection(
 
     verifier(
         &mut transcript,
-        &params.pcs,
+        &params.shrunk_vk,
         &cs,
         verifier_params,
         &online_inputs,

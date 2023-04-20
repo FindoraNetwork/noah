@@ -117,8 +117,8 @@ mod smoke_axfr_wasm {
         let seed: [u8; 32] = [0u8; 32];
         let mut prng = ChaChaRng::from_seed(seed);
         let pc_gens = PedersenCommitmentRistretto::default();
-        let params = ProverParams::ar_to_abar_params().unwrap();
-        let verify_params = VerifierParams::ar_to_abar_params().unwrap();
+        let params = ProverParams::gen_ar_to_abar().unwrap();
+        let verify_params = VerifierParams::get_ar_to_abar().unwrap();
 
         let (bar, memo) = build_bar(
             &sender.get_pk(),
@@ -150,8 +150,8 @@ mod smoke_axfr_wasm {
         let seed: [u8; 32] = [0u8; 32];
         let mut prng = ChaChaRng::from_seed(seed);
         let pc_gens = PedersenCommitmentRistretto::default();
-        let params = ProverParams::bar_to_abar_params().unwrap();
-        let verify_params = VerifierParams::bar_to_abar_params().unwrap();
+        let params = ProverParams::gen_bar_to_abar().unwrap();
+        let verify_params = VerifierParams::get_bar_to_abar().unwrap();
 
         let (bar, memo) = build_bar(
             &sender.get_pk(),
@@ -188,8 +188,8 @@ mod smoke_axfr_wasm {
     fn abar_to_ar(sender: KeyPair, receiver: KeyPair) {
         let seed: [u8; 32] = [0u8; 32];
         let mut prng = ChaChaRng::from_seed(seed);
-        let params = ProverParams::abar_to_ar_params(TREE_DEPTH).unwrap();
-        let verify_params = VerifierParams::abar_to_ar_params().unwrap();
+        let params = ProverParams::gen_abar_to_ar(TREE_DEPTH).unwrap();
+        let verify_params = VerifierParams::get_abar_to_ar().unwrap();
 
         let mut mt = EphemeralMerkleTree::new().unwrap();
 
@@ -236,8 +236,8 @@ mod smoke_axfr_wasm {
     fn abar_to_bar(sender: KeyPair, receiver: KeyPair) {
         let seed: [u8; 32] = [0u8; 32];
         let mut prng = ChaChaRng::from_seed(seed);
-        let params = ProverParams::abar_to_bar_params(TREE_DEPTH).unwrap();
-        let verify_params = VerifierParams::abar_to_bar_params().unwrap();
+        let params = ProverParams::gen_abar_to_bar(TREE_DEPTH).unwrap();
+        let verify_params = VerifierParams::get_abar_to_bar().unwrap();
 
         let mut mt = EphemeralMerkleTree::new().unwrap();
 
@@ -289,8 +289,9 @@ mod smoke_axfr_wasm {
     fn test_abar(inputs: Vec<(u64, AssetType)>, outputs: Vec<(u64, AssetType)>, fee: u32) {
         let seed: [u8; 32] = [0u8; 32];
         let mut prng = ChaChaRng::from_seed(seed);
-        let params = ProverParams::new(inputs.len(), outputs.len(), None).unwrap();
-        let verifier_params = VerifierParams::load(inputs.len(), outputs.len()).unwrap();
+        let params = ProverParams::gen_abar_to_abar(inputs.len(), outputs.len(), None).unwrap();
+        let verifier_params =
+            VerifierParams::load_abar_to_abar(inputs.len(), outputs.len()).unwrap();
 
         let sender = if prng.gen() {
             KeyPair::generate_secp256k1(&mut prng)

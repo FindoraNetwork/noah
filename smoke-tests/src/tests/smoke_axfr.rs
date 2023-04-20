@@ -128,8 +128,8 @@ mod smoke_axfr {
     fn ar_to_abar(sender: KeyPair, receiver: KeyPair) {
         let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
-        let params = ProverParams::ar_to_abar_params().unwrap();
-        let verify_params = VerifierParams::ar_to_abar_params().unwrap();
+        let params = ProverParams::gen_ar_to_abar().unwrap();
+        let verify_params = VerifierParams::get_ar_to_abar().unwrap();
 
         let (bar, memo) = build_bar(
             &sender.get_pk(),
@@ -180,8 +180,8 @@ mod smoke_axfr {
     fn bar_to_abar(sender: KeyPair, receiver: KeyPair) {
         let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
-        let params = ProverParams::bar_to_abar_params().unwrap();
-        let verify_params = VerifierParams::bar_to_abar_params().unwrap();
+        let params = ProverParams::gen_bar_to_abar().unwrap();
+        let verify_params = VerifierParams::get_bar_to_abar().unwrap();
 
         let (bar, memo) = build_bar(
             &sender.get_pk(),
@@ -241,8 +241,8 @@ mod smoke_axfr {
 
     fn abar_to_ar(sender: KeyPair, receiver: KeyPair) {
         let mut prng = test_rng();
-        let params = ProverParams::abar_to_ar_params(TREE_DEPTH).unwrap();
-        let verify_params = VerifierParams::abar_to_ar_params().unwrap();
+        let params = ProverParams::gen_abar_to_ar(TREE_DEPTH).unwrap();
+        let verify_params = VerifierParams::get_abar_to_ar().unwrap();
 
         let fdb = MemoryDB::new();
         let cs = Arc::new(RwLock::new(ChainState::new(fdb, "abar_ar".to_owned(), 0)));
@@ -348,8 +348,8 @@ mod smoke_axfr {
 
     fn abar_to_bar(sender: KeyPair, receiver: KeyPair) {
         let mut prng = test_rng();
-        let params = ProverParams::abar_to_bar_params(TREE_DEPTH).unwrap();
-        let verify_params = VerifierParams::abar_to_bar_params().unwrap();
+        let params = ProverParams::gen_abar_to_bar(TREE_DEPTH).unwrap();
+        let verify_params = VerifierParams::get_abar_to_bar().unwrap();
 
         let fdb = MemoryDB::new();
         let cs = Arc::new(RwLock::new(ChainState::new(fdb, "abar_bar".to_owned(), 0)));
@@ -599,8 +599,9 @@ mod smoke_axfr {
         input_key_type: Option<KeyType>,
     ) {
         let mut prng = test_rng();
-        let params = ProverParams::new(inputs.len(), outputs.len(), None).unwrap();
-        let verifier_params = VerifierParams::load(inputs.len(), outputs.len()).unwrap();
+        let params = ProverParams::gen_abar_to_abar(inputs.len(), outputs.len(), None).unwrap();
+        let verifier_params =
+            VerifierParams::load_abar_to_abar(inputs.len(), outputs.len()).unwrap();
 
         let sender = if input_key_type.is_some() {
             match input_key_type.unwrap() {

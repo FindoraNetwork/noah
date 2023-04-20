@@ -101,8 +101,8 @@ mod smoke_axfr_compatibility {
 
     fn ar_to_abar(bar: &BlindAssetRecord, sender: &KeyPair) {
         let mut prng = test_rng();
-        let params = ProverParams::ar_to_abar_params().unwrap();
-        let verify_params = VerifierParams::ar_to_abar_params().unwrap();
+        let params = ProverParams::gen_ar_to_abar().unwrap();
+        let verify_params = VerifierParams::get_ar_to_abar().unwrap();
         let receiver = if prng.gen() {
             KeyPair::generate_secp256k1(&mut prng)
         } else {
@@ -123,7 +123,7 @@ mod smoke_axfr_compatibility {
         "##;
 
         let note: ArToAbarNote = serde_json::from_str(&note).unwrap();
-        let verify_params = VerifierParams::ar_to_abar_params().unwrap();
+        let verify_params = VerifierParams::get_ar_to_abar().unwrap();
         assert!(verify_ar_to_abar_note(&verify_params, &note).is_ok());
     }
 
@@ -134,7 +134,7 @@ mod smoke_axfr_compatibility {
         "##;
 
         let note: ArToAbarNote = serde_json::from_str(&note).unwrap();
-        let verify_params = VerifierParams::ar_to_abar_params().unwrap();
+        let verify_params = VerifierParams::get_ar_to_abar().unwrap();
         assert!(verify_ar_to_abar_note(&verify_params, &note).is_ok());
     }
 
@@ -212,8 +212,8 @@ mod smoke_axfr_compatibility {
 
     fn bar_to_abar(bar: &BlindAssetRecord, sender: &KeyPair, memo: OwnerMemo) {
         let mut prng = test_rng();
-        let params = ProverParams::bar_to_abar_params().unwrap();
-        let verify_params = VerifierParams::bar_to_abar_params().unwrap();
+        let params = ProverParams::gen_bar_to_abar().unwrap();
+        let verify_params = VerifierParams::get_bar_to_abar().unwrap();
         let receiver = if prng.gen() {
             KeyPair::generate_secp256k1(&mut prng)
         } else {
@@ -234,7 +234,7 @@ mod smoke_axfr_compatibility {
         "##;
 
         let note: BarToAbarNote = serde_json::from_str(&note).unwrap();
-        let verify_params = VerifierParams::bar_to_abar_params().unwrap();
+        let verify_params = VerifierParams::get_bar_to_abar().unwrap();
         assert!(
             verify_bar_to_abar_note(&verify_params, &note, &note.body.input.public_key).is_ok()
         );
@@ -247,7 +247,7 @@ mod smoke_axfr_compatibility {
         "##;
 
         let note: BarToAbarNote = serde_json::from_str(&note).unwrap();
-        let verify_params = VerifierParams::bar_to_abar_params().unwrap();
+        let verify_params = VerifierParams::get_bar_to_abar().unwrap();
         assert!(
             verify_bar_to_abar_note(&verify_params, &note, &note.body.input.public_key).is_ok()
         );
@@ -303,8 +303,8 @@ mod smoke_axfr_compatibility {
 
     fn abar_to_ar(abar: &AnonAssetRecord, sender: &KeyPair, memo: AxfrOwnerMemo) {
         let mut prng = test_rng();
-        let params = ProverParams::abar_to_ar_params(TREE_DEPTH).unwrap();
-        let verify_params = VerifierParams::abar_to_ar_params().unwrap();
+        let params = ProverParams::gen_abar_to_ar(TREE_DEPTH).unwrap();
+        let verify_params = VerifierParams::get_abar_to_ar().unwrap();
         let receiver = if prng.gen() {
             KeyPair::generate_secp256k1(&mut prng)
         } else {
@@ -345,7 +345,7 @@ mod smoke_axfr_compatibility {
         "##;
 
         let note: AbarToArNote = serde_json::from_str(&note).unwrap();
-        let verify_params = VerifierParams::abar_to_ar_params().unwrap();
+        let verify_params = VerifierParams::get_abar_to_ar().unwrap();
         let hash = random_hasher([
             241, 186, 249, 60, 168, 224, 173, 197, 192, 187, 220, 252, 3, 56, 210, 206, 187, 12,
             48, 155, 105, 220, 133, 237, 185, 85, 134, 16, 232, 120, 99, 154,
@@ -366,7 +366,7 @@ mod smoke_axfr_compatibility {
         "##;
 
         let note: AbarToArNote = serde_json::from_str(&note).unwrap();
-        let verify_params = VerifierParams::abar_to_ar_params().unwrap();
+        let verify_params = VerifierParams::get_abar_to_ar().unwrap();
         let hash = random_hasher([
             30, 204, 102, 168, 9, 56, 84, 47, 97, 209, 18, 102, 12, 111, 225, 139, 239, 211, 191,
             148, 101, 135, 14, 164, 178, 16, 160, 87, 97, 173, 95, 13,
@@ -432,8 +432,8 @@ mod smoke_axfr_compatibility {
 
     fn abar_to_bar(abar: &AnonAssetRecord, sender: &KeyPair, memo: AxfrOwnerMemo) {
         let mut prng = test_rng();
-        let params = ProverParams::abar_to_bar_params(TREE_DEPTH).unwrap();
-        let verify_params = VerifierParams::abar_to_bar_params().unwrap();
+        let params = ProverParams::gen_abar_to_bar(TREE_DEPTH).unwrap();
+        let verify_params = VerifierParams::get_abar_to_bar().unwrap();
         let receiver = if prng.gen() {
             KeyPair::generate_secp256k1(&mut prng)
         } else {
@@ -479,7 +479,7 @@ mod smoke_axfr_compatibility {
         "##;
 
         let note: AbarToBarNote = serde_json::from_str(&note).unwrap();
-        let verify_params = VerifierParams::abar_to_bar_params().unwrap();
+        let verify_params = VerifierParams::get_abar_to_bar().unwrap();
         let hash = random_hasher([
             88, 54, 39, 9, 155, 198, 62, 245, 197, 80, 27, 67, 191, 205, 21, 159, 35, 109, 28, 155,
             108, 125, 183, 223, 13, 99, 24, 250, 121, 106, 252, 30,
@@ -500,7 +500,7 @@ mod smoke_axfr_compatibility {
         "##;
 
         let note: AbarToBarNote = serde_json::from_str(&note).unwrap();
-        let verify_params = VerifierParams::abar_to_bar_params().unwrap();
+        let verify_params = VerifierParams::get_abar_to_bar().unwrap();
         let hash = random_hasher([
             28, 41, 9, 130, 81, 12, 91, 68, 78, 207, 113, 228, 151, 226, 138, 166, 182, 174, 218,
             123, 40, 236, 194, 38, 89, 94, 177, 178, 222, 156, 84, 130,
@@ -627,7 +627,7 @@ mod smoke_axfr_compatibility {
         "##;
 
         let note: AXfrNote = serde_json::from_str(&note).unwrap();
-        let verifier_params = VerifierParams::load(6, 6).unwrap();
+        let verifier_params = VerifierParams::load_abar_to_abar(6, 6).unwrap();
         let hash = random_hasher([
             37, 41, 106, 44, 72, 19, 255, 171, 127, 181, 198, 56, 77, 3, 238, 59, 13, 22, 190, 62,
             57, 65, 217, 83, 111, 232, 23, 186, 18, 76, 154, 57,
@@ -648,7 +648,7 @@ mod smoke_axfr_compatibility {
         "##;
 
         let note: AXfrNote = serde_json::from_str(&note).unwrap();
-        let verifier_params = VerifierParams::load(8, 3).unwrap();
+        let verifier_params = VerifierParams::load_abar_to_abar(8, 3).unwrap();
         let hash = random_hasher([
             252, 249, 49, 82, 187, 135, 100, 24, 119, 27, 185, 206, 245, 67, 28, 9, 129, 119, 6,
             21, 110, 193, 122, 238, 209, 126, 203, 149, 73, 135, 213, 177,
@@ -669,8 +669,9 @@ mod smoke_axfr_compatibility {
         outputs: Vec<(u64, AssetType)>,
     ) {
         let mut prng = test_rng();
-        let params = ProverParams::new(abars.len(), outputs.len(), None).unwrap();
-        let verifier_params = VerifierParams::load(abars.len(), outputs.len()).unwrap();
+        let params = ProverParams::gen_abar_to_abar(abars.len(), outputs.len(), None).unwrap();
+        let verifier_params =
+            VerifierParams::load_abar_to_abar(abars.len(), outputs.len()).unwrap();
 
         let receivers: Vec<KeyPair> = (0..outputs.len())
             .map(|_| {

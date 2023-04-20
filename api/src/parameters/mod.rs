@@ -1,5 +1,8 @@
 use noah_algebra::collections::BTreeMap;
 
+/// Parameters for Bulletproofs.
+pub mod bulletproofs;
+
 #[cfg(not(feature = "no_urs"))]
 /// The Bulletproofs(over the Curve25519 curve) URS.
 pub static BULLETPROOF_CURVE25519_URS: Option<&'static [u8]> = Some(include_bytes!(
@@ -44,25 +47,44 @@ pub static VERIFIER_COMMON_PARAMS: Option<&'static [u8]> =
 
 #[cfg(feature = "no_vk")]
 /// The common part of the verifier parameters for anonymous transfer.
-pub static VERIFIER_COMMON_PARAMS: Option<&'static [u8]> = None;
+pub static ABAR_TO_ABAR_VERIFIER_COMMON_PARAMS: Option<&'static [u8]> = None;
 
 #[cfg(not(feature = "no_vk"))]
-/// The specific part of the verifier parameters for anonymous transfer.
-pub static VERIFIER_SPECIFIC_PARAMS: Option<&'static [u8]> =
-    Some(include_bytes!("../parameters/transfer-vk-specific.bin"));
-
-#[cfg(feature = "no_vk")]
-/// The specific part of the verifier parameters for anonymous transfer.
-pub static VERIFIER_SPECIFIC_PARAMS: Option<&'static [u8]> = None;
+/// The specific part of the verifier parameters for ed25519 anonymous transfer.
+pub static ABAR_TO_ABAR_VERIFIER_ED25519_SPECIFIC_PARAMS: Option<&'static [u8]> = Some(
+    include_bytes!("../parameters/transfer-vk-ed25519-specific.bin"),
+);
 
 #[cfg(not(feature = "no_vk"))]
-/// The verifier parameters for anonymous to confidential.
-pub static ABAR_TO_BAR_VERIFIER_PARAMS: Option<&'static [u8]> =
-    Some(include_bytes!("../parameters/abar-to-bar-vk.bin"));
+/// The specific part of the verifier parameters for secp256k1 anonymous transfer.
+pub static ABAR_TO_ABAR_VERIFIER_SECP256K1_SPECIFIC_PARAMS: Option<&'static [u8]> = Some(
+    include_bytes!("../parameters/transfer-vk-secp256k1-specific.bin"),
+);
+
+#[cfg(feature = "no_vk")]
+/// The specific part of the verifier parameters for ed25519 anonymous transfer.
+pub static ABAR_TO_ABAR_VERIFIER_ED25519_SPECIFIC_PARAMS: Option<&'static [u8]> = None;
+
+/// The specific part of the verifier parameters for secp256k1 anonymous transfer.
+pub static ABAR_TO_ABAR_VERIFIER_SECP256K1_SPECIFIC_PARAMS: Option<&'static [u8]> = None;
+
+#[cfg(not(feature = "no_vk"))]
+/// The verifier parameters for ed25519 anonymous to confidential.
+pub static ABAR_TO_BAR_ED25519_VERIFIER_PARAMS: Option<&'static [u8]> =
+    Some(include_bytes!("../parameters/abar-to-bar-vk-ed25519.bin"));
 
 #[cfg(feature = "no_vk")]
 /// The verifier parameters for anonymous to confidential.
-pub static ABAR_TO_BAR_VERIFIER_PARAMS: Option<&'static [u8]> = None;
+pub static ABAR_TO_BAR_ED25519_VERIFIER_PARAMS: Option<&'static [u8]> = None;
+
+#[cfg(not(feature = "no_vk"))]
+/// The verifier parameters for secp256k1 anonymous to confidential.
+pub static ABAR_TO_BAR_SECP256K1_VERIFIER_PARAMS: Option<&'static [u8]> =
+    Some(include_bytes!("../parameters/abar-to-bar-vk-secp256k1.bin"));
+
+#[cfg(feature = "no_vk")]
+/// The verifier parameters for anonymous to confidential.
+pub static ABAR_TO_BAR_SECP256K1_VERIFIER_PARAMS: Option<&'static [u8]> = None;
 
 #[cfg(not(feature = "no_vk"))]
 /// The verifier parameters for confidential to anonymous.
@@ -83,13 +105,22 @@ pub static AR_TO_ABAR_VERIFIER_PARAMS: Option<&'static [u8]> =
 pub static AR_TO_ABAR_VERIFIER_PARAMS: Option<&'static [u8]> = None;
 
 #[cfg(not(feature = "no_vk"))]
-/// The verifier parameters for anonymous to transparent.
-pub static ABAR_TO_AR_VERIFIER_PARAMS: Option<&'static [u8]> =
-    Some(include_bytes!("../parameters/abar-to-ar-vk.bin"));
+/// The verifier parameters for ed25519 anonymous to transparent.
+pub static ABAR_TO_AR_ED25519_VERIFIER_PARAMS: Option<&'static [u8]> =
+    Some(include_bytes!("../parameters/abar-to-ar-vk-ed25519.bin"));
 
 #[cfg(feature = "no_vk")]
-/// The verifier parameters for anonymous to transparent.
-pub static ABAR_TO_AR_VERIFIER_PARAMS: Option<&'static [u8]> = None;
+/// The verifier parameters for ed25519 anonymous to transparent.
+pub static ABAR_TO_AR_ED25519_VERIFIER_PARAMS: Option<&'static [u8]> = None;
+
+#[cfg(not(feature = "no_vk"))]
+/// The verifier parameters for secp256k1 anonymous to transparent.
+pub static ABAR_TO_AR_SECP256K1_VERIFIER_PARAMS: Option<&'static [u8]> =
+    Some(include_bytes!("../parameters/abar-to-ar-vk-secp256k1.bin"));
+
+#[cfg(feature = "no_vk")]
+/// The verifier parameters for secp256k1 anonymous to transparent.
+pub static ABAR_TO_AR_SECP256K1_VERIFIER_PARAMS: Option<&'static [u8]> = None;
 
 #[cfg(feature = "no_srs")]
 lazy_static! {

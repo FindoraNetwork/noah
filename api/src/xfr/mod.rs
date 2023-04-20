@@ -28,7 +28,7 @@ pub(crate) mod tests;
 
 use crate::anon_creds::{ACCommitment, Attr};
 use crate::keys::{KeyPair, MultiSig, PublicKey, PublicKeyInner, SecretKey};
-use crate::setup::BulletproofParams;
+use crate::parameters::bulletproofs::BulletproofParams;
 
 use self::{
     asset_mixer::{
@@ -128,7 +128,7 @@ impl XfrType {
 /// use noah::xfr::{gen_xfr_note, verify_xfr_note, XfrNotePolicies};
 /// use noah_algebra::prelude::*;
 /// use ruc::err::*;
-/// use noah::setup::BulletproofParams;
+/// use noah::parameters::bulletproofs::BulletproofParams;
 ///
 /// let mut prng = ChaChaRng::from_seed([0u8; 32]);
 /// let mut params = BulletproofParams::default();
@@ -206,7 +206,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
 /// use noah::xfr::structs::{AssetRecordTemplate, AssetRecord, AssetType};
 /// use noah::xfr::asset_record::AssetRecordType;
 /// use noah::xfr::{gen_xfr_body, verify_xfr_body, XfrNotePolicies, XfrNotePoliciesRef};
-/// use noah::setup::BulletproofParams;
+/// use noah::parameters::bulletproofs::BulletproofParams;
 ///
 /// let mut prng = ChaChaRng::from_seed([0u8; 32]);
 /// let mut params = BulletproofParams::default();

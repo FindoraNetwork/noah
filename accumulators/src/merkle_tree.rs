@@ -7,20 +7,17 @@ use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381
 use storage::db::MerkleDB;
 use storage::store::{ImmutablePrefixedStore, PrefixedStore, Stated, Store};
 
-// ceil(log(u32::MAX, 3)) = 21
-// 3^0 + 3^1 + 3^2 + ... 3^20 < 2^64 (u64 can include all leaf & ancestor)
-// store max num is 3^20 = 3486784401 (max uid = 3^20 - 1)
+// 3^0 + 3^1 + 3^2 + ... 3^40 < 2^64 (u64 can include all leaf & ancestor)
+// store max num is 3^40 = 12157665459056928801 (max uid = 3^40 - 1)
 // sid   max num is 2^64 = 18446744073709551616 (max uid = 2^64 - 1)
 
 /// default merkle tree depth.
-pub const TREE_DEPTH: usize = 20;
+pub const TREE_DEPTH: usize = 40;
 
-// 1743392200 = 3^0 + 3^1 + 3^2 + ... 3^19, if change TREE_DEPTH, MUST update.
-const LEAF_START: u64 = 1743392200;
+// 6078832729528464400 = 3^0 + 3^1 + 3^2 + ... 3^39, if change TREE_DEPTH, MUST update.
+const LEAF_START: u64 = 6078832729528464400;
 
 const KEY_PAD: [u8; 4] = [0, 0, 0, 0];
-const ROOT_KEY: [u8; 12] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
-// KEY_PAD + 0u64
 const ENTRY_COUNT_KEY: [u8; 4] = [0, 0, 0, 1];
 
 ///
@@ -69,7 +66,6 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
             ];
             entry_count = u64::from_be_bytes(array);
         } else {
-            store.set(&ROOT_KEY, BLSScalar::zero().noah_to_bytes())?;
             store.set(&ENTRY_COUNT_KEY, 0u64.to_be_bytes().to_vec())?;
 
             if !store.state_mut().cache_mut().good2_commit() {
@@ -439,7 +435,6 @@ impl EphemeralMerkleTree {
         let entry_count = 0;
         let mut store = HashMap::<Vec<u8>, Vec<u8>>::new();
 
-        store.insert(ROOT_KEY.to_vec(), BLSScalar::zero().noah_to_bytes());
         store.insert(ENTRY_COUNT_KEY.to_vec(), 0u64.to_be_bytes().to_vec());
 
         Ok(EphemeralMerkleTree { entry_count, store })
@@ -765,22 +760,42 @@ mod tests {
             assert_eq!(*path, TreePath::Left);
         }
 
-        let tmp = get_path_keys(1_000_000);
+        let tmp = get_path_keys(1_002_003_004_005);
         let tmp_path: Vec<TreePath> = tmp.iter().map(|(_, p)| *p).collect();
         let tmp_right = vec![
-            TreePath::Middle,
             TreePath::Left,
-            TreePath::Left,
-            TreePath::Right,
-            TreePath::Left,
-            TreePath::Right,
-            TreePath::Left,
-            TreePath::Middle,
-            TreePath::Right,
             TreePath::Right,
             TreePath::Middle,
             TreePath::Right,
+            TreePath::Left,
             TreePath::Middle,
+            TreePath::Left,
+            TreePath::Right,
+            TreePath::Middle,
+            TreePath::Right,
+            TreePath::Left,
+            TreePath::Middle,
+            TreePath::Right,
+            TreePath::Right,
+            TreePath::Left,
+            TreePath::Left,
+            TreePath::Left,
+            TreePath::Middle,
+            TreePath::Left,
+            TreePath::Middle,
+            TreePath::Right,
+            TreePath::Right,
+            TreePath::Middle,
+            TreePath::Middle,
+            TreePath::Left,
+            TreePath::Middle,
+            TreePath::Left,
+            TreePath::Left,
+            TreePath::Left,
+            TreePath::Left,
+            TreePath::Left,
+            TreePath::Left,
+            TreePath::Left,
             TreePath::Left,
             TreePath::Left,
             TreePath::Left,
@@ -792,7 +807,7 @@ mod tests {
         ];
         assert_eq!(tmp_path, tmp_right);
 
-        let last_keys = get_path_keys(3u64.pow(20) - 1);
+        let last_keys = get_path_keys(3u64.pow(40) - 1);
         let mut last_sum = 0u64;
         for (i, (key, path)) in last_keys.iter().rev().enumerate() {
             last_sum += 3u64.pow(i as u32);

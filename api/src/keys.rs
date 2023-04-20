@@ -1,3 +1,4 @@
+use crate::setup::AddressFormat;
 use ark_ff::{BigInteger, PrimeField};
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use digest::consts::U64;
@@ -167,14 +168,9 @@ impl NoahFromToBytes for PublicKey {
 }
 
 impl PublicKey {
-    /// Default secp256k1 public key
-    pub fn default_secp256k1() -> Self {
-        SecretKey::default_secp256k1().into_keypair().pub_key
-    }
-
-    /// Default ed25519 public key
-    pub fn default_ed25519() -> Self {
-        SecretKey::default_ed25519().into_keypair().pub_key
+    /// Default public key
+    pub fn default(address_format: AddressFormat) -> Self {
+        SecretKey::default(address_format).into_keypair().pub_key
     }
 
     /// Get the reference of the inner type
@@ -402,15 +398,15 @@ impl NoahFromToBytes for SecretKey {
 }
 
 impl SecretKey {
-    /// Default secp256k1 secret key
-    pub fn default_secp256k1() -> Self {
-        SecretKey::Secp256k1(Secp256k1SecretKey::default())
-    }
-
-    /// Default ed25519 secret key
-    pub fn default_ed25519() -> Self {
-        let default_bytes = [0u8; 32];
-        SecretKey::Ed25519(Ed25519SecretKey::from_bytes(&default_bytes).unwrap())
+    /// Default secret key
+    pub fn default(address_format: AddressFormat) -> Self {
+        match address_format {
+            AddressFormat::SECP256K1 => Self::Secp256k1(Secp256k1SecretKey::default()),
+            AddressFormat::ED25519 => {
+                let default_bytes = [0u8; 32];
+                SecretKey::Ed25519(Ed25519SecretKey::from_bytes(&default_bytes).unwrap())
+            }
+        }
     }
 
     /// Change to algebra secp256k1 Point
@@ -586,12 +582,24 @@ impl KeyPair {
         }
     }
 
-    /// Generate a Ed25519 key pair.
-    pub fn generate_ed25519<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
-        let kp = ed25519_dalek::Keypair::generate(prng);
-        KeyPair {
-            pub_key: PublicKey(PublicKeyInner::Ed25519(kp.public)),
-            sec_key: SecretKey::Ed25519(kp.secret_key()),
+    /// Generate a random key pair.
+    pub fn sample<R: CryptoRng + RngCore>(prng: &mut R, address_format: AddressFormat) -> Self {
+        match address_format {
+            AddressFormat::SECP256K1 => {
+                let sk = Secp256k1SecretKey::random(prng);
+                let pk = Secp256k1PublicKey::from_secret_key(&sk);
+                KeyPair {
+                    pub_key: PublicKey(PublicKeyInner::Secp256k1(pk)),
+                    sec_key: SecretKey::Secp256k1(sk),
+                }
+            }
+            AddressFormat::ED25519 => {
+                let kp = ed25519_dalek::Keypair::generate(prng);
+                KeyPair {
+                    pub_key: PublicKey(PublicKeyInner::Ed25519(kp.public)),
+                    sec_key: SecretKey::Ed25519(kp.secret_key()),
+                }
+            }
         }
     }
 
@@ -613,18 +621,6 @@ impl KeyPair {
             pub_key: PublicKey(PublicKeyInner::Secp256k1(pk)),
             sec_key: SecretKey::Secp256k1(sk),
         })
-    }
-
-    /// Generate a Secp256k1 key pair with address.
-    pub fn generate_address<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
-        let sk = Secp256k1SecretKey::random(prng);
-        let pk = Secp256k1PublicKey::from_secret_key(&sk);
-        KeyPair {
-            pub_key: PublicKey(PublicKeyInner::EthAddress(
-                convert_libsecp256k1_public_key_to_address(&pk),
-            )),
-            sec_key: SecretKey::Secp256k1(sk),
-        }
     }
 
     /// Convert to eth address keypair.

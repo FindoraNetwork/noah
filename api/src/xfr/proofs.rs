@@ -1,5 +1,6 @@
 use crate::anon_creds::{ac_confidential_verify, ACCommitment, ACConfidentialRevealProof};
-use crate::setup::{BulletproofParams, BULLET_PROOF_RANGE, MAX_CONFIDENTIAL_RECORD_NUMBER};
+use crate::parameters::bulletproofs::BulletproofParams;
+use crate::setup::{BULLET_PROOF_RANGE, MAX_CONFIDENTIAL_RECORD_NUMBER};
 use crate::xfr::{
     asset_record::AssetRecordType,
     asset_tracer::RecordDataEncKey,

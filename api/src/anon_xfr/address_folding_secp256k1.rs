@@ -1,6 +1,6 @@
 use crate::anon_xfr::TurboPlonkCS;
 use crate::keys::KeyPair;
-use crate::setup::BulletproofURS;
+use crate::parameters::bulletproofs::BulletproofURS;
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
 use noah_algebra::bls12_381::BLSScalar;

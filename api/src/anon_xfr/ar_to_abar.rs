@@ -180,7 +180,7 @@ pub fn verify_ar_to_abar_body(params: &VerifierParams, body: &ArToAbarBody) -> R
 
     verifier(
         &mut transcript,
-        &params.pcs,
+        &params.shrunk_vk,
         &cs,
         verifier_params,
         &online_inputs,

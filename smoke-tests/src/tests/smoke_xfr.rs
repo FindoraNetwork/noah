@@ -1,8 +1,8 @@
 #[cfg(test)]
 mod smoke_xfr {
+    use noah::parameters::bulletproofs::BulletproofParams;
     use noah::{
         keys::{KeyPair, PublicKey},
-        setup::BulletproofParams,
         xfr::{
             asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
             gen_xfr_note,

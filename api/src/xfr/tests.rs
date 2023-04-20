@@ -1,6 +1,6 @@
 use crate::anon_creds::{self, ac_commit, ACCommitment, Credential};
 use crate::keys::KeyPair;
-use crate::setup::BulletproofParams;
+use crate::parameters::bulletproofs::BulletproofParams;
 use crate::xfr::{
     asset_record::AssetRecordType,
     batch_verify_xfr_body_asset_records, batch_verify_xfr_notes, compute_transfer_multisig,
@@ -305,7 +305,7 @@ fn do_transfer_tests_single_asset(
 
 mod single_asset_no_tracing {
     use super::*;
-    use crate::setup::BulletproofParams;
+    use crate::parameters::bulletproofs::BulletproofParams;
 
     #[test]
     fn test_transfer_not_confidential() {
