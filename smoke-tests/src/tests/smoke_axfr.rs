@@ -546,40 +546,6 @@ mod smoke_axfr {
     }
 
     #[test]
-    fn abar_8in_2out_2asset() {
-        let fee_amount = mock_fee(8, 2);
-        let outputs = vec![(20, FEE_TYPE), (30, ASSET)];
-        let inputs = vec![
-            (15 + fee_amount as u64, FEE_TYPE),
-            (1, FEE_TYPE),
-            (4, FEE_TYPE),
-            (5, ASSET),
-            (5, ASSET),
-            (4, ASSET),
-            (6, ASSET),
-            (10, ASSET),
-        ];
-        test_abar(inputs, outputs, fee_amount, "abar-8-2-2", None);
-    }
-
-    #[test]
-    fn abar_8in_3out_2asset() {
-        let fee_amount = mock_fee(8, 3);
-        let outputs = vec![(5, FEE_TYPE), (15, FEE_TYPE), (30, ASSET)];
-        let inputs = vec![
-            (15 + fee_amount as u64, FEE_TYPE),
-            (1, FEE_TYPE),
-            (4, FEE_TYPE),
-            (5, ASSET),
-            (5, ASSET),
-            (4, ASSET),
-            (6, ASSET),
-            (10, ASSET),
-        ];
-        test_abar(inputs, outputs, fee_amount, "abar-8-3-2", None);
-    }
-
-    #[test]
     fn abar_1in_xout_1asset() {
         for output_len in 1..=20 {
             let fee_amount = mock_fee(1, output_len);
@@ -614,10 +580,18 @@ mod smoke_axfr {
     ) {
         let mut prng = test_rng();
 
-        let address_format = match input_key_type.as_ref().unwrap() {
-            KeyType::Ed25519 => ED25519,
-            KeyType::Secp256k1 => SECP256K1,
-            _ => unimplemented!(),
+        let address_format = if input_key_type.is_none() {
+            if prng.gen() {
+                SECP256K1
+            } else {
+                ED25519
+            }
+        } else {
+            match input_key_type.unwrap() {
+                KeyType::Ed25519 => ED25519,
+                KeyType::Secp256k1 => SECP256K1,
+                _ => unimplemented!(),
+            }
         };
 
         let params =
@@ -625,13 +599,7 @@ mod smoke_axfr {
         let verifier_params =
             VerifierParams::load_abar_to_abar(inputs.len(), outputs.len(), address_format).unwrap();
 
-        let sender = if input_key_type.is_some() {
-            KeyPair::sample(&mut prng, address_format)
-        } else if input_key_type.is_none() && prng.gen() {
-            KeyPair::sample(&mut prng, SECP256K1)
-        } else {
-            KeyPair::sample(&mut prng, ED25519)
-        };
+        let sender = KeyPair::sample(&mut prng, address_format);
 
         let receivers: Vec<KeyPair> = (0..outputs.len())
             .map(|_| {

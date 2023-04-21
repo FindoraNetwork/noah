@@ -18,6 +18,7 @@ pub const TREE_DEPTH: usize = 30;
 const LEAF_START: u64 = 102945566047324;
 
 const KEY_PAD: [u8; 4] = [0, 0, 0, 0];
+const ROOT_KEY: [u8; 12] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
 const ENTRY_COUNT_KEY: [u8; 4] = [0, 0, 0, 1];
 
 ///
@@ -66,6 +67,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
             ];
             entry_count = u64::from_be_bytes(array);
         } else {
+            store.set(&ROOT_KEY, BLSScalar::zero().noah_to_bytes())?;
             store.set(&ENTRY_COUNT_KEY, 0u64.to_be_bytes().to_vec())?;
 
             if !store.state_mut().cache_mut().good2_commit() {
@@ -435,6 +437,7 @@ impl EphemeralMerkleTree {
         let entry_count = 0;
         let mut store = HashMap::<Vec<u8>, Vec<u8>>::new();
 
+        store.insert(ROOT_KEY.to_vec(), BLSScalar::zero().noah_to_bytes());
         store.insert(ENTRY_COUNT_KEY.to_vec(), 0u64.to_be_bytes().to_vec());
 
         Ok(EphemeralMerkleTree { entry_count, store })
