@@ -563,8 +563,7 @@ impl VerifierParams {
         };
 
         if let Some(bytes) = bytes {
-            let verifier_params =
-                bincode::deserialize::<VerifierParams>(bytes);
+            let verifier_params = bincode::deserialize::<VerifierParams>(bytes);
             if let Ok(verifier_params) = verifier_params {
                 let label = match address_format {
                     SECP256K1 => String::from("abar_to_bar_secp256k1"),
@@ -598,8 +597,7 @@ impl VerifierParams {
     /// Obtain the parameters for confidential to anonymous from prepare.
     pub fn load_bar_to_abar() -> Result<VerifierParams> {
         if let Some(bytes) = BAR_TO_ABAR_VERIFIER_PARAMS {
-            let verifier_params =
-                bincode::deserialize::<VerifierParams>(bytes);
+            let verifier_params = bincode::deserialize::<VerifierParams>(bytes);
             if let Ok(verifier_params) = verifier_params {
                 if verifier_params.label != String::from("bar_to_abar") {
                     Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
@@ -628,8 +626,7 @@ impl VerifierParams {
     /// Obtain the parameters for transparent to anonymous from prepare.
     pub fn load_ar_to_abar() -> Result<VerifierParams> {
         if let Some(bytes) = AR_TO_ABAR_VERIFIER_PARAMS {
-            let verifier_params =
-                bincode::deserialize::<VerifierParams>(bytes);
+            let verifier_params = bincode::deserialize::<VerifierParams>(bytes);
             if let Ok(verifier_params) = verifier_params {
                 if verifier_params.label != String::from("ar_to_abar") {
                     Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
@@ -663,8 +660,7 @@ impl VerifierParams {
         };
 
         if let Some(bytes) = bytes {
-            let verifier_params =
-                bincode::deserialize::<VerifierParams>(bytes);
+            let verifier_params = bincode::deserialize::<VerifierParams>(bytes);
             if let Ok(verifier_params) = verifier_params {
                 let label = match address_format {
                     SECP256K1 => String::from("abar_to_ar_secp256k1"),
