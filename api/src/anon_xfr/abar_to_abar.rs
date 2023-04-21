@@ -18,7 +18,8 @@ use crate::anon_xfr::{
 };
 use crate::errors::NoahError;
 use crate::keys::{KeyPair, PublicKey, PublicKeyInner, SecretKey};
-use crate::setup::{AddressFormat, ProverParams, VerifierParams};
+use crate::parameters::params::ProverParams;
+use crate::parameters::params::{AddressFormat, VerifierParams};
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
 use noah_algebra::{bls12_381::BLSScalar, prelude::*};
@@ -302,7 +303,6 @@ pub fn verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default>(
         &pub_inputs,
         &note.proof,
         &address_folding_public_input,
-        &note.folding_instance,
     )
     .c(d!(NoahError::AXfrVerificationError))
 }
@@ -362,7 +362,6 @@ pub fn batch_verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default + Sync +
                 &pub_inputs,
                 &note.proof,
                 &address_folding_public_input,
-                &note.folding_instance,
             )
         })
         .all(|x| x.is_ok());
@@ -405,15 +404,13 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     );
     let witness = cs.get_and_clear_witness();
 
-    let (cs, prover_params, lagrange_pcs) = params.cs_params(Some(folding_witness));
-
     prover_with_lagrange(
         rng,
         &mut transcript,
         &params.pcs,
-        lagrange_pcs,
-        cs,
-        prover_params,
+        params.lagrange_pcs.as_ref(),
+        &params.cs,
+        &params.prover_params,
         &witness,
     )
     .c(d!(NoahError::AXfrProofError))
@@ -425,7 +422,6 @@ pub(crate) fn verify_xfr(
     pub_inputs: &AXfrPubInputs,
     proof: &AXfrPlonkPf,
     address_folding_public_input: &Vec<BLSScalar>,
-    folding_instance: &AXfrAddressFoldingInstance,
 ) -> Result<()> {
     let mut transcript = Transcript::new(ANON_XFR_PLONK_PROOF_TRANSCRIPT);
     transcript.append_u64(N_INPUTS_TRANSCRIPT, pub_inputs.payers_inputs.len() as u64);
@@ -437,13 +433,11 @@ pub(crate) fn verify_xfr(
     let mut online_inputs = pub_inputs.to_vec();
     online_inputs.extend_from_slice(address_folding_public_input);
 
-    let (cs, verifier_params) = params.cs_params(Some(folding_instance));
-
     verifier(
         &mut transcript,
         &params.shrunk_vk,
-        &cs,
-        verifier_params,
+        &params.shrunk_cs,
+        &params.verifier_params,
         &online_inputs,
         proof,
     )
@@ -1050,29 +1044,21 @@ pub(crate) fn add_payees_witnesses(
 
 #[cfg(test)]
 mod tests {
-    use crate::anon_xfr::abar_to_abar::{
-        finish_anon_xfr_note, init_anon_xfr_note, AXfrNote, ANON_XFR_FOLDING_PROOF_TRANSCRIPT,
-    };
+    use crate::anon_xfr::abar_to_abar::ANON_XFR_FOLDING_PROOF_TRANSCRIPT;
     use crate::anon_xfr::address_folding_secp256k1::{
         create_address_folding_secp256k1, prepare_verifier_input_secp256k1,
         verify_address_folding_secp256k1,
     };
     use crate::anon_xfr::{
-        abar_to_abar::{
-            asset_mixing, build_multi_xfr_cs, verify_anon_xfr_note, AXfrPubInputs, AXfrWitness,
-        },
+        abar_to_abar::{asset_mixing, build_multi_xfr_cs, AXfrPubInputs, AXfrWitness},
         add_merkle_path_variables, check_merkle_tree_validity, commit, commit_in_cs,
         compute_merkle_root_variables, nullify, nullify_in_cs,
-        structs::{
-            AccElemVars, AnonAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonAssetRecord,
-            OpenAnonAssetRecordBuilder, PayeeWitness, PayerWitness,
-        },
-        AXfrAddressFoldingWitness, FEE_TYPE,
+        structs::{AccElemVars, MTNode, MTPath, PayeeWitness, PayerWitness},
+        AXfrAddressFoldingWitness,
     };
     use crate::keys::KeyPair;
-    use crate::setup::{ProverParams, VerifierParams};
-    use crate::xfr::structs::AssetType;
-    use digest::{consts::U64, Digest};
+    use crate::parameters::AddressFormat::SECP256K1;
+    use digest::Digest;
     use merlin::Transcript;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*};
     use noah_crypto::basic::anemoi_jive::{
@@ -1080,42 +1066,6 @@ mod tests {
     };
     use noah_plonk::plonk::constraint_system::{TurboCS, VarIndex};
     use sha2::Sha512;
-
-    fn gen_keys<R: CryptoRng + RngCore>(prng: &mut R, n: usize) -> Vec<KeyPair> {
-        (0..n).map(|_| KeyPair::generate_secp256k1(prng)).collect()
-    }
-
-    fn gen_oabar_with_key<R: CryptoRng + RngCore>(
-        prng: &mut R,
-        amount: u64,
-        asset_type: AssetType,
-        keypair: &KeyPair,
-    ) -> OpenAnonAssetRecord {
-        let oabar = OpenAnonAssetRecordBuilder::new()
-            .amount(amount)
-            .asset_type(asset_type)
-            .pub_key(&keypair.get_pk())
-            .finalize(prng)
-            .unwrap()
-            .build()
-            .unwrap();
-        oabar
-    }
-
-    /// Helper function that resembles the original `gen_anon_xfr_note`
-    fn gen_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> + Default>(
-        prng: &mut R,
-        params: &ProverParams,
-        inputs: &[OpenAnonAssetRecord],
-        outputs: &[OpenAnonAssetRecord],
-        fee: u32,
-        input_keypair: &KeyPair,
-        hash: D,
-    ) -> Result<AXfrNote> {
-        let pre_note = init_anon_xfr_note(inputs, outputs, fee, input_keypair)?;
-        let note = finish_anon_xfr_note(prng, params, pre_note, hash)?;
-        Ok(note)
-    }
 
     fn new_multi_xfr_witness_for_test(
         inputs: Vec<(u64, BLSScalar)>,
@@ -1127,7 +1077,7 @@ mod tests {
         let mut prng = test_rng();
         let zero = BLSScalar::zero();
 
-        let input_keypair = KeyPair::generate_secp256k1(&mut prng);
+        let input_keypair = KeyPair::sample(&mut prng, SECP256K1);
 
         let mut payers_secrets: Vec<PayerWitness> = inputs
             .iter()
@@ -1213,7 +1163,7 @@ mod tests {
                 amount,
                 blind: BLSScalar::random(&mut prng),
                 asset_type,
-                public_key: KeyPair::generate_secp256k1(&mut prng).get_pk(),
+                public_key: KeyPair::sample(&mut prng, SECP256K1).get_pk(),
             })
             .collect();
 
@@ -1816,7 +1766,7 @@ mod tests {
         let mut prng = test_rng();
         let blind = BLSScalar::random(&mut prng);
 
-        let keypair = KeyPair::generate_secp256k1(&mut prng);
+        let keypair = KeyPair::sample(&mut prng, SECP256K1);
 
         let public_key_scalars = keypair.pub_key.to_bls_scalars().unwrap();
         let public_key_scalars_vars = [
@@ -1866,7 +1816,7 @@ mod tests {
         let uid_amount = BLSScalar::from_bytes(&bytes[..]).unwrap(); // safe unwrap
         let asset_type = one;
 
-        let keypair = KeyPair::generate_secp256k1(&mut prng);
+        let keypair = KeyPair::sample(&mut prng, SECP256K1);
 
         let public_key_scalars = keypair.pub_key.to_bls_scalars().unwrap();
         let public_key_scalars_vars = [

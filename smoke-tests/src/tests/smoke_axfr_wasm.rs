@@ -2,6 +2,7 @@
 mod smoke_axfr_wasm {
     use digest::Digest;
     use noah::anon_xfr::init_anon_xfr;
+    use noah::parameters::params::{ProverParams, VerifierParams};
     use noah::{
         anon_xfr::{
             abar_to_abar::*,
@@ -16,7 +17,6 @@ mod smoke_axfr_wasm {
             FEE_TYPE, TREE_DEPTH,
         },
         keys::{KeyPair, PublicKey},
-        setup::{ProverParams, VerifierParams},
         xfr::{
             asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
             structs::{

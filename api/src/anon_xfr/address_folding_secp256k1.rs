@@ -1,6 +1,7 @@
 use crate::anon_xfr::TurboPlonkCS;
 use crate::keys::KeyPair;
 use crate::parameters::bulletproofs::BulletproofURS;
+use crate::parameters::params::AddressFormat::SECP256K1;
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
 use noah_algebra::bls12_381::BLSScalar;
@@ -54,7 +55,7 @@ pub struct AXfrAddressFoldingWitnessSecp256k1 {
 
 impl Default for AXfrAddressFoldingWitnessSecp256k1 {
     fn default() -> Self {
-        let keypair = KeyPair::default_secp256k1();
+        let keypair = KeyPair::default(SECP256K1);
         let blinding_factors = vec![SECQ256K1Scalar::default(); 3];
 
         let delegated_schnorr_proof =

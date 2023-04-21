@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod smoke_xfr {
     use noah::parameters::bulletproofs::BulletproofParams;
+    use noah::parameters::AddressFormat::SECP256K1;
     use noah::{
         keys::{KeyPair, PublicKey},
         xfr::{
@@ -62,8 +63,8 @@ mod smoke_xfr {
         let mut prng = test_rng();
         let mut params = BulletproofParams::default();
 
-        let sender = KeyPair::generate_secp256k1(&mut prng);
-        let receiver = KeyPair::generate_secp256k1(&mut prng);
+        let sender = KeyPair::sample(&mut prng, SECP256K1);
+        let receiver = KeyPair::sample(&mut prng, SECP256K1);
 
         // fake and build blind_asset_record from ledger
         let bar = non_conf_blind_asset_record_from_ledger(&sender.get_pk(), AMOUNT, ASSET1_TYPE);
@@ -101,8 +102,8 @@ mod smoke_xfr {
         let mut prng = test_rng();
         let mut params = BulletproofParams::default();
 
-        let sender = KeyPair::generate_secp256k1(&mut prng);
-        let receiver = KeyPair::generate_secp256k1(&mut prng);
+        let sender = KeyPair::sample(&mut prng, SECP256K1);
+        let receiver = KeyPair::sample(&mut prng, SECP256K1);
 
         // fake and build blind_asset_record from ledger
         let bar = non_conf_blind_asset_record_from_ledger(&sender.get_pk(), AMOUNT, ASSET1_TYPE);
@@ -150,13 +151,13 @@ mod smoke_xfr {
         let amount_out3 = 50u64;
         let amount_out4 = 20u64;
 
-        let sender1 = KeyPair::generate_secp256k1(&mut prng);
-        let sender2 = KeyPair::generate_secp256k1(&mut prng);
-        let sender3 = KeyPair::generate_secp256k1(&mut prng);
-        let receiver1 = KeyPair::generate_secp256k1(&mut prng);
-        let receiver2 = KeyPair::generate_secp256k1(&mut prng);
-        let receiver3 = KeyPair::generate_secp256k1(&mut prng);
-        let receiver4 = KeyPair::generate_secp256k1(&mut prng);
+        let sender1 = KeyPair::sample(&mut prng, SECP256K1);
+        let sender2 = KeyPair::sample(&mut prng, SECP256K1);
+        let sender3 = KeyPair::sample(&mut prng, SECP256K1);
+        let receiver1 = KeyPair::sample(&mut prng, SECP256K1);
+        let receiver2 = KeyPair::sample(&mut prng, SECP256K1);
+        let receiver3 = KeyPair::sample(&mut prng, SECP256K1);
+        let receiver4 = KeyPair::sample(&mut prng, SECP256K1);
 
         // fake and build blind_asset_record
         let (bar_in1, memo1) =

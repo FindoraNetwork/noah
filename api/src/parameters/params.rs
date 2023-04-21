@@ -1,69 +1,52 @@
-use std::collections::BTreeMap;
-use std::fmt::Debug;
-// The Public Setup needed for Proofs
 use crate::anon_xfr::abar_to_abar::{build_multi_xfr_cs, AXfrWitness};
-use crate::anon_xfr::address_folding_ed25519::AXfrAddressFoldingWitnessEd25519;
-use crate::anon_xfr::address_folding_secp256k1::AXfrAddressFoldingWitnessSecp256k1;
-use crate::anon_xfr::structs::{PayeeWitness, PayerWitness};
+use crate::anon_xfr::abar_to_ar::build_abar_to_ar_cs;
+use crate::anon_xfr::abar_to_bar::build_abar_to_bar_cs;
+use crate::anon_xfr::ar_to_abar::build_ar_to_abar_cs;
+use crate::anon_xfr::bar_to_abar::build_bar_to_abar_cs;
+use crate::anon_xfr::structs::{MTNode, MTPath, PayeeWitness, PayerWitness};
 use crate::anon_xfr::{
-    abar_to_ar::build_abar_to_ar_cs,
-    abar_to_bar::build_abar_to_bar_cs,
-    ar_to_abar::build_ar_to_abar_cs,
-    bar_to_abar::build_bar_to_abar_cs,
-    commit, nullify,
-    structs::{MTNode, MTPath},
-    AXfrAddressFoldingInstance, AXfrAddressFoldingWitness, TurboPlonkCS, TurboVerifyCS, FEE_TYPE,
-    TREE_DEPTH,
+    commit, nullify, AXfrAddressFoldingWitness, TurboPlonkCS, FEE_TYPE, TREE_DEPTH,
 };
 use crate::keys::KeyPair;
+use crate::parameters::AddressFormat::{ED25519, SECP256K1};
 use crate::parameters::{
     ABAR_TO_ABAR_VERIFIER_COMMON_PARAMS, ABAR_TO_ABAR_VERIFIER_ED25519_SPECIFIC_PARAMS,
     ABAR_TO_ABAR_VERIFIER_SECP256K1_SPECIFIC_PARAMS, ABAR_TO_AR_ED25519_VERIFIER_PARAMS,
     ABAR_TO_AR_SECP256K1_VERIFIER_PARAMS, ABAR_TO_BAR_ED25519_VERIFIER_PARAMS,
     ABAR_TO_BAR_SECP256K1_VERIFIER_PARAMS, AR_TO_ABAR_VERIFIER_PARAMS, BAR_TO_ABAR_VERIFIER_PARAMS,
-    BULLETPROOF_CURVE25519_URS, BULLETPROOF_SECQ256K1_URS, BULLETPROOF_ZORRO_URS, LAGRANGE_BASES,
-    SRS, VERIFIER_SPECIFIC_PARAMS,
+    LAGRANGE_BASES, SRS,
 };
-use crate::setup::AddressFormat::{ED25519, SECP256K1};
-use ark_serialize::{CanonicalDeserialize, Compress, Validate};
-use bulletproofs::BulletproofGens;
-use noah_algebra::ristretto::RistrettoPoint;
-use noah_algebra::secq256k1::Secq256k1BulletproofGens;
-use noah_algebra::zorro::ZorroBulletproofGens;
-use noah_algebra::{
-    bls12_381::{BLSScalar, BLSG1},
-    prelude::*,
-    ristretto::RistrettoScalar,
-};
+use noah_algebra::bls12_381::{BLSScalar, BLSG1};
+use noah_algebra::prelude::*;
+use noah_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 use noah_crypto::delegated_schnorr::{
-    DelegatedSchnorrInspection, DelegatedSchnorrInspectionRistretto, DelegatedSchnorrProof,
-    DelegatedSchnorrProofRistretto,
+    DelegatedSchnorrInspectionRistretto, DelegatedSchnorrProofRistretto,
 };
-use noah_crypto::field_simulation::SimFrParamsRistretto;
-use noah_plonk::{
-    plonk::{
-        constraint_system::ConstraintSystem,
-        indexer::{indexer_with_lagrange, PlonkPK, PlonkVK},
-    },
-    poly_commit::{kzg_poly_com::KZGCommitmentSchemeBLS, pcs::PolyComScheme},
-};
+use noah_plonk::plonk::constraint_system::ConstraintSystem;
+use noah_plonk::plonk::indexer::{indexer_with_lagrange, PlonkPK, PlonkVK};
+use noah_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS;
+use noah_plonk::poly_commit::pcs::PolyComScheme;
+use num_traits::Zero;
 use rand_chacha::ChaChaRng;
-use serde::Deserialize;
+use rand_core::SeedableRng;
+use std::collections::BTreeMap;
 
-#[derive(Serialize, Deserialize)]
-/// The prover parameters.
-pub struct ProverParams {
-    /// A label that describes the prover parameters.
-    pub label: String,
-    /// The full SRS for the polynomial commitment scheme.
-    pub pcs: KZGCommitmentSchemeBLS,
-    /// The Lagrange basis format of SRS.
-    pub lagrange_pcs: Option<KZGCommitmentSchemeBLS>,
-    /// The constraint system.
-    pub cs: TurboPlonkCS,
-    /// The TurboPlonk proving key.
-    pub prover_params: PlonkPK<KZGCommitmentSchemeBLS>,
-}
+/// The range in the Bulletproofs range check.
+pub const BULLET_PROOF_RANGE: usize = 32;
+/// The maximal number
+pub const MAX_CONFIDENTIAL_RECORD_NUMBER: usize = 128;
+/// The maximal number of inputs and outputs supported by this setup program, for standard payments.
+pub const MAX_ANONYMOUS_RECORD_NUMBER_STANDARD: usize = 6;
+/// The maximal number of inputs supported by this setup program, for consolidation.
+pub const MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER: usize = 7;
+/// The maximal number of outputs supported by this setup program, for consolidation.
+pub const MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER: usize = 3;
+/// The maximal number of outputs supported by this setup program, for airport.
+pub const MAX_ANONYMOUS_RECORD_NUMBER_ONE_INPUT: usize = 20;
+/// The default number of Bulletproofs generators
+pub const DEFAULT_BP_NUM_GENS: usize = 256;
+/// The number of the Bulletproofs(over the Secq256k1 curve) generators needed for anonymous transfer.
+pub const ANON_XFR_BP_GENS_LEN: usize = 2048;
 
 #[derive(Serialize, Deserialize)]
 /// The verifier parameters.
@@ -73,7 +56,7 @@ pub struct VerifierParams {
     /// The shrunk version of the polynomial commitment scheme.
     pub shrunk_vk: KZGCommitmentSchemeBLS,
     /// The shrunk version of the constraint system.
-    pub shrunk_cs: TurboVerifyCS,
+    pub shrunk_cs: TurboPlonkCS,
     /// The TurboPlonk verifying key.
     pub verifier_params: PlonkVK<KZGCommitmentSchemeBLS>,
 }
@@ -91,7 +74,7 @@ pub struct VerifierParamsSplitSpecific {
     /// A label that describes the prover parameters.
     pub label: String,
     /// The shrunk version of the constraint system.
-    pub shrunk_cs: TurboVerifyCS,
+    pub shrunk_cs: TurboPlonkCS,
     /// The verifier parameters.
     pub verifier_params: PlonkVK<KZGCommitmentSchemeBLS>,
 }
@@ -99,26 +82,11 @@ pub struct VerifierParamsSplitSpecific {
 /// The address format.
 #[derive(Copy, Clone)]
 pub enum AddressFormat {
+    /// Secp256k1 address
     SECP256K1,
+    /// Ed25519 address
     ED25519,
 }
-
-/// The range in the Bulletproofs range check.
-pub const BULLET_PROOF_RANGE: usize = 32;
-/// The maximal number
-pub const MAX_CONFIDENTIAL_RECORD_NUMBER: usize = 128;
-/// The maximal number of inputs and outputs supported by this setup program, for standard payments.
-pub const MAX_ANONYMOUS_RECORD_NUMBER_STANDARD: usize = 6;
-/// The maximal number of inputs supported by this setup program, for consolidation.
-pub const MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER: usize = 8;
-/// The maximal number of outputs supported by this setup program, for consolidation.
-pub const MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER: usize = 3;
-/// The maximal number of outputs supported by this setup program, for airport.
-pub const MAX_ANONYMOUS_RECORD_NUMBER_ONE_INPUT: usize = 20;
-/// The default number of Bulletproofs generators
-pub const DEFAULT_BP_NUM_GENS: usize = 256;
-/// The number of the Bulletproofs(over the Secq256k1 curve) generators needed for anonymous transfer.
-pub const ANON_XFR_BP_GENS_LEN: usize = 2048;
 
 impl ProverParams {
     /// Obtain the parameters for anonymous transfer for a given number of inputs and a given number of outputs.
@@ -229,7 +197,7 @@ impl ProverParams {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
 
         // It's okay to choose a fixed pk to build CS.
-        let keypair = KeyPair::generate_secp256k1(&mut prng);
+        let keypair = KeyPair::sample(&mut prng, SECP256K1);
         let (_, output_commitment_trace) = commit(&keypair.get_pk(), zero, 0, zero)?;
 
         let (cs, _) = build_bar_to_abar_cs(
@@ -500,44 +468,6 @@ impl ProverParams {
     }
 }
 
-fn load_lagrange_params(size: usize) -> Option<KZGCommitmentSchemeBLS> {
-    match LAGRANGE_BASES.get(&size) {
-        None => None,
-        Some(bytes) => KZGCommitmentSchemeBLS::from_unchecked_bytes(&bytes).ok(),
-    }
-}
-
-fn load_srs_params(size: usize) -> Result<KZGCommitmentSchemeBLS> {
-    let srs = SRS.c(d!(NoahError::MissingSRSError))?;
-
-    let KZGCommitmentSchemeBLS {
-        public_parameter_group_1,
-        public_parameter_group_2,
-    } = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
-        .c(d!(NoahError::DeserializationError))?;
-
-    let mut new_group_1 = vec![BLSG1::default(); core::cmp::max(size + 3, 2051)];
-    new_group_1[0..2051].copy_from_slice(&public_parameter_group_1[0..2051]);
-
-    if size == 4096 {
-        new_group_1[4096..4099].copy_from_slice(&public_parameter_group_1[2051..2054]);
-    }
-
-    if size == 8192 {
-        new_group_1[4096..4099].copy_from_slice(&public_parameter_group_1[2051..2054]);
-        new_group_1[8192..8195].copy_from_slice(&public_parameter_group_1[2054..2057]);
-    }
-
-    if size > 8192 {
-        return Err(SimpleError::new(d!(NoahError::ParameterError), None).into());
-    }
-
-    Ok(KZGCommitmentSchemeBLS {
-        public_parameter_group_2,
-        public_parameter_group_1: new_group_1,
-    })
-}
-
 impl VerifierParams {
     /// Load the verifier parameters for a given number of inputs and a given number of outputs.
     pub fn get_abar_to_abar(
@@ -545,17 +475,21 @@ impl VerifierParams {
         n_payees: usize,
         address_format: AddressFormat,
     ) -> Result<VerifierParams> {
-        if (n_payees > MAX_ANONYMOUS_RECORD_NUMBER_STANDARD
-            || n_payers > MAX_ANONYMOUS_RECORD_NUMBER_STANDARD)
-            && (n_payers > MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER
-                || n_payees > MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER)
-            && (n_payers > 1 || n_payees > MAX_ANONYMOUS_RECORD_NUMBER_ONE_INPUT)
+        if (!(n_payees <= MAX_ANONYMOUS_RECORD_NUMBER_STANDARD
+            && n_payers <= MAX_ANONYMOUS_RECORD_NUMBER_STANDARD))
+            && (!(n_payers <= MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER
+                && n_payees <= MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER))
+            && (!(n_payers == 1 && n_payees <= MAX_ANONYMOUS_RECORD_NUMBER_ONE_INPUT))
         {
             Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
         } else {
             match Self::load_abar_to_abar(n_payers, n_payees, address_format) {
                 Ok(vk) => Ok(vk),
-                Err(_e) => Self::from(ProverParams::gen_abar_to_abar(n_payers, n_payees, NONE)?),
+                Err(_e) => Ok(Self::from(ProverParams::gen_abar_to_abar(
+                    n_payers,
+                    n_payees,
+                    address_format,
+                )?)),
             }
         }
     }
@@ -585,8 +519,12 @@ impl VerifierParams {
                     bincode::deserialize(c_bytes).c(d!(NoahError::DeserializationError))?;
                 let specials: BTreeMap<(usize, usize), Vec<u8>> =
                     bincode::deserialize(s_bytes).unwrap();
+                let special_bytes = specials.get(&(n_payers, n_payees));
+                if special_bytes.is_none() {
+                    return Err(SimpleError::new(d!(NoahError::DeserializationError), None).into());
+                }
                 let special: VerifierParamsSplitSpecific =
-                    bincode::deserialize(&specials[n_payers - 1][n_payees - 1])
+                    bincode::deserialize(special_bytes.unwrap())
                         .c(d!(NoahError::DeserializationError))?;
 
                 if special.label != label {
@@ -598,7 +536,7 @@ impl VerifierParams {
                 Ok(VerifierParams {
                     label,
                     shrunk_vk: common.shrunk_pcs,
-                    shrunk_cs: special.cs,
+                    shrunk_cs: special.shrunk_cs,
                     verifier_params: special.verifier_params,
                 })
             }
@@ -645,9 +583,7 @@ impl VerifierParams {
     /// Obtain the parameters for confidential to anonymous from prepare.
     pub fn load_bar_to_abar() -> Result<VerifierParams> {
         if let Some(bytes) = BAR_TO_ABAR_VERIFIER_PARAMS {
-            bincode::deserialize::<VerifierParamsCommon>(bytes)
-                .map(|v| v.to_full())
-                .c(d!(NoahError::DeserializationError))
+            bincode::deserialize::<VerifierParams>(bytes).c(d!(NoahError::DeserializationError))
         } else {
             Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
         }
@@ -667,9 +603,7 @@ impl VerifierParams {
     /// Obtain the parameters for transparent to anonymous from prepare.
     pub fn load_ar_to_abar() -> Result<VerifierParams> {
         if let Some(bytes) = AR_TO_ABAR_VERIFIER_PARAMS {
-            bincode::deserialize::<VerifierParamsCommon>(bytes)
-                .map(|v| v.to_full())
-                .c(d!(NoahError::DeserializationError))
+            bincode::deserialize::<VerifierParams>(bytes).c(d!(NoahError::DeserializationError))
         } else {
             Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
         }
@@ -700,25 +634,15 @@ impl VerifierParams {
         }
     }
 
-    /// Shrink the verifier parameters.
-    pub fn shrink(self) -> Result<VerifierParams> {
-        Ok(VerifierParams {
-            label: self.label,
-            shrunk_vk: self.shrunk_vk.shrink_to_verifier_only()?,
-            shrunk_cs: self.cs.into(),
-            verifier_params: self.verifier_params,
-        })
-    }
-
     /// Split the verifier parameters to the common part and the sspecific part.
     pub fn split(self) -> Result<(VerifierParamsSplitCommon, VerifierParamsSplitSpecific)> {
         Ok((
             VerifierParamsSplitCommon {
-                shrunk_pcs: self.shrunk_vk.shrink_to_verifier_only()?,
+                shrunk_pcs: self.shrunk_vk.shrink_to_verifier_only(),
             },
             VerifierParamsSplitSpecific {
                 label: self.label,
-                shrunk_cs: self.cs.into(),
+                shrunk_cs: self.shrunk_cs.shrink_to_verifier_only(),
                 verifier_params: self.verifier_params,
             },
         ))
@@ -729,19 +653,72 @@ impl From<ProverParams> for VerifierParams {
     fn from(params: ProverParams) -> Self {
         VerifierParams {
             label: params.label,
-            shrunk_vk: params.pcs,
-            shrunk_cs: params.cs.into(),
+            shrunk_vk: params.pcs.shrink_to_verifier_only(),
+            shrunk_cs: params.cs.shrink_to_verifier_only(),
             verifier_params: params.prover_params.get_verifier_params(),
         }
     }
 }
 
+#[derive(Serialize, Deserialize)]
+/// The prover parameters.
+pub struct ProverParams {
+    /// A label that describes the prover parameters.
+    pub label: String,
+    /// The full SRS for the polynomial commitment scheme.
+    pub pcs: KZGCommitmentSchemeBLS,
+    /// The Lagrange basis format of SRS.
+    pub lagrange_pcs: Option<KZGCommitmentSchemeBLS>,
+    /// The constraint system.
+    pub cs: TurboPlonkCS,
+    /// The TurboPlonk proving key.
+    pub prover_params: PlonkPK<KZGCommitmentSchemeBLS>,
+}
+
+fn load_lagrange_params(size: usize) -> Option<KZGCommitmentSchemeBLS> {
+    match LAGRANGE_BASES.get(&size) {
+        None => None,
+        Some(bytes) => KZGCommitmentSchemeBLS::from_unchecked_bytes(&bytes).ok(),
+    }
+}
+
+fn load_srs_params(size: usize) -> Result<KZGCommitmentSchemeBLS> {
+    let srs = SRS.c(d!(NoahError::MissingSRSError))?;
+
+    let KZGCommitmentSchemeBLS {
+        public_parameter_group_1,
+        public_parameter_group_2,
+    } = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
+        .c(d!(NoahError::DeserializationError))?;
+
+    let mut new_group_1 = vec![BLSG1::default(); core::cmp::max(size + 3, 2051)];
+    new_group_1[0..2051].copy_from_slice(&public_parameter_group_1[0..2051]);
+
+    if size == 4096 {
+        new_group_1[4096..4099].copy_from_slice(&public_parameter_group_1[2051..2054]);
+    }
+
+    if size == 8192 {
+        new_group_1[4096..4099].copy_from_slice(&public_parameter_group_1[2051..2054]);
+        new_group_1[8192..8195].copy_from_slice(&public_parameter_group_1[2054..2057]);
+    }
+
+    if size > 8192 {
+        return Err(SimpleError::new(d!(NoahError::ParameterError), None).into());
+    }
+
+    Ok(KZGCommitmentSchemeBLS {
+        public_parameter_group_2,
+        public_parameter_group_1: new_group_1,
+    })
+}
+
 #[cfg(test)]
 mod test {
-    use super::load_srs_params;
-    use crate::anon_xfr::TREE_DEPTH;
-    use crate::setup::AddressFormat::{ED25519, SECP256K1};
-    use crate::setup::{ProverParams, VerifierParams};
+    use crate::parameters::params::load_srs_params;
+    use crate::parameters::params::AddressFormat::{ED25519, SECP256K1};
+    use crate::parameters::params::ProverParams;
+    use crate::parameters::params::VerifierParams;
     use noah_algebra::{
         bls12_381::{BLSScalar, BLSG1},
         prelude::*,
@@ -767,19 +744,13 @@ mod test {
 
     #[test]
     fn test_vk_params_serialization() {
-        let params = VerifierParams::get_abar_to_abar(3, 3, SECP256K1)
-            .unwrap()
-            .shrink()
-            .unwrap();
+        let params = VerifierParams::get_abar_to_abar(3, 3, SECP256K1).unwrap();
         let v = bincode::serialize(&params).unwrap();
         let params_de: VerifierParams = bincode::deserialize(&v).unwrap();
         let v2 = bincode::serialize(&params_de).unwrap();
         assert_eq!(v, v2);
 
-        let params = VerifierParams::get_abar_to_abar(3, 3, ED25519)
-            .unwrap()
-            .shrink()
-            .unwrap();
+        let params = VerifierParams::get_abar_to_abar(3, 3, ED25519).unwrap();
         let v = bincode::serialize(&params).unwrap();
         let params_de: VerifierParams = bincode::deserialize(&v).unwrap();
         let v2 = bincode::serialize(&params_de).unwrap();

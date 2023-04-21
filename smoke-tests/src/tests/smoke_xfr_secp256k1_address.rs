@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod smoke_xfr_secp256k1_address {
     use noah::parameters::bulletproofs::BulletproofParams;
+    use noah::parameters::AddressFormat::SECP256K1;
     use noah::{
         keys::{KeyPair, PublicKey, PublicKeyInner, SecretKey},
         xfr::{
@@ -71,7 +72,7 @@ mod smoke_xfr_secp256k1_address {
             }
             _ => panic!("not secp256k1 address"),
         }
-        let receiver = KeyPair::generate_secp256k1(&mut prng);
+        let receiver = KeyPair::sample(&mut prng, SECP256K1);
 
         // fake and build blind_asset_record from ledger
         let bar1 = non_conf_blind_asset_record_from_ledger(&sender.get_pk(), AMOUNT, ASSET1_TYPE);

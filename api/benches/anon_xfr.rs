@@ -1,6 +1,8 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use digest::Digest;
 use mem_db::MemoryDB;
+use noah::parameters::params::{ProverParams, VerifierParams};
+use noah::parameters::AddressFormat::SECP256K1;
 use noah::{
     anon_xfr::{
         abar_to_abar::*,
@@ -15,7 +17,6 @@ use noah::{
         FEE_TYPE, TREE_DEPTH,
     },
     keys::KeyPair,
-    setup::{ProverParams, VerifierParams},
     xfr::{
         asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
         structs::{AssetRecordTemplate, AssetType, ASSET_TYPE_LENGTH},
@@ -82,7 +83,7 @@ fn abar_to_abar(
     fee: u32,
 ) {
     let mut prng = test_rng();
-    let params = ProverParams::gen_abar_to_abar(inputs.len(), outputs.len(), None).unwrap();
+    let params = ProverParams::gen_abar_to_abar(inputs.len(), outputs.len(), SECP256K1).unwrap();
     let verifier_params = VerifierParams::load_abar_to_abar(inputs.len(), outputs.len()).unwrap();
 
     let sender = KeyPair::generate_secp256k1(&mut prng);

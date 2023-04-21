@@ -22,6 +22,7 @@ pub struct DelegatedSchnorrProof<S, G, P> {
     pub params_phantom: PhantomData<P>,
 }
 
+/// The non-interactive proof provided to the verifier over Ristretto.
 pub type DelegatedSchnorrProofRistretto =
     DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>;
 
@@ -38,6 +39,7 @@ pub struct DelegatedSchnorrInspection<S, G, P> {
     pub group_phantom: PhantomData<G>,
 }
 
+/// The state of the inspector over Ristretto.
 pub type DelegatedSchnorrInspectionRistretto =
     DelegatedSchnorrInspection<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>;
 

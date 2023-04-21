@@ -8,26 +8,30 @@
 use ark_bulletproofs::BulletproofGens as BulletproofGensOverSecq256k1;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use bulletproofs::BulletproofGens;
-use noah::parameters::SRS;
-use noah::setup::{
-    ProverParams, VerifierParams, VerifierParamsCommon, VerifierParamsSplitCommon,
-    ANON_XFR_BP_GENS_LEN, MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER,
-    MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER, MAX_ANONYMOUS_RECORD_NUMBER_ONE_INPUT,
-    MAX_ANONYMOUS_RECORD_NUMBER_STANDARD,
-};
+use noah::parameters::{AddressFormat, SRS};
 use noah_algebra::bls12_381::BLSG1;
 use noah_algebra::secq256k1::{PedersenCommitmentSecq256k1, Secq256k1BulletproofGens};
 use noah_algebra::utils::save_to_file;
 use noah_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS;
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
+use std::collections::BTreeMap;
+use std::sync::{Arc, Mutex};
 use std::{collections::HashMap, path::PathBuf};
 use structopt::StructOpt;
 
 use noah::anon_xfr::TREE_DEPTH;
 use noah::parameters::bulletproofs::{BulletproofParams, BulletproofURS};
+use noah::parameters::params::{
+    ProverParams, VerifierParams, VerifierParamsSplitCommon, ANON_XFR_BP_GENS_LEN,
+    MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER,
+    MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER, MAX_ANONYMOUS_RECORD_NUMBER_ONE_INPUT,
+    MAX_ANONYMOUS_RECORD_NUMBER_STANDARD,
+};
+use noah::parameters::AddressFormat::{ED25519, SECP256K1};
 use noah_algebra::zorro::ZorroBulletproofGens;
 use rayon::prelude::*;
+use serde::Serialize;
 
 #[derive(StructOpt, Debug)]
 #[structopt(
@@ -71,7 +75,8 @@ fn main() {
     let action = Actions::from_args();
     match action {
         TRANSFER { directory } => {
-            gen_transfer_vk(directory);
+            gen_transfer_vk(directory.clone(), SECP256K1);
+            gen_transfer_vk(directory, ED25519);
         }
 
         ABAR_TO_BAR { directory } => {
@@ -103,13 +108,18 @@ fn main() {
 }
 
 // cargo run --release --features="gen no_vk" --bin gen-params transfer "./parameters"
-fn gen_transfer_vk(directory: PathBuf) {
+fn gen_transfer_vk(directory: PathBuf, address_format: AddressFormat) {
     println!(
         "Generating verifying keys for anonymous transfer for 1..{} payers, 1..{} payees ...",
         MAX_ANONYMOUS_RECORD_NUMBER_STANDARD, MAX_ANONYMOUS_RECORD_NUMBER_STANDARD
     );
 
-    let transfer_params = VerifierParams::create(1, 1, Some(TREE_DEPTH)).unwrap();
+    match address_format {
+        AddressFormat::SECP256K1 => println!("... for secp256k1"),
+        AddressFormat::ED25519 => println!("... for ed25519"),
+    }
+
+    let transfer_params = VerifierParams::get_abar_to_abar(1, 1, address_format).unwrap();
     let (common, _) = transfer_params.split().unwrap();
     let common_ser = bincode::serialize(&common).unwrap();
 
@@ -117,101 +127,101 @@ fn gen_transfer_vk(directory: PathBuf) {
     common_path.push("transfer-vk-common.bin");
     save_to_file(&common_ser, common_path);
 
+    let specials_sync = Arc::new(Mutex::new(BTreeMap::<(usize, usize), Vec<u8>>::new()));
+
     let is: Vec<usize> = (1..=MAX_ANONYMOUS_RECORD_NUMBER_STANDARD)
         .map(|i| i)
         .collect();
-    let mut bytes: HashMap<usize, Vec<Vec<u8>>> = is
-        .par_iter()
-        .map(|i| {
-            let max_receiver = if *i == 1 {
-                MAX_ANONYMOUS_RECORD_NUMBER_ONE_INPUT
-            } else {
-                MAX_ANONYMOUS_RECORD_NUMBER_STANDARD
-            };
+    is.par_iter().for_each(|i| {
+        let max_receiver = if *i == 1 {
+            MAX_ANONYMOUS_RECORD_NUMBER_ONE_INPUT
+        } else {
+            MAX_ANONYMOUS_RECORD_NUMBER_STANDARD
+        };
 
-            let js: Vec<usize> = (1..=max_receiver).map(|j| j).collect();
-            let mut bytes: HashMap<usize, Vec<u8>> = js
-                .par_iter()
-                .map(|j| {
-                    println!("generating {} payers & {} payees", i, j);
-                    let node_params = VerifierParams::create(*i, *j, Some(TREE_DEPTH)).unwrap();
-                    println!(
-                        "the size of the constraint system for {} payers & {} payees: {}",
-                        i, j, node_params.ed25519_cs.size
-                    );
-                    let (_, special) = node_params.split().unwrap();
-                    (*j, bincode::serialize(&special).unwrap())
-                })
-                .collect();
-            let mut ordered = vec![];
-            for i in 1..=max_receiver {
-                ordered.push(bytes.remove(&i).unwrap())
-            }
-            (*i, ordered)
-        })
-        .collect();
-
-    let mut specials = vec![];
-    for i in 1..=MAX_ANONYMOUS_RECORD_NUMBER_STANDARD {
-        specials.push(bytes.remove(&i).unwrap())
-    }
+        let js: Vec<usize> = (1..=max_receiver).map(|j| j).collect();
+        js.par_iter().for_each(|j| {
+            println!("generating {} payers & {} payees", i, j);
+            let node_params = VerifierParams::get_abar_to_abar(*i, *j, address_format).unwrap();
+            println!(
+                "the size of the constraint system for {} payers & {} payees: {}",
+                i, j, node_params.shrunk_cs.size
+            );
+            let (_, special) = node_params.split().unwrap();
+            specials_sync
+                .lock()
+                .unwrap()
+                .insert((*i, *j), bincode::serialize(&special).unwrap());
+        });
+    });
 
     let is: Vec<usize> = (MAX_ANONYMOUS_RECORD_NUMBER_STANDARD + 1
         ..=MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER)
         .map(|i| i)
         .collect();
-    let mut bytes: HashMap<usize, Vec<Vec<u8>>> = is
-        .par_iter()
-        .map(|i| {
-            let js: Vec<usize> = (1..=MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER)
-                .map(|j| j)
-                .collect();
-            let mut bytes: HashMap<usize, Vec<u8>> = js
-                .par_iter()
-                .map(|j| {
-                    println!("generating {} payers & {} payees", i, j);
-                    let node_params = VerifierParams::create(*i, *j, Some(TREE_DEPTH)).unwrap();
-                    println!(
-                        "the size of the constraint system for {} payers & {} payees: {}",
-                        i, j, node_params.ed25519_cs.size
-                    );
-                    let (_, special) = node_params.split().unwrap();
-                    (*j, bincode::serialize(&special).unwrap())
-                })
-                .collect();
-            let mut ordered = vec![];
-            for i in 1..=MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER {
-                ordered.push(bytes.remove(&i).unwrap())
-            }
-            (*i, ordered)
-        })
-        .collect();
+    is.par_iter().for_each(|i| {
+        let js: Vec<usize> = (1..=MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER)
+            .map(|j| j)
+            .collect();
+        js.par_iter().for_each(|j| {
+            println!("generating {} payers & {} payees", i, j);
+            let node_params = VerifierParams::get_abar_to_abar(*i, *j, address_format).unwrap();
+            println!(
+                "the size of the constraint system for {} payers & {} payees: {}",
+                i, j, node_params.shrunk_cs.size
+            );
+            let (_, special) = node_params.split().unwrap();
+            specials_sync
+                .lock()
+                .unwrap()
+                .insert((*i, *j), bincode::serialize(&special).unwrap());
+        });
+    });
 
-    for i in
-        MAX_ANONYMOUS_RECORD_NUMBER_STANDARD + 1..=MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER
-    {
-        specials.push(bytes.remove(&i).unwrap())
+    let mut specials = BTreeMap::<(usize, usize), Vec<u8>>::new();
+    for (idx, v) in specials_sync.lock().unwrap().iter() {
+        specials.insert(*idx, v.clone());
     }
 
     let specials_ser = bincode::serialize(&specials).unwrap();
     let mut specials_path = directory.clone();
-    specials_path.push("transfer-vk-specific.bin");
+    match address_format {
+        SECP256K1 => specials_path.push("transfer-vk-secp256k1-specific.bin"),
+        ED25519 => specials_path.push("transfer-vk-ed25519-specific.bin"),
+    }
     save_to_file(&specials_ser, specials_path);
 }
 
 // cargo run --release --features="gen no_vk" --bin gen-params abar-to-bar "./parameters"
-fn gen_abar_to_bar_vk(mut path: PathBuf) {
-    println!("Generating the verifying key for ABAR TO BAR ...");
-
-    let user_params = ProverParams::gen_abar_to_bar(TREE_DEPTH).unwrap();
-    let node_params = VerifierParams::from(user_params).shrink().unwrap();
+fn gen_abar_to_bar_vk(path: PathBuf) {
+    println!("Generating the verifying key for ABAR TO BAR for secp256k1 ...");
+    let mut new_path = path.clone();
+    let user_params = ProverParams::gen_abar_to_bar(TREE_DEPTH, SECP256K1).unwrap();
+    let node_params = VerifierParams::from(user_params);
     println!(
-        "the size of the constraint system for ABAR TO BAR: {}",
-        node_params.ed25519_cs.size
+        "the size of the constraint system for ABAR TO BAR for secp256k1: {}",
+        node_params.shrunk_cs.size
     );
     let bytes = bincode::serialize(&node_params).unwrap();
-    path.push("abar-to-bar-vk.bin");
-    save_to_file(&bytes, path);
+    new_path.push("abar-to-bar-vk-secp256k1.bin");
+    save_to_file(&bytes, new_path);
+
+    let start = std::time::Instant::now();
+    let _n: VerifierParams = bincode::deserialize(&bytes).unwrap();
+    let elapsed = start.elapsed();
+    println!("Deserialize time: {:.2?}", elapsed);
+
+    println!("Generating the verifying key for ABAR TO BAR for ed25519 ...");
+    let mut new_path = path.clone();
+    let user_params = ProverParams::gen_abar_to_bar(TREE_DEPTH, ED25519).unwrap();
+    let node_params = VerifierParams::from(user_params);
+    println!(
+        "the size of the constraint system for ABAR TO BAR for ed25519: {}",
+        node_params.shrunk_cs.size
+    );
+    let bytes = bincode::serialize(&node_params).unwrap();
+    new_path.push("abar-to-bar-vk-ed25519.bin");
+    save_to_file(&bytes, new_path);
 
     let start = std::time::Instant::now();
     let _n: VerifierParams = bincode::deserialize(&bytes).unwrap();
@@ -224,18 +234,17 @@ fn gen_bar_to_abar_vk(mut path: PathBuf) {
     println!("Generating the verifying key for BAR TO ABAR ...");
 
     let user_params = ProverParams::gen_bar_to_abar().unwrap();
-    let node_params =
-        VerifierParamsCommon::from_full(VerifierParams::from(user_params).shrink().unwrap());
+    let node_params = VerifierParams::from(user_params);
     println!(
         "the size of the constraint system for BAR TO ABAR: {}",
-        node_params.cs.size
+        node_params.shrunk_cs.size
     );
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("bar-to-abar-vk.bin");
     save_to_file(&bytes, path);
 
     let start = std::time::Instant::now();
-    let _n: VerifierParamsCommon = bincode::deserialize(&bytes).unwrap();
+    let _n: VerifierParams = bincode::deserialize(&bytes).unwrap();
     let elapsed = start.elapsed();
     println!("Deserialize time: {:.2?}", elapsed);
 }
@@ -245,35 +254,51 @@ fn gen_ar_to_abar_vk(mut path: PathBuf) {
     println!("Generating the verifying key for AR TO ABAR ...");
 
     let user_params = ProverParams::gen_ar_to_abar().unwrap();
-    let node_params =
-        VerifierParamsCommon::from_full(VerifierParams::from(user_params).shrink().unwrap());
+    let node_params = VerifierParams::from(user_params);
     println!(
         "the size of the constraint system for AR TO ABAR: {}",
-        node_params.cs.size
+        node_params.shrunk_cs.size
     );
     let bytes = bincode::serialize(&node_params).unwrap();
     path.push("ar-to-abar-vk.bin");
     save_to_file(&bytes, path);
 
     let start = std::time::Instant::now();
-    let _n: VerifierParamsCommon = bincode::deserialize(&bytes).unwrap();
+    let _n: VerifierParams = bincode::deserialize(&bytes).unwrap();
     let elapsed = start.elapsed();
     println!("Deserialize time: {:.2?}", elapsed);
 }
 
 // cargo run --release --features="gen no_vk" --bin gen-params abar-to-ar "./parameters"
-fn gen_abar_to_ar_vk(mut path: PathBuf) {
-    println!("Generating the verifying key for ABAR TO AR ...");
-
-    let user_params = ProverParams::gen_abar_to_ar(TREE_DEPTH).unwrap();
-    let node_params = VerifierParams::from(user_params).shrink().unwrap();
+fn gen_abar_to_ar_vk(path: PathBuf) {
+    println!("Generating the verifying key for ABAR TO AR for secp256k1 ...");
+    let mut new_path = path.clone();
+    let user_params = ProverParams::gen_abar_to_ar(TREE_DEPTH, SECP256K1).unwrap();
+    let node_params = VerifierParams::from(user_params);
     println!(
-        "the size of the constraint system for ABAR TO AR: {}",
-        node_params.ed25519_cs.size
+        "the size of the constraint system for ABAR TO AR for secp256k1: {}",
+        node_params.shrunk_cs.size
     );
     let bytes = bincode::serialize(&node_params).unwrap();
-    path.push("abar-to-ar-vk.bin");
-    save_to_file(&bytes, path);
+    new_path.push("abar-to-ar-vk-secp256k1.bin");
+    save_to_file(&bytes, new_path);
+
+    let start = std::time::Instant::now();
+    let _n: VerifierParams = bincode::deserialize(&bytes).unwrap();
+    let elapsed = start.elapsed();
+    println!("Deserialize time: {:.2?}", elapsed);
+
+    println!("Generating the verifying key for ABAR TO AR for ed25519 ...");
+    let mut new_path = path.clone();
+    let user_params = ProverParams::gen_abar_to_ar(TREE_DEPTH, ED25519).unwrap();
+    let node_params = VerifierParams::from(user_params);
+    println!(
+        "the size of the constraint system for ABAR TO AR for ed25519: {}",
+        node_params.shrunk_cs.size
+    );
+    let bytes = bincode::serialize(&node_params).unwrap();
+    new_path.push("abar-to-ar-vk-ed25519.bin");
+    save_to_file(&bytes, new_path);
 
     let start = std::time::Instant::now();
     let _n: VerifierParams = bincode::deserialize(&bytes).unwrap();
@@ -365,7 +390,8 @@ fn cut_srs(mut path: PathBuf) {
 
 // cargo run --release --features="gen no_vk" --bin gen-params all "./parameters"
 fn gen_all(directory: PathBuf) {
-    gen_transfer_vk(directory.clone());
+    gen_transfer_vk(directory.clone(), SECP256K1);
+    gen_transfer_vk(directory.clone(), ED25519);
     gen_abar_to_bar_vk(directory.clone());
     gen_bar_to_abar_vk(directory.clone());
     gen_ar_to_abar_vk(directory.clone());

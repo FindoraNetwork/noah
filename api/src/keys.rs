@@ -1,4 +1,5 @@
-use crate::setup::AddressFormat;
+use crate::parameters::params::AddressFormat;
+use crate::parameters::params::AddressFormat::{ED25519, SECP256K1};
 use ark_ff::{BigInteger, PrimeField};
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use digest::consts::U64;
@@ -401,8 +402,8 @@ impl SecretKey {
     /// Default secret key
     pub fn default(address_format: AddressFormat) -> Self {
         match address_format {
-            AddressFormat::SECP256K1 => Self::Secp256k1(Secp256k1SecretKey::default()),
-            AddressFormat::ED25519 => {
+            SECP256K1 => Self::Secp256k1(Secp256k1SecretKey::default()),
+            ED25519 => {
                 let default_bytes = [0u8; 32];
                 SecretKey::Ed25519(Ed25519SecretKey::from_bytes(&default_bytes).unwrap())
             }
@@ -550,16 +551,9 @@ impl NoahFromToBytes for KeyPair {
 }
 
 impl KeyPair {
-    /// Default secp256k1 keypair
-    pub fn default_secp256k1() -> Self {
-        let sk = SecretKey::default_secp256k1();
-        sk.into_keypair()
-    }
-
-    /// Default ed25519 keypair
-    pub fn default_ed25519() -> Self {
-        let sk = SecretKey::default_ed25519();
-        sk.into_keypair()
+    /// Default keypair
+    pub fn default(address_format: AddressFormat) -> Self {
+        SecretKey::default(address_format).into_keypair()
     }
 
     /// Change to algebra Secp256k1 keypair
@@ -585,7 +579,7 @@ impl KeyPair {
     /// Generate a random key pair.
     pub fn sample<R: CryptoRng + RngCore>(prng: &mut R, address_format: AddressFormat) -> Self {
         match address_format {
-            AddressFormat::SECP256K1 => {
+            SECP256K1 => {
                 let sk = Secp256k1SecretKey::random(prng);
                 let pk = Secp256k1PublicKey::from_secret_key(&sk);
                 KeyPair {
@@ -593,23 +587,13 @@ impl KeyPair {
                     sec_key: SecretKey::Secp256k1(sk),
                 }
             }
-            AddressFormat::ED25519 => {
+            ED25519 => {
                 let kp = ed25519_dalek::Keypair::generate(prng);
                 KeyPair {
                     pub_key: PublicKey(PublicKeyInner::Ed25519(kp.public)),
                     sec_key: SecretKey::Ed25519(kp.secret_key()),
                 }
             }
-        }
-    }
-
-    /// Generate a Secp256k1 key pair.
-    pub fn generate_secp256k1<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
-        let sk = Secp256k1SecretKey::random(prng);
-        let pk = Secp256k1PublicKey::from_secret_key(&sk);
-        KeyPair {
-            pub_key: PublicKey(PublicKeyInner::Secp256k1(pk)),
-            sec_key: SecretKey::Secp256k1(sk),
         }
     }
 
@@ -621,6 +605,30 @@ impl KeyPair {
             pub_key: PublicKey(PublicKeyInner::Secp256k1(pk)),
             sec_key: SecretKey::Secp256k1(sk),
         })
+    }
+
+    /// Generate a Secp256k1 key pair with address.
+    pub fn generate_address<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
+        let sk = Secp256k1SecretKey::random(prng);
+        let pk = Secp256k1PublicKey::from_secret_key(&sk);
+        KeyPair {
+            pub_key: PublicKey(PublicKeyInner::EthAddress(
+                convert_libsecp256k1_public_key_to_address(&pk),
+            )),
+            sec_key: SecretKey::Secp256k1(sk),
+        }
+    }
+
+    /// Generate a Secp256k1 key pair with address.
+    pub fn sample_address<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
+        let sk = Secp256k1SecretKey::random(prng);
+        let pk = Secp256k1PublicKey::from_secret_key(&sk);
+        KeyPair {
+            pub_key: PublicKey(PublicKeyInner::EthAddress(
+                convert_libsecp256k1_public_key_to_address(&pk),
+            )),
+            sec_key: SecretKey::Secp256k1(sk),
+        }
     }
 
     /// Convert to eth address keypair.
@@ -839,7 +847,7 @@ mod test {
         env::set_var("DETERMINISTIC_TEST_RNG", "1");
         let mut prng = test_rng();
 
-        let keypair = KeyPair::generate_secp256k1(&mut prng);
+        let keypair = KeyPair::sample(&mut prng, SECP256K1);
         let message = "";
 
         let sig = keypair.sign(message.as_bytes()).unwrap();
@@ -850,12 +858,12 @@ mod test {
 
         //test again with fresh same key
         let mut prng = test_rng();
-        let keypair = KeyPair::generate_secp256k1(&mut prng);
+        let keypair = KeyPair::sample(&mut prng, SECP256K1);
         pnk!(keypair.pub_key.verify("".as_bytes(), &sig));
 
         env::set_var("DETERMINISTIC_TEST_RNG", "0");
         let mut prng = test_rng();
-        let keypair = KeyPair::generate_ed25519(&mut prng);
+        let keypair = KeyPair::sample(&mut prng, ED25519);
         let message = [10u8; 500];
         let sig = keypair.sign(&message).unwrap();
         msg_eq!(
@@ -874,7 +882,7 @@ mod test {
         pnk!(keypair.pub_key.verify(&message, &sig));
 
         // test with different keys
-        let keypair = KeyPair::generate_ed25519(&mut prng);
+        let keypair = KeyPair::sample(&mut prng, ED25519);
         msg_eq!(
             NoahError::SignatureError,
             keypair.pub_key.verify(&message, &sig).unwrap_err(),
@@ -885,7 +893,7 @@ mod test {
     fn generate_keypairs<R: CryptoRng + RngCore>(prng: &mut R, n: usize) -> Vec<KeyPair> {
         let mut v = vec![];
         for _ in 0..n {
-            v.push(KeyPair::generate_secp256k1(prng));
+            v.push(KeyPair::sample(prng, SECP256K1));
         }
         v
     }
@@ -909,7 +917,7 @@ mod test {
     #[test]
     fn convert_secp256k1_key() {
         let mut prng = test_rng();
-        let kp = KeyPair::generate_secp256k1(&mut prng);
+        let kp = KeyPair::sample(&mut prng, SECP256K1);
         let (s, p) = kp.to_secp256k1().unwrap();
         assert_eq!(SECP256K1G1::get_base().mul(&s), p);
     }
@@ -918,7 +926,7 @@ mod test {
     fn convert_ed25519_key() {
         env::set_var("DETERMINISTIC_TEST_RNG", "0");
         let mut prng = test_rng();
-        let kp = KeyPair::generate_ed25519(&mut prng);
+        let kp = KeyPair::sample(&mut prng, ED25519);
         let (s, p) = kp.to_ed25519().unwrap();
         let ss = s.get_raw();
 

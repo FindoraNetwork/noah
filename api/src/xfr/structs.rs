@@ -748,10 +748,7 @@ impl<'de> Deserialize<'de> for OwnerMemo {
                 impl<'de> Visitor<'de> for FieldVisitor {
                     type Value = Field;
 
-                    fn expecting(
-                        &self,
-                        formatter: &mut std::fmt::Formatter<'_>,
-                    ) -> std::fmt::Result {
+                    fn expecting(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
                         formatter.write_str("`blind_share` or `lock` or `key_type`")
                     }
 
@@ -779,7 +776,7 @@ impl<'de> Deserialize<'de> for OwnerMemo {
         impl<'de> Visitor<'de> for OwnerMemoVisitor {
             type Value = OwnerMemo;
 
-            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            fn expecting(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
                 formatter.write_str("struct OwnerMemo")
             }
 

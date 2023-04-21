@@ -128,6 +128,7 @@ impl XfrType {
 /// use noah::xfr::{gen_xfr_note, verify_xfr_note, XfrNotePolicies};
 /// use noah_algebra::prelude::*;
 /// use ruc::err::*;
+/// use noah::parameters::AddressFormat::SECP256K1;
 /// use noah::parameters::bulletproofs::BulletproofParams;
 ///
 /// let mut prng = ChaChaRng::from_seed([0u8; 32]);
@@ -150,7 +151,7 @@ impl XfrType {
 /// let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
 ///
 /// for x in inputs_amounts.iter() {
-///   let keypair = KeyPair::generate_secp256k1(&mut prng);
+///   let keypair = KeyPair::sample(&mut prng, SECP256K1);
 ///   let asset_record = AssetRecordTemplate::with_no_asset_tracing( x.0,
 ///                                        x.1,
 ///                                        asset_record_type,
@@ -163,7 +164,7 @@ impl XfrType {
 /// }
 ///
 /// for x in outputs_amounts.iter() {
-///     let keypair = KeyPair::generate_secp256k1(&mut prng);
+///     let keypair = KeyPair::sample(&mut prng, SECP256K1);
 ///
 ///     let ar = AssetRecordTemplate::with_no_asset_tracing(x.0, x.1, asset_record_type, keypair.get_pk().clone());
 ///     let output = AssetRecord::from_template_no_identity_tracing(&mut prng, &ar).unwrap();
@@ -203,6 +204,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
 /// use ruc::{*, err::*};
 /// use rand_core::SeedableRng;
 /// use noah::keys::KeyPair;
+/// use noah::parameters::AddressFormat::SECP256K1;
 /// use noah::xfr::structs::{AssetRecordTemplate, AssetRecord, AssetType};
 /// use noah::xfr::asset_record::AssetRecordType;
 /// use noah::xfr::{gen_xfr_body, verify_xfr_body, XfrNotePolicies, XfrNotePoliciesRef};
@@ -225,7 +227,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
 /// let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
 ///
 /// for x in inputs_amounts.iter() {
-///   let keypair = KeyPair::generate_secp256k1(&mut prng);
+///   let keypair = KeyPair::sample(&mut prng, SECP256K1);
 ///   let ar = AssetRecordTemplate::with_no_asset_tracing( x.0,
 ///                                        x.1,
 ///                                        asset_record_type,
@@ -235,7 +237,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
 ///   inputs.push(AssetRecord::from_template_no_identity_tracing(&mut prng, &ar).unwrap());
 /// }
 /// for x in outputs_amounts.iter() {
-///     let keypair = KeyPair::generate_secp256k1(&mut prng);
+///     let keypair = KeyPair::sample(&mut prng, SECP256K1);
 ///
 ///     let ar = AssetRecordTemplate::with_no_asset_tracing(x.0, x.1, asset_record_type, keypair.get_pk());
 ///     outputs.push(AssetRecord::from_template_no_identity_tracing(&mut prng, &ar).unwrap());

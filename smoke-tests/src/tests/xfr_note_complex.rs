@@ -1,4 +1,5 @@
 use noah::parameters::bulletproofs::BulletproofParams;
+use noah::parameters::AddressFormat::SECP256K1;
 use noah::{
     anon_creds::{self, ac_commit, ac_sign, ac_verify_commitment, Attr, Credential},
     keys::{KeyPair, PublicKey},
@@ -90,15 +91,15 @@ fn complex_transaction() {
     let asset2_tracing_key = AssetTracerKeyPair::generate(&mut prng);
 
     // setup users keys
-    let user1_key_pair1 = KeyPair::generate_secp256k1(&mut prng);
-    let user1_key_pair2 = KeyPair::generate_secp256k1(&mut prng);
-    let user1_key_pair3 = KeyPair::generate_secp256k1(&mut prng);
+    let user1_key_pair1 = KeyPair::sample(&mut prng, SECP256K1);
+    let user1_key_pair2 = KeyPair::sample(&mut prng, SECP256K1);
+    let user1_key_pair3 = KeyPair::sample(&mut prng, SECP256K1);
     let (user1_ac_sk, user1_ac_pk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
-    let user2_key_pair1 = KeyPair::generate_secp256k1(&mut prng);
+    let user2_key_pair1 = KeyPair::sample(&mut prng, SECP256K1);
     let (user2_ac_sk, user2_ac_pk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
-    let user3_key_pair1 = KeyPair::generate_secp256k1(&mut prng);
+    let user3_key_pair1 = KeyPair::sample(&mut prng, SECP256K1);
     let (user3_ac_sk, user3_ac_pk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
-    let user4_key_pair1 = KeyPair::generate_secp256k1(&mut prng);
+    let user4_key_pair1 = KeyPair::sample(&mut prng, SECP256K1);
     let (user4_ac_sk, user4_ac_pk) = anon_creds::ac_keygen_user(&mut prng, &cred_issuer_pk);
 
     // generate credential for each of the 4 users

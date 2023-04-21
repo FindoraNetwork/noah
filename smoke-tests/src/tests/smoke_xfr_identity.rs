@@ -1,6 +1,7 @@
 #[cfg(test)]
 mod smoke_xfr_identity {
     use noah::parameters::bulletproofs::BulletproofParams;
+    use noah::parameters::AddressFormat::SECP256K1;
     use noah::{
         anon_creds::{self, ac_commit, ac_sign, ac_verify_commitment, Attr, Credential},
         keys::{KeyPair, PublicKey},
@@ -66,9 +67,9 @@ mod smoke_xfr_identity {
         let amount_in2 = 75u64;
         let amount_out1 = 125u64;
 
-        let sender1 = KeyPair::generate_secp256k1(&mut prng);
-        let sender2 = KeyPair::generate_secp256k1(&mut prng);
-        let receiver1 = KeyPair::generate_secp256k1(&mut prng);
+        let sender1 = KeyPair::sample(&mut prng, SECP256K1);
+        let sender2 = KeyPair::sample(&mut prng, SECP256K1);
+        let receiver1 = KeyPair::sample(&mut prng, SECP256K1);
 
         // create credential keys
         let (cred_issuer_sk, cred_issuer_pk) = anon_creds::ac_keygen_issuer(&mut prng, 4);
@@ -242,9 +243,9 @@ mod smoke_xfr_identity {
         let amount_out1 = 75u64;
         let amount_out2 = 25u64;
 
-        let sender1 = KeyPair::generate_secp256k1(&mut prng);
-        let receiver1 = KeyPair::generate_secp256k1(&mut prng);
-        let receiver2 = KeyPair::generate_secp256k1(&mut prng);
+        let sender1 = KeyPair::sample(&mut prng, SECP256K1);
+        let receiver1 = KeyPair::sample(&mut prng, SECP256K1);
+        let receiver2 = KeyPair::sample(&mut prng, SECP256K1);
 
         // credential keys
         let (cred_issuer_sk, cred_issuer_pk) = anon_creds::ac_keygen_issuer(&mut prng, 4);

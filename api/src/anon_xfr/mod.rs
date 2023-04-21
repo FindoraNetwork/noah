@@ -25,8 +25,11 @@ use noah_plonk::{
     poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS,
 };
 
-use noah_algebra::ed25519::{Ed25519Point, Ed25519Scalar};
-use noah_algebra::secp256k1::{SECP256K1Scalar, SECP256K1G1};
+use noah_algebra::{
+    ed25519::{Ed25519Point, Ed25519Scalar},
+    secp256k1::{SECP256K1Scalar, SECP256K1G1},
+};
+
 #[cfg(target_arch = "wasm32")]
 use {noah_plonk::plonk::prover::init_prover, wasm_bindgen::prelude::*};
 
@@ -56,8 +59,7 @@ pub const TWO_POW_32: u64 = 1 << 32;
 
 pub(crate) type TurboPlonkCS = TurboCS<BLSScalar>;
 
-use crate::setup::AddressFormat;
-pub(crate) use noah_plonk::plonk::constraint_system::turbo::TurboVerifyCS;
+use crate::parameters::params::AddressFormat;
 
 /// The Plonk proof type.
 pub(crate) type AXfrPlonkPf = PlonkPf<KZGCommitmentSchemeBLS>;
@@ -80,6 +82,7 @@ pub enum AXfrAddressFoldingWitness {
 }
 
 impl AXfrAddressFoldingWitness {
+    /// Get the default folding witness.
     pub fn default(address_format: AddressFormat) -> Self {
         match address_format {
             AddressFormat::SECP256K1 => Self::Secp256k1(
@@ -88,6 +91,14 @@ impl AXfrAddressFoldingWitness {
             AddressFormat::ED25519 => {
                 Self::Ed25519(address_folding_ed25519::AXfrAddressFoldingWitnessEd25519::default())
             }
+        }
+    }
+
+    /// Get the format type of the address.
+    pub fn get_address_format(&self) -> AddressFormat {
+        match self {
+            Self::Secp256k1(_) => AddressFormat::SECP256K1,
+            Self::Ed25519(_) => AddressFormat::ED25519,
         }
     }
 
@@ -261,7 +272,7 @@ pub fn nullify(
 pub(crate) const AMOUNT_LEN: usize = 64;
 
 /// Depth of the Merkle Tree circuit.
-pub const TREE_DEPTH: usize = 20;
+pub const TREE_DEPTH: usize = 30;
 
 /// Add the commitment constraints to the constraint system
 pub fn commit_in_cs(

@@ -233,7 +233,7 @@ pub trait PolyComScheme: Sized {
     }
 
     /// Shrink this to only for verifier use.
-    fn shrink_to_verifier_only(&self) -> Result<Self>;
+    fn shrink_to_verifier_only(&self) -> Self;
 }
 
 #[cfg(test)]

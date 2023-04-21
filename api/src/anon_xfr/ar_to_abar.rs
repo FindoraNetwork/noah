@@ -6,7 +6,8 @@ use crate::anon_xfr::{
     AXfrPlonkPf, TurboPlonkCS,
 };
 use crate::keys::{KeyPair, PublicKey, PublicKeyInner, Signature};
-use crate::setup::{ProverParams, VerifierParams};
+use crate::parameters::params::ProverParams;
+use crate::parameters::params::VerifierParams;
 use crate::xfr::structs::{BlindAssetRecord, OpenAssetRecord};
 use merlin::Transcript;
 use noah_algebra::{bls12_381::BLSScalar, errors::NoahError, prelude::*};
@@ -139,15 +140,13 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
     let (mut cs, _) = build_ar_to_abar_cs(payee_witness, &output_trace);
     let witness = cs.get_and_clear_witness();
 
-    let (cs, prover_params, lagrange_pcs) = params.cs_params(None);
-
     let proof = prover_with_lagrange(
         prng,
         &mut transcript,
         &params.pcs,
-        lagrange_pcs,
-        cs,
-        prover_params,
+        params.lagrange_pcs.as_ref(),
+        &params.cs,
+        &params.prover_params,
         &witness,
     )
     .c(d!(NoahError::AXfrProofError))?;
@@ -176,13 +175,11 @@ pub fn verify_ar_to_abar_body(params: &VerifierParams, body: &ArToAbarBody) -> R
     online_inputs.push(asset_type.as_scalar());
     online_inputs.push(body.output.commitment);
 
-    let (cs, verifier_params) = params.cs_params(None);
-
     verifier(
         &mut transcript,
         &params.shrunk_vk,
-        &cs,
-        verifier_params,
+        &params.shrunk_cs,
+        &params.verifier_params,
         &online_inputs,
         &body.proof,
     )

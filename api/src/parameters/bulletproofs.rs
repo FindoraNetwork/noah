@@ -1,19 +1,19 @@
+use crate::parameters::params::{
+    BULLET_PROOF_RANGE, DEFAULT_BP_NUM_GENS, MAX_CONFIDENTIAL_RECORD_NUMBER,
+};
 use crate::parameters::{
     BULLETPROOF_CURVE25519_URS, BULLETPROOF_SECQ256K1_URS, BULLETPROOF_ZORRO_URS,
 };
-use crate::setup::{
-    BulletproofParams, BULLET_PROOF_RANGE, DEFAULT_BP_NUM_GENS, MAX_CONFIDENTIAL_RECORD_NUMBER,
-};
 use ark_serialize::{CanonicalDeserialize, Compress, Validate};
 use bulletproofs::BulletproofGens;
+use noah_algebra::prelude::*;
 use noah_algebra::secq256k1::Secq256k1BulletproofGens;
 use noah_algebra::zorro::ZorroBulletproofGens;
-use ruc::{d, RucResult};
 
 /// The trait for Bulletproofs that can be used in Bulletproofs generators.
 pub trait BulletproofURS {
     /// Load the URS for Bulletproofs.
-    fn load() -> ruc::Result<Self>
+    fn load() -> Result<Self>
     where
         Self: Sized;
 
@@ -22,7 +22,7 @@ pub trait BulletproofURS {
 }
 
 impl BulletproofURS for BulletproofParams {
-    fn load() -> ruc::Result<BulletproofParams> {
+    fn load() -> Result<BulletproofParams> {
         let urs = BULLETPROOF_CURVE25519_URS.c(d!(NoahError::MissingSRSError))?;
 
         let pp: BulletproofParams = bincode::deserialize(&urs)
@@ -38,7 +38,7 @@ impl BulletproofURS for BulletproofParams {
 }
 
 impl BulletproofURS for Secq256k1BulletproofGens {
-    fn load() -> ruc::Result<Self> {
+    fn load() -> Result<Self> {
         let urs = BULLETPROOF_SECQ256K1_URS.c(d!(NoahError::MissingSRSError))?;
 
         let reader = ark_std::io::BufReader::new(urs);
@@ -55,7 +55,7 @@ impl BulletproofURS for Secq256k1BulletproofGens {
 }
 
 impl BulletproofURS for ZorroBulletproofGens {
-    fn load() -> ruc::Result<Self> {
+    fn load() -> Result<Self> {
         let urs = BULLETPROOF_ZORRO_URS.c(d!(NoahError::MissingSRSError))?;
 
         let reader = ark_std::io::BufReader::new(urs);
