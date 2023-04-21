@@ -17,7 +17,7 @@ mod smoke_axfr_wasm {
             },
             FEE_TYPE, TREE_DEPTH,
         },
-        keys::{KeyPair, PublicKey},
+        keys::{KeyPair, KeyType, PublicKey},
         xfr::{
             asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
             structs::{
@@ -189,8 +189,8 @@ mod smoke_axfr_wasm {
     fn abar_to_ar(sender: KeyPair, receiver: KeyPair) {
         let seed: [u8; 32] = [0u8; 32];
         let mut prng = ChaChaRng::from_seed(seed);
-        let params = ProverParams::gen_abar_to_ar(TREE_DEPTH, address_format).unwrap();
-        let verify_params = VerifierParams::get_abar_to_ar(address_format).unwrap();
+        let params = ProverParams::gen_abar_to_ar(TREE_DEPTH, SECP256K1).unwrap();
+        let verify_params = VerifierParams::get_abar_to_ar(SECP256K1).unwrap();
 
         let mut mt = EphemeralMerkleTree::new().unwrap();
 
@@ -237,8 +237,8 @@ mod smoke_axfr_wasm {
     fn abar_to_bar(sender: KeyPair, receiver: KeyPair) {
         let seed: [u8; 32] = [0u8; 32];
         let mut prng = ChaChaRng::from_seed(seed);
-        let params = ProverParams::gen_abar_to_bar(TREE_DEPTH, address_format).unwrap();
-        let verify_params = VerifierParams::get_abar_to_bar(address_format).unwrap();
+        let params = ProverParams::gen_abar_to_bar(TREE_DEPTH, SECP256K1).unwrap();
+        let verify_params = VerifierParams::get_abar_to_bar(SECP256K1).unwrap();
 
         let mut mt = EphemeralMerkleTree::new().unwrap();
 
@@ -291,11 +291,7 @@ mod smoke_axfr_wasm {
         let seed: [u8; 32] = [0u8; 32];
         let mut prng = ChaChaRng::from_seed(seed);
 
-        let address_format = match input_key_type.unwrap() {
-            KeyType::Ed25519 => ED25519,
-            KeyType::Secp256k1 => SECP256K1,
-            _ => unimplemented!(),
-        };
+        let address_format = if prng.gen() { SECP256K1 } else { ED25519 };
 
         let params =
             ProverParams::gen_abar_to_abar(inputs.len(), outputs.len(), address_format).unwrap();
