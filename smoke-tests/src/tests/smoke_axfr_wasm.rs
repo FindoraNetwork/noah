@@ -17,7 +17,7 @@ mod smoke_axfr_wasm {
             },
             FEE_TYPE, TREE_DEPTH,
         },
-        keys::{KeyPair, KeyType, PublicKey},
+        keys::{KeyPair, PublicKey},
         xfr::{
             asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
             structs::{
