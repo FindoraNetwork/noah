@@ -83,12 +83,15 @@ fn abar_to_abar(
     fee: u32,
 ) {
     let mut prng = test_rng();
-    let params = ProverParams::gen_abar_to_abar(inputs.len(), outputs.len(), SECP256K1).unwrap();
-    let verifier_params = VerifierParams::load_abar_to_abar(inputs.len(), outputs.len()).unwrap();
+    let address_format = SECP256K1;
+    let params =
+        ProverParams::gen_abar_to_abar(inputs.len(), outputs.len(), address_format).unwrap();
+    let verifier_params =
+        VerifierParams::load_abar_to_abar(inputs.len(), outputs.len(), address_format).unwrap();
 
-    let sender = KeyPair::generate_secp256k1(&mut prng);
+    let sender = KeyPair::sample(&mut prng, address_format);
     let receivers: Vec<KeyPair> = (0..outputs.len())
-        .map(|_| KeyPair::generate_secp256k1(&mut prng))
+        .map(|_| KeyPair::sample(&mut prng, address_format))
         .collect();
 
     let mut oabars: Vec<OpenAnonAssetRecord> = inputs
@@ -160,11 +163,12 @@ fn abar_to_abar(
 
 fn abar_to_ar(c: &mut Criterion) {
     let mut prng = test_rng();
-    let params = ProverParams::gen_abar_to_ar(TREE_DEPTH).unwrap();
-    let verify_params = VerifierParams::get_abar_to_ar().unwrap();
+    let address_format = SECP256K1;
+    let params = ProverParams::gen_abar_to_ar(TREE_DEPTH, address_format).unwrap();
+    let verify_params = VerifierParams::get_abar_to_ar(address_format).unwrap();
 
-    let sender = KeyPair::generate_secp256k1(&mut prng);
-    let receiver = KeyPair::generate_secp256k1(&mut prng);
+    let sender = KeyPair::sample(&mut prng, address_format);
+    let receiver = KeyPair::sample(&mut prng, address_format);
 
     let fdb = MemoryDB::new();
     let cs = Arc::new(RwLock::new(ChainState::new(fdb, "abar_ar".to_owned(), 0)));
@@ -221,11 +225,12 @@ fn abar_to_ar(c: &mut Criterion) {
 
 fn abar_to_bar(c: &mut Criterion) {
     let mut prng = test_rng();
-    let params = ProverParams::gen_abar_to_bar(TREE_DEPTH).unwrap();
-    let verify_params = VerifierParams::get_abar_to_bar().unwrap();
+    let address_format = SECP256K1;
+    let params = ProverParams::gen_abar_to_bar(TREE_DEPTH, address_format).unwrap();
+    let verify_params = VerifierParams::get_abar_to_bar(address_format).unwrap();
 
-    let sender = KeyPair::generate_secp256k1(&mut prng);
-    let receiver = KeyPair::generate_secp256k1(&mut prng);
+    let sender = KeyPair::sample(&mut prng, address_format);
+    let receiver = KeyPair::sample(&mut prng, address_format);
 
     let fdb = MemoryDB::new();
     let cs = Arc::new(RwLock::new(ChainState::new(fdb, "abar_bar".to_owned(), 0)));
@@ -293,8 +298,9 @@ fn ar_to_abar(c: &mut Criterion) {
     let params = ProverParams::gen_ar_to_abar().unwrap();
     let verify_params = VerifierParams::get_ar_to_abar().unwrap();
 
-    let sender = KeyPair::generate_secp256k1(&mut prng);
-    let receiver = KeyPair::generate_secp256k1(&mut prng);
+    let address_format = SECP256K1;
+    let sender = KeyPair::sample(&mut prng, address_format);
+    let receiver = KeyPair::sample(&mut prng, address_format);
 
     let (bar, memo) = {
         let ar = AssetRecordTemplate::with_no_asset_tracing(
@@ -339,8 +345,9 @@ fn bar_to_abar(c: &mut Criterion) {
     let params = ProverParams::gen_bar_to_abar().unwrap();
     let verify_params = VerifierParams::get_bar_to_abar().unwrap();
 
-    let sender = KeyPair::generate_secp256k1(&mut prng);
-    let receiver = KeyPair::generate_secp256k1(&mut prng);
+    let address_format = SECP256K1;
+    let sender = KeyPair::sample(&mut prng, address_format);
+    let receiver = KeyPair::sample(&mut prng, address_format);
 
     let (bar, memo) = {
         let ar = AssetRecordTemplate::with_no_asset_tracing(

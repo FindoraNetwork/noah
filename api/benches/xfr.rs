@@ -1,5 +1,6 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use noah::parameters::bulletproofs::BulletproofParams;
+use noah::parameters::AddressFormat::SECP256K1;
 use noah::{
     keys::KeyPair,
     xfr::{
@@ -468,7 +469,7 @@ fn batch_verify_multi_asset_transfer(
 fn gen_key_pair_vec<R: CryptoRng + RngCore>(size: usize, prng: &mut R) -> Vec<KeyPair> {
     let mut keys = vec![];
     for _i in 0..size {
-        keys.push(KeyPair::generate_secp256k1(prng));
+        keys.push(KeyPair::sample(prng, SECP256K1));
     }
     keys
 }

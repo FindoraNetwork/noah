@@ -108,7 +108,7 @@ impl ScalarMulProof {
             let mut bits = secret_key.into_bigint().to_bits_le();
             let mut bits_var = Vec::new();
 
-            bits.truncate(Fq::MODULUS_BIT_SIZE as usize);
+            bits.truncate(Fr::MODULUS_BIT_SIZE as usize);
 
             for bit in bits.iter() {
                 let (bit_var, one_minus_bit_var, product) = cs
@@ -126,7 +126,7 @@ impl ScalarMulProof {
             let mut wrapped_bits = Vec::new();
             let mut bits_var = Vec::new();
 
-            for _ in 0..Fq::MODULUS_BIT_SIZE {
+            for _ in 0..Fr::MODULUS_BIT_SIZE {
                 let (bit_var, one_minus_bit_var, product) = cs
                     .allocate_multiplier(None)
                     .c(d!(NoahError::R1CSProofError))?;
@@ -154,7 +154,7 @@ impl ScalarMulProof {
         let points = {
             let mut v = Vec::new();
             let mut cur = Ed25519Point::get_base().get_raw().into_group();
-            for _ in 0..Fq::MODULUS_BIT_SIZE {
+            for _ in 0..Fr::MODULUS_BIT_SIZE {
                 v.push(cur.into_affine());
                 EdwardsProjective::double_in_place(&mut cur);
             }

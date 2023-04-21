@@ -822,7 +822,7 @@ mod kzg_test {
         )
         .is_ok());
 
-        let prover_cs = cs.shrink_to_verifier_only().unwrap();
+        let prover_cs = cs.shrink_to_verifier_only();
 
         let mut transcript = Transcript::new(b"TestTurboPlonk");
         assert!(prover(

@@ -533,7 +533,7 @@ mod tests_kzg_impl {
         let res = pcs.verify(&commitment_value, degree, &point, &seven, &proof);
         pnk!(res);
 
-        let new_pcs = pcs.shrink_to_verifier_only().unwrap();
+        let new_pcs = pcs.shrink_to_verifier_only();
         let res = new_pcs.verify(&commitment_value, degree, &point, &seven, &proof);
         pnk!(res);
 
