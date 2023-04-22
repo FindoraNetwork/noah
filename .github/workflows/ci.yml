@@ -10,7 +10,7 @@ env:
 
 jobs:
   style:
-    name: Check Style
+    name: Check style
     runs-on: ubuntu-latest
     strategy:
       fail-fast: true
