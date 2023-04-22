@@ -235,9 +235,7 @@ impl ProverParams {
     }
 
     /// Obtain the parameters for anonymous to confidential.
-    pub fn gen_abar_to_bar(
-        address_format: AddressFormat,
-    ) -> Result<ProverParams> {
+    pub fn gen_abar_to_bar(address_format: AddressFormat) -> Result<ProverParams> {
         let label = match address_format {
             SECP256K1 => String::from("abar_to_bar_secp256k1"),
             ED25519 => String::from("abar_to_bar_ed25519"),
@@ -320,9 +318,9 @@ impl ProverParams {
         let lagrange_pcs = load_lagrange_params(cs_size);
 
         let verifier_params = match VerifierParams::load_abar_to_bar(address_format).ok() {
-                Some(v) => Some(v.verifier_params),
-                None => None,
-            };
+            Some(v) => Some(v.verifier_params),
+            None => None,
+        };
 
         let prover_params =
             indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), verifier_params).unwrap();
@@ -384,9 +382,7 @@ impl ProverParams {
     }
 
     /// Obtain the parameters for anonymous to transparent.
-    pub fn gen_abar_to_ar(
-        address_format: AddressFormat,
-    ) -> Result<ProverParams> {
+    pub fn gen_abar_to_ar(address_format: AddressFormat) -> Result<ProverParams> {
         let label = match address_format {
             SECP256K1 => String::from("abar_to_ar_secp256k1"),
             ED25519 => String::from("abar_to_ar_ed25519"),
@@ -440,11 +436,10 @@ impl ProverParams {
         let pcs = load_srs_params(cs_size)?;
         let lagrange_pcs = load_lagrange_params(cs_size);
 
-        let verifier_params =
-            match VerifierParams::load_abar_to_ar(address_format).ok() {
-                Some(v) => Some(v.verifier_params),
-                None => None,
-            };
+        let verifier_params = match VerifierParams::load_abar_to_ar(address_format).ok() {
+            Some(v) => Some(v.verifier_params),
+            None => None,
+        };
 
         let prover_params =
             indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), verifier_params).unwrap();
@@ -540,7 +535,7 @@ impl VerifierParams {
         match Self::load_abar_to_bar(address_format) {
             Ok(vk) => Ok(vk),
             _ => {
-                let prover_params = ProverParams::gen_abar_to_bar( address_format)?;
+                let prover_params = ProverParams::gen_abar_to_bar(address_format)?;
                 Ok(VerifierParams::from(prover_params))
             }
         }
@@ -637,7 +632,7 @@ impl VerifierParams {
         match Self::load_abar_to_ar(address_format) {
             Ok(vk) => Ok(vk),
             _ => {
-                let prover_params = ProverParams::gen_abar_to_ar( address_format)?;
+                let prover_params = ProverParams::gen_abar_to_ar(address_format)?;
                 Ok(VerifierParams::from(prover_params))
             }
         }
