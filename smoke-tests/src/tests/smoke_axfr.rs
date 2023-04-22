@@ -249,7 +249,7 @@ mod smoke_axfr {
             SecretKey::Secp256k1(_) => SECP256K1,
         };
 
-        let params = ProverParams::gen_abar_to_ar(TREE_DEPTH, address_format).unwrap();
+        let params = ProverParams::gen_abar_to_ar(address_format).unwrap();
         let verify_params = VerifierParams::get_abar_to_ar(address_format).unwrap();
 
         let fdb = MemoryDB::new();
