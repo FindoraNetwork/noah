@@ -25,7 +25,7 @@ mod smoke_axfr_compatibility {
                 AnonAssetRecord, AxfrOwnerMemo, MTLeafInfo, MTNode, MTPath, OpenAnonAssetRecord,
                 OpenAnonAssetRecordBuilder,
             },
-            FEE_TYPE, TREE_DEPTH,
+            FEE_TYPE,
         },
         keys::KeyPair,
         xfr::{
@@ -309,7 +309,7 @@ mod smoke_axfr_compatibility {
         };
 
         let mut prng = test_rng();
-        let params = ProverParams::gen_abar_to_ar(TREE_DEPTH, address_format).unwrap();
+        let params = ProverParams::gen_abar_to_ar(address_format).unwrap();
         let verify_params = VerifierParams::get_abar_to_ar(address_format).unwrap();
         let receiver = if prng.gen() {
             KeyPair::sample(&mut prng, SECP256K1)
@@ -456,7 +456,7 @@ mod smoke_axfr_compatibility {
             SecretKey::Secp256k1(_) => SECP256K1,
         };
 
-        let params = ProverParams::gen_abar_to_bar(TREE_DEPTH, address_format).unwrap();
+        let params = ProverParams::gen_abar_to_bar(address_format).unwrap();
         let verify_params = VerifierParams::get_abar_to_bar(address_format).unwrap();
         let receiver = if prng.gen() {
             KeyPair::sample(&mut prng, SECP256K1)

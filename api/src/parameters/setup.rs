@@ -196,7 +196,7 @@ fn gen_transfer_vk(directory: PathBuf, address_format: AddressFormat) {
 fn gen_abar_to_bar_vk(path: PathBuf) {
     println!("Generating the verifying key for ABAR TO BAR for secp256k1 ...");
     let mut new_path = path.clone();
-    let user_params = ProverParams::gen_abar_to_bar(TREE_DEPTH, SECP256K1).unwrap();
+    let user_params = ProverParams::gen_abar_to_bar(SECP256K1).unwrap();
     let node_params = VerifierParams::from(user_params);
     println!(
         "the size of the constraint system for ABAR TO BAR for secp256k1: {}",
@@ -213,7 +213,7 @@ fn gen_abar_to_bar_vk(path: PathBuf) {
 
     println!("Generating the verifying key for ABAR TO BAR for ed25519 ...");
     let mut new_path = path.clone();
-    let user_params = ProverParams::gen_abar_to_bar(TREE_DEPTH, ED25519).unwrap();
+    let user_params = ProverParams::gen_abar_to_bar(ED25519).unwrap();
     let node_params = VerifierParams::from(user_params);
     println!(
         "the size of the constraint system for ABAR TO BAR for ed25519: {}",
@@ -273,7 +273,7 @@ fn gen_ar_to_abar_vk(mut path: PathBuf) {
 fn gen_abar_to_ar_vk(path: PathBuf) {
     println!("Generating the verifying key for ABAR TO AR for secp256k1 ...");
     let mut new_path = path.clone();
-    let user_params = ProverParams::gen_abar_to_ar(TREE_DEPTH, SECP256K1).unwrap();
+    let user_params = ProverParams::gen_abar_to_ar(SECP256K1).unwrap();
     let node_params = VerifierParams::from(user_params);
     println!(
         "the size of the constraint system for ABAR TO AR for secp256k1: {}",
@@ -290,7 +290,7 @@ fn gen_abar_to_ar_vk(path: PathBuf) {
 
     println!("Generating the verifying key for ABAR TO AR for ed25519 ...");
     let mut new_path = path.clone();
-    let user_params = ProverParams::gen_abar_to_ar(TREE_DEPTH, ED25519).unwrap();
+    let user_params = ProverParams::gen_abar_to_ar(ED25519).unwrap();
     let node_params = VerifierParams::from(user_params);
     println!(
         "the size of the constraint system for ABAR TO AR for ed25519: {}",

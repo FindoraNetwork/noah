@@ -16,7 +16,7 @@ mod smoke_axfr {
                 AnonAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonAssetRecord,
                 OpenAnonAssetRecordBuilder,
             },
-            FEE_TYPE, TREE_DEPTH,
+            FEE_TYPE,
         },
         keys::{KeyPair, KeyType, PublicKey},
         xfr::{
@@ -249,7 +249,7 @@ mod smoke_axfr {
             SecretKey::Secp256k1(_) => SECP256K1,
         };
 
-        let params = ProverParams::gen_abar_to_ar(TREE_DEPTH, address_format).unwrap();
+        let params = ProverParams::gen_abar_to_ar(address_format).unwrap();
         let verify_params = VerifierParams::get_abar_to_ar(address_format).unwrap();
 
         let fdb = MemoryDB::new();
@@ -362,7 +362,7 @@ mod smoke_axfr {
             SecretKey::Secp256k1(_) => SECP256K1,
         };
 
-        let params = ProverParams::gen_abar_to_bar(TREE_DEPTH, address_format).unwrap();
+        let params = ProverParams::gen_abar_to_bar(address_format).unwrap();
         let verify_params = VerifierParams::get_abar_to_bar(address_format).unwrap();
 
         let fdb = MemoryDB::new();
