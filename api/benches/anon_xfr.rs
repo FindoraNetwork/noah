@@ -226,7 +226,7 @@ fn abar_to_ar(c: &mut Criterion) {
 fn abar_to_bar(c: &mut Criterion) {
     let mut prng = test_rng();
     let address_format = SECP256K1;
-    let params = ProverParams::gen_abar_to_bar(TREE_DEPTH, address_format).unwrap();
+    let params = ProverParams::gen_abar_to_bar(address_format).unwrap();
     let verify_params = VerifierParams::get_abar_to_bar(address_format).unwrap();
 
     let sender = KeyPair::sample(&mut prng, address_format);
