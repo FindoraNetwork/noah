@@ -237,7 +237,7 @@ mod smoke_axfr_wasm {
     fn abar_to_bar(sender: KeyPair, receiver: KeyPair) {
         let seed: [u8; 32] = [0u8; 32];
         let mut prng = ChaChaRng::from_seed(seed);
-        let params = ProverParams::gen_abar_to_bar(TREE_DEPTH, SECP256K1).unwrap();
+        let params = ProverParams::gen_abar_to_bar(SECP256K1).unwrap();
         let verify_params = VerifierParams::get_abar_to_bar(SECP256K1).unwrap();
 
         let mut mt = EphemeralMerkleTree::new().unwrap();

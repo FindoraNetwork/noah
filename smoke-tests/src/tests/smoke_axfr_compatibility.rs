@@ -456,7 +456,7 @@ mod smoke_axfr_compatibility {
             SecretKey::Secp256k1(_) => SECP256K1,
         };
 
-        let params = ProverParams::gen_abar_to_bar(TREE_DEPTH, address_format).unwrap();
+        let params = ProverParams::gen_abar_to_bar(address_format).unwrap();
         let verify_params = VerifierParams::get_abar_to_bar(address_format).unwrap();
         let receiver = if prng.gen() {
             KeyPair::sample(&mut prng, SECP256K1)

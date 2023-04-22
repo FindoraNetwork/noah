@@ -225,7 +225,7 @@ mod smoke_axfr_secp256k1_address {
     #[test]
     fn abar_to_secp256k1() {
         let mut prng = test_rng();
-        let params = ProverParams::gen_abar_to_bar(TREE_DEPTH, SECP256K1).unwrap();
+        let params = ProverParams::gen_abar_to_bar(SECP256K1).unwrap();
         let verify_params = VerifierParams::get_abar_to_bar(SECP256K1).unwrap();
 
         let sender = KeyPair::sample(&mut prng, SECP256K1);
