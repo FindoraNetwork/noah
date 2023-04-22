@@ -32,6 +32,7 @@ serialize_deserialize!(Signature);
 #[cfg(test)]
 mod test {
     use crate::keys::{KeyPair, PublicKey, PublicKeyInner, SecretKey, Signature};
+    use crate::parameters::AddressFormat::SECP256K1;
     use crate::ristretto::CompressedRistretto;
     use crate::serialization::NoahFromToBytes;
     use crate::xfr::{
@@ -110,7 +111,7 @@ mod test {
     #[test]
     fn anon_xfr_pub_key_serialization() {
         let mut prng = test_rng();
-        let keypair = KeyPair::generate_secp256k1(&mut prng);
+        let keypair = KeyPair::sample(&mut prng, SECP256K1);
 
         let mut pk_mp_vec = vec![];
         assert_eq!(
@@ -139,7 +140,7 @@ mod test {
     #[test]
     fn public_key_message_pack_serialization() {
         let mut prng = test_rng();
-        let keypair = KeyPair::generate_secp256k1(&mut prng);
+        let keypair = KeyPair::sample(&mut prng, SECP256K1);
 
         let mut pk_mp_vec = vec![];
         assert_eq!(
@@ -175,7 +176,7 @@ mod test {
     #[test]
     fn signature_message_pack_serialization() {
         let mut prng = test_rng();
-        let keypair = KeyPair::generate_secp256k1(&mut prng);
+        let keypair = KeyPair::sample(&mut prng, SECP256K1);
         let message = [10u8; 55];
 
         let signature = keypair.sign(&message).unwrap();
@@ -205,7 +206,7 @@ mod test {
     #[test]
     fn serialize_and_deserialize_as_json() {
         let mut prng = test_rng();
-        let keypair = KeyPair::generate_secp256k1(&mut prng);
+        let keypair = KeyPair::sample(&mut prng, SECP256K1);
         let test_struct = StructWithPubKey {
             key: keypair.pub_key,
         };

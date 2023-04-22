@@ -39,7 +39,7 @@ fn test_merkle_tree() {
     let proofx = mt.generate_proof_with_depth(sid_x, TREE_DEPTH).unwrap();
 
     assert!(verify(BLSScalar::one(), &proofx));
-    assert!(mt.generate_proof_with_depth(sid_x, 21).is_err());
+    assert!(mt.generate_proof_with_depth(sid_x, 31).is_err());
     assert!(mt.generate_proof_with_depth(sid_x, 2).is_err());
     assert_eq!(
         mt.get_root_with_depth_and_version(TREE_DEPTH, v1).unwrap(),

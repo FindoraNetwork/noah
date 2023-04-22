@@ -66,7 +66,7 @@ impl ScalarMulProof {
         public_key_var: &PointVar,
         secret_key_var: &ScalarVar,
         public_key: &Option<Affine>,
-        secret_key: &Option<Fq>,
+        secret_key: &Option<Fr>,
     ) -> Result<()> {
         assert_eq!(public_key.is_some(), secret_key.is_some());
 
@@ -291,8 +291,8 @@ impl ScalarMulProof {
             &mut prover,
             &public_key_var,
             &secret_key_var,
-            &Some(public_key.clone()),
-            &Some(secret_key_fq.clone()),
+            &Some(public_key),
+            &Some(secret_key),
         )?;
 
         let proof = prover

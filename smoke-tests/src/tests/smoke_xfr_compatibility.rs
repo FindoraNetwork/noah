@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod smoke_xfr_compatibility {
-    use noah::setup::BulletproofParams;
+    use noah::parameters::bulletproofs::BulletproofParams;
     use noah::xfr::{structs::*, *};
     use noah_algebra::prelude::*;
 

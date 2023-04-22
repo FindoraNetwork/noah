@@ -617,6 +617,7 @@ fn build_record_input_from_template<R: CryptoRng + RngCore>(
 mod test {
     use super::{build_blind_asset_record, build_open_asset_record, open_blind_asset_record};
     use crate::keys::KeyPair;
+    use crate::parameters::AddressFormat::SECP256K1;
     use crate::xfr::{
         asset_record::AssetRecordType,
         structs::{
@@ -637,7 +638,7 @@ mod test {
 
         let amount = 100u64;
         let asset_type = AssetType::from_identical_byte(0u8);
-        let keypair = KeyPair::generate_secp256k1(&mut prng);
+        let keypair = KeyPair::sample(&mut prng, SECP256K1);
         let tracing_policy = match asset_tracing {
             true => {
                 let tracer_keys = AssetTracerKeyPair::generate(&mut prng);
@@ -860,7 +861,7 @@ mod test {
         let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
 
-        let keypair = KeyPair::generate_secp256k1(&mut prng);
+        let keypair = KeyPair::sample(&mut prng, SECP256K1);
         let ar = AssetRecordTemplate::with_no_asset_tracing(
             amt,
             asset_type,
@@ -914,7 +915,7 @@ mod test {
         let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
 
-        let keypair = KeyPair::generate_secp256k1(&mut prng);
+        let keypair = KeyPair::sample(&mut prng, SECP256K1);
         let asset_type: AssetType = AssetType(prng.gen());
         let amount = 10u64;
         let ar = AssetRecordTemplate::with_no_asset_tracing(
