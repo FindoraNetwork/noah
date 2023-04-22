@@ -15,7 +15,7 @@ mod smoke_axfr_wasm {
                 AnonAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonAssetRecord,
                 OpenAnonAssetRecordBuilder,
             },
-            FEE_TYPE, TREE_DEPTH,
+            FEE_TYPE,
         },
         keys::{KeyPair, PublicKey},
         xfr::{
