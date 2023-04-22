@@ -22,6 +22,29 @@ jobs:
       - name: fmt
         run: cargo fmt --all -- --check
 
+  check-benches:
+    name: Check benchmarks
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -Dwarnings
+      CARGO_TERM_COLOR: always
+    strategy:
+      fail-fast: true
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-benches-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Check
+        run: |
+          cargo bench --no-run
+
   test-accumulators:
     name: Test (accumulators/)
     runs-on: ubuntu-latest

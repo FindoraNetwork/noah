@@ -14,7 +14,7 @@ use noah::{
             AnonAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonAssetRecord,
             OpenAnonAssetRecordBuilder,
         },
-        FEE_TYPE, TREE_DEPTH,
+        FEE_TYPE,
     },
     keys::KeyPair,
     xfr::{
