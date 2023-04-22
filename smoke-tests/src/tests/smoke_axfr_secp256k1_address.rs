@@ -14,7 +14,6 @@ mod smoke_axfr_secp256k1_address {
                 AnonAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonAssetRecord,
                 OpenAnonAssetRecordBuilder,
             },
-            TREE_DEPTH,
         },
         keys::{KeyPair, PublicKey},
         xfr::{
