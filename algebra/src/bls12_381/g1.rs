@@ -29,6 +29,10 @@ static mut WASM_INSTANCE: Option<Instance> = None;
 /// Init fast msm
 pub async fn init_fast_msm_wasm() -> core::result::Result<(), JsValue> {
     unsafe {
+        if WASM_INSTANCE.is_some() {
+            return Ok(());
+        }
+
         let a: JsValue = JsFuture::from(instantiate_buffer(WASM, &Object::new())).await?;
         WASM_INSTANCE = Some(Reflect::get(&a, &"instance".into())?.dyn_into()?);
     }
@@ -132,14 +136,7 @@ impl Group for BLSG1 {
     #[inline]
     #[cfg(not(target_arch = "wasm32"))]
     fn multi_exp(scalars: &[&Self::ScalarType], points: &[&Self]) -> Self {
-        use ark_ec::VariableBaseMSM;
-
-        let scalars_raw: Vec<_> = scalars.iter().map(|r| r.0).collect();
-        let points_raw = G1Projective::normalize_batch(
-            &points.iter().map(|r| r.0).collect::<Vec<G1Projective>>(),
-        );
-
-        Self(G1Projective::msm(&points_raw, scalars_raw.as_ref()).unwrap())
+        Self::common_multi_exp(scalars, points)
     }
 
     #[inline]
@@ -149,6 +146,10 @@ impl Group for BLSG1 {
 
         // unsafe here is alright because WASM is single threaded
         unsafe {
+            if WASM_INSTANCE.is_none() {
+                return Self::common_multi_exp(scalars, points);
+            }
+
             let c = WASM_INSTANCE
                 .clone()
                 .expect("FastMSM WASM not initialized")
@@ -324,5 +325,17 @@ impl BLSG1 {
         } else {
             Self(G1Projective::new(x.0, y.0, Fq::one()))
         }
+    }
+
+    #[inline]
+    fn common_multi_exp(scalars: &[&<Self as Group>::ScalarType], points: &[&Self]) -> Self {
+        use ark_ec::VariableBaseMSM;
+
+        let scalars_raw: Vec<_> = scalars.iter().map(|r| r.0).collect();
+        let points_raw = G1Projective::normalize_batch(
+            &points.iter().map(|r| r.0).collect::<Vec<G1Projective>>(),
+        );
+
+        Self(G1Projective::msm(&points_raw, scalars_raw.as_ref()).unwrap())
     }
 }
