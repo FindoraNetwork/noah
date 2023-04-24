@@ -153,7 +153,6 @@ tag = 'v1.1.4'
 default = [
     'std',
     'u64_backend',
-    'parallel'
 ]
 debug = [ 'noah-plonk/debug' ]
 std = ['curve25519-dalek/std', 'bulletproofs/std', 'ark-bulletproofs/std', 'ark-std/std', 'ark-ec/std']
