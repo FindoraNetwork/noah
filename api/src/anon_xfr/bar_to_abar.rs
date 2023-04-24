@@ -123,6 +123,13 @@ pub fn batch_verify_bar_to_abar_note(
     notes: &[&BarToAbarNote],
     bar_pub_keys: &[&PublicKey],
 ) -> Result<()> {
+    // Check the memo size.
+    for note in notes.iter() {
+        if note.body.memo.size() > MAX_AXFR_MEMO_SIZE {
+            return Err(eg!(NoahError::AXfrVerificationError));
+        }
+    }
+
     let is_ok = notes
         .par_iter()
         .zip(bar_pub_keys)

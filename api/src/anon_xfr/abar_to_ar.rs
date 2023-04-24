@@ -214,7 +214,7 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
         return Err(eg!(NoahError::ParameterError));
     }
 
-    //  require the output memo is none
+    // Require the output memo is none.
     if note.body.memo.is_some() {
         return Err(eg!(NoahError::ParameterError));
     }
@@ -272,6 +272,13 @@ pub fn batch_verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default + Sync
         note.body.output.amount.is_confidential() || note.body.output.asset_type.is_confidential()
     }) {
         return Err(eg!(NoahError::ParameterError));
+    }
+
+    // Require the output memo is none.
+    for note in notes.iter() {
+        if note.body.memo.is_some() {
+            return Err(eg!(NoahError::ParameterError));
+        }
     }
 
     if merkle_roots

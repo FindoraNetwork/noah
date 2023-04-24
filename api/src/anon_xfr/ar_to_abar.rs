@@ -86,6 +86,13 @@ pub fn batch_verify_ar_to_abar_note(
     params: &VerifierParams,
     notes: &[&ArToAbarNote],
 ) -> Result<()> {
+    // Check the memo size.
+    for note in notes.iter() {
+        if note.body.memo.size() > MAX_AXFR_MEMO_SIZE {
+            return Err(eg!(NoahError::AXfrVerificationError));
+        }
+    }
+
     let is_ok = notes
         .par_iter()
         .map(|note| {

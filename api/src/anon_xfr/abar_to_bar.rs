@@ -412,6 +412,11 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
         return Err(eg!(NoahError::AXfrVerificationError));
     }
 
+    // Check the memo size.
+    for note in notes.iter() {
+        check_memo_size(&note.body.output, &note.body.memo)?;
+    }
+
     // Reject anonymous-to-confidential notes whose outputs are transparent.
     if notes.par_iter().any(|note| {
         note.body.output.get_record_type()

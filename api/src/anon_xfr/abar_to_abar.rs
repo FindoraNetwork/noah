@@ -332,6 +332,15 @@ pub fn batch_verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default + Sync +
         return Err(eg!(NoahError::AXfrVerificationError));
     }
 
+    // Check the memo size.
+    for note in notes.iter() {
+        for memo in note.body.owner_memos.iter() {
+            if memo.size() > MAX_AXFR_MEMO_SIZE {
+                return Err(eg!(NoahError::AXfrVerificationError));
+            }
+        }
+    }
+
     let is_ok = params
         .par_iter()
         .zip(notes)

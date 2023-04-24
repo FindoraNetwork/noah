@@ -158,7 +158,6 @@ mod smoke_xfr_tracing {
         assert_eq!(recv_oar2.amount, amount_out2);
         assert_eq!(recv_oar2.blind_asset_record.public_key, receiver2.get_pk());
 
-       println!("{}",xfr_note.body.asset_tracing_memos)
         // check asset tracing
         assert_eq!(xfr_note.body.asset_tracing_memos.len(), 4);
         assert_eq!(xfr_note.body.asset_tracing_memos[0].len(), 1);
