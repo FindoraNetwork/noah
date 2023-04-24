@@ -15,6 +15,7 @@ use crate::anon_xfr::{
 use crate::keys::{KeyPair, PublicKey, SecretKey};
 use crate::parameters::params::ProverParams;
 use crate::parameters::params::VerifierParams;
+use crate::xfr::structs::check_memo_size;
 use crate::xfr::{
     asset_record::{build_open_asset_record, AssetRecordType},
     structs::{AssetRecordTemplate, BlindAssetRecord, OwnerMemo, XfrAmount, XfrAssetType},
@@ -280,6 +281,8 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     if *merkle_root != note.body.merkle_root {
         return Err(eg!(NoahError::AXfrVerificationError));
     }
+
+    check_memo_size(&note.body.output, &note.body.memo)?;
 
     let bar = note.body.output.clone();
     let pc_gens = PedersenCommitmentRistretto::default();

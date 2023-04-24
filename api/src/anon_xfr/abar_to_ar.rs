@@ -214,6 +214,11 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
         return Err(eg!(NoahError::ParameterError));
     }
 
+    //  require the output memo is none
+    if note.body.memo.is_some() {
+        return Err(eg!(NoahError::ParameterError));
+    }
+
     let mut transcript = Transcript::new(ABAR_TO_AR_FOLDING_PROOF_TRANSCRIPT);
 
     let address_folding_public_input = match &note.folding_instance {

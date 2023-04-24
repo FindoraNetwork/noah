@@ -1,7 +1,7 @@
 use crate::anon_xfr::{
     commit, commit_in_cs,
     structs::{AnonAssetRecord, AxfrOwnerMemo, OpenAnonAssetRecord, OpenAnonAssetRecordBuilder},
-    AXfrPlonkPf, TurboPlonkCS, TWO_POW_32,
+    AXfrPlonkPf, TurboPlonkCS, MAX_AXFR_MEMO_SIZE, TWO_POW_32,
 };
 use crate::keys::{KeyPair, PublicKey, PublicKeyInner, Signature};
 use crate::parameters::params::ProverParams;
@@ -99,6 +99,11 @@ pub fn verify_bar_to_abar_note(
     note: &BarToAbarNote,
     bar_pub_key: &PublicKey,
 ) -> Result<()> {
+    // Check the memo size.
+    if note.body.memo.size() > MAX_AXFR_MEMO_SIZE {
+        return Err(eg!(NoahError::AXfrVerificationError));
+    }
+
     verify_bar_to_abar(
         params,
         &note.body.input,

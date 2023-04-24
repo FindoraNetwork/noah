@@ -14,7 +14,7 @@ use crate::anon_xfr::{
         OpenAnonAssetRecord, PayeeWitness, PayeeWitnessVars, PayerWitness, PayerWitnessVars,
     },
     AXfrAddressFoldingInstance, AXfrAddressFoldingWitness, AXfrPlonkPf, TurboPlonkCS, AMOUNT_LEN,
-    FEE_TYPE, TREE_DEPTH,
+    FEE_TYPE, MAX_AXFR_MEMO_SIZE, TREE_DEPTH,
 };
 use crate::errors::NoahError;
 use crate::keys::{KeyPair, PublicKey, PublicKeyInner, SecretKey};
@@ -272,6 +272,14 @@ pub fn verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default>(
     if *merkle_root != note.body.merkle_root {
         return Err(eg!(NoahError::AXfrVerificationError));
     }
+
+    // Check the memo size.
+    for memo in note.body.owner_memos.iter() {
+        if memo.size() > MAX_AXFR_MEMO_SIZE {
+            return Err(eg!(NoahError::AXfrVerificationError));
+        }
+    }
+
     let payees_commitments = note
         .body
         .outputs
