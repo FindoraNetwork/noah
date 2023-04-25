@@ -604,10 +604,10 @@ pub fn check_memo_size(output: &BlindAssetRecord, memo: &Option<OwnerMemo>) -> R
         return Ok(());
     }
 
-    let memo = memo.clone().unwrap(); //safety unwrap
+    let memo = memo.as_ref().unwrap(); //safety unwrap
 
-    match output.public_key.inner() {
-        PublicKeyInner::Ed25519(_) => {
+    match (memo.key_type, output.public_key.inner()) {
+        (KeyType.Ed25519, PublicKeyInner::Ed25519(_)) => {
             if memo.blind_share_bytes.len() != Ed25519Point::COMPRESSED_LEN
                 || (output.amount.is_confidential()
                     && output.asset_type.is_confidential()
@@ -624,7 +624,7 @@ pub fn check_memo_size(output: &BlindAssetRecord, memo: &Option<OwnerMemo>) -> R
 
             Ok(())
         }
-        PublicKeyInner::Secp256k1(_) => {
+        (KeyType.Secp256k1, PublicKeyInner::Secp256k1(_)) => {
             if memo.blind_share_bytes.len() != SECP256K1G1::COMPRESSED_LEN
                 || (output.amount.is_confidential()
                     && output.asset_type.is_confidential()
@@ -641,7 +641,7 @@ pub fn check_memo_size(output: &BlindAssetRecord, memo: &Option<OwnerMemo>) -> R
 
             Ok(())
         }
-        PublicKeyInner::EthAddress(_) => unreachable!(),
+        _ => return Err(eg!(NoahError::AXfrVerificationError)),
     }
 }
 
