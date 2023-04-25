@@ -606,7 +606,7 @@ pub fn check_memo_size(output: &BlindAssetRecord, memo: &Option<OwnerMemo>) -> R
 
     let memo = memo.as_ref().unwrap(); //safety unwrap
 
-    match (memo.key_type, output.public_key.inner()) {
+    match (&memo.key_type, output.public_key.inner()) {
         (KeyType::Ed25519, PublicKeyInner::Ed25519(_)) => {
             if memo.blind_share_bytes.len() != Ed25519Point::COMPRESSED_LEN
                 || (output.amount.is_confidential()
