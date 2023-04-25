@@ -128,4 +128,4 @@ parallel = [
     'noah-algebra/parallel',
     'noah-plonk/parallel'
 ]
-tracer-memo = ['noah/tracer-memo']
+xfr-tracing = ['noah/xfr-tracing']

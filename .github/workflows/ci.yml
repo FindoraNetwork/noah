@@ -279,8 +279,8 @@ jobs:
           cargo nextest run --features=parallel
           cargo test --doc
   
-  xfr_tracer_check:
-    name: Check xfr-tracer
+  xfr_tracing_check:
+    name: Check xfr-tracing
     runs-on: ubuntu-latest
     env:
       RUSTFLAGS: -Dwarnings
@@ -301,7 +301,7 @@ jobs:
       - name: Parallel test
         run: |
           cd smoke-tests/
-          cargo nextest run --features=tracer-memo
+          cargo nextest run --features=xfr-tracing
           cargo test --doc
 
   consistency_check:

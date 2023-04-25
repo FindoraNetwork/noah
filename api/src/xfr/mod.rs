@@ -23,6 +23,7 @@ pub mod proofs;
 /// Module for shared structures.
 pub mod structs;
 
+#[cfg(feature = "xfr-tracing")]
 #[cfg(test)]
 pub(crate) mod tests;
 
@@ -496,7 +497,7 @@ pub fn batch_verify_xfr_notes<R: CryptoRng + RngCore>(
         if xfr_note.body.outputs.len() != xfr_note.body.owners_memos.len() {
             return Err(eg!(NoahError::AXfrVerifierParamsError));
         }
-        #[cfg(not(feature = "tracer-memo"))]
+        #[cfg(not(feature = "xfr-tracing"))]
         if xfr_note
             .body
             .asset_tracing_memos
