@@ -29,6 +29,9 @@ extern crate serde_derive;
 #[macro_use]
 extern crate lazy_static;
 
+/// The wrapper for next anonymous credentials.
+pub mod anon_next;
+
 /// The wrapper for anonymous credentials.
 pub mod anon_creds;
 /// Module for anonymous transfer.
