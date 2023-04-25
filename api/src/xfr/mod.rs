@@ -496,6 +496,15 @@ pub fn batch_verify_xfr_notes<R: CryptoRng + RngCore>(
         if xfr_note.body.outputs.len() != xfr_note.body.owners_memos.len() {
             return Err(eg!(NoahError::AXfrVerifierParamsError));
         }
+        #[cfg(not(feature = "tracer-memo"))]
+        if xfr_note
+            .body
+            .asset_tracing_memos
+            .iter()
+            .any(|x| !x.is_empty())
+        {
+            return Err(eg!(NoahError::AXfrVerificationError));
+        }
         for (output, memo) in xfr_note
             .body
             .outputs

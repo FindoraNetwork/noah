@@ -117,7 +117,7 @@ default-features = false
 
 [features]
 default = [
-    'std'
+    'std',
 ]
 debug = ['noah-plonk/debug', 'noah/debug']
 std = ['curve25519-dalek/std', 'noah/std', 'bulletproofs/std', 'ark-bulletproofs/std', 'ark-std/std']
@@ -128,3 +128,4 @@ parallel = [
     'noah-algebra/parallel',
     'noah-plonk/parallel'
 ]
+tracer-memo = ['noah/tracer-memo']
