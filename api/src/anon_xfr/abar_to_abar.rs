@@ -363,13 +363,13 @@ pub fn batch_verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default + Sync +
         } else {
             MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER
         };
-    
+
         if note.body.owner_memos.len() != note.body.outputs.len()
             || note.body.owner_memos.len() > max_memo_len
         {
             return Err(eg!(NoahError::AXfrVerificationError));
         }
-        
+
         for memo in note.body.owner_memos.iter() {
             if memo.size() > MAX_AXFR_MEMO_SIZE {
                 return Err(eg!(NoahError::AXfrVerificationError));
