@@ -147,6 +147,7 @@ impl Group for BLSG1 {
         // unsafe here is alright because WASM is single threaded
         unsafe {
             if WASM_INSTANCE.is_none() {
+                web_sys::console::log_1(&"FastMSM for WASM has not been initialized, and the proof generation will use the Rust-based implementation. To initialize FastMSM, call the async WASM function `init_noah()` to initialize the Noah library before proof generation.".into());
                 return Self::common_multi_exp(scalars, points);
             }
 
