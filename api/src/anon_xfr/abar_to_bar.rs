@@ -282,6 +282,7 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
         return Err(eg!(NoahError::AXfrVerificationError));
     }
 
+    // Check the memo size.
     check_memo_size(&note.body.output, &note.body.memo)?;
 
     let bar = note.body.output.clone();

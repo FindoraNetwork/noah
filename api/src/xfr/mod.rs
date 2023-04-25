@@ -491,7 +491,11 @@ pub fn batch_verify_xfr_notes<R: CryptoRng + RngCore>(
     notes: &[&XfrNote],
     policies: &[&XfrNotePoliciesRef<'_>],
 ) -> Result<()> {
+    // Check the memo size.
     for xfr_note in notes {
+        if xfr_note.body.outputs.len() != xfr_note.body.owners_memos.len() {
+            return Err(eg!(NoahError::AXfrVerifierParamsError));
+        }
         for (output, memo) in xfr_note
             .body
             .outputs
