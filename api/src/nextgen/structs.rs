@@ -9,10 +9,138 @@ use noah_algebra::{
     traits::Domain,
 };
 use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
+use serde::de::Error as SerdeError;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+/// Compute the expected number of BLS scalar elements in the memo ciphertext.
+///
+/// Note that the memo ciphertext consists of other information, such as:
+/// - The Diffie-Hellman key exchange group element, r * G
+/// - A fast-detection element
+///
+/// So it would consist of more elements than what we show here.
+///
+pub fn get_auditor_memo_length(num_inputs: usize, num_outputs: usize) -> usize {
+    // Every transaction has at most one audited asset, which means that there
+    // is also at most one auditor.
+    //
+    // The auditor will be presented all the input and output information.
+    //
+    // The memo first includes the sender address (3 BLS scalar elements).
+    //
+    // Note that, similar to anon_xfr, we prefer to consolidate assets into
+    // a few addresses, and therefore, we also restrict all the inputs to
+    // have the same owner (same public key).
+    //
+    // For each input, the memo includes:
+    // - the coin commitment, which enables back-tracing.
+    // - the amount
+    // - the asset type (all not assets have to be the audited one)
+    //
+    // For each output, the memo includes:
+    // - the amount
+    // - the asset type
+    // - the receiving address (it takes 3 BLS scalar elements)
+    // - the randomizer
+
+    return 3 + num_inputs * (1 + 1 + 1) + num_outputs * (1 + 1 + 3 + 1);
+}
+
+/// A struct for the auditor's memo.
+#[derive(Clone, Default, Debug, Eq, PartialEq)]
+pub struct NabarAuditorMemo {
+    /// The Diffie-Hellman key exchange group element.
+    ///
+    /// Note: we explicitly stress that this point is often uncompressed and unchecked,
+    /// and the application should take the responsibility to make application-specific checks.
+    pub dh_point_unchecked: JubjubPoint,
+    /// The fast-detection element.
+    pub fast_detection: BLSScalar,
+    /// The body of the memo.
+    pub body: Vec<BLSScalar>,
+}
+
+impl Serialize for NabarAuditorMemo {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut bytes = Vec::<u8>::new();
+
+        // We overwrite the serialization algorithm to avoid the need of recovering the point.
+        bytes.extend_from_slice(&self.dh_point_unchecked.to_unchecked_bytes());
+        bytes.extend_from_slice(&self.fast_detection.noah_to_bytes());
+
+        for elem in self.body.iter() {
+            bytes.extend_from_slice(&elem.noah_to_bytes());
+        }
+
+        if serializer.is_human_readable() {
+            serializer.serialize_str(&b64enc(&bytes))
+        } else {
+            serializer.serialize_bytes(&bytes)
+        }
+    }
+}
+
+impl<'de> Deserialize<'de> for NabarAuditorMemo {
+    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let bytes = if deserializer.is_human_readable() {
+            deserializer.deserialize_str(noah_obj_serde::BytesVisitor)?
+        } else {
+            deserializer.deserialize_bytes(noah_obj_serde::BytesVisitor)?
+        };
+
+        let dh_point_unchecked = {
+            let res = JubjubPoint::from_unchecked_bytes(&bytes[0..64]);
+
+            if res.is_err() {
+                return Err(SerdeError::custom(res.unwrap_err()));
+            }
+
+            res.unwrap()
+        };
+
+        let fast_detection = {
+            let res = BLSScalar::noah_from_bytes(&bytes[64..96]);
+
+            if res.is_err() {
+                return Err(SerdeError::custom(res.unwrap_err()));
+            }
+
+            res.unwrap()
+        };
+
+        let remaining_bytes = bytes.len() - 96;
+        if remaining_bytes % BLS12_381_SCALAR_LEN != 0 {
+            return Err(SerdeError::custom(
+                "The auditor memo does not have the correct length.",
+            ));
+        }
+
+        let mut body = Vec::with_capacity(remaining_bytes / BLS12_381_SCALAR_LEN);
+        for elem_bytes in bytes[96..].chunks_exact(96) {
+            let res = BLSScalar::noah_from_bytes(&elem_bytes);
+            if res.is_err() {
+                return Err(SerdeError::custom(res.unwrap_err()));
+            }
+            body.push(res.unwrap());
+        }
+
+        Ok(Self {
+            dh_point_unchecked,
+            fast_detection,
+            body,
+        })
+    }
+}
 
 impl AssetType {
     /// Generate asset type with auditor public key.
-    pub fn generate<R: CryptoRng + RngCore>(
+    pub fn sample<R: CryptoRng + RngCore>(
         prng: &mut R,
         pk: &AuditorPublicKey,
     ) -> Result<(AssetType, BLSScalar)> {
@@ -155,10 +283,10 @@ fn ecies_encrypt<R: CryptoRng + RngCore>(
 
     let output_len = total_memo_size / (BLS12_381_SCALAR_LEN - 1)
         + if total_memo_size % (BLS12_381_SCALAR_LEN - 1) == 0 {
-        0
-    } else {
-        1
-    };
+            0
+        } else {
+            1
+        };
 
     let stream_blinds =
         AnemoiJive381::eval_stream_cipher(&[ephemeral_x, ephemeral_y, dh_x, dh_y], output_len);
@@ -204,10 +332,10 @@ fn ecies_decrypt(sk: &JubjubScalar, ecies: &EciesOutput) -> Vec<Vec<u8>> {
     let total_memo_size = ecies.ctexts.iter().map(|x| x.len()).sum::<usize>();
     let output_len = total_memo_size / (BLS12_381_SCALAR_LEN - 1)
         + if total_memo_size % (BLS12_381_SCALAR_LEN - 1) == 0 {
-        0
-    } else {
-        1
-    };
+            0
+        } else {
+            1
+        };
 
     let stream_blinds =
         AnemoiJive381::eval_stream_cipher(&[ephemeral_x, ephemeral_y, dh_x, dh_y], output_len);
