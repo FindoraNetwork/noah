@@ -1,10 +1,11 @@
 use crate::anon_xfr::{
     commit, commit_in_cs,
     structs::{AnonAssetRecord, AxfrOwnerMemo, OpenAnonAssetRecord, OpenAnonAssetRecordBuilder},
-    AXfrPlonkPf, TurboPlonkCS, TWO_POW_32,
+    AXfrPlonkPf, TurboPlonkCS, MAX_AXFR_MEMO_SIZE, TWO_POW_32,
 };
 use crate::keys::{KeyPair, PublicKey, PublicKeyInner, Signature};
-use crate::setup::{ProverParams, VerifierParams};
+use crate::parameters::params::ProverParams;
+use crate::parameters::params::VerifierParams;
 use crate::xfr::{
     asset_record::AssetRecordType,
     structs::{BlindAssetRecord, OpenAssetRecord, XfrAmount, XfrAssetType},
@@ -98,6 +99,11 @@ pub fn verify_bar_to_abar_note(
     note: &BarToAbarNote,
     bar_pub_key: &PublicKey,
 ) -> Result<()> {
+    // Check the memo size.
+    if note.body.memo.size() > MAX_AXFR_MEMO_SIZE {
+        return Err(eg!(NoahError::AXfrVerificationError));
+    }
+
     verify_bar_to_abar(
         params,
         &note.body.input,
@@ -117,6 +123,13 @@ pub fn batch_verify_bar_to_abar_note(
     notes: &[&BarToAbarNote],
     bar_pub_keys: &[&PublicKey],
 ) -> Result<()> {
+    // Check the memo size.
+    for note in notes.iter() {
+        if note.body.memo.size() > MAX_AXFR_MEMO_SIZE {
+            return Err(eg!(NoahError::AXfrVerificationError));
+        }
+    }
+
     let is_ok = notes
         .par_iter()
         .zip(bar_pub_keys)
@@ -319,15 +332,13 @@ pub(crate) fn prove_bar_to_abar_cs<R: CryptoRng + RngCore>(
     );
     let witness = cs.get_and_clear_witness();
 
-    let (cs, prover_params) = params.cs_params(None);
-
     prover_with_lagrange(
         rng,
         &mut transcript,
         &params.pcs,
         params.lagrange_pcs.as_ref(),
-        cs,
-        prover_params,
+        &params.cs,
+        &params.prover_params,
         &witness,
     )
     .c(d!(NoahError::AXfrProofError))
@@ -365,13 +376,11 @@ pub(crate) fn verify_inspection(
     online_inputs.extend_from_slice(&beta_lambda_sim_fr.limbs);
     online_inputs.extend_from_slice(&s1_plus_lambda_s2_sim_fr.limbs);
 
-    let (cs, verifier_params) = params.cs_params(None);
-
     verifier(
         &mut transcript,
-        &params.pcs,
-        &cs,
-        verifier_params,
+        &params.shrunk_vk,
+        &params.shrunk_cs,
+        &params.verifier_params,
         &online_inputs,
         proof,
     )
@@ -653,6 +662,7 @@ pub(crate) fn build_bar_to_abar_cs(
 mod test {
     use crate::anon_xfr::{bar_to_abar::BAR_TO_ABAR_PLONK_PROOF_TRANSCRIPT, commit};
     use crate::keys::KeyPair;
+    use crate::parameters::AddressFormat::SECP256K1;
     use crate::xfr::structs::AssetType;
     use merlin::Transcript;
     use noah_algebra::{
@@ -692,7 +702,7 @@ mod test {
         let point_q = pc_gens.commit(y, delta);
 
         let z_randomizer = BLSScalar::random(&mut prng);
-        let keypair = KeyPair::generate_secp256k1(&mut prng);
+        let keypair = KeyPair::sample(&mut prng, SECP256K1);
         let pubkey = keypair.get_pk();
 
         let (z, output_commitment_trace) =

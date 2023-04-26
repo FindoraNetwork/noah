@@ -1,8 +1,14 @@
+use aes_gcm::aead::Aead;
+use digest::{generic_array::GenericArray, Digest, KeyInit};
+use noah_algebra::secp256k1::{SECP256K1Scalar, SECP256K1G1};
 use noah_algebra::{
     collections::HashMap,
     prelude::*,
     ristretto::{CompressedRistretto, PedersenCommitmentRistretto, RistrettoScalar},
     traits::PedersenCommitment,
+};
+use noah_crypto::basic::hybrid_encryption::{
+    hybrid_decrypt_with_ed25519_secret_key, hybrid_encrypt_ed25519, NoahHybridCiphertext,
 };
 use serde::ser::Serialize;
 
@@ -17,12 +23,13 @@ pub mod proofs;
 /// Module for shared structures.
 pub mod structs;
 
+#[cfg(feature = "xfr-tracing")]
 #[cfg(test)]
 pub(crate) mod tests;
 
 use crate::anon_creds::{ACCommitment, Attr};
-use crate::keys::{KeyPair, MultiSig, PublicKey};
-use crate::setup::BulletproofParams;
+use crate::keys::{KeyPair, MultiSig, PublicKey, PublicKeyInner, SecretKey};
+use crate::parameters::bulletproofs::BulletproofParams;
 
 use self::{
     asset_mixer::{
@@ -122,7 +129,8 @@ impl XfrType {
 /// use noah::xfr::{gen_xfr_note, verify_xfr_note, XfrNotePolicies};
 /// use noah_algebra::prelude::*;
 /// use ruc::err::*;
-/// use noah::setup::BulletproofParams;
+/// use noah::parameters::AddressFormat::SECP256K1;
+/// use noah::parameters::bulletproofs::BulletproofParams;
 ///
 /// let mut prng = ChaChaRng::from_seed([0u8; 32]);
 /// let mut params = BulletproofParams::default();
@@ -144,7 +152,7 @@ impl XfrType {
 /// let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
 ///
 /// for x in inputs_amounts.iter() {
-///   let keypair = KeyPair::generate_secp256k1(&mut prng);
+///   let keypair = KeyPair::sample(&mut prng, SECP256K1);
 ///   let asset_record = AssetRecordTemplate::with_no_asset_tracing( x.0,
 ///                                        x.1,
 ///                                        asset_record_type,
@@ -157,7 +165,7 @@ impl XfrType {
 /// }
 ///
 /// for x in outputs_amounts.iter() {
-///     let keypair = KeyPair::generate_secp256k1(&mut prng);
+///     let keypair = KeyPair::sample(&mut prng, SECP256K1);
 ///
 ///     let ar = AssetRecordTemplate::with_no_asset_tracing(x.0, x.1, asset_record_type, keypair.get_pk().clone());
 ///     let output = AssetRecord::from_template_no_identity_tracing(&mut prng, &ar).unwrap();
@@ -197,10 +205,11 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
 /// use ruc::{*, err::*};
 /// use rand_core::SeedableRng;
 /// use noah::keys::KeyPair;
+/// use noah::parameters::AddressFormat::SECP256K1;
 /// use noah::xfr::structs::{AssetRecordTemplate, AssetRecord, AssetType};
 /// use noah::xfr::asset_record::AssetRecordType;
 /// use noah::xfr::{gen_xfr_body, verify_xfr_body, XfrNotePolicies, XfrNotePoliciesRef};
-/// use noah::setup::BulletproofParams;
+/// use noah::parameters::bulletproofs::BulletproofParams;
 ///
 /// let mut prng = ChaChaRng::from_seed([0u8; 32]);
 /// let mut params = BulletproofParams::default();
@@ -219,7 +228,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
 /// let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
 ///
 /// for x in inputs_amounts.iter() {
-///   let keypair = KeyPair::generate_secp256k1(&mut prng);
+///   let keypair = KeyPair::sample(&mut prng, SECP256K1);
 ///   let ar = AssetRecordTemplate::with_no_asset_tracing( x.0,
 ///                                        x.1,
 ///                                        asset_record_type,
@@ -229,7 +238,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
 ///   inputs.push(AssetRecord::from_template_no_identity_tracing(&mut prng, &ar).unwrap());
 /// }
 /// for x in outputs_amounts.iter() {
-///     let keypair = KeyPair::generate_secp256k1(&mut prng);
+///     let keypair = KeyPair::sample(&mut prng, SECP256K1);
 ///
 ///     let ar = AssetRecordTemplate::with_no_asset_tracing(x.0, x.1, asset_record_type, keypair.get_pk());
 ///     outputs.push(AssetRecord::from_template_no_identity_tracing(&mut prng, &ar).unwrap());
@@ -483,6 +492,30 @@ pub fn batch_verify_xfr_notes<R: CryptoRng + RngCore>(
     notes: &[&XfrNote],
     policies: &[&XfrNotePoliciesRef<'_>],
 ) -> Result<()> {
+    // Check the memo size.
+    for xfr_note in notes {
+        if xfr_note.body.outputs.len() != xfr_note.body.owners_memos.len() {
+            return Err(eg!(NoahError::AXfrVerifierParamsError));
+        }
+        #[cfg(not(feature = "xfr-tracing"))]
+        if xfr_note
+            .body
+            .asset_tracing_memos
+            .iter()
+            .any(|x| !x.is_empty())
+        {
+            return Err(eg!(NoahError::AXfrVerificationError));
+        }
+        for (output, memo) in xfr_note
+            .body
+            .outputs
+            .iter()
+            .zip(xfr_note.body.owners_memos.iter())
+        {
+            check_memo_size(output, memo)?
+        }
+    }
+
     // Verify each note's multisignature, one by one.
     for xfr_note in notes {
         verify_transfer_multisig(xfr_note).c(d!())?;
@@ -854,6 +887,107 @@ fn batch_verify_asset_mix<R: CryptoRng + RngCore>(
     }
 
     batch_verify_asset_mixing(prng, params, &asset_mix_instances).c(d!())
+}
+
+/// Hybrid encryption
+pub fn xfr_hybrid_encrypt<R: CryptoRng + RngCore>(
+    pk: &PublicKey,
+    prng: &mut R,
+    msg: &[u8],
+) -> Result<Vec<u8>> {
+    match pk.0 {
+        PublicKeyInner::Ed25519(pk) => Ok(hybrid_encrypt_ed25519(prng, &pk, msg).noah_to_bytes()),
+        PublicKeyInner::Secp256k1(_) => {
+            let pk = pk.to_secp256k1()?;
+
+            let share_scalar = SECP256K1Scalar::random(prng);
+            let share = SECP256K1G1::get_base().mul(&share_scalar);
+
+            let mut bytes = share.to_compressed_bytes();
+
+            let dh = pk.mul(&share_scalar);
+
+            let mut hasher = sha2::Sha512::new();
+            hasher.update(&dh.to_compressed_bytes());
+
+            let mut key = [0u8; 32];
+            key.copy_from_slice(&hasher.finalize().as_slice()[0..32]);
+
+            let nonce = GenericArray::from_slice(&[0u8; 12]);
+
+            let gcm = {
+                let res = aes_gcm::Aes256Gcm::new_from_slice(key.as_slice());
+
+                if res.is_err() {
+                    return Err(eg!(NoahError::EncryptionError));
+                }
+
+                res.unwrap()
+            };
+
+            let mut ctext = {
+                let res = gcm.encrypt(nonce, msg);
+
+                if res.is_err() {
+                    return Err(eg!(NoahError::EncryptionError));
+                }
+
+                res.unwrap()
+            };
+            bytes.append(&mut ctext);
+            Ok(bytes)
+        }
+        PublicKeyInner::EthAddress(_) => panic!("EthAddress not supported"),
+    }
+}
+
+/// Hybrid decryption
+pub fn xfr_hybrid_decrypt(sk: &SecretKey, ctext: &[u8]) -> Result<Vec<u8>> {
+    match sk {
+        SecretKey::Ed25519(sk) => {
+            let ctext = NoahHybridCiphertext::noah_from_bytes(ctext)?;
+            Ok(hybrid_decrypt_with_ed25519_secret_key(&ctext, sk))
+        }
+        SecretKey::Secp256k1(_) => {
+            let sk = sk.to_secp256k1()?;
+
+            let share_len = SECP256K1G1::COMPRESSED_LEN;
+            if ctext.len() < share_len {
+                return Err(eg!(NoahError::DecryptionError));
+            }
+            let share = SECP256K1G1::from_compressed_bytes(&ctext[..share_len])?;
+            let dh = share.mul(&sk);
+
+            let mut hasher = sha2::Sha512::new();
+            hasher.update(&dh.to_compressed_bytes());
+
+            let mut key = [0u8; 32];
+            key.copy_from_slice(&hasher.finalize().as_slice()[0..32]);
+
+            let nonce = GenericArray::from_slice(&[0u8; 12]);
+
+            let gcm = {
+                let res = aes_gcm::Aes256Gcm::new_from_slice(key.as_slice());
+
+                if res.is_err() {
+                    return Err(eg!(NoahError::DecryptionError));
+                }
+
+                res.unwrap()
+            };
+
+            let res = {
+                let res = gcm.decrypt(nonce, &ctext[share_len..]);
+
+                if res.is_err() {
+                    return Err(eg!(NoahError::DecryptionError));
+                }
+
+                res.unwrap()
+            };
+            Ok(res)
+        }
+    }
 }
 
 /// Find the tracer memo corresponding to the encryption keys.

@@ -3,10 +3,11 @@ use crate::anon_xfr::{
     structs::{
         AnonAssetRecord, AxfrOwnerMemo, OpenAnonAssetRecordBuilder, PayeeWitness, PayeeWitnessVars,
     },
-    AXfrPlonkPf, TurboPlonkCS,
+    AXfrPlonkPf, TurboPlonkCS, MAX_AXFR_MEMO_SIZE,
 };
 use crate::keys::{KeyPair, PublicKey, PublicKeyInner, Signature};
-use crate::setup::{ProverParams, VerifierParams};
+use crate::parameters::params::ProverParams;
+use crate::parameters::params::VerifierParams;
 use crate::xfr::structs::{BlindAssetRecord, OpenAssetRecord};
 use merlin::Transcript;
 use noah_algebra::{bls12_381::BLSScalar, errors::NoahError, prelude::*};
@@ -64,6 +65,11 @@ pub fn gen_ar_to_abar_note<R: CryptoRng + RngCore>(
 
 /// Verify a transparent-to-anonymous note.
 pub fn verify_ar_to_abar_note(params: &VerifierParams, note: &ArToAbarNote) -> Result<()> {
+    // Check the memo size.
+    if note.body.memo.size() > MAX_AXFR_MEMO_SIZE {
+        return Err(eg!(NoahError::AXfrVerificationError));
+    }
+
     let msg = bincode::serialize(&note.body).c(d!(NoahError::SerializationError))?;
     note.body
         .input
@@ -80,6 +86,13 @@ pub fn batch_verify_ar_to_abar_note(
     params: &VerifierParams,
     notes: &[&ArToAbarNote],
 ) -> Result<()> {
+    // Check the memo size.
+    for note in notes.iter() {
+        if note.body.memo.size() > MAX_AXFR_MEMO_SIZE {
+            return Err(eg!(NoahError::AXfrVerificationError));
+        }
+    }
+
     let is_ok = notes
         .par_iter()
         .map(|note| {
@@ -139,15 +152,13 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
     let (mut cs, _) = build_ar_to_abar_cs(payee_witness, &output_trace);
     let witness = cs.get_and_clear_witness();
 
-    let (cs, prover_params) = params.cs_params(None);
-
     let proof = prover_with_lagrange(
         prng,
         &mut transcript,
         &params.pcs,
         params.lagrange_pcs.as_ref(),
-        cs,
-        prover_params,
+        &params.cs,
+        &params.prover_params,
         &witness,
     )
     .c(d!(NoahError::AXfrProofError))?;
@@ -176,13 +187,11 @@ pub fn verify_ar_to_abar_body(params: &VerifierParams, body: &ArToAbarBody) -> R
     online_inputs.push(asset_type.as_scalar());
     online_inputs.push(body.output.commitment);
 
-    let (cs, verifier_params) = params.cs_params(None);
-
     verifier(
         &mut transcript,
-        &params.pcs,
-        &cs,
-        verifier_params,
+        &params.shrunk_vk,
+        &params.shrunk_cs,
+        &params.verifier_params,
         &online_inputs,
         &body.proof,
     )

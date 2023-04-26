@@ -2,6 +2,9 @@
 mod smoke_axfr {
     use digest::Digest;
     use mem_db::MemoryDB;
+    use noah::keys::SecretKey;
+    use noah::parameters::params::{ProverParams, VerifierParams};
+    use noah::parameters::AddressFormat::{ED25519, SECP256K1};
     use noah::{
         anon_xfr::{
             abar_to_abar::*,
@@ -13,10 +16,9 @@ mod smoke_axfr {
                 AnonAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonAssetRecord,
                 OpenAnonAssetRecordBuilder,
             },
-            FEE_TYPE, TREE_DEPTH,
+            FEE_TYPE,
         },
-        keys::{KeyPair, PublicKey},
-        setup::{ProverParams, VerifierParams},
+        keys::{KeyPair, KeyType, PublicKey},
         xfr::{
             asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
             structs::{
@@ -112,24 +114,24 @@ mod smoke_axfr {
     #[test]
     fn ar_to_abar_secp256k1() {
         let mut prng = test_rng();
-        let sender = KeyPair::generate_secp256k1(&mut prng);
-        let receiver = KeyPair::generate_secp256k1(&mut prng);
+        let sender = KeyPair::sample(&mut prng, SECP256K1);
+        let receiver = KeyPair::sample(&mut prng, SECP256K1);
         ar_to_abar(sender, receiver);
     }
 
     #[test]
     fn ar_to_abar_ed25519() {
         let mut prng = test_rng();
-        let sender = KeyPair::generate_ed25519(&mut prng);
-        let receiver = KeyPair::generate_ed25519(&mut prng);
+        let sender = KeyPair::sample(&mut prng, ED25519);
+        let receiver = KeyPair::sample(&mut prng, ED25519);
         ar_to_abar(sender, receiver);
     }
 
     fn ar_to_abar(sender: KeyPair, receiver: KeyPair) {
         let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
-        let params = ProverParams::ar_to_abar_params().unwrap();
-        let verify_params = VerifierParams::ar_to_abar_params().unwrap();
+        let params = ProverParams::gen_ar_to_abar().unwrap();
+        let verify_params = VerifierParams::get_ar_to_abar().unwrap();
 
         let (bar, memo) = build_bar(
             &sender.get_pk(),
@@ -164,24 +166,24 @@ mod smoke_axfr {
     #[test]
     fn bar_to_abar_secp256k1() {
         let mut prng = test_rng();
-        let sender = KeyPair::generate_secp256k1(&mut prng);
-        let receiver = KeyPair::generate_secp256k1(&mut prng);
+        let sender = KeyPair::sample(&mut prng, SECP256K1);
+        let receiver = KeyPair::sample(&mut prng, SECP256K1);
         bar_to_abar(sender, receiver);
     }
 
     #[test]
     fn bar_to_abar_ed25519() {
         let mut prng = test_rng();
-        let sender = KeyPair::generate_ed25519(&mut prng);
-        let receiver = KeyPair::generate_ed25519(&mut prng);
+        let sender = KeyPair::sample(&mut prng, ED25519);
+        let receiver = KeyPair::sample(&mut prng, ED25519);
         bar_to_abar(sender, receiver);
     }
 
     fn bar_to_abar(sender: KeyPair, receiver: KeyPair) {
         let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
-        let params = ProverParams::bar_to_abar_params().unwrap();
-        let verify_params = VerifierParams::bar_to_abar_params().unwrap();
+        let params = ProverParams::gen_bar_to_abar().unwrap();
+        let verify_params = VerifierParams::get_bar_to_abar().unwrap();
 
         let (bar, memo) = build_bar(
             &sender.get_pk(),
@@ -226,23 +228,29 @@ mod smoke_axfr {
     #[test]
     fn abar_to_ar_secp256k1() {
         let mut prng = test_rng();
-        let sender = KeyPair::generate_secp256k1(&mut prng);
-        let receiver = KeyPair::generate_secp256k1(&mut prng);
+        let sender = KeyPair::sample(&mut prng, SECP256K1);
+        let receiver = KeyPair::sample(&mut prng, SECP256K1);
         abar_to_ar(sender, receiver);
     }
 
     #[test]
     fn abar_to_ar_ed25519() {
         let mut prng = test_rng();
-        let sender = KeyPair::generate_ed25519(&mut prng);
-        let receiver = KeyPair::generate_ed25519(&mut prng);
+        let sender = KeyPair::sample(&mut prng, ED25519);
+        let receiver = KeyPair::sample(&mut prng, ED25519);
         abar_to_ar(sender, receiver);
     }
 
     fn abar_to_ar(sender: KeyPair, receiver: KeyPair) {
         let mut prng = test_rng();
-        let params = ProverParams::abar_to_ar_params(TREE_DEPTH).unwrap();
-        let verify_params = VerifierParams::abar_to_ar_params().unwrap();
+
+        let address_format = match sender.get_sk_ref() {
+            SecretKey::Ed25519(_) => ED25519,
+            SecretKey::Secp256k1(_) => SECP256K1,
+        };
+
+        let params = ProverParams::gen_abar_to_ar(address_format).unwrap();
+        let verify_params = VerifierParams::get_abar_to_ar(address_format).unwrap();
 
         let fdb = MemoryDB::new();
         let cs = Arc::new(RwLock::new(ChainState::new(fdb, "abar_ar".to_owned(), 0)));
@@ -333,23 +341,29 @@ mod smoke_axfr {
     #[test]
     fn abar_to_bar_secp256k1() {
         let mut prng = test_rng();
-        let sender = KeyPair::generate_secp256k1(&mut prng);
-        let receiver = KeyPair::generate_secp256k1(&mut prng);
+        let sender = KeyPair::sample(&mut prng, SECP256K1);
+        let receiver = KeyPair::sample(&mut prng, SECP256K1);
         abar_to_bar(sender, receiver);
     }
 
     #[test]
     fn abar_to_bar_ed25519() {
         let mut prng = test_rng();
-        let sender = KeyPair::generate_ed25519(&mut prng);
-        let receiver = KeyPair::generate_ed25519(&mut prng);
+        let sender = KeyPair::sample(&mut prng, ED25519);
+        let receiver = KeyPair::sample(&mut prng, ED25519);
         abar_to_bar(sender, receiver);
     }
 
     fn abar_to_bar(sender: KeyPair, receiver: KeyPair) {
         let mut prng = test_rng();
-        let params = ProverParams::abar_to_bar_params(TREE_DEPTH).unwrap();
-        let verify_params = VerifierParams::abar_to_bar_params().unwrap();
+
+        let address_format = match sender.get_sk_ref() {
+            SecretKey::Ed25519(_) => ED25519,
+            SecretKey::Secp256k1(_) => SECP256K1,
+        };
+
+        let params = ProverParams::gen_abar_to_bar(address_format).unwrap();
+        let verify_params = VerifierParams::get_abar_to_bar(address_format).unwrap();
 
         let fdb = MemoryDB::new();
         let cs = Arc::new(RwLock::new(ChainState::new(fdb, "abar_bar".to_owned(), 0)));
@@ -446,7 +460,13 @@ mod smoke_axfr {
         let fee_amount = mock_fee(1, 1);
         let outputs = vec![(1, FEE_TYPE)];
         let inputs = vec![(fee_amount as u64 + 1, FEE_TYPE)];
-        test_abar(inputs, outputs, fee_amount, "abar-1-1-1");
+        test_abar(
+            inputs,
+            outputs,
+            fee_amount,
+            "abar-1-1-1",
+            Some(KeyType::Ed25519),
+        );
     }
 
     #[test]
@@ -454,7 +474,13 @@ mod smoke_axfr {
         let fee_amount = mock_fee(1, 2);
         let outputs = vec![(1, FEE_TYPE), (0, FEE_TYPE)];
         let inputs = vec![(fee_amount as u64 + 1, FEE_TYPE)];
-        test_abar(inputs, outputs, fee_amount, "abar-1-2-1");
+        test_abar(
+            inputs,
+            outputs,
+            fee_amount,
+            "abar-1-2-1",
+            Some(KeyType::Ed25519),
+        );
     }
 
     #[test]
@@ -462,7 +488,7 @@ mod smoke_axfr {
         let fee_amount = mock_fee(2, 1);
         let outputs = vec![(1, FEE_TYPE)];
         let inputs = vec![(1, FEE_TYPE), (fee_amount as u64, FEE_TYPE)];
-        test_abar(inputs, outputs, fee_amount, "abar-2-1-1");
+        test_abar(inputs, outputs, fee_amount, "abar-2-1-1", None);
     }
 
     #[test]
@@ -485,7 +511,7 @@ mod smoke_axfr {
             (55555, FEE_TYPE),
             (666666 + fee_amount as u64, FEE_TYPE),
         ];
-        test_abar(inputs, outputs, fee_amount, "abar-6-6-1");
+        test_abar(inputs, outputs, fee_amount, "abar-6-6-1", None);
     }
 
     #[test]
@@ -493,7 +519,7 @@ mod smoke_axfr {
         let fee_amount = mock_fee(2, 3);
         let outputs = vec![(5, FEE_TYPE), (15, FEE_TYPE), (30, ASSET)];
         let inputs = vec![(20 + fee_amount as u64, FEE_TYPE), (30, ASSET)];
-        test_abar(inputs, outputs, fee_amount, "abar-2-3-2");
+        test_abar(inputs, outputs, fee_amount, "abar-2-3-2", None);
     }
 
     #[test]
@@ -516,41 +542,33 @@ mod smoke_axfr {
             (55555, ASSET5),
             (666666, ASSET6),
         ];
-        test_abar(inputs, outputs, fee_amount, "abar-6-6-6");
+        test_abar(inputs, outputs, fee_amount, "abar-6-6-6", None);
     }
 
     #[test]
-    fn abar_8in_2out_2asset() {
-        let fee_amount = mock_fee(8, 2);
-        let outputs = vec![(20, FEE_TYPE), (30, ASSET)];
-        let inputs = vec![
-            (15 + fee_amount as u64, FEE_TYPE),
-            (1, FEE_TYPE),
-            (4, FEE_TYPE),
-            (5, ASSET),
-            (5, ASSET),
-            (4, ASSET),
-            (6, ASSET),
-            (10, ASSET),
-        ];
-        test_abar(inputs, outputs, fee_amount, "abar-9-2-2");
-    }
+    fn abar_1in_xout_1asset() {
+        for output_len in 1..=20 {
+            let fee_amount = mock_fee(1, output_len);
 
-    #[test]
-    fn abar_8in_3out_2asset() {
-        let fee_amount = mock_fee(8, 3);
-        let outputs = vec![(5, FEE_TYPE), (15, FEE_TYPE), (30, ASSET)];
-        let inputs = vec![
-            (15 + fee_amount as u64, FEE_TYPE),
-            (1, FEE_TYPE),
-            (4, FEE_TYPE),
-            (5, ASSET),
-            (5, ASSET),
-            (4, ASSET),
-            (6, ASSET),
-            (10, ASSET),
-        ];
-        test_abar(inputs, outputs, fee_amount, "abar-9-3-2");
+            let fee_t = FEE_TYPE;
+            let inputs = vec![(100 + fee_amount as u64, fee_t)];
+
+            let mut outputs = Vec::with_capacity(output_len);
+            outputs.push(((100 - output_len + 1) as u64, fee_t));
+            for _ in 0..output_len - 1 {
+                outputs.push((1, fee_t));
+            }
+
+            assert_eq!(outputs.len(), output_len);
+
+            test_abar(
+                inputs,
+                outputs,
+                fee_amount,
+                format!("abar-1-{}-1", output_len).as_str(),
+                Some(KeyType::Secp256k1),
+            );
+        }
     }
 
     fn test_abar(
@@ -558,22 +576,37 @@ mod smoke_axfr {
         outputs: Vec<(u64, AssetType)>,
         fee: u32,
         name: &str,
+        input_key_type: Option<KeyType>,
     ) {
         let mut prng = test_rng();
-        let params = ProverParams::new(inputs.len(), outputs.len(), None).unwrap();
-        let verifier_params = VerifierParams::load(inputs.len(), outputs.len()).unwrap();
 
-        let sender = if prng.gen() {
-            KeyPair::generate_secp256k1(&mut prng)
+        let address_format = if input_key_type.is_none() {
+            if prng.gen() {
+                SECP256K1
+            } else {
+                ED25519
+            }
         } else {
-            KeyPair::generate_ed25519(&mut prng)
+            match input_key_type.unwrap() {
+                KeyType::Ed25519 => ED25519,
+                KeyType::Secp256k1 => SECP256K1,
+                _ => unimplemented!(),
+            }
         };
+
+        let params =
+            ProverParams::gen_abar_to_abar(inputs.len(), outputs.len(), address_format).unwrap();
+        let verifier_params =
+            VerifierParams::load_abar_to_abar(inputs.len(), outputs.len(), address_format).unwrap();
+
+        let sender = KeyPair::sample(&mut prng, address_format);
+
         let receivers: Vec<KeyPair> = (0..outputs.len())
             .map(|_| {
                 if prng.gen() {
-                    KeyPair::generate_secp256k1(&mut prng)
+                    KeyPair::sample(&mut prng, SECP256K1)
                 } else {
-                    KeyPair::generate_ed25519(&mut prng)
+                    KeyPair::sample(&mut prng, ED25519)
                 }
             })
             .collect();

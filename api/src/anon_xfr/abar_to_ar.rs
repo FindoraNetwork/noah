@@ -13,7 +13,8 @@ use crate::anon_xfr::{
     AXfrAddressFoldingInstance, AXfrAddressFoldingWitness, AXfrPlonkPf, TurboPlonkCS,
 };
 use crate::keys::{KeyPair, PublicKey, SecretKey};
-use crate::setup::{ProverParams, VerifierParams};
+use crate::parameters::params::ProverParams;
+use crate::parameters::params::VerifierParams;
 use crate::xfr::{
     asset_record::{
         build_open_asset_record, AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType,
@@ -213,6 +214,11 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
         return Err(eg!(NoahError::ParameterError));
     }
 
+    // Require the output memo is none.
+    if note.body.memo.is_some() {
+        return Err(eg!(NoahError::ParameterError));
+    }
+
     let mut transcript = Transcript::new(ABAR_TO_AR_FOLDING_PROOF_TRANSCRIPT);
 
     let address_folding_public_input = match &note.folding_instance {
@@ -241,13 +247,11 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
     online_inputs.push(payer_asset_type.as_scalar());
     online_inputs.extend_from_slice(&address_folding_public_input);
 
-    let (cs, verifier_params) = params.cs_params(Some(&note.folding_instance));
-
     verifier(
         &mut transcript,
-        &params.pcs,
-        &cs,
-        verifier_params,
+        &params.shrunk_vk,
+        &params.shrunk_cs,
+        &params.verifier_params,
         &online_inputs,
         &note.proof,
     )
@@ -268,6 +272,13 @@ pub fn batch_verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default + Sync
         note.body.output.amount.is_confidential() || note.body.output.asset_type.is_confidential()
     }) {
         return Err(eg!(NoahError::ParameterError));
+    }
+
+    // Require the output memo is none.
+    for note in notes.iter() {
+        if note.body.memo.is_some() {
+            return Err(eg!(NoahError::ParameterError));
+        }
     }
 
     if merkle_roots
@@ -308,13 +319,11 @@ pub fn batch_verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default + Sync
             online_inputs.push(payer_asset_type.as_scalar());
             online_inputs.extend_from_slice(&address_folding_public_input);
 
-            let (cs, verifier_params) = params.cs_params(Some(&note.folding_instance));
-
             verifier(
                 &mut transcript,
-                &params.pcs,
-                &cs,
-                verifier_params,
+                &params.shrunk_vk,
+                &params.shrunk_cs,
+                &params.verifier_params,
                 &online_inputs,
                 &note.proof,
             )
@@ -345,14 +354,13 @@ fn prove_abar_to_ar<R: CryptoRng + RngCore>(
     );
     let witness = cs.get_and_clear_witness();
 
-    let (cs, prover_params) = params.cs_params(Some(folding_witness));
     prover_with_lagrange(
         rng,
         &mut transcript,
         &params.pcs,
         params.lagrange_pcs.as_ref(),
-        cs,
-        prover_params,
+        &params.cs,
+        &params.prover_params,
         &witness,
     )
     .c(d!(NoahError::AXfrProofError))

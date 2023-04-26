@@ -1,6 +1,6 @@
 [[bin]]
 name = 'gen-params'
-path = 'src/gen-params.rs'
+path = 'src/parameters/setup.rs'
 required-features = ['gen']
 
 [[bench]]
@@ -177,3 +177,4 @@ parallel = [
 gen = ["parallel", "structopt"]
 lightweight = [] # Minimize size for only AR2ABAR and ABAR2AR.
 print-trace = ['noah-algebra/print-trace']
+xfr-tracing = []

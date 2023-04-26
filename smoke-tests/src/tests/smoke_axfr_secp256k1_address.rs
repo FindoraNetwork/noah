@@ -2,6 +2,8 @@
 mod smoke_axfr_secp256k1_address {
     use digest::Digest;
     use mem_db::MemoryDB;
+    use noah::parameters::params::{ProverParams, VerifierParams};
+    use noah::parameters::AddressFormat::SECP256K1;
     use noah::{
         anon_xfr::{
             abar_to_ar::*,
@@ -12,10 +14,8 @@ mod smoke_axfr_secp256k1_address {
                 AnonAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonAssetRecord,
                 OpenAnonAssetRecordBuilder,
             },
-            TREE_DEPTH,
         },
         keys::{KeyPair, PublicKey},
-        setup::{ProverParams, VerifierParams},
         xfr::{
             asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
             structs::{
@@ -104,11 +104,11 @@ mod smoke_axfr_secp256k1_address {
     fn secp256k1_to_abar() {
         let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
-        let params = ProverParams::bar_to_abar_params().unwrap();
-        let verify_params = VerifierParams::bar_to_abar_params().unwrap();
+        let params = ProverParams::gen_bar_to_abar().unwrap();
+        let verify_params = VerifierParams::get_bar_to_abar().unwrap();
 
-        let sender = KeyPair::generate_secp256k1(&mut prng);
-        let receiver = KeyPair::generate_secp256k1(&mut prng);
+        let sender = KeyPair::sample(&mut prng, SECP256K1);
+        let receiver = KeyPair::sample(&mut prng, SECP256K1);
 
         let (bar, memo) = build_bar(
             &sender.get_pk(),
@@ -143,11 +143,11 @@ mod smoke_axfr_secp256k1_address {
     fn address_to_abar() {
         let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
-        let params = ProverParams::ar_to_abar_params().unwrap();
-        let verify_params = VerifierParams::ar_to_abar_params().unwrap();
+        let params = ProverParams::gen_ar_to_abar().unwrap();
+        let verify_params = VerifierParams::get_ar_to_abar().unwrap();
 
-        let sender = KeyPair::generate_address(&mut prng);
-        let receiver = KeyPair::generate_secp256k1(&mut prng);
+        let sender = KeyPair::sample_address(&mut prng);
+        let receiver = KeyPair::sample(&mut prng, SECP256K1);
 
         let (bar, memo) = build_bar(
             &sender.get_pk(),
@@ -176,11 +176,11 @@ mod smoke_axfr_secp256k1_address {
     #[test]
     fn abar_to_address() {
         let mut prng = test_rng();
-        let params = ProverParams::abar_to_ar_params(TREE_DEPTH).unwrap();
-        let verify_params = VerifierParams::abar_to_ar_params().unwrap();
+        let params = ProverParams::gen_abar_to_ar(SECP256K1).unwrap();
+        let verify_params = VerifierParams::get_abar_to_ar(SECP256K1).unwrap();
 
-        let sender = KeyPair::generate_secp256k1(&mut prng);
-        let receiver = KeyPair::generate_address(&mut prng);
+        let sender = KeyPair::sample(&mut prng, SECP256K1);
+        let receiver = KeyPair::sample_address(&mut prng);
 
         let fdb = MemoryDB::new();
         let cs = Arc::new(RwLock::new(ChainState::new(
@@ -224,11 +224,11 @@ mod smoke_axfr_secp256k1_address {
     #[test]
     fn abar_to_secp256k1() {
         let mut prng = test_rng();
-        let params = ProverParams::abar_to_bar_params(TREE_DEPTH).unwrap();
-        let verify_params = VerifierParams::abar_to_bar_params().unwrap();
+        let params = ProverParams::gen_abar_to_bar(SECP256K1).unwrap();
+        let verify_params = VerifierParams::get_abar_to_bar(SECP256K1).unwrap();
 
-        let sender = KeyPair::generate_secp256k1(&mut prng);
-        let receiver = KeyPair::generate_secp256k1(&mut prng);
+        let sender = KeyPair::sample(&mut prng, SECP256K1);
+        let receiver = KeyPair::sample(&mut prng, SECP256K1);
 
         let fdb = MemoryDB::new();
         let cs = Arc::new(RwLock::new(ChainState::new(

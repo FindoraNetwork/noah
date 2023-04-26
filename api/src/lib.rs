@@ -1,6 +1,6 @@
 //! The API interfaces of the Noah library
 #![cfg_attr(not(feature = "std"), no_std)]
-#![deny(unused_import_braces, unused_qualifications, trivial_casts)]
+#![deny(unused, unused_import_braces, unused_qualifications, trivial_casts)]
 #![deny(trivial_numeric_casts, private_in_public)]
 #![deny(stable_features, unreachable_pub, non_shorthand_field_patterns)]
 #![deny(unused_attributes, unused_imports, unused_mut)]
@@ -39,8 +39,6 @@ pub mod keys;
 pub mod parameters;
 /// Module for serialization.
 pub mod serialization;
-/// Module for generating parameters.
-pub mod setup;
 /// Module for traceable confidential transfer.
 pub mod t_anon_xfr;
 /// Module for confidential transfer.
