@@ -14,12 +14,16 @@ use crate::anon_xfr::{
         OpenAnonAssetRecord, PayeeWitness, PayeeWitnessVars, PayerWitness, PayerWitnessVars,
     },
     AXfrAddressFoldingInstance, AXfrAddressFoldingWitness, AXfrPlonkPf, TurboPlonkCS, AMOUNT_LEN,
-    FEE_TYPE, TREE_DEPTH,
+    FEE_TYPE, MAX_AXFR_MEMO_SIZE, TREE_DEPTH,
 };
 use crate::errors::NoahError;
 use crate::keys::{KeyPair, PublicKey, PublicKeyInner, SecretKey};
 use crate::parameters::params::ProverParams;
 use crate::parameters::params::{AddressFormat, VerifierParams};
+use crate::parameters::{
+    MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER, MAX_ANONYMOUS_RECORD_NUMBER_ONE_INPUT,
+    MAX_ANONYMOUS_RECORD_NUMBER_STANDARD,
+};
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
 use noah_algebra::{bls12_381::BLSScalar, prelude::*};
@@ -272,6 +276,30 @@ pub fn verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default>(
     if *merkle_root != note.body.merkle_root {
         return Err(eg!(NoahError::AXfrVerificationError));
     }
+
+    // Check the memo size.
+    let max_memo_len = if note.body.inputs.len() == 1 {
+        MAX_ANONYMOUS_RECORD_NUMBER_ONE_INPUT
+    } else if note.body.inputs.len() > 1
+        && note.body.inputs.len() <= MAX_ANONYMOUS_RECORD_NUMBER_STANDARD
+    {
+        MAX_ANONYMOUS_RECORD_NUMBER_STANDARD
+    } else {
+        MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER
+    };
+
+    if note.body.owner_memos.len() != note.body.outputs.len()
+        || note.body.owner_memos.len() > max_memo_len
+    {
+        return Err(eg!(NoahError::AXfrVerificationError));
+    }
+
+    for memo in note.body.owner_memos.iter() {
+        if memo.size() > MAX_AXFR_MEMO_SIZE {
+            return Err(eg!(NoahError::AXfrVerificationError));
+        }
+    }
+
     let payees_commitments = note
         .body
         .outputs
@@ -322,6 +350,31 @@ pub fn batch_verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default + Sync +
         .any(|(x, y)| **x != y.body.merkle_root)
     {
         return Err(eg!(NoahError::AXfrVerificationError));
+    }
+
+    // Check the memo size.
+    for note in notes.iter() {
+        let max_memo_len = if note.body.inputs.len() == 1 {
+            MAX_ANONYMOUS_RECORD_NUMBER_ONE_INPUT
+        } else if note.body.inputs.len() > 1
+            && note.body.inputs.len() <= MAX_ANONYMOUS_RECORD_NUMBER_STANDARD
+        {
+            MAX_ANONYMOUS_RECORD_NUMBER_STANDARD
+        } else {
+            MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER
+        };
+
+        if note.body.owner_memos.len() != note.body.outputs.len()
+            || note.body.owner_memos.len() > max_memo_len
+        {
+            return Err(eg!(NoahError::AXfrVerificationError));
+        }
+
+        for memo in note.body.owner_memos.iter() {
+            if memo.size() > MAX_AXFR_MEMO_SIZE {
+                return Err(eg!(NoahError::AXfrVerificationError));
+            }
+        }
     }
 
     let is_ok = params

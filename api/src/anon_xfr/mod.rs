@@ -56,6 +56,8 @@ const ASSET_TYPE_FRA: AssetType = AssetType([0; ASSET_TYPE_LENGTH]);
 pub const FEE_TYPE: AssetType = ASSET_TYPE_FRA;
 /// A constant 2^{32}.
 pub const TWO_POW_32: u64 = 1 << 32;
+/// Restricting the maximum size of memo to 121.
+pub const MAX_AXFR_MEMO_SIZE: usize = 121;
 
 pub(crate) type TurboPlonkCS = TurboCS<BLSScalar>;
 

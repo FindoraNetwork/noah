@@ -613,6 +613,7 @@ fn build_record_input_from_template<R: CryptoRng + RngCore>(
     })
 }
 
+#[cfg(feature = "xfr-tracing")]
 #[cfg(test)]
 mod test {
     use super::{build_blind_asset_record, build_open_asset_record, open_blind_asset_record};

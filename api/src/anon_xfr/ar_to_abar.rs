@@ -3,7 +3,7 @@ use crate::anon_xfr::{
     structs::{
         AnonAssetRecord, AxfrOwnerMemo, OpenAnonAssetRecordBuilder, PayeeWitness, PayeeWitnessVars,
     },
-    AXfrPlonkPf, TurboPlonkCS,
+    AXfrPlonkPf, TurboPlonkCS, MAX_AXFR_MEMO_SIZE,
 };
 use crate::keys::{KeyPair, PublicKey, PublicKeyInner, Signature};
 use crate::parameters::params::ProverParams;
@@ -65,6 +65,11 @@ pub fn gen_ar_to_abar_note<R: CryptoRng + RngCore>(
 
 /// Verify a transparent-to-anonymous note.
 pub fn verify_ar_to_abar_note(params: &VerifierParams, note: &ArToAbarNote) -> Result<()> {
+    // Check the memo size.
+    if note.body.memo.size() > MAX_AXFR_MEMO_SIZE {
+        return Err(eg!(NoahError::AXfrVerificationError));
+    }
+
     let msg = bincode::serialize(&note.body).c(d!(NoahError::SerializationError))?;
     note.body
         .input
@@ -81,6 +86,13 @@ pub fn batch_verify_ar_to_abar_note(
     params: &VerifierParams,
     notes: &[&ArToAbarNote],
 ) -> Result<()> {
+    // Check the memo size.
+    for note in notes.iter() {
+        if note.body.memo.size() > MAX_AXFR_MEMO_SIZE {
+            return Err(eg!(NoahError::AXfrVerificationError));
+        }
+    }
+
     let is_ok = notes
         .par_iter()
         .map(|note| {

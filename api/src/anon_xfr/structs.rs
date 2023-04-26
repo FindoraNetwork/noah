@@ -345,6 +345,11 @@ impl AxfrOwnerMemo {
     pub fn decrypt(&self, secret_key: &SecretKey) -> Result<Vec<u8>> {
         axfr_hybrid_decrypt(secret_key, &self.0)
     }
+
+    /// Return the size of the memo.
+    pub fn size(&self) -> usize {
+        self.0.len()
+    }
 }
 
 #[cfg(test)]

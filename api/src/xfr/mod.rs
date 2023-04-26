@@ -23,6 +23,7 @@ pub mod proofs;
 /// Module for shared structures.
 pub mod structs;
 
+#[cfg(feature = "xfr-tracing")]
 #[cfg(test)]
 pub(crate) mod tests;
 
@@ -491,6 +492,30 @@ pub fn batch_verify_xfr_notes<R: CryptoRng + RngCore>(
     notes: &[&XfrNote],
     policies: &[&XfrNotePoliciesRef<'_>],
 ) -> Result<()> {
+    // Check the memo size.
+    for xfr_note in notes {
+        if xfr_note.body.outputs.len() != xfr_note.body.owners_memos.len() {
+            return Err(eg!(NoahError::AXfrVerifierParamsError));
+        }
+        #[cfg(not(feature = "xfr-tracing"))]
+        if xfr_note
+            .body
+            .asset_tracing_memos
+            .iter()
+            .any(|x| !x.is_empty())
+        {
+            return Err(eg!(NoahError::AXfrVerificationError));
+        }
+        for (output, memo) in xfr_note
+            .body
+            .outputs
+            .iter()
+            .zip(xfr_note.body.owners_memos.iter())
+        {
+            check_memo_size(output, memo)?
+        }
+    }
+
     // Verify each note's multisignature, one by one.
     for xfr_note in notes {
         verify_transfer_multisig(xfr_note).c(d!())?;

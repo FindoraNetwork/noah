@@ -278,6 +278,31 @@ jobs:
           cd smoke-tests/
           cargo nextest run --features=parallel
           cargo test --doc
+  
+  xfr_tracing_check:
+    name: Check xfr_tracing
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -Dwarnings
+      CARGO_TERM_COLOR: always
+    strategy:
+      fail-fast: true
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: taiki-e/install-action@nextest
+      - uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-xfr_tracing-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: xfr_tracing test
+        run: |
+          cd smoke-tests/
+          cargo nextest run --features=xfr-tracing
+          cargo test --doc
 
   consistency_check:
     name: Check verifier parameters
