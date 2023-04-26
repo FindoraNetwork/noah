@@ -11,16 +11,16 @@ use super::structs::TAxfrAuditorMemo;
 
 /// The traceable transparent-to-anonymous note.
 #[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
-pub struct ArToTAbarNote {
+pub struct ArToNabarNote {
     /// The traceable transparent-to-anonymous body.
-    pub body: ArToTAbarBody,
+    pub body: ArToNabarBody,
     /// Signature of the sender.
     pub signature: Signature,
 }
 
 /// The traceable transparent-to-anonymous body.
 #[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
-pub struct ArToTAbarBody {
+pub struct ArToNabarBody {
     /// The input transparent asset note, requiring both amounts and asset types to be transparent.
     pub input: BlindAssetRecord,
     /// The output anonymous asset record.

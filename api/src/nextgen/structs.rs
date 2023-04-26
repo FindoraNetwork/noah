@@ -155,10 +155,10 @@ fn ecies_encrypt<R: CryptoRng + RngCore>(
 
     let output_len = total_memo_size / (BLS12_381_SCALAR_LEN - 1)
         + if total_memo_size % (BLS12_381_SCALAR_LEN - 1) == 0 {
-            0
-        } else {
-            1
-        };
+        0
+    } else {
+        1
+    };
 
     let stream_blinds =
         AnemoiJive381::eval_stream_cipher(&[ephemeral_x, ephemeral_y, dh_x, dh_y], output_len);
@@ -204,10 +204,10 @@ fn ecies_decrypt(sk: &JubjubScalar, ecies: &EciesOutput) -> Vec<Vec<u8>> {
     let total_memo_size = ecies.ctexts.iter().map(|x| x.len()).sum::<usize>();
     let output_len = total_memo_size / (BLS12_381_SCALAR_LEN - 1)
         + if total_memo_size % (BLS12_381_SCALAR_LEN - 1) == 0 {
-            0
-        } else {
-            1
-        };
+        0
+    } else {
+        1
+    };
 
     let stream_blinds =
         AnemoiJive381::eval_stream_cipher(&[ephemeral_x, ephemeral_y, dh_x, dh_y], output_len);

@@ -39,8 +39,8 @@ pub mod keys;
 pub mod parameters;
 /// Module for serialization.
 pub mod serialization;
-/// Module for traceable confidential transfer.
-pub mod t_anon_xfr;
+/// Module for next-generation anonymous transfer.
+pub mod nextgen;
 /// Module for confidential transfer.
 pub mod xfr;
 
