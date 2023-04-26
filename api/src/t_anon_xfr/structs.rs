@@ -63,9 +63,8 @@ impl TAxfrAuditorMemo {
     pub fn new<R: CryptoRng + RngCore>(
         prng: &mut R,
         pk: &AuditorPublicKey,
-        plaintexts: &Vec<Vec<u8>>,
+        plaintexts: &[&[u8]],
     ) -> Result<(Self, JubjubScalar, JubjubPoint, JubjubPoint)> {
-        let plaintexts = plaintexts.iter().map(|x| x.as_slice()).collect::<Vec<_>>();
         let output = ecies_encrypt(prng, &pk.0, &plaintexts)?;
         let ctext_bytes = output.0.to_bytes()?;
 
