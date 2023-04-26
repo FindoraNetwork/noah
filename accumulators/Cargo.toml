@@ -26,4 +26,4 @@ tag = 'v1.1.4'
 
 [dev-dependencies.mem_db]
 git = 'https://github.com/FindoraNetwork/storage.git'
-tag = 'v1.1.4'
+tag = 'v1.1.5'
