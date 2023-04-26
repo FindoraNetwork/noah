@@ -4,10 +4,9 @@ use crate::anon_xfr::{
     AXfrAddressFoldingInstance, AXfrPlonkPf,
 };
 use crate::keys::KeyPair;
+use crate::nextgen::structs::NabarAuditorMemo;
 use noah_algebra::bls12_381::BLSScalar;
 use noah_crypto::basic::anemoi_jive::AnemoiVLHTrace;
-
-use super::structs::TAxfrAuditorMemo;
 
 /// Traceable anonymous transfer note.
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
@@ -53,5 +52,5 @@ pub struct TAXfrBody {
     /// The owner memos.
     pub owner_memos: Vec<AxfrOwnerMemo>,
     /// The auditor memos.
-    pub auditor_memos: Vec<TAxfrAuditorMemo>,
+    pub auditor_memos: Vec<NabarAuditorMemo>,
 }

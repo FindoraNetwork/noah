@@ -1,3 +1,4 @@
+use crate::nextgen::structs::NabarAuditorMemo;
 use crate::{
     anon_xfr::{
         structs::{AnonAssetRecord, AxfrOwnerMemo},
@@ -6,8 +7,6 @@ use crate::{
     keys::Signature,
     xfr::structs::BlindAssetRecord,
 };
-
-use super::structs::TAxfrAuditorMemo;
 
 /// The traceable transparent-to-anonymous note.
 #[derive(Debug, Serialize, Deserialize, Eq, Clone, PartialEq)]
@@ -30,5 +29,5 @@ pub struct ArToNabarBody {
     /// memo to hold the blinding factor of commitment
     pub memo: AxfrOwnerMemo,
     /// The auditor memos.
-    pub auditor_memos: Vec<TAxfrAuditorMemo>,
+    pub auditor_memos: Vec<NabarAuditorMemo>,
 }

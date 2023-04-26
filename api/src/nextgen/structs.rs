@@ -1,12 +1,8 @@
-use crate::{
-    keys::PublicKey,
-    xfr::structs::{AssetType, ASSET_TYPE_LENGTH},
-};
+use crate::xfr::structs::AssetType;
 use noah_algebra::{
     bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN},
     jubjub::{JubjubPoint, JubjubScalar},
     prelude::*,
-    traits::Domain,
 };
 use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
 use serde::de::Error as SerdeError;
@@ -300,7 +296,7 @@ pub struct NabarAuditableAssetIssuance {
     /// A list of encryption keys to be authorized.
     pub enc_ek: Vec<NabarAuditEncryptionKey>,
     /// A list of signatures for such authorization.
-    pub enc_sign: Vec<NabarAuditKeySignature>
+    pub enc_sign: Vec<NabarAuditKeySignature>,
 }
 
 impl NabarAuditableAssetIssuance {
@@ -310,136 +306,12 @@ impl NabarAuditableAssetIssuance {
     }
 }
 
-impl AssetType {
-    /// Generate asset type with auditor public key.
-    pub fn sample<R: CryptoRng + RngCore>(
-        prng: &mut R,
-        pk: &AuditorPublicKey,
-    ) -> Result<(AssetType, BLSScalar)> {
-        // todo()
-        let sample = BLSScalar::random(prng);
-        let pk_x = BLSScalar::from_field((pk.0).0.x);
-        let pk_y = BLSScalar::from_field((pk.0).0.y);
-
-        let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[pk_x, pk_y, sample]);
-        let output = trace.output.to_bytes();
-
-        let mut bytes = [0u8; ASSET_TYPE_LENGTH];
-        if ASSET_TYPE_LENGTH != output.len() {
-            return Err(eg!(NoahError::ParameterError));
-        }
-        bytes.copy_from_slice(&output);
-
-        Ok((AssetType(bytes), sample))
-    }
-}
-
-/// The public key for auditor.
-#[derive(Clone, Copy, Debug)]
-pub struct AuditorPublicKey(pub JubjubPoint);
-
-impl AuditorSecretKey {
-    /// Generate an auditor secret key and public key.
-    pub fn generate_keypair<R: CryptoRng + RngCore>(
-        prng: &mut R,
-    ) -> (AuditorSecretKey, AuditorPublicKey) {
-        let sk = JubjubScalar::random(prng);
-        let pk = JubjubPoint::get_base().mul(&sk);
-        (AuditorSecretKey(sk), AuditorPublicKey(pk))
-    }
-}
-
-/// An auditor’s memo that accurately describes contents of the transactions.
-#[derive(Clone, Default, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct TAxfrAuditorMemo(Vec<Vec<u8>>);
-
-/// The secret key for auditor.
-#[derive(Debug)]
-pub struct AuditorSecretKey(pub JubjubScalar);
-
-impl TAxfrAuditorMemo {
-    /// Encrypt struct data to memo bytes
-    pub fn new<R: CryptoRng + RngCore>(
-        prng: &mut R,
-        pk: &AuditorPublicKey,
-        plaintexts: &[TAxfrAuditorProMemo],
-    ) -> (Self, JubjubScalar, JubjubPoint, JubjubPoint) {
-        let output = ecies_encrypt(prng, &pk.0, plaintexts);
-        let ctext_bytes = output.0.to_bytes();
-
-        (TAxfrAuditorMemo(ctext_bytes), output.1, output.2, output.3)
-    }
-
-    /// Try to decryp memo bytes to struct data
-    pub fn decrypt(sk: &AuditorSecretKey, ciphertext: &[&[u8]]) -> Result<Vec<Vec<u8>>> {
-        let ecies = EciesOutput::from_bytes(ciphertext)?;
-        Ok(ecies_decrypt(&sk.0, &ecies))
-    }
-}
-
-/// An auditor’s memo to be encrypted.
-pub struct TAxfrAuditorProMemo {
-    amount_asset_type: BLSScalar,
-    blind: BLSScalar,
-    receiver: PublicKey,
-}
-
-impl TAxfrAuditorProMemo {
-    /// Create an auditor's memo that is to be encrypted.
-    // fn new(amount_asset_type: BLSScalar, blind: BLSScalar, receiver: PublicKey) -> Self {
-    //     Self {
-    //         amount_asset_type,
-    //         blind,
-    //         receiver,
-    //     }
-    // }
-
-    /// Convert auditor memo to bytes.
-    fn to_bytes(&self) -> Vec<u8> {
-        let mut bytes = vec![];
-        bytes.extend(self.amount_asset_type.noah_to_bytes());
-        bytes.extend(self.blind.noah_to_bytes());
-        bytes.extend(self.receiver.noah_to_bytes());
-        bytes
-    }
-}
-
-/// ECIES Hybrid Encryption Scheme.
-struct EciesOutput {
-    /// ephemeral encrypt public key.
-    ephemeral: JubjubPoint,
-    /// encrypted message.
-    ctexts: Vec<Vec<u8>>,
-}
-
-impl EciesOutput {
-    /// Convert ECIES output to bytes.
-    fn to_bytes(&self) -> Vec<Vec<u8>> {
-        let mut bytes = vec![];
-        bytes.push(self.ephemeral.to_compressed_bytes());
-        self.ctexts.iter().for_each(|x| bytes.push(x.to_vec()));
-        bytes
-    }
-
-    /// Convert bytes to ECIES output.
-    fn from_bytes(bytes: &[&[u8]]) -> Result<EciesOutput> {
-        let len: usize = JubjubPoint::COMPRESSED_LEN;
-        if bytes[0].len() < len {
-            return Err(eg!(NoahError::DeserializationError));
-        }
-        let ephemeral = JubjubPoint::from_compressed_bytes(&bytes[0][..len])?;
-
-        let ctexts = bytes.iter().skip(1).map(|x| x.to_vec()).collect();
-
-        Ok(Self { ephemeral, ctexts })
-    }
-}
-
+/*
 /// ECIES encrypt function.
 fn ecies_encrypt<R: CryptoRng + RngCore>(
     prng: &mut R,
     pk: &JubjubPoint,
-    plaintexts: &[TAxfrAuditorProMemo],
+    plaintexts: &[NabarAuditorMemo],
 ) -> (EciesOutput, JubjubScalar, JubjubPoint, JubjubPoint) {
     let ephemeral_sk: JubjubScalar = JubjubScalar::random(prng);
     let ephemeral = JubjubPoint::get_base().mul(&ephemeral_sk);
@@ -535,3 +407,5 @@ fn ecies_decrypt(sk: &JubjubScalar, ecies: &EciesOutput) -> Vec<Vec<u8>> {
 
     res
 }
+
+*/

@@ -1,13 +1,13 @@
+use crate::anon_xfr::structs::AxfrOwnerMemo;
 use crate::anon_xfr::{
     structs::{Nullifier, PayerWitness},
     AXfrAddressFoldingInstance, AXfrPlonkPf,
 };
 use crate::keys::KeyPair;
-use crate::xfr::structs::{BlindAssetRecord, OwnerMemo};
+use crate::nextgen::structs::NabarAuditorMemo;
+use crate::xfr::structs::BlindAssetRecord;
 use noah_algebra::bls12_381::BLSScalar;
 use noah_crypto::basic::anemoi_jive::AnemoiVLHTrace;
-
-use super::structs::TAxfrAuditorMemo;
 
 /// The traceable anonymous-to-transparent note.
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
@@ -47,7 +47,7 @@ pub struct TAbarToArBody {
     /// The Merkle root version.
     pub merkle_root_version: u64,
     /// The owner memo.
-    pub memo: Option<OwnerMemo>,
+    pub memo: Option<AxfrOwnerMemo>,
     /// The auditor memos.
-    pub auditor_memos: TAxfrAuditorMemo,
+    pub auditor_memos: NabarAuditorMemo,
 }
