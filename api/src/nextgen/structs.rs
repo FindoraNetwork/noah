@@ -138,6 +138,178 @@ impl<'de> Deserialize<'de> for NabarAuditorMemo {
     }
 }
 
+/// SNARK-friendly signature used to authorize encryption keys.
+///
+/// We do not need to enforce the signature to be deterministic, and for our use case, we want a
+/// signature scheme whose verification algorithm does not involve algebraic operations over the
+/// scalar field (as it would be nonnative arithmetics).
+///
+/// We also favor a signature scheme that does not require a lot of sanity checks, such as checking
+/// if some values are nonzeros.
+///
+/// We identify the Schnorr signature over Jubjub to be a use case. However, note that we play with
+/// the hash function a bit, as we will be doing the hash function used in the Schnorr signature over
+/// the BLS12-381's scalar field.
+///
+pub struct NabarAuditKeySignature {
+    /// The s element of the signature for authorizing encryption keys.
+    pub schnorr_s: JubjubScalar,
+    /// the r element of the signature for authorizing encryption keys.
+    pub schnorr_e: BLSScalar,
+}
+
+/// The struct for the signing key, which would be of the Schnorr signature scheme.
+#[derive(Clone, Default)]
+pub struct NabarAuditSigningKey(JubjubScalar);
+
+/// The struct for the verifying key, which would be of the Schnorr signature scheme.
+#[derive(Clone, Default)]
+pub struct NabarAuditVerifyingKey(JubjubPoint);
+
+/// The struct for the encryption key.
+#[derive(Clone, Default)]
+pub struct NabarAuditEncryptionKey(JubjubPoint);
+
+/// The struct for the decryption key.
+#[derive(Clone, Default)]
+pub struct NabarAuditDecryptionKey(JubjubScalar);
+
+impl NabarAuditSigningKey {
+    /// Sample the signing key.
+    pub fn sample<R: CryptoRng + RngCore>(prng: &mut R) -> Self {
+        Self(JubjubScalar::random(prng))
+    }
+
+    /// Get the raw Jubjub scalar element.
+    pub fn get_raw(&self) -> JubjubScalar {
+        self.0
+    }
+
+    /// Reconstruct from the raw Jubjub scalar element.
+    pub fn from_raw(raw: JubjubScalar) -> Self {
+        Self(raw)
+    }
+
+    /// Compute the corresponding verifying key.
+    pub fn to_verifying_key(&self) -> NabarAuditVerifyingKey {
+        NabarAuditVerifyingKey(JubjubPoint::get_base().mul(&self.0))
+    }
+
+    /// Sign an encryption key.
+    pub fn sign<R: CryptoRng + RngCore>(
+        &self,
+        prng: &mut R,
+        ek: &NabarAuditEncryptionKey,
+    ) -> NabarAuditKeySignature {
+        let k = JubjubScalar::random(prng);
+        let point_r = JubjubPoint::get_base().mul(&k);
+
+        let e = AnemoiJive381::eval_variable_length_hash(&[
+            BLSScalar::zero(),
+            point_r.get_x(),
+            point_r.get_y(),
+            ek.0.get_x(),
+            ek.0.get_y(),
+        ]);
+
+        // This will perform a modular reduction.
+        let e_converted = JubjubScalar::from(&e.into());
+
+        let s = k - &(self.0 * &e_converted);
+
+        NabarAuditKeySignature {
+            schnorr_s: s,
+            schnorr_e: e,
+        }
+    }
+}
+
+impl NabarAuditVerifyingKey {
+    /// Get the raw Jubjub point element.
+    pub fn get_raw(&self) -> JubjubPoint {
+        self.0
+    }
+
+    /// Reconstruct from the raw Jubjub point element.
+    pub fn from_raw(raw: JubjubPoint) -> Self {
+        Self(raw)
+    }
+
+    /// Verify the signature of an encryption key.
+    pub fn verify(
+        &self,
+        ek: &NabarAuditEncryptionKey,
+        signature: &NabarAuditKeySignature,
+    ) -> Result<()> {
+        let e_converted = JubjubScalar::from(&signature.schnorr_e.into());
+
+        let point_r_recovered =
+            JubjubPoint::get_base().mul(&signature.schnorr_s) + &self.0.mul(&e_converted);
+
+        let e = AnemoiJive381::eval_variable_length_hash(&[
+            BLSScalar::zero(),
+            point_r_recovered.get_x(),
+            point_r_recovered.get_y(),
+            ek.0.get_x(),
+            ek.0.get_y(),
+        ]);
+        if e != signature.schnorr_e {
+            Err(eg!(NoahError::SignatureError))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+/// On-chain disclosure for a new asset that has the auditability.
+///
+/// Note: this asset is not limited to Nextgen assets. To enforce the auditability,
+/// the enforcement must propagate all the ways to transparent, Maxwell, and Zerocash assets.
+/// - Maxwell assets and Zerocash assets are completely suspended for auditable assets.
+///   Transactions that include auditable assets in ops that involve Maxwell or Zerocash will fail.
+/// - This is done by having the consensus to remember a list of all auditable assets.
+///
+/// The disclosure performs three things:
+/// - declare that an asset code represents an auditable asset
+///     (which would be verified for consistency on the platform side).
+/// - provide the randomness and the signature verifying key for the auditor.
+/// - provide a number of signed encryption key.
+///
+/// A transaction fee shall be charged for on-chain disclosure.
+pub struct NabarAuditableAssetIssuance {
+    /// The asset type code that has been remapped (after the domain separation,
+    /// which modifies the asset type code and specifies it as an auditable asset).
+    ///
+    /// This should be handled by the application layer to check if the remapping
+    /// is correct in respect to the randomness and the signature verifying key, which
+    /// is expected to unique.
+    pub remapped_asset_type: AssetType,
+    /// The randomness chosen by the token issuer, which allows the same
+    /// signature verifying key to have multiple different types of assets.
+    pub randomness: BLSScalar,
+    /// The signature verifying key, which is a point on the Jubjub curve.
+    ///
+    /// However, note that the Jubjub curve has cofactor 8.
+    /// Checking if the point is in the correct subgroup is cumbersome.
+    ///
+    /// Therefore, we choose a separate way of implementation.
+    /// The issuance request should use sign_vk divided by 8.
+    /// This allows the other party to get the actual point by simply
+    /// multiplying by 8 (i.e., doubling three times).
+    pub sign_vk_div_by_cofactor: JubjubPoint,
+    /// A list of encryption keys to be authorized.
+    pub enc_ek: Vec<NabarAuditEncryptionKey>,
+    /// A list of signatures for such authorization.
+    pub enc_sign: Vec<NabarAuditKeySignature>
+}
+
+impl NabarAuditableAssetIssuance {
+    /// Compute the actual, reconstructed signature verifying key.
+    pub fn get_sign_vk(&self) -> NabarAuditVerifyingKey {
+        NabarAuditVerifyingKey(self.sign_vk_div_by_cofactor.double().double().double())
+    }
+}
+
 impl AssetType {
     /// Generate asset type with auditor public key.
     pub fn sample<R: CryptoRng + RngCore>(
