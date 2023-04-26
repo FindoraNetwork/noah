@@ -1,4 +1,7 @@
-use crate::xfr::structs::{AssetType, ASSET_TYPE_LENGTH};
+use crate::{
+    keys::PublicKey,
+    xfr::structs::{AssetType, ASSET_TYPE_LENGTH},
+};
 use noah_algebra::{
     bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN},
     jubjub::{JubjubPoint, JubjubScalar},
@@ -6,10 +9,6 @@ use noah_algebra::{
     traits::Domain,
 };
 use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
-
-// If the auditor's memory includes amount, asset_type, blind and receiver address,
-// then the size of the auditor's memory equals to 8 + 32 + 32 + 34 = 106.
-const MAX_AUDITOR_MEMO_SIZE: usize = 106;
 
 impl AssetType {
     /// Generate asset type with auditor public key.
@@ -35,14 +34,6 @@ impl AssetType {
     }
 }
 
-/// An auditor’s memo that accurately describes contents of the transactions.
-#[derive(Clone, Default, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct TAxfrAuditorMemo(Vec<u8>);
-
-/// The secret key for auditor.
-#[derive(Debug)]
-pub struct AuditorSecretKey(pub JubjubScalar);
-
 /// The public key for auditor.
 #[derive(Clone, Copy, Debug)]
 pub struct AuditorPublicKey(pub JubjubPoint);
@@ -58,23 +49,58 @@ impl AuditorSecretKey {
     }
 }
 
+/// An auditor’s memo that accurately describes contents of the transactions.
+#[derive(Clone, Default, Debug, Deserialize, Eq, PartialEq, Serialize)]
+pub struct TAxfrAuditorMemo(Vec<Vec<u8>>);
+
+/// The secret key for auditor.
+#[derive(Debug)]
+pub struct AuditorSecretKey(pub JubjubScalar);
+
 impl TAxfrAuditorMemo {
     /// Encrypt struct data to memo bytes
     pub fn new<R: CryptoRng + RngCore>(
         prng: &mut R,
         pk: &AuditorPublicKey,
-        plaintexts: &[&[u8]],
-    ) -> Result<(Self, JubjubScalar, JubjubPoint, JubjubPoint)> {
-        let output = ecies_encrypt(prng, &pk.0, &plaintexts)?;
-        let ctext_bytes = output.0.to_bytes()?;
+        plaintexts: &[TAxfrAuditorProMemo],
+    ) -> (Self, JubjubScalar, JubjubPoint, JubjubPoint) {
+        let output = ecies_encrypt(prng, &pk.0, plaintexts);
+        let ctext_bytes = output.0.to_bytes();
 
-        Ok((TAxfrAuditorMemo(ctext_bytes), output.1, output.2, output.3))
+        (TAxfrAuditorMemo(ctext_bytes), output.1, output.2, output.3)
     }
 
     /// Try to decryp memo bytes to struct data
-    pub fn decrypt(sk: &AuditorSecretKey, ciphertext: &[u8]) -> Result<Vec<Vec<u8>>> {
+    pub fn decrypt(sk: &AuditorSecretKey, ciphertext: &[&[u8]]) -> Result<Vec<Vec<u8>>> {
         let ecies = EciesOutput::from_bytes(ciphertext)?;
         Ok(ecies_decrypt(&sk.0, &ecies))
+    }
+}
+
+/// An auditor’s memo to be encrypted.
+pub struct TAxfrAuditorProMemo {
+    amount_asset_type: BLSScalar,
+    blind: BLSScalar,
+    receiver: PublicKey,
+}
+
+impl TAxfrAuditorProMemo {
+    /// Create an auditor's memo that is to be encrypted.
+    // fn new(amount_asset_type: BLSScalar, blind: BLSScalar, receiver: PublicKey) -> Self {
+    //     Self {
+    //         amount_asset_type,
+    //         blind,
+    //         receiver,
+    //     }
+    // }
+
+    /// Convert auditor memo to bytes.
+    fn to_bytes(&self) -> Vec<u8> {
+        let mut bytes = vec![];
+        bytes.extend(self.amount_asset_type.noah_to_bytes());
+        bytes.extend(self.blind.noah_to_bytes());
+        bytes.extend(self.receiver.noah_to_bytes());
+        bytes
     }
 }
 
@@ -88,29 +114,22 @@ struct EciesOutput {
 
 impl EciesOutput {
     /// Convert ECIES output to bytes.
-    fn to_bytes(self) -> Result<Vec<u8>> {
+    fn to_bytes(&self) -> Vec<Vec<u8>> {
         let mut bytes = vec![];
-        bytes.extend(self.ephemeral.to_compressed_bytes());
-        self.ctexts.iter().for_each(|x| bytes.extend(x));
-        Ok(bytes)
+        bytes.push(self.ephemeral.to_compressed_bytes());
+        self.ctexts.iter().for_each(|x| bytes.push(x.to_vec()));
+        bytes
     }
 
     /// Convert bytes to ECIES output.
-    fn from_bytes(bytes: &[u8]) -> Result<EciesOutput> {
-        let len = JubjubPoint::COMPRESSED_LEN;
-        if bytes.len() < len {
+    fn from_bytes(bytes: &[&[u8]]) -> Result<EciesOutput> {
+        let len: usize = JubjubPoint::COMPRESSED_LEN;
+        if bytes[0].len() < len {
             return Err(eg!(NoahError::DeserializationError));
         }
-        let ephemeral = JubjubPoint::from_compressed_bytes(&bytes[..len])?;
+        let ephemeral = JubjubPoint::from_compressed_bytes(&bytes[0][..len])?;
 
-        if (bytes.len() - len) % MAX_AUDITOR_MEMO_SIZE != 0 {
-            return Err(eg!(NoahError::DeserializationError));
-        }
-
-        let ctexts = bytes
-            .chunks_exact(MAX_AUDITOR_MEMO_SIZE)
-            .map(|x| x.to_vec())
-            .collect();
+        let ctexts = bytes.iter().skip(1).map(|x| x.to_vec()).collect();
 
         Ok(Self { ephemeral, ctexts })
     }
@@ -120,8 +139,8 @@ impl EciesOutput {
 fn ecies_encrypt<R: CryptoRng + RngCore>(
     prng: &mut R,
     pk: &JubjubPoint,
-    plaintexts: &[&[u8]],
-) -> Result<(EciesOutput, JubjubScalar, JubjubPoint, JubjubPoint)> {
+    plaintexts: &[TAxfrAuditorProMemo],
+) -> (EciesOutput, JubjubScalar, JubjubPoint, JubjubPoint) {
     let ephemeral_sk: JubjubScalar = JubjubScalar::random(prng);
     let ephemeral = JubjubPoint::get_base().mul(&ephemeral_sk);
     let dh: JubjubPoint = pk.mul(&ephemeral_sk);
@@ -131,16 +150,18 @@ fn ecies_encrypt<R: CryptoRng + RngCore>(
     let dh_x = BLSScalar::from_field(dh.0.x);
     let dh_y = BLSScalar::from_field(dh.0.y);
 
-    let mut output_len = MAX_AUDITOR_MEMO_SIZE * plaintexts.len() / BLS12_381_SCALAR_LEN;
-    let remain = MAX_AUDITOR_MEMO_SIZE * plaintexts.len() % BLS12_381_SCALAR_LEN;
-    if remain != 0 {
-        output_len += 1;
-    }
+    let plaintexts = plaintexts.iter().map(|x| x.to_bytes()).collect::<Vec<_>>();
+    let total_memo_size = plaintexts.iter().map(|x| x.len()).sum::<usize>();
+
+    let output_len = total_memo_size / (BLS12_381_SCALAR_LEN - 1)
+        + if total_memo_size % (BLS12_381_SCALAR_LEN - 1) == 0 {
+            0
+        } else {
+            1
+        };
 
     let stream_blinds =
         AnemoiJive381::eval_stream_cipher(&[ephemeral_x, ephemeral_y, dh_x, dh_y], output_len);
-
-    let mut ctexts = Vec::with_capacity(plaintexts.len());
 
     let stream_blinds = stream_blinds
         .iter()
@@ -148,24 +169,27 @@ fn ecies_encrypt<R: CryptoRng + RngCore>(
         .flatten()
         .collect::<Vec<u8>>();
 
-    for (blind, plaintext) in stream_blinds
-        .chunks_exact(MAX_AUDITOR_MEMO_SIZE)
-        .zip(plaintexts.iter())
-    {
-        let ctext = blind
+    let mut ctexts = Vec::with_capacity(plaintexts.len());
+    let mut sum = 0;
+
+    for plaintext in plaintexts.iter() {
+        let size = plaintext.len();
+        let blind = &stream_blinds[sum..sum + size];
+        let ctext = plaintext
             .iter()
-            .zip(plaintext.iter())
+            .zip(blind.iter())
             .map(|(x, y)| x ^ y)
             .collect::<Vec<u8>>();
-        ctexts.push(ctext)
+        ctexts.push(ctext);
+        sum += size
     }
 
-    Ok((
+    (
         EciesOutput { ephemeral, ctexts },
         ephemeral_sk,
         ephemeral,
         dh,
-    ))
+    )
 }
 
 /// ECIES decrypt function.
@@ -177,16 +201,16 @@ fn ecies_decrypt(sk: &JubjubScalar, ecies: &EciesOutput) -> Vec<Vec<u8>> {
     let dh_x = BLSScalar::from_field(dh.0.x);
     let dh_y = BLSScalar::from_field(dh.0.y);
 
-    let mut output_len = MAX_AUDITOR_MEMO_SIZE * ecies.ctexts.len() / BLS12_381_SCALAR_LEN;
-    let remain = MAX_AUDITOR_MEMO_SIZE * ecies.ctexts.len() % BLS12_381_SCALAR_LEN;
-    if remain != 0 {
-        output_len += 1;
-    }
+    let total_memo_size = ecies.ctexts.iter().map(|x| x.len()).sum::<usize>();
+    let output_len = total_memo_size / (BLS12_381_SCALAR_LEN - 1)
+        + if total_memo_size % (BLS12_381_SCALAR_LEN - 1) == 0 {
+            0
+        } else {
+            1
+        };
 
     let stream_blinds =
         AnemoiJive381::eval_stream_cipher(&[ephemeral_x, ephemeral_y, dh_x, dh_y], output_len);
-
-    let mut res = Vec::with_capacity(ecies.ctexts.len());
 
     let stream_blinds = stream_blinds
         .iter()
@@ -194,16 +218,19 @@ fn ecies_decrypt(sk: &JubjubScalar, ecies: &EciesOutput) -> Vec<Vec<u8>> {
         .flatten()
         .collect::<Vec<u8>>();
 
-    for (blind, ctext) in stream_blinds
-        .chunks_exact(MAX_AUDITOR_MEMO_SIZE)
-        .zip(ecies.ctexts.iter())
-    {
-        let plaintext = blind
+    let mut res = Vec::with_capacity(ecies.ctexts.len());
+    let mut sum: usize = 0;
+
+    for ctext in ecies.ctexts.iter() {
+        let size = ctext.len();
+        let blind = &stream_blinds[sum..sum + size];
+        let r = ctext
             .iter()
-            .zip(ctext.iter())
+            .zip(blind.iter())
             .map(|(x, y)| x ^ y)
             .collect::<Vec<u8>>();
-        res.push(plaintext)
+        res.push(r);
+        sum += size
     }
 
     res
