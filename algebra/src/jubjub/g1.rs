@@ -60,6 +60,7 @@ impl JubjubPoint {
 impl Group for JubjubPoint {
     type ScalarType = JubjubScalar;
     const COMPRESSED_LEN: usize = 32;
+    const UNCOMPRESSED_LEN: usize = 64;
 
     #[inline]
     fn double(&self) -> Self {

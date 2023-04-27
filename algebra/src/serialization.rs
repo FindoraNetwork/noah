@@ -280,3 +280,29 @@ pub mod noah_obj_serde {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    fn check_compressed_len<T: Group + NoahFromToBytes>() {
+        let mut prng = test_rng();
+        let point = T::random(&mut prng);
+        assert_eq!(point.to_compressed_bytes().len(), T::COMPRESSED_LEN);
+        assert_eq!(point.to_unchecked_bytes().len(), T::UNCOMPRESSED_LEN);
+        assert_eq!(point.noah_to_bytes().len(), T::COMPRESSED_LEN);
+    }
+
+    #[test]
+    fn test_compressed_len() {
+        check_compressed_len::<BLSG1>();
+        check_compressed_len::<BLSG2>();
+        check_compressed_len::<BLSGt>();
+        check_compressed_len::<JubjubPoint>();
+        check_compressed_len::<SECQ256K1G1>();
+        check_compressed_len::<SECP256K1G1>();
+        check_compressed_len::<ZorroG1>();
+        check_compressed_len::<RistrettoPoint>();
+        check_compressed_len::<Ed25519Point>();
+    }
+}

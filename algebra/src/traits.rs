@@ -146,6 +146,9 @@ pub trait Group:
     /// The number of bytes for a compressed representation of a group element
     const COMPRESSED_LEN: usize;
 
+    /// The number of bytes for a uncompressed representation of a group element
+    const UNCOMPRESSED_LEN: usize;
+
     /// Return the doubling of the group element
     fn double(&self) -> Self;
 

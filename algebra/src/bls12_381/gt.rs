@@ -100,6 +100,7 @@ impl Group for BLSGt {
     type ScalarType = BLSScalar;
 
     const COMPRESSED_LEN: usize = 576;
+    const UNCOMPRESSED_LEN: usize = 576;
 
     #[inline]
     fn double(&self) -> Self {

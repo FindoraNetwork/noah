@@ -342,6 +342,7 @@ impl Neg for RistrettoPoint {
 impl Group for RistrettoPoint {
     type ScalarType = RistrettoScalar;
     const COMPRESSED_LEN: usize = 32;
+    const UNCOMPRESSED_LEN: usize = 32;
 
     #[inline]
     fn double(&self) -> Self {
