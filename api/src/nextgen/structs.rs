@@ -280,9 +280,6 @@ pub struct NabarAuditableAssetIssuance {
     /// is correct in respect to the randomness and the signature verifying key, which
     /// is expected to unique.
     pub remapped_asset_type: AssetType,
-    /// The randomness chosen by the token issuer, which allows the same
-    /// signature verifying key to have multiple different types of assets.
-    pub randomness: BLSScalar,
     /// The signature verifying key, which is a point on the Jubjub curve.
     ///
     /// However, note that the Jubjub curve has cofactor 8.
@@ -305,6 +302,10 @@ impl NabarAuditableAssetIssuance {
         NabarAuditVerifyingKey(self.sign_vk_div_by_cofactor.double().double().double())
     }
 }
+
+/// On-chain update notices to the list of encryption keys.
+///
+/// The owner of the related signature signing key
 
 /*
 /// ECIES encrypt function.
