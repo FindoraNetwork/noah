@@ -55,6 +55,7 @@ impl Debug for SECP256K1G1 {
 impl Group for SECP256K1G1 {
     type ScalarType = SECP256K1Scalar;
     const COMPRESSED_LEN: usize = 33;
+    const UNCOMPRESSED_LEN: usize = 65;
 
     #[inline]
     fn double(&self) -> Self {

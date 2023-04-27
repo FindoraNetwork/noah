@@ -96,6 +96,7 @@ impl<'a> MulAssign<&'a ZorroScalar> for ZorroG1 {
 impl Group for ZorroG1 {
     type ScalarType = ZorroScalar;
     const COMPRESSED_LEN: usize = 33;
+    const UNCOMPRESSED_LEN: usize = 65;
 
     #[inline]
     fn double(&self) -> Self {

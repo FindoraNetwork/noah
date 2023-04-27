@@ -54,6 +54,7 @@ impl Debug for BLSG1 {
 impl Group for BLSG1 {
     type ScalarType = BLSScalar;
     const COMPRESSED_LEN: usize = 48;
+    const UNCOMPRESSED_LEN: usize = 96;
 
     #[inline]
     fn double(&self) -> Self {

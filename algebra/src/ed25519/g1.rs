@@ -62,6 +62,7 @@ impl Ed25519Point {
 impl Group for Ed25519Point {
     type ScalarType = Ed25519Scalar;
     const COMPRESSED_LEN: usize = 32;
+    const UNCOMPRESSED_LEN: usize = 64;
 
     #[inline]
     fn double(&self) -> Self {
