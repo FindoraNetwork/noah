@@ -56,7 +56,7 @@ impl<S: Scalar, G: Group<ScalarType = S>> SchnorrKeyPair<S, G> {
 
 impl<S: Scalar> SchnorrSigningKey<S> {
     /// Sign the message with the signing key.
-    pub fn sign<M, H, G, R>(&self, prng: &mut R, msg: &[M]) -> SchnorrSignature<S, M>
+    pub fn sign<M, H, G, R>(&self, prng: &mut R, aux: M, msg: &[M]) -> SchnorrSignature<S, M>
     where
         M: Scalar,
         H: AnemoiJive<M, 2, 12>,
@@ -66,7 +66,7 @@ impl<S: Scalar> SchnorrSigningKey<S> {
         let k = S::random(prng);
         let point_r = G::get_base().mul(&k);
 
-        let mut input = vec![M::zero(), point_r.get_x(), point_r.get_y()];
+        let mut input = vec![aux, point_r.get_x(), point_r.get_y()];
         input.extend_from_slice(msg);
 
         let e = H::eval_variable_length_hash(&input);
@@ -102,7 +102,7 @@ impl<M: Scalar, S: Scalar, G: Group<ScalarType = S> + Coordinate<ScalarField = M
     SchnorrVerifyingKey<G>
 {
     /// Verify the signature with the verifying key.
-    pub fn verify<H>(&self, signature: &SchnorrSignature<S, M>, msg: &[M]) -> Result<()>
+    pub fn verify<H>(&self, signature: &SchnorrSignature<S, M>, aux: M, msg: &[M]) -> Result<()>
     where
         H: AnemoiJive<M, 2, 12>,
     {
@@ -111,7 +111,7 @@ impl<M: Scalar, S: Scalar, G: Group<ScalarType = S> + Coordinate<ScalarField = M
         let point_r_recovered = G::get_base().mul(&signature.schnorr_s) + &self.0.mul(&e_converted);
 
         let mut input = vec![
-            M::zero(),
+            aux,
             point_r_recovered.get_x(),
             point_r_recovered.get_y(),
         ];
@@ -157,11 +157,11 @@ mod tests {
             BLSScalar::random(&mut rng),
         ];
 
-        let sign = signing_key.sign::<BLSScalar, AnemoiJive381, JubjubPoint, _>(&mut rng, &msg);
+        let aux = BLSScalar::random(&mut rng);
 
-        assert!(verifying_key.verify::<AnemoiJive381>(&sign, &msg).is_ok());
+        let sign = signing_key.sign::<BLSScalar, AnemoiJive381, JubjubPoint, _>(&mut rng, aux, &msg);
 
-        let msg = &msg[..4];
-        assert!(verifying_key.verify::<AnemoiJive381>(&sign, msg).is_err());
+        assert!(verifying_key.verify::<AnemoiJive381>(&sign, aux, &msg).is_ok());
+        assert!(verifying_key.verify::<AnemoiJive381>(&sign, aux, &msg[..4]).is_err());
     }
 }
