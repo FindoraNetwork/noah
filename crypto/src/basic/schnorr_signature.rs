@@ -5,15 +5,15 @@ use noah_algebra::{
 };
 use rand_core::{CryptoRng, RngCore};
 
-/// The schnorr signing key is also called private key.
+/// The Schnorr signing key is often also called private key.
 #[derive(Copy, Clone, Default, Debug, Eq, PartialEq)]
 pub struct SchnorrSigningKey<S: Scalar>(S);
 
-/// The schnorr verifying key is also called public key.
+/// The Schnorr verifying key is also often called public key.
 #[derive(Copy, Clone, Default, Debug, Eq, PartialEq)]
 pub struct SchnorrVerifyingKey<G: Group>(G);
 
-/// The schnorr signature.
+/// The Schnorr signature.
 #[derive(Copy, Clone, Default, Debug, Eq, PartialEq)]
 pub struct SchnorrSignature<S: Scalar, E: Scalar> {
     /// The s element of the signature.
@@ -22,7 +22,7 @@ pub struct SchnorrSignature<S: Scalar, E: Scalar> {
     pub schnorr_e: E,
 }
 
-/// The keypair for schnorr signature.
+/// The keypair for Schnorr signature.
 #[derive(Copy, Clone, Default, Debug, Eq, PartialEq)]
 pub struct SchnorrKeyPair<S: Scalar, G: Group<ScalarType = S>> {
     /// The verifying key.
