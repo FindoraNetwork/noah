@@ -110,11 +110,7 @@ impl<M: Scalar, S: Scalar, G: Group<ScalarType = S> + Coordinate<ScalarField = M
 
         let point_r_recovered = G::get_base().mul(&signature.schnorr_s) + &self.0.mul(&e_converted);
 
-        let mut input = vec![
-            aux,
-            point_r_recovered.get_x(),
-            point_r_recovered.get_y(),
-        ];
+        let mut input = vec![aux, point_r_recovered.get_x(), point_r_recovered.get_y()];
         input.extend_from_slice(msg);
 
         let e: M = H::eval_variable_length_hash(&input);
@@ -159,9 +155,14 @@ mod tests {
 
         let aux = BLSScalar::random(&mut rng);
 
-        let sign = signing_key.sign::<BLSScalar, AnemoiJive381, JubjubPoint, _>(&mut rng, aux, &msg);
+        let sign =
+            signing_key.sign::<BLSScalar, AnemoiJive381, JubjubPoint, _>(&mut rng, aux, &msg);
 
-        assert!(verifying_key.verify::<AnemoiJive381>(&sign, aux, &msg).is_ok());
-        assert!(verifying_key.verify::<AnemoiJive381>(&sign, aux, &msg[..4]).is_err());
+        assert!(verifying_key
+            .verify::<AnemoiJive381>(&sign, aux, &msg)
+            .is_ok());
+        assert!(verifying_key
+            .verify::<AnemoiJive381>(&sign, aux, &msg[..4])
+            .is_err());
     }
 }
