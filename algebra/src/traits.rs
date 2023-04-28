@@ -223,6 +223,18 @@ pub trait Pairing {
     fn product_of_pairings(a: &[Self::G1], b: &[Self::G2]) -> Self::Gt;
 }
 
+/// The trait for get x-coordinate and y-coordinate.
+pub trait Coordinate {
+    /// The scalar type
+    type ScalarField: Scalar;
+
+    /// Get the x-coordinate.
+    fn get_x(&self) -> Self::ScalarField;
+
+    /// Get the y-coordinate.
+    fn get_y(&self) -> Self::ScalarField;
+}
+
 /// Convert the scalar into a vector of small chunks, each of size `w`
 pub fn scalar_to_radix_2_power_w<S: Scalar>(scalar: &S, w: usize) -> Vec<i8> {
     assert!(w <= 7);
