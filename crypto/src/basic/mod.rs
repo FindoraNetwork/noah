@@ -10,3 +10,5 @@ pub mod hybrid_encryption;
 pub mod matrix_sigma;
 /// The module for the equality proof between a Pedersen commitment and an ElGamal ciphertext.
 pub mod pedersen_elgamal;
+/// The module for the schnorr signature.
+pub mod schnorr_signature;

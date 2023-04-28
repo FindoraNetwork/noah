@@ -2,6 +2,7 @@ use crate::bls12_381::BLSScalar;
 use crate::errors::AlgebraError;
 use crate::jubjub::JubjubScalar;
 use crate::prelude::*;
+use crate::traits::Coordinate;
 use crate::{
     cmp::Ordering,
     hash::{Hash, Hasher},
@@ -189,16 +190,19 @@ impl Neg for JubjubPoint {
     }
 }
 
-impl JubjubPoint {
+impl Coordinate for JubjubPoint {
+    type ScalarField = BLSScalar;
+
     /// Get the x-coordinate of the Jubjub affine point.
     #[inline]
-    pub fn get_x(&self) -> BLSScalar {
+    fn get_x(&self) -> Self::ScalarField {
         let affine_point = AffinePoint::from(self.0);
         BLSScalar(affine_point.x)
     }
+
     /// Get the y-coordinate of the Jubjub affine point.
     #[inline]
-    pub fn get_y(&self) -> BLSScalar {
+    fn get_y(&self) -> Self::ScalarField {
         let affine_point = AffinePoint::from(self.0);
         BLSScalar(affine_point.y)
     }
