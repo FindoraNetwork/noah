@@ -1,5 +1,5 @@
 use crate::plonk::constraint_system::{TurboCS, VarIndex};
-use noah_algebra::{bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*};
+use noah_algebra::{bls12_381::BLSScalar, jubjub::JubjubPoint, prelude::*, traits::Coordinate};
 
 type F = BLSScalar;
 
