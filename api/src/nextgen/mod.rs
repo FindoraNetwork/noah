@@ -2,11 +2,11 @@
 pub mod ar_to_nabar;
 /// Module for converting Maxwell assets to Nextgen assets.
 pub mod bar_to_nabar;
-/// Module for transferring Zerocash or NX assets where the outcomes are NX assets.
-pub mod nabar_or_abar_to_nabar;
+/// Module for transferring Zerocash or Nextgen assets where outcomes are Zerocash or Nextgen assets.
+pub mod nabar_or_abar_xfr;
 /// Module for converting Nextgen assets to transparent assets.
 pub mod nabar_to_ar;
-/// Module for converting NX anonymous assets to confidential assets.
+/// Module for converting Nextgen assets to confidential assets.
 pub mod nabar_to_bar;
 
 /// Module for shared structures.

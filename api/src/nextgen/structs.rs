@@ -147,7 +147,7 @@ impl<'de> Deserialize<'de> for NabarAuditorMemo {
 /// the hash function a bit, as we will be doing the hash function used in the Schnorr signature over
 /// the BLS12-381's scalar field.
 ///
-pub struct NabarAuditKeySignature {
+pub struct NabarAuditSignature {
     /// The s element of the signature for authorizing encryption keys.
     pub schnorr_s: JubjubScalar,
     /// the r element of the signature for authorizing encryption keys.
@@ -195,13 +195,15 @@ impl NabarAuditSigningKey {
     pub fn sign<R: CryptoRng + RngCore>(
         &self,
         prng: &mut R,
+        aux: BLSScalar,
         ek: &NabarAuditEncryptionKey,
-    ) -> NabarAuditKeySignature {
+    ) -> NabarAuditSignature {
         let k = JubjubScalar::random(prng);
         let point_r = JubjubPoint::get_base().mul(&k);
 
         let e = AnemoiJive381::eval_variable_length_hash(&[
             BLSScalar::zero(),
+            aux,
             point_r.get_x(),
             point_r.get_y(),
             ek.0.get_x(),
@@ -213,7 +215,7 @@ impl NabarAuditSigningKey {
 
         let s = k - &(self.0 * &e_converted);
 
-        NabarAuditKeySignature {
+        NabarAuditSignature {
             schnorr_s: s,
             schnorr_e: e,
         }
@@ -235,7 +237,8 @@ impl NabarAuditVerifyingKey {
     pub fn verify(
         &self,
         ek: &NabarAuditEncryptionKey,
-        signature: &NabarAuditKeySignature,
+        aux: BLSScalar,
+        signature: &NabarAuditSignature,
     ) -> Result<()> {
         let e_converted = JubjubScalar::from(&signature.schnorr_e.into());
 
@@ -244,6 +247,7 @@ impl NabarAuditVerifyingKey {
 
         let e = AnemoiJive381::eval_variable_length_hash(&[
             BLSScalar::zero(),
+            aux,
             point_r_recovered.get_x(),
             point_r_recovered.get_y(),
             ek.0.get_x(),
@@ -272,13 +276,12 @@ impl NabarAuditVerifyingKey {
 /// - provide a number of signed encryption key.
 ///
 /// A transaction fee shall be charged for on-chain disclosure.
+///
+/// This is planned to be submitted from the EVM side.
+///
 pub struct NabarAuditableAssetIssuance {
-    /// The asset type code that has been remapped (after the domain separation,
-    /// which modifies the asset type code and specifies it as an auditable asset).
-    ///
-    /// This should be handled by the application layer to check if the remapping
-    /// is correct in respect to the randomness and the signature verifying key, which
-    /// is expected to unique.
+    /// The asset type code after remapping.
+    /// We expect all auditable assets be issued on the EVM side.
     pub remapped_asset_type: AssetType,
     /// The signature verifying key, which is a point on the Jubjub curve.
     ///
@@ -293,7 +296,7 @@ pub struct NabarAuditableAssetIssuance {
     /// A list of encryption keys to be authorized.
     pub enc_ek: Vec<NabarAuditEncryptionKey>,
     /// A list of signatures for such authorization.
-    pub enc_sign: Vec<NabarAuditKeySignature>,
+    pub enc_sign: Vec<NabarAuditSignature>,
 }
 
 impl NabarAuditableAssetIssuance {
@@ -305,7 +308,17 @@ impl NabarAuditableAssetIssuance {
 
 /// On-chain update notices to the list of encryption keys.
 ///
-/// The owner of the related signature signing key
+/// The owner of the related signature signing key can explicit request changes to encryption keys,
+/// including removing them or adding them.
+///
+/// Removing an encryption key does not mean that the key becomes invalid.
+pub struct NabarAuditableAssetUpdate {
+    /// The asset type code after remapping.
+    /// We expect all auditable assets be issued on the EVM side.
+    pub remapped_asset_type: AssetType,
+    /// A list of
+}
+
 
 /*
 /// ECIES encrypt function.
