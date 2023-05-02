@@ -143,11 +143,11 @@ default-features = false
 
 [dev-dependencies.storage]
 git = 'https://github.com/FindoraNetwork/storage.git'
-tag = 'v1.1.4'
+tag = 'v1.1.5'
 
 [dev-dependencies.mem_db]
 git = 'https://github.com/FindoraNetwork/storage.git'
-tag = 'v1.1.4'
+tag = 'v1.1.5'
 
 [features]
 default = [
