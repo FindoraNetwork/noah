@@ -35,12 +35,12 @@ pub mod anon_creds;
 pub mod anon_xfr;
 /// module for anonymous and confidential keys
 pub mod keys;
+/// Module for next-generation anonymous transfer.
+pub mod nextgen;
 /// The wrapper of the parameters.
 pub mod parameters;
 /// Module for serialization.
 pub mod serialization;
-/// Module for traceable confidential transfer.
-pub mod t_anon_xfr;
 /// Module for confidential transfer.
 pub mod xfr;
 
