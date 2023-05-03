@@ -1,6 +1,7 @@
 use noah_algebra::bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN};
 use noah_algebra::jubjub::JubjubPoint;
 use noah_algebra::prelude::*;
+use serde::de::Error as SerdeError;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 /// Compute the expected number of BLS scalar elements in the memo ciphertext.

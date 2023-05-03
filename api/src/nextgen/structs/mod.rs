@@ -1,13 +1,7 @@
 use crate::xfr::structs::AssetType;
-use noah_algebra::{
-    bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN},
-    jubjub::{JubjubPoint, JubjubScalar},
-    prelude::*,
-};
-use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
-use serde::de::Error as SerdeError;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use noah_algebra::jubjub::JubjubPoint;
 
+/// The data structure for the memo.
 pub mod memo;
 pub use memo::*;
 
@@ -43,15 +37,8 @@ pub struct NabarAuditableAssetIssuance {
     /// This allows the other party to get the actual point by simply
     /// multiplying by 8 (i.e., doubling three times).
     pub sign_vk_div_by_cofactor: JubjubPoint,
-    /// A list of encryption keys to be authorized.
-    pub enc_ek: Vec<NabarAuditEncryptionKey>,
-    /// A list of signatures for such authorization.
-    pub enc_sign: Vec<NabarMasterSignature>,
-}
-
-impl NabarAuditableAssetIssuance {
-    /// Compute the actual, reconstructed signature verifying key.
-    pub fn get_sign_vk(&self) -> NabarMasterPublicKey {
-        NabarMasterPublicKey(self.sign_vk_div_by_cofactor.double().double().double())
-    }
+    // A list of encryption keys to be authorized.
+    // pub enc_ek: Vec<NabarAuditEncryptionKey>,
+    // A list of signatures for such authorization.
+    // pub enc_sign: Vec<NabarMasterSignature>,
 }
