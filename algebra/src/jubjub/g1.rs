@@ -2,7 +2,11 @@ use crate::bls12_381::BLSScalar;
 use crate::errors::AlgebraError;
 use crate::jubjub::JubjubScalar;
 use crate::prelude::*;
-use crate::{cmp::Ordering, hash::{Hash, Hasher}, new_bls12_381};
+use crate::{
+    cmp::Ordering,
+    hash::{Hash, Hasher},
+    new_bls12_381,
+};
 use ark_ec::{AffineRepr, CurveGroup as ArkCurveGroup, Group as ArkGroup};
 use ark_ed_on_bls12_381::{EdwardsAffine as AffinePoint, EdwardsProjective};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
@@ -209,10 +213,14 @@ impl CurveGroup for JubjubPoint {
         //
         // This is because among all the 8 points for P such as 8P = G,
         // one of them is in the subgroup spanned by G.
-        let x = new_bls12_381!("37283441954580174170554388175493150130054720173248049475226975321836017924287");
-        let y = new_bls12_381!("38161757907713225632814750034917660204320126559701604632199511537313216752811");
+        let x = new_bls12_381!(
+            "37283441954580174170554388175493150130054720173248049475226975321836017924287"
+        );
+        let y = new_bls12_381!(
+            "38161757907713225632814750034917660204320126559701604632199511537313216752811"
+        );
 
-        Self (EdwardsProjective::from(AffinePoint::new(x.0, y.0)))
+        Self(EdwardsProjective::from(AffinePoint::new(x.0, y.0)))
     }
 
     fn multiply_by_cofactor(&self) -> Self {
@@ -226,6 +234,9 @@ mod test {
 
     #[test]
     fn correctness_div_by_cofactor() {
-        assert_eq!(super::JubjubPoint::get_point_div_by_cofactor().multiply_by_cofactor(), super::JubjubPoint::get_base());
+        assert_eq!(
+            super::JubjubPoint::get_point_div_by_cofactor().multiply_by_cofactor(),
+            super::JubjubPoint::get_base()
+        );
     }
 }
