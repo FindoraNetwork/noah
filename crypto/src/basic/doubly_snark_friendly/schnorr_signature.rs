@@ -1,9 +1,9 @@
+use crate::basic::anemoi_jive::AnemoiJive;
 use noah_algebra::{
     prelude::*,
-    traits::{CurveGroup, Group, Scalar},
+    traits::{CurveGroup, Scalar},
 };
 use rand_core::{CryptoRng, RngCore};
-use crate::basic::anemoi_jive::AnemoiJive;
 
 /// The Schnorr signing key is often also called private key.
 #[derive(Clone, Default, Debug, Eq, PartialEq)]
@@ -56,7 +56,12 @@ impl<G: CurveGroup> SchnorrKeyPair<G> {
 
 impl<G: CurveGroup> SchnorrSigningKey<G> {
     /// Sign the message with the signing key.
-    pub fn sign<H, R>(&self, prng: &mut R, aux: G::BaseType, msg: &[G::BaseType]) -> SchnorrSignature<G>
+    pub fn sign<H, R>(
+        &self,
+        prng: &mut R,
+        aux: G::BaseType,
+        msg: &[G::BaseType],
+    ) -> SchnorrSignature<G>
     where
         H: AnemoiJive<G::BaseType, 2, 12>,
         R: CryptoRng + RngCore,
@@ -96,11 +101,14 @@ impl<G: CurveGroup> SchnorrSigningKey<G> {
     }
 }
 
-impl<G: CurveGroup>
-    SchnorrVerifyingKey<G>
-{
+impl<G: CurveGroup> SchnorrVerifyingKey<G> {
     /// Verify the signature with the verifying key.
-    pub fn verify<H>(&self, signature: &SchnorrSignature<G>, aux: G::BaseType, msg: &[G::BaseType]) -> Result<()>
+    pub fn verify<H>(
+        &self,
+        signature: &SchnorrSignature<G>,
+        aux: G::BaseType,
+        msg: &[G::BaseType],
+    ) -> Result<()>
     where
         H: AnemoiJive<G::BaseType, 2, 12>,
     {
@@ -124,10 +132,7 @@ impl<G: CurveGroup>
 #[cfg(test)]
 mod tests {
     use noah_algebra::{
-        bls12_381::BLSScalar,
-        jubjub::{JubjubPoint, JubjubScalar},
-        rand_helper::test_rng,
-        traits::Scalar,
+        bls12_381::BLSScalar, jubjub::JubjubPoint, rand_helper::test_rng, traits::Scalar,
     };
 
     use crate::basic::anemoi_jive::AnemoiJive381;
@@ -153,8 +158,7 @@ mod tests {
 
         let aux = BLSScalar::random(&mut rng);
 
-        let sign =
-            signing_key.sign::<AnemoiJive381, _>(&mut rng, aux, &msg);
+        let sign = signing_key.sign::<AnemoiJive381, _>(&mut rng, aux, &msg);
 
         assert!(verifying_key
             .verify::<AnemoiJive381>(&sign, aux, &msg)

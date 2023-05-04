@@ -2,6 +2,8 @@
 pub mod anemoi_jive;
 /// The module for the Chaum-Pedersen protocol.
 pub mod chaum_pedersen;
+/// The module for the doubly SNARK-friendly primitives.
+pub mod doubly_snark_friendly;
 /// The module for the ElGamal encryption.
 pub mod elgamal;
 /// The module for hybrid encryption.
@@ -10,5 +12,3 @@ pub mod hybrid_encryption;
 pub mod matrix_sigma;
 /// The module for the equality proof between a Pedersen commitment and an ElGamal ciphertext.
 pub mod pedersen_elgamal;
-/// The module for the doubly SNARK-friendly primitives.
-pub mod doubly_snark_friendly;

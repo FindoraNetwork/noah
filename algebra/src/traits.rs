@@ -230,6 +230,12 @@ pub trait CurveGroup: Group {
 
     /// Get the y-coordinate.
     fn get_y(&self) -> Self::BaseType;
+
+    /// Get the base point divided by the cofactor.
+    fn get_point_div_by_cofactor() -> Self;
+
+    /// Multiply by the cofactor.
+    fn multiply_by_cofactor(&self) -> Self;
 }
 
 /// Convert the scalar into a vector of small chunks, each of size `w`
