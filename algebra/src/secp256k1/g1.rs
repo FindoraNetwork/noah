@@ -3,7 +3,7 @@ use crate::prelude::*;
 use crate::prelude::{derive_prng_from_hash, CryptoRng, Group, RngCore};
 use crate::secp256k1::SECP256K1Scalar;
 use crate::secq256k1::SECQ256K1Scalar;
-use ark_ec::{AffineRepr, CurveGroup, Group as ArkGroup, VariableBaseMSM};
+use ark_ec::{AffineRepr, CurveGroup as ArkCurveGroup, Group as ArkGroup, VariableBaseMSM};
 use ark_secp256k1::{Affine, Projective};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use ark_std::fmt::{Debug, Formatter};
