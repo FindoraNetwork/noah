@@ -2,7 +2,7 @@ use crate::errors::AlgebraError;
 use crate::prelude::*;
 use crate::zorro::ZorroScalar;
 use ark_bulletproofs::curve::zorro::{G1Affine, G1Projective};
-use ark_ec::{AffineRepr, CurveGroup, Group as ArkGroup, VariableBaseMSM};
+use ark_ec::{AffineRepr, CurveGroup as ArkCurveGroup, Group as ArkGroup, VariableBaseMSM};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use ark_std::fmt::{Debug, Formatter};
 use digest::consts::U64;

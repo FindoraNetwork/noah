@@ -2,12 +2,12 @@ use crate::bls12_381::BLSScalar;
 use crate::errors::AlgebraError;
 use crate::jubjub::JubjubScalar;
 use crate::prelude::*;
-use crate::traits::Coordinate;
+use crate::traits::CurveGroup;
 use crate::{
     cmp::Ordering,
     hash::{Hash, Hasher},
 };
-use ark_ec::{AffineRepr, CurveGroup, Group as ArkGroup};
+use ark_ec::{AffineRepr, CurveGroup as ArkCurveGroup, Group as ArkGroup};
 use ark_ed_on_bls12_381::{EdwardsAffine as AffinePoint, EdwardsProjective};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use digest::consts::U64;
@@ -190,19 +190,19 @@ impl Neg for JubjubPoint {
     }
 }
 
-impl Coordinate for JubjubPoint {
-    type ScalarField = BLSScalar;
+impl CurveGroup for JubjubPoint {
+    type BaseType = BLSScalar;
 
     /// Get the x-coordinate of the Jubjub affine point.
     #[inline]
-    fn get_x(&self) -> Self::ScalarField {
+    fn get_x(&self) -> Self::BaseType {
         let affine_point = AffinePoint::from(self.0);
         BLSScalar(affine_point.x)
     }
 
     /// Get the y-coordinate of the Jubjub affine point.
     #[inline]
-    fn get_y(&self) -> Self::ScalarField {
+    fn get_y(&self) -> Self::BaseType {
         let affine_point = AffinePoint::from(self.0);
         BLSScalar(affine_point.y)
     }

@@ -6,7 +6,7 @@ use crate::{
     cmp::Ordering,
     hash::{Hash, Hasher},
 };
-use ark_ec::{AffineRepr, CurveGroup, Group as ArkGroup};
+use ark_ec::{AffineRepr, CurveGroup as ArkCurveGroup, Group as ArkGroup};
 use ark_ed25519::{EdwardsAffine, EdwardsProjective};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use digest::consts::U64;
