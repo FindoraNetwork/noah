@@ -19,7 +19,7 @@ use noah_algebra::{
     ristretto::{PedersenCommitmentRistretto, RistrettoScalar},
     traits::PedersenCommitment,
 };
-use noah_crypto::basic::{
+use noah_crypto::{
     elgamal::{elgamal_encrypt, elgamal_key_gen},
     pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof},
 };
@@ -823,7 +823,7 @@ mod asset_tracing {
         ristretto::{PedersenCommitmentRistretto, RistrettoPoint, RistrettoScalar},
         traits::PedersenCommitment,
     };
-    use noah_crypto::basic::elgamal::ElGamalCiphertext;
+    use noah_crypto::elgamal::ElGamalCiphertext;
 
     const GOLD_ASSET: AssetType = AssetType([0; ASSET_TYPE_LENGTH]);
     const BITCOIN_ASSET: AssetType = AssetType([1; ASSET_TYPE_LENGTH]);

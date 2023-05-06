@@ -4,7 +4,7 @@ use super::{ConstraintSystem, CsIndex, VarIndex};
 use crate::plonk::errors::PlonkError;
 use noah_algebra::prelude::*;
 
-use noah_crypto::basic::anemoi_jive::AnemoiJive;
+use noah_crypto::anemoi_jive::AnemoiJive;
 #[cfg(feature = "debug")]
 use std::collections::HashMap;
 
@@ -1514,7 +1514,8 @@ mod test {
     #[cfg(feature = "debug")]
     #[should_panic]
     fn test_dangling_witness_should_panic() {
-        use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
+        use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381};
+
         let one = F::one();
         let two = one.add(&one);
         let three = one.add(&two);

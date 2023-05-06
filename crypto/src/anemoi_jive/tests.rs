@@ -1,4 +1,4 @@
-use crate::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, ApplicableMDSMatrix, MDSMatrix};
+use crate::anemoi_jive::{AnemoiJive, AnemoiJive381, ApplicableMDSMatrix, MDSMatrix};
 use noah_algebra::bls12_381::BLSScalar;
 use noah_algebra::new_bls12_381;
 use noah_algebra::prelude::Scalar;

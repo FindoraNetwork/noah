@@ -2,7 +2,7 @@ use crate::plonk::constraint_system::{TurboCS, VarIndex};
 use noah_algebra::bls12_381::BLSScalar;
 use noah_algebra::ops::Neg;
 use noah_algebra::{One, Zero};
-use noah_crypto::basic::anemoi_jive::{
+use noah_crypto::anemoi_jive::{
     AnemoiJive, AnemoiJive381, AnemoiStreamCipherTrace, AnemoiVLHTrace, JiveTrace,
 };
 
@@ -597,7 +597,7 @@ impl TurboCS<BLSScalar> {
 mod test {
     use crate::plonk::constraint_system::TurboCS;
     use noah_algebra::bls12_381::BLSScalar;
-    use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS};
+    use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS};
 
     #[test]
     fn test_jive_constraint_system() {
@@ -690,7 +690,7 @@ mod kzg_test {
     use crate::poly_commit::pcs::PolyComScheme;
     use merlin::Transcript;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*};
-    use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS};
+    use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS};
 
     #[test]
     fn test_turbo_plonk_kzg_anemoi_jive() {

@@ -14,7 +14,7 @@ use noah_algebra::{
     collections::HashMap,
     prelude::*,
 };
-use noah_crypto::basic::anemoi_jive::{
+use noah_crypto::anemoi_jive::{
     AnemoiJive, AnemoiJive381, AnemoiVLHTrace, JiveTrace, ANEMOI_JIVE_381_SALTS,
 };
 use noah_plonk::{

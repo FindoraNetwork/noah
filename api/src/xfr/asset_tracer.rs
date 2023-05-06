@@ -7,7 +7,7 @@ use noah_algebra::{
     prelude::*,
     ristretto::{RistrettoPoint, RistrettoScalar},
 };
-use noah_crypto::basic::{
+use noah_crypto::{
     elgamal::{
         elgamal_encrypt, elgamal_partial_decrypt, ElGamalCiphertext, ElGamalDecKey, ElGamalEncKey,
     },
@@ -225,7 +225,7 @@ impl TracerMemo {
 mod tests {
     use crate::xfr::structs::{AssetTracerKeyPair, AssetType, TracerMemo};
     use noah_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::RistrettoScalar};
-    use noah_crypto::basic::elgamal::elgamal_encrypt;
+    use noah_crypto::elgamal::elgamal_encrypt;
 
     #[test]
     fn extract_amount_from_tracer_memo() {

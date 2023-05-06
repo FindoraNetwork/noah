@@ -1,4 +1,4 @@
-use crate::basic::anemoi_jive::AnemoiJive;
+use crate::anemoi_jive::AnemoiJive;
 use noah_algebra::bls12_381::BLSScalar;
 use noah_algebra::new_bls12_381;
 

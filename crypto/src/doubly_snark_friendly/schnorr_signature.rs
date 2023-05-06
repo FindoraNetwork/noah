@@ -1,4 +1,4 @@
-use crate::basic::anemoi_jive::AnemoiJive;
+use crate::anemoi_jive::AnemoiJive;
 use noah_algebra::{
     prelude::*,
     traits::{CurveGroup, Scalar},
@@ -135,7 +135,7 @@ mod tests {
         bls12_381::BLSScalar, jubjub::JubjubPoint, rand_helper::test_rng, traits::Scalar,
     };
 
-    use crate::basic::anemoi_jive::AnemoiJive381;
+    use crate::anemoi_jive::AnemoiJive381;
 
     use super::SchnorrKeyPair;
 

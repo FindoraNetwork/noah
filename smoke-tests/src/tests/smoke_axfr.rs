@@ -28,7 +28,7 @@ mod smoke_axfr {
     };
     use noah_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
     use noah_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::PedersenCommitmentRistretto};
-    use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
+    use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381};
     use parking_lot::RwLock;
     use sha2::Sha512;
     use std::sync::Arc;
