@@ -37,7 +37,7 @@ mod smoke_axfr_compatibility {
     use noah_algebra::{
         bls12_381::BLSScalar, rand_helper::test_rng, serialization::NoahFromToBytes,
     };
-    use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
+    use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381};
     use parking_lot::RwLock;
     use rand::Rng;
     use rand_core::{CryptoRng, RngCore};

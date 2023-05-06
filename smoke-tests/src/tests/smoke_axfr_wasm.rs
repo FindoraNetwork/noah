@@ -27,7 +27,7 @@ mod smoke_axfr_wasm {
     };
     use noah_accumulators::merkle_tree::{EphemeralMerkleTree, Proof, TreePath};
     use noah_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::PedersenCommitmentRistretto};
-    use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
+    use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381};
     use rand_chacha::rand_core::SeedableRng;
     use rand_chacha::ChaChaRng;
     use sha2::Sha512;
