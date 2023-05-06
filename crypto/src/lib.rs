@@ -23,15 +23,27 @@ extern crate itertools;
 #[macro_use]
 extern crate serde_derive;
 
+/// The module for the Anemoi-Jive hash functions.
+pub mod anemoi_jive;
 /// The module for anonymous credentials.
 pub mod anon_creds;
-/// The basic cryptographic primitives.
-pub mod basic;
 /// The library for Bulletproofs.
 pub mod bulletproofs;
+/// The module for the Chaum-Pedersen protocol.
+pub mod chaum_pedersen;
 /// The module for confidential anonymous credentials.
 pub mod confidential_anon_creds;
 /// The module for the delegated Schnorr protocol.
 pub mod delegated_schnorr;
+/// The module for the doubly SNARK-friendly primitives.
+pub mod doubly_snark_friendly;
+/// The module for the ElGamal encryption.
+pub mod elgamal;
 /// The module for field simulation.
 pub mod field_simulation;
+/// The module for hybrid encryption.
+pub mod hybrid_encryption;
+/// The module for the matrix Sigma protocol.
+pub mod matrix_sigma;
+/// The module for the equality proof between a Pedersen commitment and an ElGamal ciphertext.
+pub mod pedersen_elgamal;

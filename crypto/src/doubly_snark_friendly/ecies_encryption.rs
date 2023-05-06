@@ -1,4 +1,4 @@
-use crate::basic::anemoi_jive::AnemoiJive;
+use crate::anemoi_jive::AnemoiJive;
 use noah_algebra::prelude::*;
 use rand_core::{CryptoRng, RngCore};
 
@@ -129,8 +129,8 @@ mod tests {
         bls12_381::BLSScalar, jubjub::JubjubPoint, rand_helper::test_rng, traits::Scalar,
     };
 
-    use crate::basic::anemoi_jive::AnemoiJive381;
-    use crate::basic::doubly_snark_friendly::ecies_encryption::{ECIESKeyPair, ECIESPlaintext};
+    use crate::anemoi_jive::AnemoiJive381;
+    use crate::doubly_snark_friendly::ecies_encryption::{ECIESKeyPair, ECIESPlaintext};
 
     #[test]
     fn test_ecies_encryption() {

@@ -40,7 +40,7 @@ mod test {
         structs::{BlindAssetRecord, OpenAssetRecord, XfrAmount, XfrAssetType},
     };
     use noah_algebra::{prelude::*, ristretto::RistrettoPoint};
-    use noah_crypto::basic::{
+    use noah_crypto::{
         elgamal::elgamal_key_gen,
         hybrid_encryption::{XPublicKey, XSecretKey},
     };

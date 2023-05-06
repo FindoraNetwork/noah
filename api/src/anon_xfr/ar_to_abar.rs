@@ -11,7 +11,7 @@ use crate::parameters::params::VerifierParams;
 use crate::xfr::structs::{BlindAssetRecord, OpenAssetRecord};
 use merlin::Transcript;
 use noah_algebra::{bls12_381::BLSScalar, errors::NoahError, prelude::*};
-use noah_crypto::basic::anemoi_jive::{AnemoiJive381, AnemoiVLHTrace};
+use noah_crypto::anemoi_jive::{AnemoiJive381, AnemoiVLHTrace};
 use noah_plonk::plonk::{
     constraint_system::TurboCS, prover::prover_with_lagrange, verifier::verifier,
 };

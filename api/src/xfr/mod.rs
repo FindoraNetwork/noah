@@ -7,7 +7,7 @@ use noah_algebra::{
     ristretto::{CompressedRistretto, PedersenCommitmentRistretto, RistrettoScalar},
     traits::PedersenCommitment,
 };
-use noah_crypto::basic::hybrid_encryption::{
+use noah_crypto::hybrid_encryption::{
     hybrid_decrypt_with_ed25519_secret_key, hybrid_encrypt_ed25519, NoahHybridCiphertext,
 };
 use serde::ser::Serialize;

@@ -28,9 +28,7 @@ use noah_algebra::{
     ristretto::{PedersenCommitmentRistretto, RistrettoPoint, RistrettoScalar},
     traits::PedersenCommitment,
 };
-use noah_crypto::basic::anemoi_jive::{
-    AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS,
-};
+use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS};
 use noah_crypto::{
     delegated_schnorr::{
         prove_delegated_schnorr, verify_delegated_schnorr, DelegatedSchnorrInspection,

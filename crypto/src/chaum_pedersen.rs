@@ -1,4 +1,4 @@
-use crate::basic::matrix_sigma::{
+use crate::matrix_sigma::{
     sigma_prove, sigma_verify, sigma_verify_scalars, SigmaProof, SigmaTranscript,
 };
 use curve25519_dalek::traits::{Identity, VartimeMultiscalarMul};

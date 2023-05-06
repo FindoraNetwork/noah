@@ -20,7 +20,7 @@ use noah_algebra::{
     secp256k1::{SECP256K1Scalar, SECP256K1G1},
     traits::PedersenCommitment,
 };
-use noah_crypto::basic::{
+use noah_crypto::{
     chaum_pedersen::ChaumPedersenProofX,
     elgamal::elgamal_key_gen,
     hybrid_encryption::{NoahHybridCiphertext, XPublicKey, XSecretKey},

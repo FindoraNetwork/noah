@@ -1,7 +1,7 @@
 //! Anonymous credentials enable a credential issuer to issue a credential (with some attributes)
 //! to a user, and the user can later, with anonymity, selectively disclose some attributes.
 
-use crate::{basic::matrix_sigma::SigmaTranscript, confidential_anon_creds::CACTranscript};
+use crate::{confidential_anon_creds::CACTranscript, matrix_sigma::SigmaTranscript};
 use merlin::Transcript;
 use noah_algebra::{prelude::*, traits::Pairing};
 use serde_derive::{Deserialize, Serialize};

@@ -1,4 +1,4 @@
-use crate::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
+use crate::anemoi_jive::{AnemoiJive, AnemoiJive381};
 use crate::field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto};
 use merlin::Transcript;
 use noah_algebra::ristretto::{RistrettoPoint, RistrettoScalar};

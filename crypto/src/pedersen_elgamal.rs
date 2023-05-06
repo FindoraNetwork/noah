@@ -1,5 +1,5 @@
-use crate::basic::elgamal::{ElGamalCiphertext, ElGamalEncKey};
-use crate::basic::matrix_sigma::{sigma_prove, sigma_verify_scalars, SigmaProof, SigmaTranscript};
+use crate::elgamal::{ElGamalCiphertext, ElGamalEncKey};
+use crate::matrix_sigma::{sigma_prove, sigma_verify_scalars, SigmaProof, SigmaTranscript};
 use curve25519_dalek::traits::{Identity, MultiscalarMul};
 use merlin::Transcript;
 use noah_algebra::prelude::*;
@@ -348,10 +348,8 @@ pub fn pedersen_elgamal_aggregate_eq_verify<R: CryptoRng + RngCore>(
 #[cfg(test)]
 mod test {
     use super::PedersenElGamalEqProof;
-    use crate::basic::elgamal::{
-        elgamal_encrypt, elgamal_key_gen, ElGamalCiphertext, ElGamalEncKey,
-    };
-    use crate::basic::pedersen_elgamal::{
+    use crate::elgamal::{elgamal_encrypt, elgamal_key_gen, ElGamalCiphertext, ElGamalEncKey};
+    use crate::pedersen_elgamal::{
         pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_aggregate_eq_verify,
         pedersen_elgamal_batch_verify, PedersenElGamalProofInstance,
     };
