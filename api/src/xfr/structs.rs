@@ -2,7 +2,7 @@ use crate::anon_creds::{
     ACConfidentialRevealProof, ACIssuerPublicKey, AttributeCiphertext, AttributeDecKey,
     AttributeEncKey,
 };
-use crate::keys::{KeyPair, KeyType, SignatureList, PublicKey, PublicKeyInner};
+use crate::keys::{KeyPair, KeyType, PublicKey, PublicKeyInner, SignatureList};
 use crate::xfr::{
     asset_mixer::AssetMixProof,
     asset_record::AssetRecordType,

@@ -28,7 +28,7 @@ pub mod structs;
 pub(crate) mod tests;
 
 use crate::anon_creds::{ACCommitment, Attr};
-use crate::keys::{KeyPair, SignatureList, PublicKey, PublicKeyInner, SecretKey};
+use crate::keys::{KeyPair, PublicKey, PublicKeyInner, SecretKey, SignatureList};
 use crate::parameters::bulletproofs::BulletproofParams;
 
 use self::{
@@ -451,7 +451,10 @@ fn check_asset_amount(inputs: &[AssetRecord], outputs: &[AssetRecord]) -> Result
 }
 
 /// Compute a multisignature over the body.
-pub(crate) fn compute_transfer_multisig(body: &XfrBody, keys: &[&KeyPair]) -> Result<SignatureList> {
+pub(crate) fn compute_transfer_multisig(
+    body: &XfrBody,
+    keys: &[&KeyPair],
+) -> Result<SignatureList> {
     let mut bytes = vec![];
     body.serialize(&mut rmp_serde::Serializer::new(&mut bytes))
         .c(d!(NoahError::SerializationError))?;
