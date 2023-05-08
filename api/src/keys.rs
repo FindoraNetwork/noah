@@ -730,15 +730,15 @@ impl NoahFromToBytes for Signature {
     }
 }
 
-/// Multisignatures (aka multisig), which is now a list of signatures under each signer.
+/// A list of signatures under each signer.
 #[derive(Clone, Debug, Default, Deserialize, Eq, PartialEq, Serialize)]
-pub struct MultiSig {
+pub struct SignatureList {
     /// The list of signatures.
     pub signatures: Vec<Signature>,
 }
 
-impl MultiSig {
-    /// Sign a multisig under a list of key pairs.
+impl SignatureList {
+    /// Sign a message under a list of key pairs.
     pub fn sign(keypairs: &[&KeyPair], message: &[u8]) -> Result<Self> {
         // sort the key pairs based on alphabetical order of their public keys
         let mut sorted = keypairs.to_owned();
@@ -747,10 +747,10 @@ impl MultiSig {
         for kp in sorted {
             signatures.push(kp.sign(message)?);
         }
-        Ok(MultiSig { signatures })
+        Ok(SignatureList { signatures })
     }
 
-    /// Verify a multisig.
+    /// Verify a list of signature.
     pub fn verify(&self, pubkeys: &[&PublicKey], message: &[u8]) -> Result<()> {
         if pubkeys.len() != self.signatures.len() {
             return Err(eg!(NoahError::SignatureError));
@@ -957,7 +957,7 @@ mod test {
         let keypairs_refs = keypairs.iter().collect_vec();
         let pubkeys = keypairs.iter().map(|kp| &kp.pub_key).collect_vec();
         assert!(
-            MultiSig::sign(&keypairs_refs, &msg)
+            SignatureList::sign(&keypairs_refs, &msg)
                 .unwrap()
                 .verify(&pubkeys, &msg)
                 .is_ok(),
@@ -969,7 +969,7 @@ mod test {
         let keypairs_refs = keypairs.iter().collect_vec();
         let pubkeys = keypairs.iter().map(|kp| &kp.pub_key).collect_vec();
         assert!(
-            MultiSig::sign(&keypairs_refs, &msg)
+            SignatureList::sign(&keypairs_refs, &msg)
                 .unwrap()
                 .verify(&pubkeys, &msg)
                 .is_ok(),
@@ -983,7 +983,7 @@ mod test {
         pubkeys.swap(1, 3);
         pubkeys.swap(4, 9);
         assert!(
-            MultiSig::sign(&keypairs_refs, &msg)
+            SignatureList::sign(&keypairs_refs, &msg)
                 .unwrap()
                 .verify(&pubkeys, &msg)
                 .is_ok(),

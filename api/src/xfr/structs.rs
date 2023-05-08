@@ -2,7 +2,7 @@ use crate::anon_creds::{
     ACConfidentialRevealProof, ACIssuerPublicKey, AttributeCiphertext, AttributeDecKey,
     AttributeEncKey,
 };
-use crate::keys::{KeyPair, KeyType, MultiSig, PublicKey, PublicKeyInner};
+use crate::keys::{KeyPair, KeyType, SignatureList, PublicKey, PublicKeyInner};
 use crate::xfr::{
     asset_mixer::AssetMixProof,
     asset_record::AssetRecordType,
@@ -93,7 +93,7 @@ pub struct XfrNote {
     /// The confidential transfer body.
     pub body: XfrBody,
     /// The multisiganture of the senders
-    pub multisig: MultiSig,
+    pub multisig: SignatureList,
 }
 
 /// A confidential transfer body.
