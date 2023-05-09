@@ -21,7 +21,7 @@ pub use pairing::*;
 
 /// A convenient macro to initialize a field element over the BLS12-381 curve.
 #[macro_export]
-macro_rules! new_bls12_381 {
+macro_rules! new_bls12_381_fr {
     ($c0:expr) => {{
         let (is_positive, limbs) = ark_ff::ark_ff_macros::to_sign_and_limbs!($c0);
         BLSScalar::new(is_positive, &limbs)
