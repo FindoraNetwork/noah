@@ -271,6 +271,11 @@ impl SECQ256K1Scalar {
     pub fn from_raw(raw: Fr) -> Self {
         Self(raw)
     }
+
+    /// Create a new scalar element from the arkworks-rs representation.
+    pub const fn new(is_positive: bool, limbs: &[u64]) -> Self {
+        SECQ256K1Scalar(Fr::from_sign_and_limbs(is_positive, &limbs))
+    }
 }
 
 impl Into<BigUint> for SECQ256K1Scalar {

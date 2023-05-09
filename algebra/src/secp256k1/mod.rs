@@ -10,6 +10,15 @@ pub use fq::*;
 mod g1;
 pub use g1::*;
 
+/// A convenient macro to initialize a field element over the BLS12-381 curve.
+#[macro_export]
+macro_rules! new_secp256k1_fq {
+    ($c0:expr) => {{
+        let (is_positive, limbs) = ark_ff::ark_ff_macros::to_sign_and_limbs!($c0);
+        SECP256K1Fq::new(is_positive, &limbs)
+    }};
+}
+
 #[cfg(test)]
 mod secp256k1_groups_test {
     use crate::{
