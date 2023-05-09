@@ -12,7 +12,7 @@ use digest::Digest;
 use merlin::Transcript;
 use noah_algebra::zorro::{PedersenCommitmentZorro, ZorroProof, ZorroScalar};
 use noah_algebra::{
-    ed25519::{ED25519_D, Ed25519Point, Ed25519Scalar},
+    ed25519::{Ed25519Point, Ed25519Scalar, ED25519_D},
     prelude::*,
     zorro::ZorroG1,
 };

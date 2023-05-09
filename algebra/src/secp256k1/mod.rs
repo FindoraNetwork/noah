@@ -10,7 +10,7 @@ pub use fq::*;
 mod g1;
 pub use g1::*;
 
-/// A convenient macro to initialize a field element over the BLS12-381 curve.
+/// A convenient macro to initialize a field element over the SECP256K1 curve.
 #[macro_export]
 macro_rules! new_secp256k1_fq {
     ($c0:expr) => {{

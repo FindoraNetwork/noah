@@ -12,7 +12,7 @@ pub use fq::*;
 mod g1;
 pub use g1::*;
 
-/// A convenient macro to initialize a field element over the BLS12-381 curve.
+/// A convenient macro to initialize a field element over the ED25519 curve.
 #[macro_export]
 macro_rules! new_ed25519_fq {
     ($c0:expr) => {{
@@ -22,7 +22,10 @@ macro_rules! new_ed25519_fq {
 }
 
 /// Obtain the d parameter of the ed25519 curve
-pub const ED25519_D: Fq = new_ed25519_fq!("37095705934669439343138083508754565189542113879843219016388785533085940283555").0;
+pub const ED25519_D: Fq = new_ed25519_fq!(
+    "37095705934669439343138083508754565189542113879843219016388785533085940283555"
+)
+.0;
 
 #[cfg(test)]
 mod ed25519_groups_test {
