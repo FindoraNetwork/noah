@@ -41,6 +41,8 @@ pub mod doubly_snark_friendly;
 pub mod elgamal;
 /// The module for field simulation.
 pub mod field_simulation;
+/// The module for hashing to the curve.
+pub mod hashing_to_the_curve;
 /// The module for hybrid encryption.
 pub mod hybrid_encryption;
 /// The module for the matrix Sigma protocol.

@@ -11,3 +11,6 @@ pub mod nabar_to_bar;
 
 /// Module for shared structures.
 pub mod structs;
+
+/// Module for nullifiers
+pub mod nullifiers;
