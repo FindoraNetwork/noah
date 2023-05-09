@@ -171,6 +171,11 @@ impl ZorroScalar {
     pub fn from_raw(raw: Fr) -> Self {
         Self(raw)
     }
+
+    /// Create a new scalar element from the arkworks-rs representation.
+    pub const fn new(is_positive: bool, limbs: &[u64]) -> Self {
+        ZorroScalar(Fr::from_sign_and_limbs(is_positive, &limbs))
+    }
 }
 
 impl Scalar for ZorroScalar {

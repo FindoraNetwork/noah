@@ -1,5 +1,4 @@
 use ark_ed25519::Fq;
-use ark_ff::MontFp;
 
 /// The number of bytes for a scalar value over the ed25519 curve
 pub const ED25519_SCALAR_LEN: usize = 32;
@@ -13,10 +12,20 @@ pub use fq::*;
 mod g1;
 pub use g1::*;
 
-/// Obtain the d parameter of the ed25519 curve
-pub const fn get_ed25519_d() -> Fq {
-    MontFp!("37095705934669439343138083508754565189542113879843219016388785533085940283555")
+/// A convenient macro to initialize a field element over the ED25519 curve.
+#[macro_export]
+macro_rules! new_ed25519_fq {
+    ($c0:expr) => {{
+        let (is_positive, limbs) = ark_ff::ark_ff_macros::to_sign_and_limbs!($c0);
+        Ed25519Fq::new(is_positive, &limbs)
+    }};
 }
+
+/// Obtain the d parameter of the ed25519 curve
+pub const ED25519_D: Fq = new_ed25519_fq!(
+    "37095705934669439343138083508754565189542113879843219016388785533085940283555"
+)
+.0;
 
 #[cfg(test)]
 mod ed25519_groups_test {

@@ -10,10 +10,9 @@ use ark_ed25519::{EdwardsAffine, EdwardsProjective, Fq, Fr};
 use ark_ff::{BigInteger, Field, PrimeField};
 use digest::Digest;
 use merlin::Transcript;
-use noah_algebra::ed25519::Ed25519Scalar;
 use noah_algebra::zorro::{PedersenCommitmentZorro, ZorroProof, ZorroScalar};
 use noah_algebra::{
-    ed25519::{get_ed25519_d, Ed25519Point},
+    ed25519::{Ed25519Point, Ed25519Scalar, ED25519_D},
     prelude::*,
     zorro::ZorroG1,
 };
@@ -198,7 +197,7 @@ impl ScalarMulProof {
         let (_, _, left_xy_res_x_var) = cs.multiply(left_xy_var.into(), res_var.x_var.into());
         let (_, _, left_xy_res_y_var) = cs.multiply(left_xy_var.into(), res_var.y_var.into());
 
-        let d = get_ed25519_d();
+        let d = ED25519_D;
 
         cs.constrain(
             res_var.x_var - left_var.x_var * right.y - left_var.y_var * right.x
