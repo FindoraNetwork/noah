@@ -25,6 +25,12 @@ Foundation and Electric Coin Company (ECC), is another privacy-preserving transf
    - An inhouse variant of TurboPlonk with various optimization tricks
    - The European technique for efficient memory in zk-SNARK, using the Anemoi-Jive hashes
 
+Thanks to all the people who already contributed!
+
+<a href="https://github.com/FindoraNetwork/noah/graphs/contributors">
+  <img src="https://contributors-img.web.app/image?repo=FindoraNetwork/noah" />
+</a>
+
 ## Licensing
 
 The primary license for Noah is the Business Source License 1.1 (`BUSL-1.1`), see [`LICENSE`](./LICENSE).

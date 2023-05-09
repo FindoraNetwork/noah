@@ -1,6 +1,8 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use digest::Digest;
 use mem_db::MemoryDB;
+use noah::parameters::params::{ProverParams, VerifierParams};
+use noah::parameters::AddressFormat::SECP256K1;
 use noah::{
     anon_xfr::{
         abar_to_abar::*,
@@ -12,10 +14,9 @@ use noah::{
             AnonAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonAssetRecord,
             OpenAnonAssetRecordBuilder,
         },
-        FEE_TYPE, TREE_DEPTH,
+        FEE_TYPE,
     },
     keys::KeyPair,
-    setup::{ProverParams, VerifierParams},
     xfr::{
         asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
         structs::{AssetRecordTemplate, AssetType, ASSET_TYPE_LENGTH},
@@ -24,7 +25,7 @@ use noah::{
 use noah_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
 use noah_algebra::ristretto::PedersenCommitmentRistretto;
 use noah_algebra::{bls12_381::BLSScalar, prelude::*};
-use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
+use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381};
 use parking_lot::RwLock;
 use sha2::Sha512;
 use std::sync::Arc;
@@ -82,12 +83,15 @@ fn abar_to_abar(
     fee: u32,
 ) {
     let mut prng = test_rng();
-    let params = ProverParams::new(inputs.len(), outputs.len(), None).unwrap();
-    let verifier_params = VerifierParams::load(inputs.len(), outputs.len()).unwrap();
+    let address_format = SECP256K1;
+    let params =
+        ProverParams::gen_abar_to_abar(inputs.len(), outputs.len(), address_format).unwrap();
+    let verifier_params =
+        VerifierParams::load_abar_to_abar(inputs.len(), outputs.len(), address_format).unwrap();
 
-    let sender = KeyPair::generate_secp256k1(&mut prng);
+    let sender = KeyPair::sample(&mut prng, address_format);
     let receivers: Vec<KeyPair> = (0..outputs.len())
-        .map(|_| KeyPair::generate(&mut prng))
+        .map(|_| KeyPair::sample(&mut prng, address_format))
         .collect();
 
     let mut oabars: Vec<OpenAnonAssetRecord> = inputs
@@ -159,11 +163,12 @@ fn abar_to_abar(
 
 fn abar_to_ar(c: &mut Criterion) {
     let mut prng = test_rng();
-    let params = ProverParams::abar_to_ar_params(TREE_DEPTH).unwrap();
-    let verify_params = VerifierParams::abar_to_ar_params().unwrap();
+    let address_format = SECP256K1;
+    let params = ProverParams::gen_abar_to_ar(address_format).unwrap();
+    let verify_params = VerifierParams::get_abar_to_ar(address_format).unwrap();
 
-    let sender = KeyPair::generate_secp256k1(&mut prng);
-    let receiver = KeyPair::generate_secp256k1(&mut prng);
+    let sender = KeyPair::sample(&mut prng, address_format);
+    let receiver = KeyPair::sample(&mut prng, address_format);
 
     let fdb = MemoryDB::new();
     let cs = Arc::new(RwLock::new(ChainState::new(fdb, "abar_ar".to_owned(), 0)));
@@ -220,11 +225,12 @@ fn abar_to_ar(c: &mut Criterion) {
 
 fn abar_to_bar(c: &mut Criterion) {
     let mut prng = test_rng();
-    let params = ProverParams::abar_to_bar_params(TREE_DEPTH).unwrap();
-    let verify_params = VerifierParams::abar_to_bar_params().unwrap();
+    let address_format = SECP256K1;
+    let params = ProverParams::gen_abar_to_bar(address_format).unwrap();
+    let verify_params = VerifierParams::get_abar_to_bar(address_format).unwrap();
 
-    let sender = KeyPair::generate_secp256k1(&mut prng);
-    let receiver = KeyPair::generate_secp256k1(&mut prng);
+    let sender = KeyPair::sample(&mut prng, address_format);
+    let receiver = KeyPair::sample(&mut prng, address_format);
 
     let fdb = MemoryDB::new();
     let cs = Arc::new(RwLock::new(ChainState::new(fdb, "abar_bar".to_owned(), 0)));
@@ -289,11 +295,12 @@ fn abar_to_bar(c: &mut Criterion) {
 fn ar_to_abar(c: &mut Criterion) {
     let mut prng = test_rng();
     let pc_gens = PedersenCommitmentRistretto::default();
-    let params = ProverParams::ar_to_abar_params().unwrap();
-    let verify_params = VerifierParams::ar_to_abar_params().unwrap();
+    let params = ProverParams::gen_ar_to_abar().unwrap();
+    let verify_params = VerifierParams::get_ar_to_abar().unwrap();
 
-    let sender = KeyPair::generate_secp256k1(&mut prng);
-    let receiver = KeyPair::generate_secp256k1(&mut prng);
+    let address_format = SECP256K1;
+    let sender = KeyPair::sample(&mut prng, address_format);
+    let receiver = KeyPair::sample(&mut prng, address_format);
 
     let (bar, memo) = {
         let ar = AssetRecordTemplate::with_no_asset_tracing(
@@ -335,11 +342,12 @@ fn ar_to_abar(c: &mut Criterion) {
 fn bar_to_abar(c: &mut Criterion) {
     let mut prng = test_rng();
     let pc_gens = PedersenCommitmentRistretto::default();
-    let params = ProverParams::bar_to_abar_params().unwrap();
-    let verify_params = VerifierParams::bar_to_abar_params().unwrap();
+    let params = ProverParams::gen_bar_to_abar().unwrap();
+    let verify_params = VerifierParams::get_bar_to_abar().unwrap();
 
-    let sender = KeyPair::generate_secp256k1(&mut prng);
-    let receiver = KeyPair::generate_secp256k1(&mut prng);
+    let address_format = SECP256K1;
+    let sender = KeyPair::sample(&mut prng, address_format);
+    let receiver = KeyPair::sample(&mut prng, address_format);
 
     let (bar, memo) = {
         let ar = AssetRecordTemplate::with_no_asset_tracing(

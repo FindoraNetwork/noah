@@ -1,4 +1,5 @@
-use crate::setup::{BulletproofParams, BulletproofURS};
+use crate::parameters::bulletproofs::BulletproofParams;
+use crate::parameters::bulletproofs::BulletproofURS;
 use bulletproofs::{
     r1cs::{batch_verify, Prover, R1CSProof, Verifier},
     BulletproofGens, PedersenGens,
@@ -139,7 +140,7 @@ pub struct AssetMixingInstance<'a> {
 /// use bulletproofs::PedersenGens;
 /// use rand::thread_rng;
 /// use ruc::err::*;
-/// use noah::setup::BulletproofParams;
+/// use noah::parameters::bulletproofs::BulletproofParams;
 /// use noah_algebra::traits::PedersenCommitment;
 /// let input = [
 ///            (60u64, RistrettoScalar::from(0u32), RistrettoScalar::from(10000u32), RistrettoScalar::from(200000u32)),
@@ -274,7 +275,7 @@ fn asset_mix_num_generators(n_input: usize, n_output: usize) -> usize {
 }
 #[cfg(test)]
 mod test {
-    use crate::setup::BulletproofParams;
+    use crate::parameters::bulletproofs::BulletproofParams;
     use crate::xfr::asset_mixer::AssetMixingInstance;
     use noah_algebra::{
         prelude::*,

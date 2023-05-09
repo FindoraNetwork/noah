@@ -1,6 +1,7 @@
 use crate::anon_creds::{self, ac_commit, ACCommitment, Credential};
 use crate::keys::KeyPair;
-use crate::setup::BulletproofParams;
+use crate::parameters::bulletproofs::BulletproofParams;
+use crate::parameters::AddressFormat::SECP256K1;
 use crate::xfr::{
     asset_record::AssetRecordType,
     batch_verify_xfr_body_asset_records, batch_verify_xfr_notes, compute_transfer_multisig,
@@ -18,7 +19,7 @@ use noah_algebra::{
     ristretto::{PedersenCommitmentRistretto, RistrettoScalar},
     traits::PedersenCommitment,
 };
-use noah_crypto::basic::{
+use noah_crypto::{
     elgamal::{elgamal_encrypt, elgamal_key_gen},
     pedersen_elgamal::{pedersen_elgamal_eq_prove, PedersenElGamalEqProof},
 };
@@ -48,7 +49,7 @@ pub(crate) fn create_xfr<R: CryptoRng + RngCore>(
 pub(crate) fn gen_key_pair_vec<R: CryptoRng + RngCore>(size: usize, prng: &mut R) -> Vec<KeyPair> {
     let mut keys = vec![];
     for _i in 0..size {
-        keys.push(KeyPair::generate_secp256k1(prng));
+        keys.push(KeyPair::sample(prng, SECP256K1));
     }
     keys
 }
@@ -305,7 +306,7 @@ fn do_transfer_tests_single_asset(
 
 mod single_asset_no_tracing {
     use super::*;
-    use crate::setup::BulletproofParams;
+    use crate::parameters::bulletproofs::BulletproofParams;
 
     #[test]
     fn test_transfer_not_confidential() {
@@ -629,7 +630,7 @@ mod keys {
         let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
 
         for x in amounts.iter() {
-            let keypair = KeyPair::generate_secp256k1(&mut prng);
+            let keypair = KeyPair::sample(&mut prng, SECP256K1);
             let asset_record = AssetRecordTemplate::with_no_asset_tracing(
                 x.0,
                 x.1,
@@ -646,7 +647,7 @@ mod keys {
         }
 
         for x in amounts.iter() {
-            let keypair = KeyPair::generate_secp256k1(&mut prng);
+            let keypair = KeyPair::sample(&mut prng, SECP256K1);
 
             let ar_template = AssetRecordTemplate::with_no_asset_tracing(
                 x.0,
@@ -668,8 +669,8 @@ mod keys {
         );
         msg_eq!(NoahError::ParameterError, xfr_note.unwrap_err());
 
-        let key1 = KeyPair::generate_secp256k1(&mut prng);
-        let key2 = KeyPair::generate_secp256k1(&mut prng);
+        let key1 = KeyPair::sample(&mut prng, SECP256K1);
+        let key2 = KeyPair::sample(&mut prng, SECP256K1);
         let xfr_note = gen_xfr_note(
             &mut prng,
             inputs.as_slice(),
@@ -683,6 +684,7 @@ mod keys {
 
 mod identity_tracing {
     use super::*;
+    use crate::parameters::AddressFormat::SECP256K1;
     use crate::xfr::{structs::TracingPolicies, XfrNotePoliciesRef};
 
     fn check_identity_tracing_for_asset_type(asset_record_type: AssetRecordType) {
@@ -724,7 +726,7 @@ mod identity_tracing {
             identity_tracing: Some(id_tracing_policy),
         });
 
-        let input_keypair = KeyPair::generate_secp256k1(&mut prng);
+        let input_keypair = KeyPair::sample(&mut prng, SECP256K1);
 
         let input_asset_record = AssetRecordTemplate::with_no_asset_tracing(
             10,
@@ -810,6 +812,7 @@ mod identity_tracing {
 
 mod asset_tracing {
     use super::*;
+    use crate::parameters::AddressFormat::SECP256K1;
     use crate::xfr::{
         structs::XfrAmount::NonConfidential,
         structs::{AssetTracerKeyPair, TracingPolicies},
@@ -820,7 +823,7 @@ mod asset_tracing {
         ristretto::{PedersenCommitmentRistretto, RistrettoPoint, RistrettoScalar},
         traits::PedersenCommitment,
     };
-    use noah_crypto::basic::elgamal::ElGamalCiphertext;
+    use noah_crypto::elgamal::ElGamalCiphertext;
 
     const GOLD_ASSET: AssetType = AssetType([0; ASSET_TYPE_LENGTH]);
     const BITCOIN_ASSET: AssetType = AssetType([1; ASSET_TYPE_LENGTH]);
@@ -1056,7 +1059,7 @@ mod asset_tracing {
             identity_tracing: None,
         });
 
-        let input_keypair = KeyPair::generate_secp256k1(&mut prng);
+        let input_keypair = KeyPair::sample(&mut prng, SECP256K1);
         let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
         let input_asset_record = AssetRecordTemplate::with_asset_tracing(
             10,

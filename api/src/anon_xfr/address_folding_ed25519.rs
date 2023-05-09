@@ -1,13 +1,14 @@
 use crate::anon_xfr::TurboPlonkCS;
 use crate::keys::KeyPair;
-use crate::setup::BulletproofURS;
+use crate::parameters::bulletproofs::BulletproofURS;
+use crate::parameters::params::AddressFormat::ED25519;
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
 use noah_algebra::bls12_381::BLSScalar;
 use noah_algebra::ed25519::Ed25519Fq;
 use noah_algebra::prelude::*;
 use noah_algebra::zorro::{PedersenCommitmentZorro, ZorroBulletproofGens, ZorroG1, ZorroScalar};
-use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
+use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381};
 use noah_crypto::bulletproofs::scalar_mul_for_ed25519::ScalarMulProof;
 use noah_crypto::delegated_schnorr::{
     prove_delegated_schnorr, verify_delegated_schnorr, DelegatedSchnorrInspection,
@@ -50,7 +51,7 @@ pub struct AXfrAddressFoldingWitnessEd25519 {
 
 impl Default for AXfrAddressFoldingWitnessEd25519 {
     fn default() -> Self {
-        let keypair = KeyPair::default_ed25519();
+        let keypair = KeyPair::default(ED25519);
         let blinding_factors = vec![ZorroScalar::default(); 3];
 
         let delegated_schnorr_proof =

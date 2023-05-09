@@ -2,11 +2,12 @@ use crate::anon_creds::{
     ACConfidentialRevealProof, ACIssuerPublicKey, AttributeCiphertext, AttributeDecKey,
     AttributeEncKey,
 };
-use crate::keys::{KeyPair, KeyType, MultiSig, PublicKey};
+use crate::keys::{KeyPair, KeyType, PublicKey, PublicKeyInner, SignatureList};
 use crate::xfr::{
     asset_mixer::AssetMixProof,
     asset_record::AssetRecordType,
     asset_tracer::{RecordDataCiphertext, RecordDataDecKey, RecordDataEncKey},
+    xfr_hybrid_decrypt, xfr_hybrid_encrypt,
 };
 use bulletproofs::RangeProof;
 use digest::Digest;
@@ -19,7 +20,7 @@ use noah_algebra::{
     secp256k1::{SECP256K1Scalar, SECP256K1G1},
     traits::PedersenCommitment,
 };
-use noah_crypto::basic::{
+use noah_crypto::{
     chaum_pedersen::ChaumPedersenProofX,
     elgamal::elgamal_key_gen,
     hybrid_encryption::{NoahHybridCiphertext, XPublicKey, XSecretKey},
@@ -29,6 +30,24 @@ use sha2::Sha512;
 
 /// Asset Type identifier.
 pub const ASSET_TYPE_LENGTH: usize = 32;
+/// For `ConfidentialAmount_ConfidentialAssetType` transaction with output key type ed25519,
+/// the maximum ciphertext size is limited to 72.
+pub const MAX_LOCK_BYTES_CON_CON_ED25519: usize = 72;
+/// For `NonConfidentialAmount_ConfidentialAssetType` transaction with output key type ed25519,
+/// the maximum ciphertext size is limited to 64.
+pub const MAX_LOCK_BYTES_NON_CON_ED25519: usize = 64;
+/// For `ConfidentialAmount_NonConfidentialAssetType` transaction with output key type ed25519,
+/// the maximum ciphertext size is limited to 40.
+pub const MAX_LOCK_BYTES_CON_NON_ED25519: usize = 40;
+/// For `ConfidentialAmount_ConfidentialAssetType` transaction with output key type secp256k1,
+/// the maximum ciphertext size is limited to 89.
+pub const MAX_LOCK_BYTES_CON_CON_SECP256K1: usize = 89;
+/// For `NonConfidentialAmount_ConfidentialAssetType` transaction with output key type secp256k1,
+/// the maximum ciphertext size is limited to 81.
+pub const MAX_LOCK_BYTES_NON_CON_SECP256K1: usize = 81;
+/// For `ConfidentialAmount_NonConfidentialAssetType` transaction with output key type secp256k1,
+/// the maximum ciphertext size is limited to 57.
+pub const MAX_LOCK_BYTES_CON_NON_SECP256K1: usize = 57;
 
 #[derive(
     Deserialize, Serialize, Clone, Copy, Debug, Default, Eq, Hash, PartialEq, PartialOrd, Ord,
@@ -74,7 +93,7 @@ pub struct XfrNote {
     /// The confidential transfer body.
     pub body: XfrBody,
     /// The multisiganture of the senders
-    pub multisig: MultiSig,
+    pub multisig: SignatureList,
 }
 
 /// A confidential transfer body.
@@ -407,7 +426,7 @@ impl OwnerMemo {
             OwnerMemo::derive_shared_point(&key_type, &r, &pub_key.as_compressed_point()?)?;
         let amount_blinds = OwnerMemo::calc_amount_blinds(&shared_point);
 
-        let lock_bytes = pub_key.hybrid_encrypt(prng, &amount.to_be_bytes())?;
+        let lock_bytes = xfr_hybrid_encrypt(&pub_key, prng, &amount.to_be_bytes())?;
         Ok((
             OwnerMemo {
                 key_type,
@@ -429,7 +448,7 @@ impl OwnerMemo {
             OwnerMemo::derive_shared_point(&key_type, &r, &pub_key.as_compressed_point()?)?;
         let asset_type_blind = OwnerMemo::calc_asset_type_blind(&shared_point);
 
-        let lock_bytes = pub_key.hybrid_encrypt(prng, &asset_type.0)?;
+        let lock_bytes = xfr_hybrid_encrypt(&pub_key, prng, &asset_type.0)?;
         Ok((
             OwnerMemo {
                 key_type,
@@ -456,7 +475,7 @@ impl OwnerMemo {
         let mut amount_asset_type_plaintext = vec![];
         amount_asset_type_plaintext.extend_from_slice(&amount.to_be_bytes()[..]);
         amount_asset_type_plaintext.extend_from_slice(&asset_type.0[..]);
-        let lock_bytes = pub_key.hybrid_encrypt(prng, &amount_asset_type_plaintext)?;
+        let lock_bytes = xfr_hybrid_encrypt(&pub_key, prng, &amount_asset_type_plaintext)?;
         Ok((
             OwnerMemo {
                 key_type,
@@ -532,7 +551,7 @@ impl OwnerMemo {
 impl OwnerMemo {
     // Decrypt the lock.
     fn decrypt(&self, keypair: &KeyPair) -> Result<Vec<u8>> {
-        keypair.hybrid_decrypt(&self.lock_bytes)
+        xfr_hybrid_decrypt(&keypair.sec_key, &self.lock_bytes)
     }
 
     // Given a shared point, calculate the amount blinds.
@@ -573,6 +592,56 @@ impl OwnerMemo {
         hasher.update(point);
         hasher.update(aux);
         RistrettoScalar::from_hash(hasher)
+    }
+}
+
+/// Check memo size.
+pub fn check_memo_size(output: &BlindAssetRecord, memo: &Option<OwnerMemo>) -> Result<()> {
+    if !output.amount.is_confidential() && !output.asset_type.is_confidential() {
+        if memo.is_some() {
+            return Err(eg!(NoahError::AXfrVerifierParamsError));
+        }
+        return Ok(());
+    }
+
+    let memo = memo.as_ref().unwrap(); //safety unwrap
+
+    match (&memo.key_type, output.public_key.inner()) {
+        (KeyType::Ed25519, PublicKeyInner::Ed25519(_)) => {
+            if memo.blind_share_bytes.len() != Ed25519Point::COMPRESSED_LEN
+                || (output.amount.is_confidential()
+                    && output.asset_type.is_confidential()
+                    && memo.lock_bytes.len() > MAX_LOCK_BYTES_CON_CON_ED25519)
+                || (!output.amount.is_confidential()
+                    && output.asset_type.is_confidential()
+                    && memo.lock_bytes.len() > MAX_LOCK_BYTES_NON_CON_ED25519)
+                || (output.amount.is_confidential()
+                    && !output.asset_type.is_confidential()
+                    && memo.lock_bytes.len() > MAX_LOCK_BYTES_CON_NON_ED25519)
+            {
+                return Err(eg!(NoahError::AXfrVerifierParamsError));
+            }
+
+            Ok(())
+        }
+        (KeyType::Secp256k1, PublicKeyInner::Secp256k1(_)) => {
+            if memo.blind_share_bytes.len() != SECP256K1G1::COMPRESSED_LEN
+                || (output.amount.is_confidential()
+                    && output.asset_type.is_confidential()
+                    && memo.lock_bytes.len() > MAX_LOCK_BYTES_CON_CON_SECP256K1)
+                || (!output.amount.is_confidential()
+                    && output.asset_type.is_confidential()
+                    && memo.lock_bytes.len() > MAX_LOCK_BYTES_NON_CON_SECP256K1)
+                || (output.amount.is_confidential()
+                    && !output.asset_type.is_confidential()
+                    && memo.lock_bytes.len() > MAX_LOCK_BYTES_CON_NON_SECP256K1)
+            {
+                return Err(eg!(NoahError::AXfrVerificationError));
+            }
+
+            Ok(())
+        }
+        _ => return Err(eg!(NoahError::AXfrVerificationError)),
     }
 }
 
@@ -747,10 +816,7 @@ impl<'de> Deserialize<'de> for OwnerMemo {
                 impl<'de> Visitor<'de> for FieldVisitor {
                     type Value = Field;
 
-                    fn expecting(
-                        &self,
-                        formatter: &mut std::fmt::Formatter<'_>,
-                    ) -> std::fmt::Result {
+                    fn expecting(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
                         formatter.write_str("`blind_share` or `lock` or `key_type`")
                     }
 
@@ -778,7 +844,7 @@ impl<'de> Deserialize<'de> for OwnerMemo {
         impl<'de> Visitor<'de> for OwnerMemoVisitor {
             type Value = OwnerMemo;
 
-            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            fn expecting(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
                 formatter.write_str("struct OwnerMemo")
             }
 

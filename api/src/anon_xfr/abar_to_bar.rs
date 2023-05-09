@@ -13,7 +13,9 @@ use crate::anon_xfr::{
     AXfrAddressFoldingInstance, AXfrAddressFoldingWitness, AXfrPlonkPf, TurboPlonkCS, TWO_POW_32,
 };
 use crate::keys::{KeyPair, PublicKey, SecretKey};
-use crate::setup::{ProverParams, VerifierParams};
+use crate::parameters::params::ProverParams;
+use crate::parameters::params::VerifierParams;
+use crate::xfr::structs::check_memo_size;
 use crate::xfr::{
     asset_record::{build_open_asset_record, AssetRecordType},
     structs::{AssetRecordTemplate, BlindAssetRecord, OwnerMemo, XfrAmount, XfrAssetType},
@@ -26,9 +28,7 @@ use noah_algebra::{
     ristretto::{PedersenCommitmentRistretto, RistrettoPoint, RistrettoScalar},
     traits::PedersenCommitment,
 };
-use noah_crypto::basic::anemoi_jive::{
-    AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS,
-};
+use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS};
 use noah_crypto::{
     delegated_schnorr::{
         prove_delegated_schnorr, verify_delegated_schnorr, DelegatedSchnorrInspection,
@@ -280,6 +280,9 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
         return Err(eg!(NoahError::AXfrVerificationError));
     }
 
+    // Check the memo size.
+    check_memo_size(&note.body.output, &note.body.memo)?;
+
     let bar = note.body.output.clone();
     let pc_gens = PedersenCommitmentRistretto::default();
 
@@ -380,13 +383,11 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     online_inputs.extend_from_slice(&s1_plus_lambda_s2_sim_fr.limbs);
     online_inputs.extend_from_slice(&address_folding_public_input);
 
-    let (cs, verifier_params) = params.cs_params(Some(&note.folding_instance));
-
     verifier(
         &mut transcript,
-        &params.pcs,
-        &cs,
-        verifier_params,
+        &params.shrunk_vk,
+        &params.shrunk_cs,
+        &params.verifier_params,
         &online_inputs,
         &note.proof,
     )
@@ -408,6 +409,11 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
         .any(|(x, y)| **x != y.body.merkle_root)
     {
         return Err(eg!(NoahError::AXfrVerificationError));
+    }
+
+    // Check the memo size.
+    for note in notes.iter() {
+        check_memo_size(&note.body.output, &note.body.memo)?;
     }
 
     // Reject anonymous-to-confidential notes whose outputs are transparent.
@@ -520,13 +526,11 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
             online_inputs.extend_from_slice(&s1_plus_lambda_s2_sim_fr.limbs);
             online_inputs.extend_from_slice(&address_folding_public_input);
 
-            let (cs, verifier_params) = params.cs_params(Some(&note.folding_instance));
-
             verifier(
                 &mut transcript,
-                &params.pcs,
-                &cs,
-                verifier_params,
+                &params.shrunk_vk,
+                &params.shrunk_cs,
+                &params.verifier_params,
                 &online_inputs,
                 &note.proof,
             )
@@ -566,15 +570,13 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
     );
     let witness = cs.get_and_clear_witness();
 
-    let (cs, prover_params) = params.cs_params(Some(folding_witness));
-
     prover_with_lagrange(
         rng,
         &mut transcript,
         &params.pcs,
         params.lagrange_pcs.as_ref(),
-        cs,
-        prover_params,
+        &params.cs,
+        &params.prover_params,
         &witness,
     )
     .c(d!(NoahError::AXfrProofError))

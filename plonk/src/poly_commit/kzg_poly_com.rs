@@ -373,14 +373,14 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         }
     }
 
-    fn shrink_to_verifier_only(&self) -> Result<Self> {
-        Ok(Self {
+    fn shrink_to_verifier_only(&self) -> Self {
+        Self {
             public_parameter_group_1: vec![self.public_parameter_group_1[0].clone()],
             public_parameter_group_2: vec![
                 self.public_parameter_group_2[0].clone(),
                 self.public_parameter_group_2[1].clone(),
             ],
-        })
+        }
     }
 }
 
@@ -533,7 +533,7 @@ mod tests_kzg_impl {
         let res = pcs.verify(&commitment_value, degree, &point, &seven, &proof);
         pnk!(res);
 
-        let new_pcs = pcs.shrink_to_verifier_only().unwrap();
+        let new_pcs = pcs.shrink_to_verifier_only();
         let res = new_pcs.verify(&commitment_value, degree, &point, &seven, &proof);
         pnk!(res);
 

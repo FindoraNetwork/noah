@@ -4,7 +4,7 @@ use super::{ConstraintSystem, CsIndex, VarIndex};
 use crate::plonk::errors::PlonkError;
 use noah_algebra::prelude::*;
 
-use noah_crypto::basic::anemoi_jive::AnemoiJive;
+use noah_crypto::anemoi_jive::AnemoiJive;
 #[cfg(feature = "debug")]
 use std::collections::HashMap;
 
@@ -170,8 +170,8 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
         self.verifier_only
     }
 
-    fn shrink_to_verifier_only(&self) -> Result<Self> {
-        Ok(Self {
+    fn shrink_to_verifier_only(&self) -> Self {
+        Self {
             selectors: vec![],
             wiring: [vec![], vec![], vec![], vec![], vec![]],
             anemoi_preprocessed_round_keys_x: [[F::zero(); 2]; 12],
@@ -189,7 +189,7 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
 
             #[cfg(feature = "debug")]
             witness_backtrace: HashMap::new(),
-        })
+        }
     }
 
     fn compute_anemoi_jive_selectors(&self) -> [Vec<Self::Field>; 4] {
@@ -972,48 +972,6 @@ impl<F: Scalar> TurboCS<F> {
     }
 }
 
-/// Turbo PLONK Verify Constraint System.
-#[derive(Serialize, Deserialize, Clone)]
-pub struct TurboVerifyCS {
-    /// the number of variable.
-    pub num_vars: usize,
-    /// the size of circuit.
-    pub size: usize,
-}
-
-impl<F: Scalar> From<TurboCS<F>> for TurboVerifyCS {
-    fn from(cs: TurboCS<F>) -> TurboVerifyCS {
-        TurboVerifyCS {
-            num_vars: cs.num_vars,
-            size: cs.size,
-        }
-    }
-}
-
-impl<F: Scalar> From<TurboVerifyCS> for TurboCS<F> {
-    fn from(cs: TurboVerifyCS) -> TurboCS<F> {
-        TurboCS {
-            selectors: vec![],
-            wiring: [vec![], vec![], vec![], vec![], vec![]],
-            anemoi_preprocessed_round_keys_x: [[F::zero(); 2]; 12],
-            anemoi_preprocessed_round_keys_y: [[F::zero(); 2]; 12],
-            anemoi_generator: F::zero(),
-            anemoi_generator_inv: F::zero(),
-            anemoi_constraints_indices: vec![],
-            num_vars: cs.num_vars,
-            size: cs.size,
-            public_vars_constraint_indices: vec![],
-            public_vars_witness_indices: vec![],
-            boolean_constraint_indices: vec![],
-            verifier_only: true,
-            witness: vec![],
-
-            #[cfg(feature = "debug")]
-            witness_backtrace: HashMap::new(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod test {
     use crate::plonk::{
@@ -1495,7 +1453,7 @@ mod test {
         )
         .is_ok());
 
-        let prover_cs = cs.shrink_to_verifier_only().unwrap();
+        let prover_cs = cs.shrink_to_verifier_only();
 
         let mut transcript = Transcript::new(b"TestTurboPlonk");
         assert!(prover(
@@ -1556,7 +1514,8 @@ mod test {
     #[cfg(feature = "debug")]
     #[should_panic]
     fn test_dangling_witness_should_panic() {
-        use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
+        use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381};
+
         let one = F::one();
         let two = one.add(&one);
         let three = one.add(&two);

@@ -1,5 +1,6 @@
-use crate::anon_xfr::{commit, decrypt_memo};
+use crate::anon_xfr::{axfr_hybrid_decrypt, axfr_hybrid_encrypt, commit, decrypt_memo};
 use crate::keys::{KeyPair, PublicKey, SecretKey};
+use crate::parameters::params::AddressFormat::{ED25519, SECP256K1};
 use crate::xfr::structs::AssetType;
 use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 use noah_plonk::plonk::constraint_system::VarIndex;
@@ -95,7 +96,7 @@ impl Default for OpenAnonAssetRecord {
             amount: 0,
             asset_type: AssetType::default(),
             blind: BLSScalar::default(),
-            pub_key: PublicKey::default_secp256k1(),
+            pub_key: PublicKey::default(SECP256K1),
             owner_memo: None,
             mt_leaf_info: None,
         }
@@ -221,7 +222,9 @@ impl OpenAnonAssetRecordBuilder {
 
     fn sanity_check(&self) -> Result<()> {
         // 1. check public key is non-default
-        if self.oabar.pub_key == PublicKey::default_secp256k1() {
+        if self.oabar.pub_key == PublicKey::default(SECP256K1)
+            || self.oabar.pub_key == PublicKey::default(ED25519)
+        {
             return Err(eg!(NoahError::InconsistentStructureError));
         }
 
@@ -334,13 +337,18 @@ impl AxfrOwnerMemo {
         pub_key: &PublicKey,
         msg: &[u8],
     ) -> Result<Self> {
-        let ctext = pub_key.hybrid_encrypt(prng, msg)?;
+        let ctext = axfr_hybrid_encrypt(pub_key, prng, msg)?;
         Ok(Self(ctext))
     }
 
     /// Decrypt a memo using the viewing key.
     pub fn decrypt(&self, secret_key: &SecretKey) -> Result<Vec<u8>> {
-        secret_key.hybrid_decrypt(&self.0)
+        axfr_hybrid_decrypt(secret_key, &self.0)
+    }
+
+    /// Return the size of the memo.
+    pub fn size(&self) -> usize {
+        self.0.len()
     }
 }
 
@@ -348,12 +356,13 @@ impl AxfrOwnerMemo {
 mod test {
     use crate::anon_xfr::structs::PublicKey;
     use crate::keys::KeyPair;
+    use crate::parameters::AddressFormat::SECP256K1;
     use noah_algebra::prelude::*;
 
     #[test]
     fn test_axfr_pub_key_serialization() {
         let mut prng = test_rng();
-        let keypair: KeyPair = KeyPair::generate_secp256k1(&mut prng);
+        let keypair = KeyPair::sample(&mut prng, SECP256K1);
 
         let pub_key: PublicKey = keypair.get_pk();
 
@@ -367,7 +376,7 @@ mod test {
     #[test]
     fn test_axfr_key_pair_serialization() {
         let mut prng = test_rng();
-        let keypair: KeyPair = KeyPair::generate_secp256k1(&mut prng);
+        let keypair = KeyPair::sample(&mut prng, SECP256K1);
 
         let bytes: Vec<u8> = keypair.noah_to_bytes();
         assert_ne!(bytes.len(), 0);

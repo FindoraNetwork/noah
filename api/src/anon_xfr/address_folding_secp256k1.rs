@@ -1,6 +1,7 @@
 use crate::anon_xfr::TurboPlonkCS;
 use crate::keys::KeyPair;
-use crate::setup::BulletproofURS;
+use crate::parameters::bulletproofs::BulletproofURS;
+use crate::parameters::params::AddressFormat::SECP256K1;
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
 use noah_algebra::bls12_381::BLSScalar;
@@ -9,7 +10,7 @@ use noah_algebra::secp256k1::SECP256K1Scalar;
 use noah_algebra::secq256k1::{
     PedersenCommitmentSecq256k1, SECQ256K1Scalar, Secq256k1BulletproofGens, SECQ256K1G1,
 };
-use noah_crypto::basic::anemoi_jive::{AnemoiJive, AnemoiJive381};
+use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381};
 use noah_crypto::bulletproofs::scalar_mul_for_secp256k1::ScalarMulProof;
 use noah_crypto::delegated_schnorr::{
     prove_delegated_schnorr, verify_delegated_schnorr, DelegatedSchnorrInspection,
@@ -54,7 +55,7 @@ pub struct AXfrAddressFoldingWitnessSecp256k1 {
 
 impl Default for AXfrAddressFoldingWitnessSecp256k1 {
     fn default() -> Self {
-        let keypair = KeyPair::default_secp256k1();
+        let keypair = KeyPair::default(SECP256K1);
         let blinding_factors = vec![SECQ256K1Scalar::default(); 3];
 
         let delegated_schnorr_proof =

@@ -498,6 +498,14 @@ pub fn open_blind_asset_record(
             let owner_memo = owner_memo.as_ref().c(d!(NoahError::ParameterError))?;
             let amount = owner_memo.decrypt_amount(&keypair).c(d!())?;
             let amount_blinds = owner_memo.derive_amount_blinds(&keypair).c(d!())?;
+
+            let pc_gens = PedersenCommitmentRistretto::default();
+            if input.amount
+                != XfrAmount::from_blinds(&pc_gens, amount, &amount_blinds.0, &amount_blinds.1)
+            {
+                return Err(eg!(NoahError::ParameterError));
+            }
+
             (
                 amount,
                 input
@@ -513,6 +521,14 @@ pub fn open_blind_asset_record(
             let owner_memo = owner_memo.as_ref().c(d!(NoahError::ParameterError))?;
             let asset_type = owner_memo.decrypt_asset_type(&keypair).c(d!())?;
             let asset_type_blind = owner_memo.derive_asset_type_blind(&keypair).c(d!())?;
+
+            let pc_gens = PedersenCommitmentRistretto::default();
+            if input.asset_type
+                != XfrAssetType::from_blind(&pc_gens, &asset_type, &asset_type_blind)
+            {
+                return Err(eg!(NoahError::ParameterError));
+            }
+
             (
                 input.amount.get_amount().c(d!(NoahError::ParameterError))?,
                 asset_type,
@@ -527,6 +543,19 @@ pub fn open_blind_asset_record(
                 owner_memo.decrypt_amount_and_asset_type(&keypair).c(d!())?;
             let amount_blinds = owner_memo.derive_amount_blinds(&keypair).c(d!())?;
             let asset_type_blind = owner_memo.derive_asset_type_blind(&keypair).c(d!())?;
+
+            let pc_gens = PedersenCommitmentRistretto::default();
+            if input.amount
+                != XfrAmount::from_blinds(&pc_gens, amount, &amount_blinds.0, &amount_blinds.1)
+            {
+                return Err(eg!(NoahError::ParameterError));
+            }
+
+            if input.asset_type
+                != XfrAssetType::from_blind(&pc_gens, &asset_type, &asset_type_blind)
+            {
+                return Err(eg!(NoahError::ParameterError));
+            }
 
             (amount, asset_type, amount_blinds, asset_type_blind)
         }
@@ -584,10 +613,12 @@ fn build_record_input_from_template<R: CryptoRng + RngCore>(
     })
 }
 
+#[cfg(feature = "xfr-tracing")]
 #[cfg(test)]
 mod test {
     use super::{build_blind_asset_record, build_open_asset_record, open_blind_asset_record};
     use crate::keys::KeyPair;
+    use crate::parameters::AddressFormat::SECP256K1;
     use crate::xfr::{
         asset_record::AssetRecordType,
         structs::{
@@ -608,7 +639,7 @@ mod test {
 
         let amount = 100u64;
         let asset_type = AssetType::from_identical_byte(0u8);
-        let keypair = KeyPair::generate_secp256k1(&mut prng);
+        let keypair = KeyPair::sample(&mut prng, SECP256K1);
         let tracing_policy = match asset_tracing {
             true => {
                 let tracer_keys = AssetTracerKeyPair::generate(&mut prng);
@@ -831,7 +862,7 @@ mod test {
         let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
 
-        let keypair = KeyPair::generate_secp256k1(&mut prng);
+        let keypair = KeyPair::sample(&mut prng, SECP256K1);
         let ar = AssetRecordTemplate::with_no_asset_tracing(
             amt,
             asset_type,
@@ -885,7 +916,7 @@ mod test {
         let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
 
-        let keypair = KeyPair::generate_secp256k1(&mut prng);
+        let keypair = KeyPair::sample(&mut prng, SECP256K1);
         let asset_type: AssetType = AssetType(prng.gen());
         let amount = 10u64;
         let ar = AssetRecordTemplate::with_no_asset_tracing(
@@ -902,6 +933,21 @@ mod test {
         let open_rec = open_blind_asset_record(&blind_rec, &None, &keypair);
         assert!(open_rec.is_err(), "Expect error as amount is confidential");
 
+        let amount = 10u64;
+        let ar = AssetRecordTemplate::with_no_asset_tracing(
+            amount,
+            asset_type,
+            AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
+            keypair.pub_key,
+        );
+        let (_, _asset_tracer_memo, owner_memo) =
+            build_blind_asset_record(&mut prng, &pc_gens, &ar, vec![]);
+        let open_rec = open_blind_asset_record(&blind_rec, &owner_memo, &keypair);
+        assert!(
+            open_rec.is_err(),
+            "Expect error as the blind record is inconsistent"
+        );
+
         let ar = AssetRecordTemplate::with_no_asset_tracing(
             amount,
             asset_type,
@@ -917,6 +963,21 @@ mod test {
         assert!(
             open_rec.is_err(),
             "Expect error as asset type is confidential"
+        );
+
+        let asset_type: AssetType = AssetType(prng.gen());
+        let ar = AssetRecordTemplate::with_no_asset_tracing(
+            amount,
+            asset_type,
+            AssetRecordType::NonConfidentialAmount_ConfidentialAssetType,
+            keypair.pub_key,
+        );
+        let (_, _asset_tracer_memo, owner_memo) =
+            build_blind_asset_record(&mut prng, &pc_gens, &ar, vec![]);
+        let open_rec = open_blind_asset_record(&blind_rec, &owner_memo, &keypair);
+        assert!(
+            open_rec.is_err(),
+            "Expect error as the blind record is inconsistent"
         );
 
         let ar = AssetRecordTemplate::with_no_asset_tracing(

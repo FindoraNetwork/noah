@@ -7,7 +7,7 @@ use noah_algebra::{
 };
 use noah_crypto::{
     anon_creds::{Attribute, CommOutput},
-    basic::elgamal::elgamal_key_gen,
+    elgamal::elgamal_key_gen,
 };
 
 type G1 = BLSG1;
@@ -353,11 +353,11 @@ pub fn ac_verify(
 }
 
 /// The attribute encryption key.
-pub type AttributeEncKey = noah_crypto::basic::elgamal::ElGamalEncKey<G1>;
+pub type AttributeEncKey = noah_crypto::elgamal::ElGamalEncKey<G1>;
 /// The attribute decryption key.
-pub type AttributeDecKey = noah_crypto::basic::elgamal::ElGamalDecKey<S>;
+pub type AttributeDecKey = noah_crypto::elgamal::ElGamalDecKey<S>;
 /// The ciphertext of an attribute.
-pub type AttributeCiphertext = noah_crypto::basic::elgamal::ElGamalCiphertext<G1>;
+pub type AttributeCiphertext = noah_crypto::elgamal::ElGamalCiphertext<G1>;
 
 /// Confidential anonymous credential
 pub type ConfidentialAC = noah_crypto::confidential_anon_creds::ConfidentialAC<G1, G2, S>;

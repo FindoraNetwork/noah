@@ -1,8 +1,9 @@
 #[cfg(test)]
 mod smoke_xfr_tracing {
+    use noah::parameters::bulletproofs::BulletproofParams;
+    use noah::parameters::AddressFormat::SECP256K1;
     use noah::{
         keys::{KeyPair, PublicKey},
-        setup::BulletproofParams,
         xfr::{
             asset_record::{build_blind_asset_record, open_blind_asset_record, AssetRecordType},
             gen_xfr_note,
@@ -62,10 +63,10 @@ mod smoke_xfr_tracing {
         let amount_out1 = 100u64;
         let amount_out2 = 25u64;
 
-        let sender1 = KeyPair::generate_secp256k1(&mut prng);
-        let sender2 = KeyPair::generate_secp256k1(&mut prng);
-        let receiver1 = KeyPair::generate_secp256k1(&mut prng);
-        let receiver2 = KeyPair::generate_secp256k1(&mut prng);
+        let sender1 = KeyPair::sample(&mut prng, SECP256K1);
+        let sender2 = KeyPair::sample(&mut prng, SECP256K1);
+        let receiver1 = KeyPair::sample(&mut prng, SECP256K1);
+        let receiver2 = KeyPair::sample(&mut prng, SECP256K1);
 
         // setup policy
         let tracer_keys = AssetTracerKeyPair::generate(&mut prng);
@@ -178,9 +179,9 @@ mod smoke_xfr_tracing {
         let amount_out1 = 30u64;
         let amount_out2 = 20u64;
 
-        let sender1 = KeyPair::generate_secp256k1(&mut prng);
-        let receiver1 = KeyPair::generate_secp256k1(&mut prng);
-        let receiver2 = KeyPair::generate_secp256k1(&mut prng);
+        let sender1 = KeyPair::sample(&mut prng, SECP256K1);
+        let receiver1 = KeyPair::sample(&mut prng, SECP256K1);
+        let receiver2 = KeyPair::sample(&mut prng, SECP256K1);
 
         // instantiate issuer with public keys
         let asset_tracing_key_pair = AssetTracerKeyPair::generate(&mut prng);

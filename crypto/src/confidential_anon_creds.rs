@@ -4,7 +4,7 @@ use crate::anon_creds::{
     Credential, CredentialComm, CredentialCommRandomizer, CredentialIssuerPK, CredentialPoK,
     CredentialUserSK, POK_LABEL,
 };
-use crate::basic::{
+use crate::{
     elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalEncKey},
     matrix_sigma::SigmaTranscript,
 };
@@ -355,8 +355,8 @@ pub(crate) mod test_helper {
         check_comm, commit_without_randomizer, grant_credential, issuer_keygen, user_keygen,
         Credential,
     };
-    use crate::basic::elgamal::elgamal_key_gen;
     use crate::confidential_anon_creds::{confidential_open_comm, confidential_verify_open};
+    use crate::elgamal::elgamal_key_gen;
     use noah_algebra::prelude::*;
     use noah_algebra::traits::Pairing;
 

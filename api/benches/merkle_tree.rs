@@ -1,5 +1,4 @@
 use ark_std::sync::Arc;
-use ark_std::test_rng;
 use criterion::{criterion_group, criterion_main, Criterion};
 use mem_db::MemoryDB;
 use merlin::Transcript;
@@ -8,7 +7,7 @@ use noah::anon_xfr::structs::{AccElemVars, MTLeafInfo, MTNode, MTPath, MerklePat
 use noah_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
 use noah_algebra::bls12_381::BLSScalar;
 use noah_algebra::prelude::*;
-use noah_crypto::basic::anemoi_jive::{
+use noah_crypto::anemoi_jive::{
     AnemoiJive, AnemoiJive381, AnemoiVLHTrace, JiveTrace, ANEMOI_JIVE_381_SALTS,
 };
 use noah_plonk::plonk::constraint_system::{TurboCS, VarIndex};

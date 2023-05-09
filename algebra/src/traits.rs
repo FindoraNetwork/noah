@@ -140,11 +140,11 @@ pub trait Group:
     /// The scalar type
     type ScalarType: Scalar;
 
-    // The base type
-    // type BaseType: Scalar;
-
     /// The number of bytes for a compressed representation of a group element
     const COMPRESSED_LEN: usize;
+
+    /// The number of bytes for a uncompressed representation of a group element
+    const UNCOMPRESSED_LEN: usize;
 
     /// Return the doubling of the group element
     fn double(&self) -> Self;
@@ -218,6 +218,24 @@ pub trait Pairing {
 
     /// The product of pairing operation
     fn product_of_pairings(a: &[Self::G1], b: &[Self::G2]) -> Self::Gt;
+}
+
+/// The trait for get x-coordinate and y-coordinate.
+pub trait CurveGroup: Group {
+    /// The scalar type
+    type BaseType: Scalar;
+
+    /// Get the x-coordinate.
+    fn get_x(&self) -> Self::BaseType;
+
+    /// Get the y-coordinate.
+    fn get_y(&self) -> Self::BaseType;
+
+    /// Get the base point divided by the cofactor.
+    fn get_point_div_by_cofactor() -> Self;
+
+    /// Multiply by the cofactor.
+    fn multiply_by_cofactor(&self) -> Self;
 }
 
 /// Convert the scalar into a vector of small chunks, each of size `w`

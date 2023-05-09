@@ -3,7 +3,7 @@ use crate::fmt::{Debug, Formatter};
 use crate::prelude::*;
 use crate::zorro::ZorroScalar;
 use ark_bulletproofs::curve::zorro::{G1Affine, G1Projective};
-use ark_ec::{AffineRepr, CurveGroup, Group as ArkGroup, VariableBaseMSM};
+use ark_ec::{AffineRepr, CurveGroup as ArkCurveGroup, Group as ArkGroup, VariableBaseMSM};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use ark_std::{boxed::Box, format, vec::Vec};
 use digest::consts::U64;
@@ -97,6 +97,7 @@ impl<'a> MulAssign<&'a ZorroScalar> for ZorroG1 {
 impl Group for ZorroG1 {
     type ScalarType = ZorroScalar;
     const COMPRESSED_LEN: usize = 33;
+    const UNCOMPRESSED_LEN: usize = 65;
 
     #[inline]
     fn double(&self) -> Self {

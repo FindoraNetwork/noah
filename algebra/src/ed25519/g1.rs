@@ -6,7 +6,7 @@ use crate::{
     cmp::Ordering,
     hash::{Hash, Hasher},
 };
-use ark_ec::{AffineRepr, CurveGroup, Group as ArkGroup};
+use ark_ec::{AffineRepr, CurveGroup as ArkCurveGroup, Group as ArkGroup};
 use ark_ed25519::{EdwardsAffine, EdwardsProjective};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use ark_std::{boxed::Box, format, string::ToString, vec::Vec};
@@ -63,6 +63,7 @@ impl Ed25519Point {
 impl Group for Ed25519Point {
     type ScalarType = Ed25519Scalar;
     const COMPRESSED_LEN: usize = 32;
+    const UNCOMPRESSED_LEN: usize = 64;
 
     #[inline]
     fn double(&self) -> Self {

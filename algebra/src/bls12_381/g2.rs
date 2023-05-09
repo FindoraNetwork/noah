@@ -2,7 +2,7 @@ use crate::bls12_381::BLSScalar;
 use crate::errors::AlgebraError;
 use crate::prelude::{derive_prng_from_hash, *};
 use ark_bls12_381::{G2Affine, G2Projective};
-use ark_ec::{AffineRepr, CurveGroup, Group as ArkGroup};
+use ark_ec::{AffineRepr, CurveGroup as ArkCurveGroup, Group as ArkGroup};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use ark_std::{
     boxed::Box,
@@ -27,6 +27,7 @@ impl Debug for BLSG2 {
 impl Group for BLSG2 {
     type ScalarType = BLSScalar;
     const COMPRESSED_LEN: usize = 96;
+    const UNCOMPRESSED_LEN: usize = 192;
 
     #[inline]
     fn double(&self) -> Self {
