@@ -51,18 +51,9 @@ pub trait SW<S: Scalar> {
 
 /// Trait for the simplified SWU map
 pub trait SSWU<S: Scalar> {
-    /// Constant k_1,0 of simplified SWU map
-    const K10: S;
-    /// Constant k_1,1 of simplified SWU map
-    const K11: S;
-    /// Constant k_1,2 of simplified SWU map
-    const K12: S;
-    /// Constant k_1,3 of simplified SWU map
-    const K13: S;
-    /// Constant k_2,0 of simplified SWU map
-    const K20: S;
-    /// Constant k_2,1 of simplified SWU map
-    const K21: S;
-    /// Constant k_2,2 of simplified SWU map
-    const K22: S;
+    /// first candidate for solution x
+    fn x1(&self, t: &S) -> Result<S>;
+
+    /// second candidate for solution x
+    fn x2(&self, t: &S, x1: &S) -> Result<S>;
 }

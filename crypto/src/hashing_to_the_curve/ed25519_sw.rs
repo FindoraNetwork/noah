@@ -1,9 +1,7 @@
-use std::ops::{Add, Mul};
-use ark_ff::LegendreSymbol;
 use crate::hashing_to_the_curve::traits::SW;
-use noah_algebra::{
-    ed25519::Ed25519Fq, new_ed25519_fq, prelude::*
-};
+use ark_ff::LegendreSymbol;
+use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq, prelude::*};
+use std::ops::{Add, Mul};
 
 ///
 pub type Ed25519SW = Ed25519Fq;
@@ -34,6 +32,8 @@ impl SW<Ed25519Fq> for Ed25519SW {
 
         if y_squared.legendre() == LegendreSymbol::QuadraticNonResidue {
             false
-        } else { true }
+        } else {
+            true
+        }
     }
 }

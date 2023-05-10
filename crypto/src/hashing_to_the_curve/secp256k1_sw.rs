@@ -1,9 +1,7 @@
-use std::ops::Add;
-use ark_ff::LegendreSymbol;
 use crate::hashing_to_the_curve::traits::SW;
-use noah_algebra::{
-    new_secp256k1_fq, prelude::*, secp256k1::SECP256K1Fq
-};
+use ark_ff::LegendreSymbol;
+use noah_algebra::{new_secp256k1_fq, prelude::*, secp256k1::SECP256K1Fq};
+use std::ops::Add;
 
 ///
 pub type Secp256k1SW = SECP256K1Fq;
@@ -34,6 +32,8 @@ impl SW<SECP256K1Fq> for Secp256k1SW {
 
         if y_squared.legendre() == LegendreSymbol::QuadraticNonResidue {
             false
-        } else { true }
+        } else {
+            true
+        }
     }
 }
