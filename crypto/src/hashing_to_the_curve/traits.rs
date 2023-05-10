@@ -19,7 +19,7 @@ pub trait SW<S: Scalar> {
     const C6: S;
 
     /// first candidate for solution x
-    fn x1(&self, t: S) -> Result<S> {
+    fn x1(&self, t: &S) -> Result<S> {
         let t_sq_inv = t.square().inv()?;
         let c3t_sq_inv = Self::C3.mul(t_sq_inv);
         let temp = S::one().add(c3t_sq_inv);
@@ -34,7 +34,7 @@ pub trait SW<S: Scalar> {
     }
 
     /// third candidate for solution x
-    fn x3(&self, t: S) -> Result<S> {
+    fn x3(&self, t: &S) -> Result<S> {
         let t_sq = t.square();
         let t_sq_inv = t_sq.inv()?;
         let c3t_sq_inv = Self::C3.mul(t_sq_inv);
@@ -44,6 +44,9 @@ pub trait SW<S: Scalar> {
 
         Ok(Self::C5.add(Self::C6.mul(temp2)))
     }
+
+    /// check whether candidate x lies on the curve
+    fn is_x_on_curve(&self, x: &S) -> bool;
 }
 
 /// Trait for the simplified SWU map

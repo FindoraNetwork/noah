@@ -2,7 +2,7 @@ use crate::errors::AlgebraError;
 use crate::prelude::*;
 use crate::prelude::{derive_prng_from_hash, u8_le_slice_to_u64, CryptoRng, RngCore, Scalar};
 use crate::secq256k1::SECQ256K1_SCALAR_LEN;
-use ark_ff::{BigInteger, BigInteger256, FftField, Field, PrimeField};
+use ark_ff::{BigInteger, BigInteger256, FftField, Field, LegendreSymbol, PrimeField};
 use ark_secq256k1::Fr;
 use ark_std::fmt::{Debug, Formatter};
 use ark_std::iter::Sum;
@@ -275,6 +275,11 @@ impl SECQ256K1Scalar {
     /// Create a new scalar element from the arkworks-rs representation.
     pub const fn new(is_positive: bool, limbs: &[u64]) -> Self {
         SECQ256K1Scalar(Fr::from_sign_and_limbs(is_positive, &limbs))
+    }
+
+    /// Legendre
+    pub fn legendre(&self) -> LegendreSymbol {
+        self.0.legendre()
     }
 }
 

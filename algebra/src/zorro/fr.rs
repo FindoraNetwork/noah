@@ -2,7 +2,7 @@ use crate::errors::AlgebraError;
 use crate::prelude::*;
 use crate::zorro::{ZorroG1, ZORRO_SCALAR_LEN};
 use ark_bulletproofs::curve::zorro::Fr;
-use ark_ff::{BigInteger, FftField, Field, PrimeField};
+use ark_ff::{BigInteger, FftField, Field, LegendreSymbol, PrimeField};
 use digest::consts::U64;
 use digest::Digest;
 use num_bigint::BigUint;
@@ -175,6 +175,11 @@ impl ZorroScalar {
     /// Create a new scalar element from the arkworks-rs representation.
     pub const fn new(is_positive: bool, limbs: &[u64]) -> Self {
         ZorroScalar(Fr::from_sign_and_limbs(is_positive, &limbs))
+    }
+
+    /// Legendre
+    pub fn legendre(&self) -> LegendreSymbol {
+        self.0.legendre()
     }
 }
 

@@ -1,6 +1,9 @@
+use std::ops::{Add, Mul};
+use ark_ff::LegendreSymbol;
 use crate::hashing_to_the_curve::traits::SW;
-use noah_algebra::ed25519::Ed25519Fq;
-use noah_algebra::new_ed25519_fq;
+use noah_algebra::{
+    ed25519::Ed25519Fq, new_ed25519_fq, prelude::*
+};
 
 ///
 pub type Ed25519SW = Ed25519Fq;
@@ -23,4 +26,14 @@ impl SW<Ed25519Fq> for Ed25519SW {
     const C6: Ed25519Fq = new_ed25519_fq!(
         "22595885493139578480537169384951274962349491958774703396425382945106958635058"
     );
+
+    fn is_x_on_curve(&self, x: &Ed25519Fq) -> bool {
+        let first_term = x.pow(&[3u64]);
+        let second_term = x.pow(&[2u64]).mul(Ed25519Fq::from(486662u64));
+        let y_squared = first_term.add(second_term).add(x);
+
+        if y_squared.legendre() == LegendreSymbol::QuadraticNonResidue {
+            false
+        } else { true }
+    }
 }
