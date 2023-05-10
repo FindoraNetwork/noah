@@ -1,7 +1,5 @@
 use crate::hashing_to_the_curve::traits::SSWU;
-use noah_algebra::ed25519::Ed25519Fq;
-use noah_algebra::new_ed25519_fq;
-use noah_algebra::prelude::Scalar;
+use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq, prelude::*};
 use num_traits::One;
 use ruc::*;
 use std::ops::{Add, Mul, Neg, Sub};
