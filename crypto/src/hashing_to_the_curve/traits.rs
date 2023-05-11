@@ -56,4 +56,10 @@ pub trait SSWU<S: Scalar> {
 
     /// second candidate for solution x
     fn x2(&self, t: &S, x1: &S) -> Result<S>;
+
+    ///
+    fn is_x_on_curve(&self, x: &S) -> bool;
+
+    ///
+    fn convert_x(&self, x: &S) -> Result<S>;
 }

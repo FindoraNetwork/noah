@@ -1,7 +1,7 @@
 use crate::hashing_to_the_curve::traits::SSWU;
+use ark_ff::LegendreSymbol;
 use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq, prelude::*};
 use num_traits::One;
-use ruc::*;
 use std::ops::{Add, Mul, Neg, Sub};
 
 ///
@@ -27,5 +27,21 @@ impl SSWU<Ed25519Fq> for Ed25519SSWU {
         let t2 = t.square();
 
         Ok(x1.mul(t2).mul(Ed25519Fq::from(2u32)))
+    }
+
+    fn is_x_on_curve(&self, x: &Ed25519Fq) -> bool {
+        let first_term = x.pow(&[3u64]);
+        let second_term = x.mul(Ed25519Fq::from(6u64));
+        let y_squared = first_term.add(second_term).add(B);
+
+        if y_squared.legendre() == LegendreSymbol::QuadraticNonResidue {
+            false
+        } else {
+            true
+        }
+    }
+
+    fn convert_x(&self, _x: &Ed25519Fq) -> Result<Ed25519Fq> {
+        todo!()
     }
 }

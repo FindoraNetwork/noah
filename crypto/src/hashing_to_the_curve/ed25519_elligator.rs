@@ -1,6 +1,5 @@
 use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq, prelude::*};
 use num_traits::One;
-use ruc::*;
 use std::ops::{Add, Mul, Neg};
 
 /// Elligator map for Ed25519
@@ -21,7 +20,7 @@ impl Ed25519Elligator {
     }
 
     /// second candidate for x
-    pub fn x2(t: &Ed25519Fq, x1: &Ed25519Fq) -> Result<Ed25519Fq> {
+    pub fn x2(x1: &Ed25519Fq) -> Result<Ed25519Fq> {
         Ok(C.add(x1).neg())
     }
 }
