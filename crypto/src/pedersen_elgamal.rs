@@ -468,7 +468,7 @@ mod test {
             &ctexts,
             &commitments,
         );
-        let verify = pedersen_elgamal_aggregate_eq_verify(
+        pedersen_elgamal_aggregate_eq_verify(
             &mut verifier_transcript,
             &mut prng,
             &pk,
@@ -489,7 +489,7 @@ mod test {
             &ctexts[..1],
             &commitments[..1],
         );
-        let verify = pedersen_elgamal_aggregate_eq_verify(
+        pedersen_elgamal_aggregate_eq_verify(
             &mut verifier_transcript,
             &mut prng,
             &pk,
@@ -510,7 +510,7 @@ mod test {
             &ctexts[1..2],
             &commitments[1..2],
         );
-        let verify = pedersen_elgamal_aggregate_eq_verify(
+        pedersen_elgamal_aggregate_eq_verify(
             &mut verifier_transcript,
             &mut prng,
             &pk,

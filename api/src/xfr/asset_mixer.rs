@@ -179,7 +179,7 @@ pub struct AssetMixingInstance<'a> {
 ///    };
 ///    let mut prng = thread_rng();
 ///    let mut params = BulletproofParams::default();
-///    pnk!(batch_verify_asset_mixing(&mut prng, &mut params, &[instance]));
+///    batch_verify_asset_mixing(&mut prng, &mut params, &[instance]).unwrap();
 /// ```
 pub fn batch_verify_asset_mixing<R: CryptoRng + RngCore>(
     prng: &mut R,

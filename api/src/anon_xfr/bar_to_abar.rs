@@ -137,8 +137,7 @@ pub fn batch_verify_bar_to_abar_note(
                 &note.body.input,
                 &note.body.output,
                 &note.body.proof,
-            )
-            .c(d!())?;
+            )?;
 
             let msg = bincode::serialize(&note.body).map_err(|_| NoahError::SerializationError)?;
             bar_pub_key.verify(&msg, &note.signature)

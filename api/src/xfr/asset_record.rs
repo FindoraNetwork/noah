@@ -609,6 +609,7 @@ fn build_record_input_from_template<R: CryptoRng + RngCore>(
 #[cfg(test)]
 mod test {
     use super::{build_blind_asset_record, build_open_asset_record, open_blind_asset_record};
+    use crate::errors::NoahError;
     use crate::keys::KeyPair;
     use crate::parameters::AddressFormat::SECP256K1;
     use crate::xfr::{

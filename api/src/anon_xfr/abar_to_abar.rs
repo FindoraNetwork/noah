@@ -2238,7 +2238,7 @@ mod tests {
 
         let verify = cs.verify_witness(&witness, &online_inputs);
         if witness_is_valid {
-            pnk!(verify);
+            verify.unwrap();
         } else {
             assert!(verify.is_err());
         }

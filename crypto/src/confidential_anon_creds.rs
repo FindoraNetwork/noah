@@ -357,6 +357,7 @@ pub(crate) mod test_helper {
     };
     use crate::confidential_anon_creds::{confidential_open_comm, confidential_verify_open};
     use crate::elgamal::elgamal_key_gen;
+    use crate::errors::CryptoError;
     use noah_algebra::prelude::*;
     use noah_algebra::traits::Pairing;
 
@@ -439,8 +440,8 @@ pub(crate) mod test_helper {
             &conf_reveal_proof.pok,
             proof_msg,
         );
-        msg_eq!(
-            NoahError::IdentityRevealVerifyError,
+        assert_eq!(
+            CryptoError::IdentityRevealVerifyError,
             res.unwrap_err(),
             "proof should fail, reveal map doesn't match"
         );
@@ -456,8 +457,8 @@ pub(crate) mod test_helper {
             &conf_reveal_proof.pok,
             proof_msg,
         );
-        msg_eq!(
-            NoahError::ParameterError,
+        assert_eq!(
+            CryptoError::ParameterError,
             res.unwrap_err(),
             "proof should fail, bitmap length does not match number of attributes"
         );
@@ -473,8 +474,8 @@ pub(crate) mod test_helper {
             &conf_reveal_proof.pok,
             proof_msg,
         );
-        msg_eq!(
-            NoahError::IdentityRevealVerifyError,
+        assert_eq!(
+            CryptoError::IdentityRevealVerifyError,
             res.unwrap_err(),
             "proof should fail, inconsistent issuer public key"
         );
@@ -490,8 +491,8 @@ pub(crate) mod test_helper {
             &conf_reveal_proof.pok,
             proof_msg,
         );
-        msg_eq!(
-            NoahError::IdentityRevealVerifyError,
+        assert_eq!(
+            CryptoError::IdentityRevealVerifyError,
             res.unwrap_err(),
             "proof should fail, inconsistent encryption key"
         );
@@ -507,8 +508,8 @@ pub(crate) mod test_helper {
             &conf_reveal_proof.pok,
             wrong_message,
         );
-        msg_eq!(
-            NoahError::IdentityRevealVerifyError,
+        assert_eq!(
+            CryptoError::IdentityRevealVerifyError,
             res.unwrap_err(),
             "proof should fail, bad sok message"
         );

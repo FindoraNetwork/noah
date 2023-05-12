@@ -1184,27 +1184,26 @@ mod test {
 
         // Another good witness also satisfies the circuit:
         // [0, 2, 2, 1, 5, 4], e_binary_le = [1, 0, 1], f_binary_le = [0, 0, 1]
-        let verify = cs
-            .verify_witness(
-                &[
-                    F::zero(),
-                    F::one(),
-                    num[0],
-                    num[2],
-                    num[2],
-                    num[1],
-                    num[5],
-                    num[4],
-                    num[1],
-                    num[0],
-                    num[1],
-                    num[0],
-                    num[0],
-                    num[1],
-                ],
-                &[],
-            )
-            .unwrap();
+        cs.verify_witness(
+            &[
+                F::zero(),
+                F::one(),
+                num[0],
+                num[2],
+                num[2],
+                num[1],
+                num[5],
+                num[4],
+                num[1],
+                num[0],
+                num[1],
+                num[0],
+                num[0],
+                num[1],
+            ],
+            &[],
+        )
+        .unwrap();
 
         // Bad witness: a is not boolean
         assert!(cs

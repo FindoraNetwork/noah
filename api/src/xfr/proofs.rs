@@ -753,6 +753,7 @@ pub(crate) fn batch_verify_confidential_asset<R: CryptoRng + RngCore>(
 
 #[cfg(test)]
 mod tests {
+    use crate::errors::NoahError;
     use crate::xfr::{
         proofs::verify_identity_proofs,
         structs::{AssetTracerKeyPair, TracerMemo, TracingPolicies, TracingPolicy},
@@ -770,7 +771,7 @@ mod tests {
         let sig_commitments = vec![];
 
         // 1. no policies => correct verification
-        let res = verify_identity_proofs(
+        verify_identity_proofs(
             reveal_policies.as_slice(),
             memos.as_slice(),
             proofs.as_slice(),

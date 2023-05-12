@@ -316,16 +316,16 @@ pub fn batch_verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default + Sync
             online_inputs.push(payer_asset_type.as_scalar());
             online_inputs.extend_from_slice(&address_folding_public_input);
 
-            verifier(
+            Ok(verifier(
                 &mut transcript,
                 &params.shrunk_vk,
                 &params.shrunk_cs,
                 &params.verifier_params,
                 &online_inputs,
                 &note.proof,
-            )
+            )?)
         })
-        .all(|x| x.is_ok());
+        .all(|x: Result<()>| x.is_ok());
 
     if is_ok {
         Ok(())

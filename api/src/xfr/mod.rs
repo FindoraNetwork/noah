@@ -179,7 +179,7 @@ impl XfrType {
 ///                              inkeys.iter().map(|x| x).collect_vec().as_slice()
 ///                ).unwrap();
 /// let policies = XfrNotePolicies::empty_policies(inputs.len(), outputs.len());
-/// pnk!(verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies.to_ref()));
+/// verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies.to_ref()).unwrap();
 /// ```
 pub fn gen_xfr_note<R: CryptoRng + RngCore>(
     prng: &mut R,
@@ -245,7 +245,7 @@ pub fn gen_xfr_note<R: CryptoRng + RngCore>(
 /// }
 /// let body = gen_xfr_body(&mut prng, &inputs, &outputs).unwrap();
 /// let policies = XfrNotePolicies::empty_policies(inputs.len(), outputs.len());
-/// pnk!(verify_xfr_body(&mut prng, &mut params, &body, &policies.to_ref()));
+/// verify_xfr_body(&mut prng, &mut params, &body, &policies.to_ref()).unwrap();
 /// ```
 pub fn gen_xfr_body<R: CryptoRng + RngCore>(
     prng: &mut R,

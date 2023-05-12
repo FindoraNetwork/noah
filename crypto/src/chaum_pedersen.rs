@@ -99,7 +99,7 @@ pub fn chaum_pedersen_verify_eq_scalars<R: CryptoRng + RngCore>(
 }
 
 /// Verify a Chaum-Pedersen equality proof. Return Ok() in case of success,
-/// Err([NoahError::ZKProofVerificationError]) in case of verification failure.
+/// Err([CryptoError::ZKProofVerificationError]) in case of verification failure.
 pub fn chaum_pedersen_verify_eq<R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     prng: &mut R,
@@ -275,8 +275,8 @@ pub fn chaum_pedersen_verify_multiple_eq_scalars<R: CryptoRng + RngCore>(
 
 /// Verify a proof that all commitments are to the same value.
 /// Return Ok() in case of success,
-/// Err([NoahError::ParameterError]) in case of parameter error,
-/// Err([NoahError::ZKProofVerificationError]) in case of verification failure.
+/// Err([CryptoError::ParameterError]) in case of parameter error,
+/// Err([CryptoError::ZKProofVerificationError]) in case of verification failure.
 pub fn chaum_pedersen_verify_multiple_eq<R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     prng: &mut R,
@@ -328,7 +328,7 @@ pub fn chaum_pedersen_verify_multiple_eq<R: CryptoRng + RngCore>(
 /// Batch verification of chaum pedersen equality of commitment proofs
 /// This function aggregates all instances using a random linear combination
 /// of each, grouping scalars and elements, and executing a single multiexponentiation.
-/// Returns [NoahError::ZKProofBatchVerificationError] if at least one instance has an incorrect proof.
+/// Returns [CryptoError::ZKProofBatchVerificationError] if at least one instance has an incorrect proof.
 pub fn chaum_pedersen_batch_verify_multiple_eq<R: CryptoRng + RngCore>(
     transcript: &mut Transcript,
     prng: &mut R,
@@ -434,8 +434,8 @@ mod test {
         );
 
         let mut verifier_transcript = Transcript::new(b"test");
-        msg_eq!(
-            NoahError::ZKProofVerificationError,
+        assert_eq!(
+            CryptoError::ZKProofVerificationError,
             chaum_pedersen_verify_eq(&mut verifier_transcript, &mut prng, &c1, &c2, &proof)
                 .unwrap_err()
         );
@@ -449,8 +449,8 @@ mod test {
             (&c2, &bf2),
         );
         let mut verifier_transcript = Transcript::new(b"test");
-        msg_eq!(
-            NoahError::ZKProofVerificationError,
+        assert_eq!(
+            CryptoError::ZKProofVerificationError,
             chaum_pedersen_verify_eq(&mut verifier_transcript, &mut prng, &c1, &c2, &proof)
                 .unwrap_err()
         );
@@ -497,8 +497,8 @@ mod test {
         .unwrap();
 
         let mut verifier_transcript = Transcript::new(b"Test");
-        msg_eq!(
-            NoahError::ZKProofVerificationError,
+        assert_eq!(
+            CryptoError::ZKProofVerificationError,
             chaum_pedersen_verify_multiple_eq(&mut verifier_transcript, &mut prng, com_vec, &proof)
                 .unwrap_err()
         );
@@ -554,8 +554,8 @@ mod test {
         .unwrap();
 
         let mut verifier_transcript = Transcript::new(b"Test");
-        msg_eq!(
-            NoahError::ZKProofVerificationError,
+        assert_eq!(
+            CryptoError::ZKProofVerificationError,
             chaum_pedersen_verify_multiple_eq(&mut verifier_transcript, &mut prng, com_vec, &proof)
                 .unwrap_err(),
             "Values were different"

@@ -70,20 +70,6 @@ pub use ark_std::{
     start_timer, str, One, UniformRand, Zero,
 };
 
-/// check if the error messages equal
-#[macro_export]
-macro_rules! msg_eq {
-    ($noah_err: expr, $ruc_err: expr $(,)?) => {
-        assert!($ruc_err.msg_has_overloop(ruc::eg!($noah_err).as_ref()));
-    };
-    ($noah_err: expr, $ruc_err: expr, $msg: expr $(,)?) => {
-        assert!(
-            $ruc_err.msg_has_overloop(ruc::eg!($noah_err).as_ref()),
-            $msg
-        );
-    };
-}
-
 /// Implement serialization and deserialization
 #[macro_export]
 macro_rules! serialize_deserialize {

@@ -115,12 +115,7 @@ fn do_transfer_tests_single_asset(
 
     let policies = XfrNotePolicies::empty_policies(inputs.len(), outputs.len());
     // test 1: simple transfer
-    pnk!(verify_xfr_note(
-        &mut prng,
-        params,
-        &xfr_note,
-        &policies.to_ref()
-    ));
+    verify_xfr_note(&mut prng, params, &xfr_note, &policies.to_ref()).unwrap();
 
     // 1.1 test batching
     batch_verify_xfr_notes(
@@ -532,12 +527,7 @@ mod multi_asset_no_tracing {
         let policies = XfrNotePolicies::empty_policies(input_record.len(), output_record.len());
 
         // test 1: simple transfer using confidential asset mixer
-        pnk!(verify_xfr_note(
-            &mut prng,
-            &mut params,
-            &xfr_note,
-            &policies.to_ref()
-        ));
+        verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies.to_ref()).unwrap();
 
         let asset_record_type = AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType;
 
@@ -674,7 +664,7 @@ mod keys {
             &[&key1, &key2],
         );
 
-        msg_eq!(NoahError::ParameterError, xfr_note.unwrap_err());
+        assert_eq!(NoahError::ParameterError, xfr_note.unwrap_err());
     }
 }
 

@@ -562,6 +562,7 @@ pub mod tests {
 
     #[test]
     fn test_mix_merge() {
+        let mut prng = test_rng();
         let pc_gens = PedersenGens::default();
 
         let sorted_values = vec![
@@ -597,7 +598,7 @@ pub mod tests {
             (num_wires + 2 * (sorted.len() + mid.len() + added.len())).next_power_of_two(),
             1,
         );
-        let proof = prover.prove(&bp_gens).unwrap();
+        let proof = prover.prove(&mut prng, &bp_gens).unwrap();
 
         let mut verifier_transcript = Transcript::new(b"test");
         let mut verifier = Verifier::new(&mut verifier_transcript);
@@ -611,7 +612,9 @@ pub mod tests {
             (num_wires + 2 * (sorted.len() + mid.len() + added.len())).next_power_of_two(),
             1,
         );
-        assert!(verifier.verify(&proof, &pc_gens, &bp_gens).is_ok());
+        assert!(verifier
+            .verify(&mut prng, &proof, &pc_gens, &bp_gens)
+            .is_ok());
 
         // test the same using commitments
         let mut prover_transcript = Transcript::new(b"test");
@@ -633,7 +636,7 @@ pub mod tests {
                 .unwrap();
         let num_wires = num_wires + added.len() + mid.len();
         let bp_gens = BulletproofGens::new(num_wires.next_power_of_two(), 1);
-        let proof = prover.prove(&bp_gens).unwrap();
+        let proof = prover.prove(&mut prng, &bp_gens).unwrap();
 
         let mut verifier_transcript = Transcript::new(b"test");
         let mut verifier = Verifier::new(&mut verifier_transcript);
@@ -650,11 +653,14 @@ pub mod tests {
                 .unwrap();
         let num_wires = num_wires + added.len() + mid.len();
         let bp_gens = BulletproofGens::new(num_wires.next_power_of_two(), 1);
-        assert!(verifier.verify(&proof, &pc_gens, &bp_gens).is_ok());
+        assert!(verifier
+            .verify(&mut prng, &proof, &pc_gens, &bp_gens)
+            .is_ok());
     }
 
     #[test]
     fn test_shuffle() {
+        let mut prng = test_rng();
         let pc_gens = PedersenGens::default();
         let input_values = vec![
             MixValue::new(RistrettoScalar::from(10u32), RistrettoScalar::from(10u32)),
@@ -683,14 +689,16 @@ pub mod tests {
             super::mix_shuffle_gadget(&mut prover, input.to_vec(), shuffled.to_vec()).unwrap();
         let num_wires = num_wires + input.len() + shuffled.len();
         let bp_gens = BulletproofGens::new(num_wires.next_power_of_two(), 1);
-        let proof = prover.prove(&bp_gens).unwrap();
+        let proof = prover.prove(&mut prng, &bp_gens).unwrap();
 
         let mut verifier_transcript = Transcript::new(b"test");
         let mut verifier = Verifier::new(&mut verifier_transcript);
         let input = allocate_mix_vector(&mut verifier, None, input_values.len()).unwrap();
         let shuffled = allocate_mix_vector(&mut verifier, None, shuffled_values.len()).unwrap();
         super::mix_shuffle_gadget(&mut verifier, input.to_vec(), shuffled.to_vec()).unwrap();
-        assert!(verifier.verify(&proof, &pc_gens, &bp_gens).is_ok());
+        assert!(verifier
+            .verify(&mut prng, &proof, &pc_gens, &bp_gens)
+            .is_ok());
 
         let bad_shuffle_values = vec![
             MixValue::new(RistrettoScalar::zero(), RistrettoScalar::zero()),
@@ -708,7 +716,7 @@ pub mod tests {
             super::mix_shuffle_gadget(&mut prover, input.to_vec(), bad_shuffle).unwrap();
         let num_wires = num_wires + input.len() + shuffled.len();
         let bp_gens = BulletproofGens::new(num_wires.next_power_of_two(), 1);
-        let proof = prover.prove(&bp_gens).unwrap();
+        let proof = prover.prove(&mut prng, &bp_gens).unwrap();
 
         let mut verifier_transcript = Transcript::new(b"test");
         let mut verifier = Verifier::new(&mut verifier_transcript);
@@ -716,7 +724,9 @@ pub mod tests {
         let bad_shuffle =
             allocate_mix_vector(&mut verifier, None, bad_shuffle_values.len()).unwrap();
         super::mix_shuffle_gadget(&mut verifier, input.to_vec(), bad_shuffle.to_vec()).unwrap();
-        assert!(verifier.verify(&proof, &pc_gens, &bp_gens).is_err());
+        assert!(verifier
+            .verify(&mut prng, &proof, &pc_gens, &bp_gens)
+            .is_err());
     }
 
     fn yuan(q: u64) -> MixValue {
@@ -828,7 +838,7 @@ pub mod tests {
 
             assert!(n_gates <= BP_GENS.gens_capacity);
 
-            proof = prover.prove(&BP_GENS).unwrap();
+            proof = prover.prove(&mut prng, &BP_GENS).unwrap();
         }
         {
             // verifier scope
@@ -846,7 +856,12 @@ pub mod tests {
 
             super::mix(&mut verifier, &in_vars, None, &out_vars, None).unwrap();
 
-            assert_eq!(verifier.verify(&proof, &pc_gens, &BP_GENS).is_ok(), pass);
+            assert_eq!(
+                verifier
+                    .verify(&mut prng, &proof, &pc_gens, &BP_GENS)
+                    .is_ok(),
+                pass
+            );
         }
     }
 

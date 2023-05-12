@@ -18,3 +18,6 @@
 
 /// The module for the Merkle tree implementation
 pub mod merkle_tree;
+
+/// The module for error handling
+pub mod errors;

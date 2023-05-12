@@ -221,6 +221,7 @@ impl TracerMemo {
 
 #[cfg(test)]
 mod tests {
+    use crate::errors::NoahError;
     use crate::xfr::structs::{AssetTracerKeyPair, AssetType, TracerMemo};
     use noah_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::RistrettoScalar};
     use noah_crypto::elgamal::elgamal_encrypt;
@@ -271,12 +272,12 @@ mod tests {
             &[],
         );
 
-        msg_eq!(
+        assert_eq!(
             NoahError::ParameterError,
             memo.extract_asset_type(&tracer_keys.dec_key.record_data_dec_key, &[])
                 .unwrap_err(),
         );
-        msg_eq!(
+        assert_eq!(
             NoahError::AssetTracingExtractionError,
             memo.extract_asset_type(
                 &tracer_keys.dec_key.record_data_dec_key,
@@ -284,7 +285,7 @@ mod tests {
             )
             .unwrap_err(),
         );
-        msg_eq!(
+        assert_eq!(
             NoahError::AssetTracingExtractionError,
             memo.extract_asset_type(
                 &tracer_keys.dec_key.record_data_dec_key,
