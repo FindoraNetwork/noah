@@ -1,6 +1,7 @@
 use crate::fmt::{Debug, Formatter};
+use crate::prelude::*;
 use crate::traits::PedersenCommitment;
-use crate::{errors::AlgebraError, prelude::*};
+use ark_std::{vec, vec::Vec};
 use byteorder::ByteOrder;
 use curve25519_dalek::traits::MultiscalarMul;
 use curve25519_dalek::{
@@ -33,7 +34,7 @@ pub struct CompressedEdwardsY(pub curve25519_dalek::edwards::CompressedEdwardsY)
 pub struct RistrettoPoint(pub RPoint);
 
 impl Debug for RistrettoScalar {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> ark_std::fmt::Result {
         <curve25519_dalek::scalar::Scalar as Debug>::fmt(&self.0, f)
     }
 }
@@ -252,7 +253,7 @@ impl Scalar for RistrettoScalar {
     #[inline]
     fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() > Self::bytes_len() {
-            return Err(eg!(AlgebraError::DeserializationError));
+            return Err(AlgebraError::DeserializationError);
         }
         let mut array = [0u8; RISTRETTO_SCALAR_LEN];
         array[0..bytes.len()].copy_from_slice(bytes);
@@ -383,7 +384,7 @@ impl Group for RistrettoPoint {
         Ok(Self(
             CR::from_slice(bytes)
                 .decompress()
-                .ok_or(eg!(AlgebraError::DecompressElementError))?,
+                .ok_or(AlgebraError::DecompressElementError)?,
         ))
     }
 
@@ -392,7 +393,7 @@ impl Group for RistrettoPoint {
         Ok(Self(
             CR::from_slice(bytes)
                 .decompress()
-                .ok_or(eg!(AlgebraError::DecompressElementError))?,
+                .ok_or(AlgebraError::DecompressElementError)?,
         ))
     }
 

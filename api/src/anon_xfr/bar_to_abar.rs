@@ -3,6 +3,7 @@ use crate::anon_xfr::{
     structs::{AnonAssetRecord, AxfrOwnerMemo, OpenAnonAssetRecord, OpenAnonAssetRecordBuilder},
     AXfrPlonkPf, TurboPlonkCS, MAX_AXFR_MEMO_SIZE, TWO_POW_32,
 };
+use crate::errors::{NoahError, Result};
 use crate::keys::{KeyPair, PublicKey, PublicKeyInner, Signature};
 use crate::parameters::params::ProverParams;
 use crate::parameters::params::VerifierParams;
@@ -72,11 +73,11 @@ pub fn gen_bar_to_abar_note<R: CryptoRng + RngCore>(
     // Reject confidential-to-anonymous note that actually has transparent input.
     // Should direct to ArToAbar.
     if record.get_record_type() == AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType {
-        return Err(eg!(NoahError::ParameterError));
+        return Err(NoahError::ParameterError);
     }
 
     let (open_abar, delegated_schnorr_proof, inspector_proof) =
-        prove_bar_to_abar(prng, params, record, abar_pubkey).c(d!())?;
+        prove_bar_to_abar(prng, params, record, abar_pubkey)?;
     let body = BarToAbarBody {
         input: record.blind_asset_record.clone(),
         output: AnonAssetRecord::from_oabar(&open_abar),
@@ -84,9 +85,7 @@ pub fn gen_bar_to_abar_note<R: CryptoRng + RngCore>(
         memo: open_abar.owner_memo.unwrap(),
     };
 
-    let msg = bincode::serialize(&body)
-        .map_err(|_| NoahError::SerializationError)
-        .c(d!())?;
+    let msg = bincode::serialize(&body).map_err(|_| NoahError::SerializationError)?;
     let signature = bar_keypair.sign(&msg)?;
 
     let note = BarToAbarNote { body, signature };
@@ -101,7 +100,7 @@ pub fn verify_bar_to_abar_note(
 ) -> Result<()> {
     // Check the memo size.
     if note.body.memo.size() > MAX_AXFR_MEMO_SIZE {
-        return Err(eg!(NoahError::AXfrVerificationError));
+        return Err(NoahError::AXfrVerificationError);
     }
 
     verify_bar_to_abar(
@@ -109,11 +108,10 @@ pub fn verify_bar_to_abar_note(
         &note.body.input,
         &note.body.output,
         &note.body.proof,
-    )
-    .c(d!())?;
+    )?;
 
-    let msg = bincode::serialize(&note.body).c(d!(NoahError::SerializationError))?;
-    bar_pub_key.verify(&msg, &note.signature).c(d!())
+    let msg = bincode::serialize(&note.body).map_err(|_| NoahError::SerializationError)?;
+    bar_pub_key.verify(&msg, &note.signature)
 }
 
 /// Batch verify the confidential-to-anonymous notes.
@@ -126,7 +124,7 @@ pub fn batch_verify_bar_to_abar_note(
     // Check the memo size.
     for note in notes.iter() {
         if note.body.memo.size() > MAX_AXFR_MEMO_SIZE {
-            return Err(eg!(NoahError::AXfrVerificationError));
+            return Err(NoahError::AXfrVerificationError);
         }
     }
 
@@ -139,10 +137,9 @@ pub fn batch_verify_bar_to_abar_note(
                 &note.body.input,
                 &note.body.output,
                 &note.body.proof,
-            )
-            .c(d!())?;
+            )?;
 
-            let msg = bincode::serialize(&note.body).c(d!(NoahError::SerializationError))?;
+            let msg = bincode::serialize(&note.body).map_err(|_| NoahError::SerializationError)?;
             bar_pub_key.verify(&msg, &note.signature)
         })
         .all(|x| x.is_ok());
@@ -150,7 +147,7 @@ pub fn batch_verify_bar_to_abar_note(
     if is_ok {
         Ok(())
     } else {
-        Err(eg!())
+        Err(NoahError::AXfrVerificationError)
     }
 }
 
@@ -173,10 +170,8 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
         .amount(oabar_amount)
         .asset_type(obar.asset_type)
         .pub_key(abar_pubkey)
-        .finalize(prng)
-        .c(d!())?
-        .build()
-        .c(d!())?;
+        .finalize(prng)?
+        .build()?;
 
     // 2. Reconstruct the points.
     let x = RistrettoScalar::from(oabar_amount);
@@ -210,8 +205,7 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
         &pc_gens,
         &vec![point_p, point_q],
         &mut transcript,
-    )
-    .c(d!())?;
+    )?;
 
     // 4. Compute the inspector's proof.
     let inspector_proof = prove_bar_to_abar_cs(
@@ -226,8 +220,7 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
         &beta,
         &lambda,
         &comm_trace,
-    )
-    .c(d!())?;
+    )?;
 
     Ok((oabar, delegated_schnorr_proof, inspector_proof))
 }
@@ -245,19 +238,15 @@ pub(crate) fn verify_bar_to_abar(
 
     // Reject confidential-to-anonymous notes whose inputs are transparent.
     if bar.get_record_type() == AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType {
-        return Err(eg!(NoahError::AXfrVerificationError));
+        return Err(NoahError::AXfrVerificationError);
     }
 
     // 1. Get commitments.
     // 1.1 Reconstruct the commitments for the amount.
     let (com_low, com_high) = match bar.amount {
         XfrAmount::Confidential((low, high)) => (
-            low.decompress()
-                .ok_or(NoahError::DecompressElementError)
-                .c(d!())?,
-            high.decompress()
-                .ok_or(NoahError::DecompressElementError)
-                .c(d!())?,
+            low.decompress().ok_or(NoahError::DecompressElementError)?,
+            high.decompress().ok_or(NoahError::DecompressElementError)?,
         ),
         XfrAmount::NonConfidential(amount) => {
             // a trivial commitment
@@ -272,10 +261,7 @@ pub(crate) fn verify_bar_to_abar(
     // 1.2 Reconstruct the commitments for the asset types.
     let com_amount = com_low.add(&com_high.mul(&RistrettoScalar::from(TWO_POW_32)));
     let com_asset_type = match bar.asset_type {
-        XfrAssetType::Confidential(a) => a
-            .decompress()
-            .ok_or(NoahError::DecompressElementError)
-            .c(d!())?,
+        XfrAssetType::Confidential(a) => a.decompress().ok_or(NoahError::DecompressElementError)?,
         XfrAssetType::NonConfidential(a) => {
             // a trivial commitment
             pc_gens.commit(a.as_scalar(), RistrettoScalar::zero())
@@ -293,11 +279,10 @@ pub(crate) fn verify_bar_to_abar(
         &vec![com_amount, com_asset_type],
         &proof.0,
         &mut transcript,
-    )
-    .c(d!())?;
+    )?;
 
     // 3. Verify the inspector's proof.
-    verify_inspection(params, abar.commitment, &proof.0, &proof.1, &beta, &lambda).c(d!())
+    verify_inspection(params, abar.commitment, &proof.0, &proof.1, &beta, &lambda)
 }
 
 /// Generate the inspector's proof.
@@ -332,7 +317,7 @@ pub(crate) fn prove_bar_to_abar_cs<R: CryptoRng + RngCore>(
     );
     let witness = cs.get_and_clear_witness();
 
-    prover_with_lagrange(
+    Ok(prover_with_lagrange(
         rng,
         &mut transcript,
         &params.pcs,
@@ -340,8 +325,7 @@ pub(crate) fn prove_bar_to_abar_cs<R: CryptoRng + RngCore>(
         &params.cs,
         &params.prover_params,
         &witness,
-    )
-    .c(d!(NoahError::AXfrProofError))
+    )?)
 }
 
 /// Verify the inspector's proof.
@@ -376,15 +360,14 @@ pub(crate) fn verify_inspection(
     online_inputs.extend_from_slice(&beta_lambda_sim_fr.limbs);
     online_inputs.extend_from_slice(&s1_plus_lambda_s2_sim_fr.limbs);
 
-    verifier(
+    Ok(verifier(
         &mut transcript,
         &params.shrunk_vk,
         &params.shrunk_cs,
         &params.verifier_params,
         &online_inputs,
         proof,
-    )
-    .c(d!(NoahError::ZKProofVerificationError))
+    )?)
 }
 
 /// Construct the confidential-to-anonymous constraint system.

@@ -1,4 +1,4 @@
-use noah_algebra::prelude::Scalar;
+use noah_algebra::prelude::*;
 
 /// The structure for the trace of the Anemoi-Jive sponge hash function.
 #[derive(Clone)]
@@ -33,7 +33,7 @@ impl<F: Scalar, const N: usize, const NUM_ROUNDS: usize> Default
 impl<F: Scalar, const N: usize, const NUM_ROUNDS: usize> noah_algebra::fmt::Debug
     for AnemoiVLHTrace<F, N, NUM_ROUNDS>
 {
-    fn fmt(&self, f: &mut noah_algebra::fmt::Formatter<'_>) -> noah_algebra::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> noah_algebra::fmt::Result {
         f.write_str("input:\n")?;
         for (i, elem) in self.input.iter().enumerate() {
             f.write_fmt(format_args!("\r x[{}] = {:?}\n", i, elem))?;
@@ -121,7 +121,7 @@ impl<F: Scalar, const N: usize, const NUM_ROUNDS: usize> Default for JiveTrace<F
 impl<F: Scalar, const N: usize, const NUM_ROUNDS: usize> noah_algebra::fmt::Debug
     for JiveTrace<F, N, NUM_ROUNDS>
 {
-    fn fmt(&self, f: &mut noah_algebra::fmt::Formatter<'_>) -> noah_algebra::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> noah_algebra::fmt::Result {
         f.write_str("input_x:\n")?;
         for (i, elem) in self.input_x.iter().enumerate() {
             f.write_fmt(format_args!("\r x[{}] = {:?}\n", i, elem))?;
@@ -197,7 +197,7 @@ impl<F: Scalar, const N: usize, const NUM_ROUNDS: usize> Default
 impl<F: Scalar, const N: usize, const NUM_ROUNDS: usize> noah_algebra::fmt::Debug
     for AnemoiStreamCipherTrace<F, N, NUM_ROUNDS>
 {
-    fn fmt(&self, f: &mut noah_algebra::fmt::Formatter<'_>) -> noah_algebra::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> noah_algebra::fmt::Result {
         f.write_str("input:\n")?;
         for (i, elem) in self.input.iter().enumerate() {
             f.write_fmt(format_args!("\r x[{}] = {:?}\n", i, elem))?;

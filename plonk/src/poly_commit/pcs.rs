@@ -1,8 +1,9 @@
+use crate::errors::{PlonkError, Result};
 use crate::poly_commit::{field_polynomial::FpPolynomial, transcript::PolyComTranscript};
+use ark_std::fmt::Debug;
 use merlin::Transcript;
 use noah_algebra::{prelude::*, traits::Domain};
 use serde::{Deserialize, Serialize};
-use std::fmt::Debug;
 
 /// The trait for serialization to bytes
 pub trait ToBytes {
@@ -125,7 +126,7 @@ pub trait PolyComScheme: Sized {
 
         let (q, rem) = h.div_rem(&z);
         if !rem.is_zero() {
-            return Err(eg!());
+            return Err(PlonkError::ProofError);
         }
 
         if let Some(lagrange_pcs) = lagrange_pcs {
@@ -149,10 +150,10 @@ pub trait PolyComScheme: Sized {
             }
 
             let sub_q = FpPolynomial::from_coefs(new_coefs);
-            let q_eval = FpPolynomial::fft(&sub_q, max_power_of_2).c(d!())?;
+            let q_eval = FpPolynomial::fft(&sub_q, max_power_of_2).ok_or(PlonkError::ProofError)?;
             let q_eval = FpPolynomial::from_coefs(q_eval);
 
-            let cm = lagrange_pcs.commit(&q_eval).c(d!())?;
+            let cm = lagrange_pcs.commit(&q_eval)?;
             Ok(self.apply_blind_factors(&cm, &blinds, max_power_of_2))
         } else {
             self.commit(&q)
@@ -196,7 +197,6 @@ pub trait PolyComScheme: Sized {
             self.batch(transcript, commitments, max_degree, point, values);
 
         self.verify(&cm_combined, max_degree, &point, &eval_combined, &proof)
-            .c(d!())
     }
 
     /// Batch verify a list of proofs with different points.

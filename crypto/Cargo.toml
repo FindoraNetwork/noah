@@ -19,7 +19,6 @@ rand_chacha = '0.3'
 serde = '1.0'
 serde_derive = '1.0'
 sha2 = '0.10'
-ruc = '1.0'
 sha3 = { version = "0.10", default-features = false }
 
 [dependencies.noah-algebra]
@@ -41,31 +40,35 @@ version = "4.0.0"
 
 [dependencies.bulletproofs]
 package = "noah-bulletproofs"
-version = "4.0.0"
+version = "4.1.0"
 
 [dependencies.ark-ec]
-version = '0.4.0-alpha'
+version = '0.4.0'
 default-features = false
 
 [dependencies.ark-ff]
-version = '0.4.0-alpha'
+version = '0.4.0'
 default-features = false
 features = ['asm']
 
+[dependencies.ark-std]
+version = '0.4.0'
+default-features = false
+
 [dependencies.ark-ed25519]
-version = '0.4.0-alpha'
+version = '0.4.0'
 default-features = false
 
 [dependencies.ark-secp256k1]
-version = '0.4.0-alpha'
+version = '0.4.0'
 default-features = false
 
 [dependencies.ark-secq256k1]
-version = '0.4.0-alpha'
+version = '0.4.0'
 default-features = false
 
 [dependencies.ark-bulletproofs]
-version = '4.0.0'
+version = '4.1.0'
 default-features = false
 features = ['yoloproofs']
 
@@ -99,22 +102,22 @@ rmp-serde = '1.0.0'
 serde_json = '1.0'
 typenum = '1.11.2'
 
-[dev-dependencies.ark-std]
-version = '0.4.0-alpha'
-default-features = false
-
 [features]
 default = [
     'std',
     'u64_backend',
 ]
 std = [
+    'noah-algebra/std',
     'curve25519-dalek/std',
     'ark-bulletproofs/std',
     'ark-std/std',
+    'ark-ec/std',
+    'ark-ff/std',
     'ark-ed25519/std',
     'ark-secp256k1/std',
-    'ark-secq256k1/std'
+    'ark-secq256k1/std',
+    'ark-bulletproofs/std'
 ]
 alloc = ['curve25519-dalek/alloc']
 nightly = [
@@ -125,3 +128,10 @@ u64_backend = ['curve25519-dalek/u64_backend']
 u32_backend = ['curve25519-dalek/u32_backend']
 avx2_backend = ['curve25519-dalek/avx2_backend']
 print-trace = ['noah-algebra/print-trace']
+parallel = [
+    'noah-algebra/parallel',
+    'ark-std/parallel',
+    'ark-ec/parallel',
+    'ark-ff/parallel',
+    'ark-bulletproofs/parallel'
+]

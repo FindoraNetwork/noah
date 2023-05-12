@@ -1,4 +1,5 @@
 //! The crate for Plonk and polynomial commitment for the Noah library
+#![cfg_attr(not(feature = "std"), no_std)]
 #![deny(unused_import_braces, unused_qualifications, trivial_casts)]
 #![deny(trivial_numeric_casts, private_in_public)]
 #![deny(stable_features, unreachable_pub, non_shorthand_field_patterns)]
@@ -23,6 +24,9 @@
 
 #[macro_use]
 extern crate serde_derive;
+
+/// Module for error handling
+pub mod errors;
 
 /// Module for the TurboPlonk systems.
 pub mod plonk;

@@ -66,30 +66,16 @@ pub mod rand_helper;
 
 #[doc(hidden)]
 pub use ark_std::{
-    borrow, cfg_into_iter, cmp, collections, end_timer, fmt, fs, hash, io, iter, ops, path, rand,
-    result, start_timer, str, One, UniformRand, Zero,
+    borrow, cfg_into_iter, cmp, collections, end_timer, fmt, hash, io, iter, ops, rand, result,
+    start_timer, str, One, UniformRand, Zero,
 };
-
-/// check if the error messages equal
-#[macro_export]
-macro_rules! msg_eq {
-    ($noah_err: expr, $ruc_err: expr $(,)?) => {
-        assert!($ruc_err.msg_has_overloop(ruc::eg!($noah_err).as_ref()));
-    };
-    ($noah_err: expr, $ruc_err: expr, $msg: expr $(,)?) => {
-        assert!(
-            $ruc_err.msg_has_overloop(ruc::eg!($noah_err).as_ref()),
-            $msg
-        );
-    };
-}
 
 /// Implement serialization and deserialization
 #[macro_export]
 macro_rules! serialize_deserialize {
     ($t:ident) => {
         impl serde::Serialize for $t {
-            fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+            fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
             where
                 S: Serializer,
             {
@@ -102,7 +88,7 @@ macro_rules! serialize_deserialize {
         }
 
         impl<'de> serde::Deserialize<'de> for $t {
-            fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+            fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
             where
                 D: serde::Deserializer<'de>,
             {

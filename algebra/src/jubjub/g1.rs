@@ -1,5 +1,4 @@
 use crate::bls12_381::BLSScalar;
-use crate::errors::AlgebraError;
 use crate::jubjub::JubjubScalar;
 use crate::prelude::*;
 use crate::{
@@ -10,6 +9,7 @@ use crate::{
 use ark_ec::{AffineRepr, CurveGroup as ArkCurveGroup, Group as ArkGroup};
 use ark_ed_on_bls12_381::{EdwardsAffine as AffinePoint, EdwardsProjective};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
+use ark_std::{string::ToString, vec::Vec};
 use digest::consts::U64;
 use digest::Digest;
 
@@ -101,27 +101,23 @@ impl Group for JubjubPoint {
 
     #[inline]
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
-        let mut reader = ark_std::io::BufReader::new(bytes);
-
-        let affine = AffinePoint::deserialize_with_mode(&mut reader, Compress::Yes, Validate::Yes);
+        let affine = AffinePoint::deserialize_with_mode(bytes, Compress::Yes, Validate::Yes);
 
         if let Ok(affine) = affine {
             Ok(Self(EdwardsProjective::from(affine))) // safe unwrap
         } else {
-            Err(eg!(AlgebraError::DecompressElementError))
+            Err(AlgebraError::DecompressElementError)
         }
     }
 
     #[inline]
     fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
-        let mut reader = ark_std::io::BufReader::new(bytes);
-
-        let affine = AffinePoint::deserialize_with_mode(&mut reader, Compress::No, Validate::No);
+        let affine = AffinePoint::deserialize_with_mode(bytes, Compress::No, Validate::No);
 
         if let Ok(affine) = affine {
             Ok(Self(EdwardsProjective::from(affine))) // safe unwrap
         } else {
-            Err(eg!(AlgebraError::DecompressElementError))
+            Err(AlgebraError::DecompressElementError)
         }
     }
 

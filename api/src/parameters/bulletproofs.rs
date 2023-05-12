@@ -1,3 +1,4 @@
+use crate::errors::{NoahError, Result};
 use crate::parameters::params::{
     BULLET_PROOF_RANGE, DEFAULT_BP_NUM_GENS, MAX_CONFIDENTIAL_RECORD_NUMBER,
 };
@@ -6,7 +7,6 @@ use crate::parameters::{
 };
 use ark_serialize::{CanonicalDeserialize, Compress, Validate};
 use bulletproofs::BulletproofGens;
-use noah_algebra::prelude::*;
 use noah_algebra::secq256k1::Secq256k1BulletproofGens;
 use noah_algebra::zorro::ZorroBulletproofGens;
 
@@ -23,11 +23,10 @@ pub trait BulletproofURS {
 
 impl BulletproofURS for BulletproofParams {
     fn load() -> Result<BulletproofParams> {
-        let urs = BULLETPROOF_CURVE25519_URS.c(d!(NoahError::MissingSRSError))?;
+        let urs = BULLETPROOF_CURVE25519_URS.ok_or(NoahError::MissingSRSError)?;
 
-        let pp: BulletproofParams = bincode::deserialize(&urs)
-            .c(d!(NoahError::DeserializationError))
-            .unwrap();
+        let pp: BulletproofParams =
+            bincode::deserialize(&urs).map_err(|_| NoahError::DeserializationError)?;
         Ok(pp)
     }
 
@@ -39,13 +38,12 @@ impl BulletproofURS for BulletproofParams {
 
 impl BulletproofURS for Secq256k1BulletproofGens {
     fn load() -> Result<Self> {
-        let urs = BULLETPROOF_SECQ256K1_URS.c(d!(NoahError::MissingSRSError))?;
+        let urs = BULLETPROOF_SECQ256K1_URS.ok_or(NoahError::MissingSRSError)?;
 
         let reader = ark_std::io::BufReader::new(urs);
         let bp_gens =
             Secq256k1BulletproofGens::deserialize_with_mode(reader, Compress::No, Validate::No)
-                .c(d!(NoahError::DeserializationError))
-                .unwrap();
+                .map_err(|_| NoahError::DeserializationError)?;
         Ok(bp_gens)
     }
 
@@ -56,13 +54,12 @@ impl BulletproofURS for Secq256k1BulletproofGens {
 
 impl BulletproofURS for ZorroBulletproofGens {
     fn load() -> Result<Self> {
-        let urs = BULLETPROOF_ZORRO_URS.c(d!(NoahError::MissingSRSError))?;
+        let urs = BULLETPROOF_ZORRO_URS.ok_or(NoahError::MissingSRSError)?;
 
         let reader = ark_std::io::BufReader::new(urs);
         let bp_gens =
             ZorroBulletproofGens::deserialize_with_mode(reader, Compress::No, Validate::No)
-                .c(d!(NoahError::DeserializationError))
-                .unwrap();
+                .map_err(|_| NoahError::DeserializationError)?;
         Ok(bp_gens)
     }
 

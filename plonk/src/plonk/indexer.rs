@@ -1,6 +1,5 @@
-use crate::plonk::{
-    constraint_system::ConstraintSystem, errors::PlonkError, helpers::compute_lagrange_constant,
-};
+use crate::errors::{PlonkError, Result};
+use crate::plonk::{constraint_system::ConstraintSystem, helpers::compute_lagrange_constant};
 use crate::poly_commit::{field_polynomial::FpPolynomial, pcs::PolyComScheme};
 use ark_poly::EvaluationDomain;
 use noah_algebra::{prelude::*, traits::Domain};
@@ -182,7 +181,7 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
     let m = cs.quot_eval_dom_size();
     let factor = m / n;
     if n * factor != m {
-        return Err(eg!(PlonkError::SetupError));
+        return Err(PlonkError::SetupError);
     }
     let lagrange_pcs = if lagrange_pcs.is_some() && lagrange_pcs.unwrap().max_degree() + 1 == n {
         lagrange_pcs
@@ -191,9 +190,9 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
     };
 
     let domain =
-        FpPolynomial::<PCS::Field>::evaluation_domain(n).c(d!(PlonkError::GroupNotFound(n)))?;
+        FpPolynomial::<PCS::Field>::evaluation_domain(n).ok_or(PlonkError::GroupNotFound(n))?;
     let domain_m = FpPolynomial::<PCS::Field>::quotient_evaluation_domain(m)
-        .c(d!(PlonkError::GroupNotFound(m)))?;
+        .ok_or(PlonkError::GroupNotFound(m))?;
     let group = domain
         .elements()
         .into_iter()
@@ -213,10 +212,12 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
             let s_evals = FpPolynomial::from_coefs(coefs);
             let cm = lagrange_pcs
                 .commit(&s_evals)
-                .c(d!(PlonkError::SetupError))?;
+                .map_err(|_| PlonkError::SetupError)?;
             Ok(cm)
         } else {
-            let cm = pcs.commit(&polynomial).c(d!(PlonkError::SetupError))?;
+            let cm = pcs
+                .commit(&polynomial)
+                .map_err(|_| PlonkError::SetupError)?;
             Ok(cm)
         }
     };

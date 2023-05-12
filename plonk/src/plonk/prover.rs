@@ -1,6 +1,6 @@
+use crate::errors::{PlonkError, Result};
 use crate::plonk::{
     constraint_system::ConstraintSystem,
-    errors::PlonkError,
     helpers::{
         first_lagrange_poly, hide_polynomial, pi_poly, r_poly, split_t_and_commit, t_poly, z_poly,
         PlonkChallenges,
@@ -105,14 +105,14 @@ pub fn prover_with_lagrange<
     w: &[PCS::Field],
 ) -> Result<PlonkPf<PCS>> {
     if cs.is_verifier_only() {
-        return Err(eg!(PlonkError::FuncParamsError));
+        return Err(PlonkError::FuncParamsError);
     }
 
     let prover_timer = start_timer!(|| "TurboPlonk::Prover");
 
     let get_domain_and_root_timer = start_timer!(|| "Get the domain and a root");
     let domain = FpPolynomial::<PCS::Field>::evaluation_domain(cs.size())
-        .c(d!(PlonkError::GroupNotFound(cs.size())))?;
+        .ok_or(PlonkError::GroupNotFound(cs.size()))?;
     let root = PCS::Field::from_field(domain.group_gen);
     end_timer!(get_domain_and_root_timer);
 
@@ -175,7 +175,7 @@ pub fn prover_with_lagrange<
 
             let cm_w = lagrange_pcs
                 .commit(&f_eval)
-                .c(d!(PlonkError::CommitmentError))?;
+                .map_err(|_| PlonkError::CommitmentError)?;
             let cm_w = pcs.apply_blind_factors(&cm_w, &blinds, n_constraints);
             transcript.append_commitment::<PCS::Commitment>(&cm_w);
             end_timer!(this_w_comm_timer);
@@ -198,7 +198,9 @@ pub fn prover_with_lagrange<
             end_timer!(this_w_poly_timer);
 
             let this_w_comm_timer = start_timer!(|| "Commit the polynomial");
-            let cm_w = pcs.commit(&f_coefs).c(d!(PlonkError::CommitmentError))?;
+            let cm_w = pcs
+                .commit(&f_coefs)
+                .map_err(|_| PlonkError::CommitmentError)?;
             transcript.append_commitment::<PCS::Commitment>(&cm_w);
             end_timer!(this_w_comm_timer);
 
@@ -228,7 +230,7 @@ pub fn prover_with_lagrange<
         let z_comm_timer = start_timer!(|| "Commit the polynomial");
         let cm_z = lagrange_pcs
             .commit(&z_evals)
-            .c(d!(PlonkError::CommitmentError))?;
+            .map_err(|_| PlonkError::CommitmentError)?;
         let cm_z = pcs.apply_blind_factors(&cm_z, &blinds, n_constraints);
         transcript.append_commitment::<PCS::Commitment>(&cm_z);
         end_timer!(z_comm_timer);
@@ -242,7 +244,9 @@ pub fn prover_with_lagrange<
         end_timer!(z_poly_timer);
 
         let z_comm_timer = start_timer!(|| "Commit the polynomial");
-        let cm_z = pcs.commit(&z_coefs).c(d!(PlonkError::CommitmentError))?;
+        let cm_z = pcs
+            .commit(&z_coefs)
+            .map_err(|_| PlonkError::CommitmentError)?;
         transcript.append_commitment::<PCS::Commitment>(&cm_z);
         end_timer!(z_comm_timer);
 
@@ -257,8 +261,7 @@ pub fn prover_with_lagrange<
     // 5. build t, split into `n_wires_per_gate` degree-(N+2) polynomials and commit
     let t_timer = start_timer!(|| "Round 3: t polynomial");
     let t_poly_timer = start_timer!(|| "Prepare the polynomial");
-    let t_poly =
-        t_poly::<PCS, CS>(cs, prover_params, &w_polys, &z_poly, &challenges, &pi).c(d!())?;
+    let t_poly = t_poly::<PCS, CS>(cs, prover_params, &w_polys, &z_poly, &challenges, &pi)?;
     end_timer!(t_poly_timer);
     let t_comm_timer = start_timer!(|| "Commit the polynomial");
     let (cm_t_vec, t_polys) = split_t_and_commit(
@@ -268,8 +271,7 @@ pub fn prover_with_lagrange<
         &t_poly,
         n_wires_per_gate,
         n_constraints + 2,
-    )
-    .c(d!())?;
+    )?;
     end_timer!(t_comm_timer);
     end_timer!(t_timer);
 
@@ -369,7 +371,7 @@ pub fn prover_with_lagrange<
             &zeta,
             n_constraints + 2,
         )
-        .c(d!(PlonkError::ProofError))?;
+        .map_err(|_| PlonkError::ProofError)?;
     end_timer!(zeta_proof_timer);
 
     let zeta_omega_proof_timer = start_timer!(|| "Compute the witness for opening at zeta omega");
@@ -384,7 +386,7 @@ pub fn prover_with_lagrange<
             &zeta_omega,
             n_constraints + 2,
         )
-        .c(d!(PlonkError::ProofError))?;
+        .map_err(|_| PlonkError::ProofError)?;
     end_timer!(zeta_omega_proof_timer);
 
     end_timer!(r_timer);

@@ -1,6 +1,8 @@
+use crate::errors::{NoahError, Result};
 use crate::parameters::params::AddressFormat;
 use crate::parameters::params::AddressFormat::{ED25519, SECP256K1};
 use ark_ff::{BigInteger, PrimeField};
+use ark_std::borrow::ToOwned;
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use digest::consts::U64;
 use digest::Digest;
@@ -129,17 +131,17 @@ impl NoahFromToBytes for PublicKey {
         bytes
     }
 
-    fn noah_from_bytes(bytes: &[u8]) -> Result<PublicKey> {
+    fn noah_from_bytes(bytes: &[u8]) -> core::result::Result<PublicKey, AlgebraError> {
         // Compatible with old data.
         if bytes.len() == 32 {
             return match Ed25519PublicKey::from_bytes(bytes) {
                 Ok(pk) => Ok(PublicKey(PublicKeyInner::Ed25519(pk))),
-                Err(_) => Err(eg!(NoahError::DeserializationError)),
+                Err(_) => Err(AlgebraError::DeserializationError),
             };
         }
 
         if bytes.len() != PUBLIC_KEY_LENGTH {
-            return Err(eg!(NoahError::DeserializationError));
+            return Err(AlgebraError::DeserializationError);
         }
 
         let ktype = KeyType::from_byte(bytes[0]);
@@ -148,7 +150,7 @@ impl NoahFromToBytes for PublicKey {
                 let bytes = &bytes[1..PUBLIC_KEY_LENGTH - 1];
                 match Ed25519PublicKey::from_bytes(bytes) {
                     Ok(pk) => Ok(PublicKey(PublicKeyInner::Ed25519(pk))),
-                    Err(_) => Err(eg!(NoahError::DeserializationError)),
+                    Err(_) => Err(AlgebraError::DeserializationError),
                 }
             }
             KeyType::Secp256k1 => {
@@ -156,7 +158,7 @@ impl NoahFromToBytes for PublicKey {
                 pk_bytes.copy_from_slice(&bytes[1..]);
                 match Secp256k1PublicKey::parse_compressed(&pk_bytes) {
                     Ok(pk) => Ok(PublicKey(PublicKeyInner::Secp256k1(pk))),
-                    Err(_) => Err(eg!(NoahError::DeserializationError)),
+                    Err(_) => Err(AlgebraError::DeserializationError),
                 }
             }
             KeyType::EthAddress => {
@@ -187,23 +189,23 @@ impl PublicKey {
                 Ok(PublicKey(PublicKeyInner::EthAddress(address)))
             }
             PublicKeyInner::EthAddress(_) => Ok(self.clone()),
-            _ => Err(eg!(NoahError::ParameterError)),
+            _ => Err(NoahError::ParameterError),
         }
     }
 
     /// Change to algebra secp256k1 Point
     pub fn to_secp256k1(&self) -> Result<SECP256K1G1> {
         match self.inner() {
-            PublicKeyInner::Secp256k1(pk) => convert_point_libsecp256k1_to_algebra(&pk),
-            _ => Err(eg!(NoahError::ParameterError)),
+            PublicKeyInner::Secp256k1(pk) => Ok(convert_point_libsecp256k1_to_algebra(&pk)?),
+            _ => Err(NoahError::ParameterError),
         }
     }
 
     /// Change to algebra Ristretto Point
     pub fn to_ed25519(&self) -> Result<Ed25519Point> {
         match self.inner() {
-            PublicKeyInner::Ed25519(pk) => convert_ed25519_pk_to_algebra(&pk),
-            _ => Err(eg!(NoahError::ParameterError)),
+            PublicKeyInner::Ed25519(pk) => Ok(convert_ed25519_pk_to_algebra(&pk)?),
+            _ => Err(NoahError::ParameterError),
         }
     }
 
@@ -228,7 +230,7 @@ impl PublicKey {
 
                 bytes
             }
-            _ => return Err(eg!(NoahError::ParameterError)),
+            _ => return Err(NoahError::ParameterError),
         };
 
         let first = BLSScalar::from_bytes(&bytes[0..31])?;
@@ -271,34 +273,34 @@ impl PublicKey {
     /// Verify a signature.
     pub fn verify(&self, message: &[u8], signature: &Signature) -> Result<()> {
         match (self.0, signature) {
-            (PublicKeyInner::Ed25519(pk), Signature::Ed25519(sign)) => {
-                pk.verify(message, sign).c(d!(NoahError::SignatureError))
-            }
+            (PublicKeyInner::Ed25519(pk), Signature::Ed25519(sign)) => pk
+                .verify(message, sign)
+                .map_err(|_| NoahError::SignatureError),
             (PublicKeyInner::Secp256k1(pk), Signature::Secp256k1(sign, _)) => {
                 let mut hasher = Keccak256::new();
                 hasher.update(message);
                 let res = hasher.finalize();
-                let msg = Message::parse_slice(&res[..]).c(d!(NoahError::SignatureError))?;
+                let msg = Message::parse_slice(&res[..]).map_err(|_| NoahError::SignatureError)?;
                 if secp256k1_verify(&msg, sign, &pk) {
                     Ok(())
                 } else {
-                    Err(eg!(NoahError::SignatureError))
+                    Err(NoahError::SignatureError)
                 }
             }
             (PublicKeyInner::EthAddress(hash), Signature::Secp256k1(sign, rec)) => {
                 let mut hasher = Keccak256::new();
                 hasher.update(message);
                 let res = hasher.finalize();
-                let msg = Message::parse_slice(&res[..]).c(d!(NoahError::SignatureError))?;
-                let pk = recover(&msg, sign, rec).c(d!(NoahError::SignatureError))?;
+                let msg = Message::parse_slice(&res[..]).map_err(|_| NoahError::SignatureError)?;
+                let pk = recover(&msg, sign, rec).map_err(|_| NoahError::SignatureError)?;
                 let other = convert_libsecp256k1_public_key_to_address(&pk);
                 if hash == other {
                     Ok(())
                 } else {
-                    Err(eg!(NoahError::SignatureError))
+                    Err(NoahError::SignatureError)
                 }
             }
-            _ => Err(eg!(NoahError::SignatureError)),
+            _ => Err(NoahError::SignatureError),
         }
     }
 
@@ -369,29 +371,29 @@ impl NoahFromToBytes for SecretKey {
         bytes
     }
 
-    fn noah_from_bytes(bytes: &[u8]) -> Result<SecretKey> {
+    fn noah_from_bytes(bytes: &[u8]) -> core::result::Result<SecretKey, AlgebraError> {
         // Compatible with old data.
         if bytes.len() == 32 {
             return match Ed25519SecretKey::from_bytes(bytes) {
                 Ok(sk) => Ok(SecretKey::Ed25519(sk)),
-                Err(_) => Err(eg!(NoahError::DeserializationError)),
+                Err(_) => Err(AlgebraError::DeserializationError),
             };
         }
 
         if bytes.len() != SECRET_KEY_LENGTH {
-            return Err(eg!(NoahError::DeserializationError));
+            return Err(AlgebraError::DeserializationError);
         }
 
         let ktype = KeyType::from_byte(bytes[0]);
         match ktype {
             KeyType::Ed25519 => match Ed25519SecretKey::from_bytes(&bytes[1..]) {
                 Ok(sk) => Ok(SecretKey::Ed25519(sk)),
-                Err(_) => Err(eg!(NoahError::DeserializationError)),
+                Err(_) => Err(AlgebraError::DeserializationError),
             },
             KeyType::Secp256k1 | KeyType::EthAddress => {
                 match Secp256k1SecretKey::parse_slice(&bytes[1..]) {
                     Ok(sk) => Ok(SecretKey::Secp256k1(sk)),
-                    Err(_) => Err(eg!(NoahError::DeserializationError)),
+                    Err(_) => Err(AlgebraError::DeserializationError),
                 }
             }
         }
@@ -415,17 +417,17 @@ impl SecretKey {
         match self {
             SecretKey::Secp256k1(sk) => {
                 let s: LibSecp256k1Scalar = (*sk).into();
-                convert_scalar_libsecp256k1_to_algebra(&s.0)
+                Ok(convert_scalar_libsecp256k1_to_algebra(&s.0)?)
             }
-            _ => Err(eg!(NoahError::ParameterError)),
+            _ => Err(NoahError::ParameterError),
         }
     }
 
     /// Change to algebra Ristretto Point
     pub fn to_ed25519(&self) -> Result<Ed25519Scalar> {
         match self {
-            SecretKey::Ed25519(sk) => convert_ed25519_sk_to_algebra(&sk),
-            _ => Err(eg!(NoahError::ParameterError)),
+            SecretKey::Ed25519(sk) => Ok(convert_ed25519_sk_to_algebra(&sk)?),
+            _ => Err(NoahError::ParameterError),
         }
     }
 
@@ -479,7 +481,7 @@ impl SecretKey {
                 let mut hasher = Keccak256::new();
                 hasher.update(message);
                 let res = hasher.finalize();
-                let msg = Message::parse_slice(&res[..]).c(d!(NoahError::SignatureError))?;
+                let msg = Message::parse_slice(&res[..]).map_err(|_| NoahError::SignatureError)?;
                 let (sign, rec) = secp256k1_sign(&msg, sk);
                 Ok(Signature::Secp256k1(sign, rec))
             }
@@ -506,7 +508,8 @@ impl SecretKey {
 
     /// Convert from raw bytes used secp256k1 and use it with address.
     pub fn from_secp256k1_with_address(bytes: &[u8]) -> Result<Self> {
-        let sk = Secp256k1SecretKey::parse_slice(bytes).c(d!(NoahError::DeserializationError))?;
+        let sk =
+            Secp256k1SecretKey::parse_slice(bytes).map_err(|_| NoahError::DeserializationError)?;
         Ok(SecretKey::Secp256k1(sk))
     }
 }
@@ -529,22 +532,22 @@ impl NoahFromToBytes for KeyPair {
         vec
     }
 
-    fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
+    fn noah_from_bytes(bytes: &[u8]) -> core::result::Result<Self, AlgebraError> {
         if bytes.len() == 64 {
             Ok(KeyPair {
                 sec_key: SecretKey::Ed25519(
                     Ed25519SecretKey::from_bytes(&bytes[0..32])
-                        .c(d!(NoahError::DeserializationError))?,
+                        .map_err(|_| AlgebraError::DeserializationError)?,
                 ),
                 pub_key: PublicKey(PublicKeyInner::Ed25519(
                     Ed25519PublicKey::from_bytes(&bytes[32..64])
-                        .c(d!(NoahError::DeserializationError))?,
+                        .map_err(|_| AlgebraError::DeserializationError)?,
                 )),
             })
         } else {
             Ok(KeyPair {
-                sec_key: SecretKey::noah_from_bytes(&bytes[0..SECRET_KEY_LENGTH]).c(d!())?,
-                pub_key: PublicKey::noah_from_bytes(&bytes[SECRET_KEY_LENGTH..]).c(d!())?,
+                sec_key: SecretKey::noah_from_bytes(&bytes[0..SECRET_KEY_LENGTH])?,
+                pub_key: PublicKey::noah_from_bytes(&bytes[SECRET_KEY_LENGTH..])?,
             })
         }
     }
@@ -562,7 +565,7 @@ impl KeyPair {
             (SecretKey::Secp256k1(_), PublicKey(PublicKeyInner::Secp256k1(_))) => {
                 Ok((self.sec_key.to_secp256k1()?, self.pub_key.to_secp256k1()?))
             }
-            _ => Err(eg!(NoahError::ParameterError)),
+            _ => Err(NoahError::ParameterError),
         }
     }
 
@@ -572,7 +575,7 @@ impl KeyPair {
             (SecretKey::Ed25519(_), PublicKey(PublicKeyInner::Ed25519(_))) => {
                 Ok((self.sec_key.to_ed25519()?, self.pub_key.to_ed25519()?))
             }
-            _ => Err(eg!(NoahError::ParameterError)),
+            _ => Err(NoahError::ParameterError),
         }
     }
 
@@ -599,7 +602,7 @@ impl KeyPair {
 
     /// Generate a key pair from secret key bytes.
     pub fn generate_secp256k1_from_bytes(bytes: &[u8]) -> Result<Self> {
-        let sk = Secp256k1SecretKey::parse_slice(bytes).c(d!())?;
+        let sk = Secp256k1SecretKey::parse_slice(bytes).map_err(|_| NoahError::ParameterError)?;
         let pk = Secp256k1PublicKey::from_secret_key(&sk);
         Ok(KeyPair {
             pub_key: PublicKey(PublicKeyInner::Secp256k1(pk)),
@@ -695,17 +698,17 @@ impl NoahFromToBytes for Signature {
         bytes
     }
 
-    fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
+    fn noah_from_bytes(bytes: &[u8]) -> core::result::Result<Self, AlgebraError> {
         // Compatible with old data.
         if bytes.len() == 64 {
             return match Ed25519Signature::from_bytes(bytes) {
                 Ok(sign) => Ok(Signature::Ed25519(sign)),
-                Err(_) => Err(eg!(NoahError::DeserializationError)),
+                Err(_) => Err(AlgebraError::DeserializationError),
             };
         }
 
         if bytes.len() != SIGNATURE_LENGTH {
-            return Err(eg!(NoahError::DeserializationError));
+            return Err(AlgebraError::DeserializationError);
         }
 
         let ktype = KeyType::from_byte(bytes[0]);
@@ -714,16 +717,16 @@ impl NoahFromToBytes for Signature {
                 let s_bytes = &bytes[1..SIGNATURE_LENGTH - 1];
                 match Ed25519Signature::from_bytes(s_bytes) {
                     Ok(sign) => Ok(Signature::Ed25519(sign)),
-                    Err(_) => Err(eg!(NoahError::DeserializationError)),
+                    Err(_) => Err(AlgebraError::DeserializationError),
                 }
             }
             KeyType::Secp256k1 | KeyType::EthAddress => {
                 let mut s_bytes = [0u8; SIGNATURE_LENGTH - 2];
                 s_bytes.copy_from_slice(&bytes[1..SIGNATURE_LENGTH - 1]);
                 let sign = Secp256k1Signature::parse_standard(&s_bytes)
-                    .c(d!(NoahError::DeserializationError))?;
+                    .map_err(|_| AlgebraError::DeserializationError)?;
                 let rec = RecoveryId::parse(bytes[SIGNATURE_LENGTH - 1])
-                    .c(d!(NoahError::DeserializationError))?;
+                    .map_err(|_| AlgebraError::DeserializationError)?;
                 Ok(Signature::Secp256k1(sign, rec))
             }
         }
@@ -753,13 +756,13 @@ impl SignatureList {
     /// Verify a list of signature.
     pub fn verify(&self, pubkeys: &[&PublicKey], message: &[u8]) -> Result<()> {
         if pubkeys.len() != self.signatures.len() {
-            return Err(eg!(NoahError::SignatureError));
+            return Err(NoahError::SignatureError);
         }
         // sort the key pairs based on alphabetical order of their public keys
         let mut sorted = pubkeys.to_owned();
         sorted.sort_unstable_by_key(|k| k.noah_to_bytes());
         for (pk, sig) in sorted.iter().zip(self.signatures.iter()) {
-            pk.verify(&message, &sig).c(d!())?;
+            pk.verify(&message, &sig)?;
         }
         Ok(())
     }
@@ -787,7 +790,9 @@ pub fn convert_libsecp256k1_public_key_to_address(pk: &Secp256k1PublicKey) -> [u
     bytes
 }
 
-fn convert_point_libsecp256k1_to_algebra(pk: &Secp256k1PublicKey) -> Result<SECP256K1G1> {
+fn convert_point_libsecp256k1_to_algebra(
+    pk: &Secp256k1PublicKey,
+) -> core::result::Result<SECP256K1G1, AlgebraError> {
     let p: LibSecp256k1G1 = (*pk).into();
     let (mut x, mut y) = (p.x, p.y);
     x.normalize();
@@ -800,7 +805,9 @@ fn convert_point_libsecp256k1_to_algebra(pk: &Secp256k1PublicKey) -> Result<SECP
     SECP256K1G1::from_unchecked_bytes(&bytes)
 }
 
-fn convert_scalar_libsecp256k1_to_algebra(b: &[u32; 8]) -> Result<SECP256K1Scalar> {
+fn convert_scalar_libsecp256k1_to_algebra(
+    b: &[u32; 8],
+) -> core::result::Result<SECP256K1Scalar, AlgebraError> {
     let bytes = from_u32_slice_to_u8_slice(b);
     SECP256K1Scalar::from_bytes(&bytes)
 }
@@ -818,12 +825,16 @@ fn from_u32_slice_to_u8_slice(b: &[u32; 8]) -> [u8; 32] {
     bytes
 }
 
-fn convert_ed25519_sk_to_algebra(sk: &Ed25519SecretKey) -> Result<Ed25519Scalar> {
+fn convert_ed25519_sk_to_algebra(
+    sk: &Ed25519SecretKey,
+) -> core::result::Result<Ed25519Scalar, AlgebraError> {
     let esk = ExpandedSecretKey::from(sk);
     Ed25519Scalar::from_bytes(&esk.to_bytes()[..32])
 }
 
-fn convert_ed25519_pk_to_algebra(pk: &Ed25519PublicKey) -> Result<Ed25519Point> {
+fn convert_ed25519_pk_to_algebra(
+    pk: &Ed25519PublicKey,
+) -> core::result::Result<Ed25519Point, AlgebraError> {
     let y = CompressedEdwardsY(pk.to_bytes());
     let p = y.decompress().unwrap();
 
@@ -851,39 +862,39 @@ mod test {
         let message = "";
 
         let sig = keypair.sign(message.as_bytes()).unwrap();
-        pnk!(keypair.pub_key.verify("".as_bytes(), &sig));
+        keypair.pub_key.verify("".as_bytes(), &sig).unwrap();
         //same test with secret key
         let sig = keypair.sec_key.sign(message.as_bytes()).unwrap();
-        pnk!(keypair.pub_key.verify("".as_bytes(), &sig));
+        keypair.pub_key.verify("".as_bytes(), &sig).unwrap();
 
         //test again with fresh same key
         let mut prng = test_rng();
         let keypair = KeyPair::sample(&mut prng, SECP256K1);
-        pnk!(keypair.pub_key.verify("".as_bytes(), &sig));
+        keypair.pub_key.verify("".as_bytes(), &sig).unwrap();
 
         env::set_var("DETERMINISTIC_TEST_RNG", "0");
         let mut prng = test_rng();
         let keypair = KeyPair::sample(&mut prng, ED25519);
         let message = [10u8; 500];
         let sig = keypair.sign(&message).unwrap();
-        msg_eq!(
+        assert_eq!(
             dbg!(NoahError::SignatureError),
             dbg!(keypair.pub_key.verify("".as_bytes(), &sig).unwrap_err()),
             "Verifying sig on different message should have return Err(Signature Error)"
         );
-        pnk!(keypair.pub_key.verify(&message, &sig));
+        keypair.pub_key.verify(&message, &sig).unwrap();
         //test again with secret key
         let sig = keypair.sec_key.sign(&message).unwrap();
-        msg_eq!(
+        assert_eq!(
             NoahError::SignatureError,
             keypair.pub_key.verify("".as_bytes(), &sig).unwrap_err(),
             "Verifying sig on different message should have return Err(Signature Error)"
         );
-        pnk!(keypair.pub_key.verify(&message, &sig));
+        keypair.pub_key.verify(&message, &sig).unwrap();
 
         // test with different keys
         let keypair = KeyPair::sample(&mut prng, ED25519);
-        msg_eq!(
+        assert_eq!(
             NoahError::SignatureError,
             keypair.pub_key.verify(&message, &sig).unwrap_err(),
             "Verifying sig on with a different key should have return Err(Signature Error)"

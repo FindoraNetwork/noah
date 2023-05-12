@@ -1,4 +1,5 @@
 use crate::anon_xfr::{axfr_hybrid_decrypt, axfr_hybrid_encrypt, commit, decrypt_memo};
+use crate::errors::{NoahError, Result};
 use crate::keys::{KeyPair, PublicKey, SecretKey};
 use crate::parameters::params::AddressFormat::{ED25519, SECP256K1};
 use crate::xfr::structs::AssetType;
@@ -181,7 +182,7 @@ impl OpenAnonAssetRecordBuilder {
     /// If built via `Self::from_abar(...)`, return Err(NoahError::InconsistentStructureError)
     pub fn finalize<R: CryptoRng + RngCore>(mut self, prng: &mut R) -> Result<Self> {
         if self.oabar.owner_memo.is_some() {
-            return Err(eg!(NoahError::InconsistentStructureError));
+            return Err(NoahError::InconsistentStructureError);
         }
 
         self.oabar.blind = BLSScalar::random(prng);
@@ -196,7 +197,7 @@ impl OpenAnonAssetRecordBuilder {
 
     /// Run a sanity check and if ok, return Ok(OpenBlindAssetRecord)
     pub fn build(self) -> Result<OpenAnonAssetRecord> {
-        self.sanity_check().c(d!())?;
+        self.sanity_check()?;
         Ok(self.oabar)
     }
 }
@@ -209,7 +210,7 @@ impl OpenAnonAssetRecordBuilder {
         owner_memo: AxfrOwnerMemo,
         key_pair: &KeyPair,
     ) -> Result<Self> {
-        let (amount, asset_type, blind) = decrypt_memo(&owner_memo, key_pair, record).c(d!())?;
+        let (amount, asset_type, blind) = decrypt_memo(&owner_memo, key_pair, record)?;
         let mut builder = OpenAnonAssetRecordBuilder::new()
             .pub_key(&key_pair.get_pk())
             .amount(amount)
@@ -225,12 +226,12 @@ impl OpenAnonAssetRecordBuilder {
         if self.oabar.pub_key == PublicKey::default(SECP256K1)
             || self.oabar.pub_key == PublicKey::default(ED25519)
         {
-            return Err(eg!(NoahError::InconsistentStructureError));
+            return Err(NoahError::InconsistentStructureError);
         }
 
         // 2. OwnerMemo is not None
         if self.oabar.owner_memo.is_none() {
-            return Err(eg!(NoahError::InconsistentStructureError));
+            return Err(NoahError::InconsistentStructureError);
         }
         Ok(())
     }

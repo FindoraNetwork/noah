@@ -1,10 +1,12 @@
 use crate::bls12_381::BLSScalar;
-use crate::errors::AlgebraError;
-use crate::prelude::{derive_prng_from_hash, *};
+use crate::prelude::*;
 use ark_bls12_381::{G2Affine, G2Projective};
 use ark_ec::{AffineRepr, CurveGroup as ArkCurveGroup, Group as ArkGroup};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
-use ark_std::fmt::{Debug, Display, Formatter};
+use ark_std::{
+    fmt::{Debug, Display, Formatter},
+    vec::Vec,
+};
 use digest::{consts::U64, Digest};
 use wasm_bindgen::prelude::*;
 
@@ -14,7 +16,7 @@ use wasm_bindgen::prelude::*;
 pub struct BLSG2(pub(crate) G2Projective);
 
 impl Debug for BLSG2 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> ark_std::fmt::Result {
         <G2Affine as Display>::fmt(&self.0.into_affine(), f)
     }
 }
@@ -63,27 +65,23 @@ impl Group for BLSG2 {
 
     #[inline]
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
-        let mut reader = ark_std::io::BufReader::new(bytes);
-
-        let affine = G2Affine::deserialize_with_mode(&mut reader, Compress::Yes, Validate::Yes);
+        let affine = G2Affine::deserialize_with_mode(bytes, Compress::Yes, Validate::Yes);
 
         if affine.is_ok() {
             Ok(Self(affine.unwrap().into_group()))
         } else {
-            Err(eg!(AlgebraError::DeserializationError))
+            Err(AlgebraError::DeserializationError)
         }
     }
 
     #[inline]
     fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
-        let mut reader = ark_std::io::BufReader::new(bytes);
-
-        let affine = G2Affine::deserialize_with_mode(&mut reader, Compress::No, Validate::No);
+        let affine = G2Affine::deserialize_with_mode(bytes, Compress::No, Validate::No);
 
         if affine.is_ok() {
             Ok(Self(affine.unwrap().into_group()))
         } else {
-            Err(eg!(AlgebraError::DeserializationError))
+            Err(AlgebraError::DeserializationError)
         }
     }
 

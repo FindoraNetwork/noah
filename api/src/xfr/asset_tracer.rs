@@ -1,4 +1,5 @@
 use crate::anon_creds::{Attr, AttributeCiphertext};
+use crate::errors::{NoahError, Result};
 use crate::xfr::structs::{
     AssetTracerDecKeys, AssetTracerEncKeys, AssetType, TracerMemo, ASSET_TYPE_LENGTH,
 };
@@ -84,13 +85,12 @@ impl TracerMemo {
         // decrypt and sanitize amount
         let amount = if self.lock_amount.is_some() {
             if plaintext.len() < 2 * U32_BYTES {
-                return Err(eg!(NoahError::BogusAssetTracerMemo));
+                return Err(NoahError::BogusAssetTracerMemo);
             }
             let amount_low = u8_be_slice_to_u32(&plaintext[0..U32_BYTES]);
             let amount_high = u8_be_slice_to_u32(&plaintext[U32_BYTES..2 * U32_BYTES]);
             let amount = (amount_low as u64) + ((amount_high as u64) << 32);
-            self.verify_amount(&dec_key.record_data_dec_key, amount)
-                .c(d!(NoahError::BogusAssetTracerMemo))?;
+            self.verify_amount(&dec_key.record_data_dec_key, amount)?;
             plaintext = plaintext.split_off(2 * U32_BYTES);
             Some(amount)
         } else {
@@ -100,14 +100,13 @@ impl TracerMemo {
         // decrypt and sanitize asset type
         let asset_type = if self.lock_asset_type.is_some() {
             if plaintext.len() < ASSET_TYPE_LENGTH {
-                return Err(eg!(NoahError::BogusAssetTracerMemo));
+                return Err(NoahError::BogusAssetTracerMemo);
             }
             let mut asset_type = [0u8; ASSET_TYPE_LENGTH];
             asset_type.copy_from_slice(&plaintext[0..ASSET_TYPE_LENGTH]);
             let asset_type = AssetType(asset_type);
 
-            self.verify_asset_type(&dec_key.record_data_dec_key, &asset_type)
-                .c(d!(NoahError::BogusAssetTracerMemo))?;
+            self.verify_asset_type(&dec_key.record_data_dec_key, &asset_type)?;
             plaintext = plaintext.split_off(ASSET_TYPE_LENGTH);
             Some(asset_type)
         } else {
@@ -115,7 +114,7 @@ impl TracerMemo {
         };
 
         if plaintext.len() < self.lock_attributes.len() * U32_BYTES {
-            return Err(eg!(NoahError::BogusAssetTracerMemo));
+            return Err(NoahError::BogusAssetTracerMemo);
         }
         let mut attrs = vec![];
         for attr_byte in plaintext.chunks(U32_BYTES) {
@@ -123,12 +122,11 @@ impl TracerMemo {
         }
 
         if !self
-            .verify_identity_attributes(&dec_key.attrs_dec_key, &attrs)
-            .c(d!(NoahError::BogusAssetTracerMemo))?
+            .verify_identity_attributes(&dec_key.attrs_dec_key, &attrs)?
             .iter()
             .all(|&x| x)
         {
-            return Err(eg!(NoahError::BogusAssetTracerMemo));
+            return Err(NoahError::BogusAssetTracerMemo);
         }
         Ok((amount, asset_type, attrs))
     }
@@ -149,12 +147,12 @@ impl TracerMemo {
             if base.mul(&RistrettoScalar::from(low)) != decrypted_low
                 || base.mul(&RistrettoScalar::from(high)) != decrypted_high
             {
-                Err(eg!(NoahError::AssetTracingExtractionError))
+                Err(NoahError::AssetTracingExtractionError)
             } else {
                 Ok(())
             }
         } else {
-            Err(eg!(NoahError::ParameterError)) // nothing to decrypt
+            Err(NoahError::ParameterError) // nothing to decrypt
         }
     }
 
@@ -170,9 +168,9 @@ impl TracerMemo {
             if decrypted == RistrettoPoint::get_base().mul(&expected.as_scalar()) {
                 return Ok(());
             }
-            Err(eg!(NoahError::AssetTracingExtractionError))
+            Err(NoahError::AssetTracingExtractionError)
         } else {
-            Err(eg!(NoahError::ParameterError)) // nothing to decrypt
+            Err(NoahError::ParameterError) // nothing to decrypt
         }
     }
 
@@ -186,14 +184,14 @@ impl TracerMemo {
         candidate_asset_types: &[AssetType],
     ) -> Result<AssetType> {
         if candidate_asset_types.is_empty() {
-            return Err(eg!(NoahError::ParameterError));
+            return Err(NoahError::ParameterError);
         }
         for candidate in candidate_asset_types.iter() {
             if self.verify_asset_type(&dec_key, &candidate).is_ok() {
                 return Ok(*candidate);
             }
         }
-        Err(eg!(NoahError::AssetTracingExtractionError))
+        Err(NoahError::AssetTracingExtractionError)
     }
 
     /// Check is the attributes encrypted in self.lock_attrs are the same as in expected_attributes,
@@ -205,7 +203,7 @@ impl TracerMemo {
         expected_attributes: &[u32],
     ) -> Result<Vec<bool>> {
         if self.lock_attributes.len() != expected_attributes.len() {
-            return Err(eg!(NoahError::ParameterError));
+            return Err(NoahError::ParameterError);
         }
         let mut result = vec![];
         for (ctext, expected) in self.lock_attributes.iter().zip(expected_attributes.iter()) {
@@ -223,6 +221,7 @@ impl TracerMemo {
 
 #[cfg(test)]
 mod tests {
+    use crate::errors::NoahError;
     use crate::xfr::structs::{AssetTracerKeyPair, AssetType, TracerMemo};
     use noah_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::RistrettoScalar};
     use noah_crypto::elgamal::elgamal_encrypt;
@@ -273,12 +272,12 @@ mod tests {
             &[],
         );
 
-        msg_eq!(
+        assert_eq!(
             NoahError::ParameterError,
             memo.extract_asset_type(&tracer_keys.dec_key.record_data_dec_key, &[])
                 .unwrap_err(),
         );
-        msg_eq!(
+        assert_eq!(
             NoahError::AssetTracingExtractionError,
             memo.extract_asset_type(
                 &tracer_keys.dec_key.record_data_dec_key,
@@ -286,7 +285,7 @@ mod tests {
             )
             .unwrap_err(),
         );
-        msg_eq!(
+        assert_eq!(
             NoahError::AssetTracingExtractionError,
             memo.extract_asset_type(
                 &tracer_keys.dec_key.record_data_dec_key,
@@ -358,12 +357,12 @@ mod tests {
             &attrs_and_ctexts,
         );
 
-        msg_eq!(
+        assert_eq!(
             NoahError::ParameterError,
             memo.verify_identity_attributes(&tracer_keys.dec_key.attrs_dec_key, &[1u32])
                 .unwrap_err(),
         );
-        msg_eq!(
+        assert_eq!(
             NoahError::ParameterError,
             memo.verify_identity_attributes(&tracer_keys.dec_key.attrs_dec_key, &[1u32, 2, 3, 4])
                 .unwrap_err(),
