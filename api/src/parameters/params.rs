@@ -7,6 +7,7 @@ use crate::anon_xfr::structs::{MTNode, MTPath, PayeeWitness, PayerWitness};
 use crate::anon_xfr::{
     commit, nullify, AXfrAddressFoldingWitness, TurboPlonkCS, FEE_TYPE, TREE_DEPTH,
 };
+use crate::errors::{NoahError, Result};
 use crate::keys::KeyPair;
 use crate::parameters::AddressFormat::{ED25519, SECP256K1};
 use crate::parameters::{
@@ -16,6 +17,7 @@ use crate::parameters::{
     ABAR_TO_BAR_SECP256K1_VERIFIER_PARAMS, AR_TO_ABAR_VERIFIER_PARAMS, BAR_TO_ABAR_VERIFIER_PARAMS,
     LAGRANGE_BASES, SRS,
 };
+use ark_std::{collections::BTreeMap, format};
 use noah_algebra::bls12_381::{BLSScalar, BLSG1};
 use noah_algebra::prelude::*;
 use noah_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
@@ -29,7 +31,6 @@ use noah_plonk::poly_commit::pcs::PolyComScheme;
 use num_traits::Zero;
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
-use std::collections::BTreeMap;
 
 /// The range in the Bulletproofs range check.
 pub const BULLET_PROOF_RANGE: usize = 32;
@@ -467,7 +468,7 @@ impl VerifierParams {
                 && n_payees <= MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER))
             && (!(n_payers == 1 && n_payees <= MAX_ANONYMOUS_RECORD_NUMBER_ONE_INPUT))
         {
-            Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
+            Err(NoahError::MissingVerifierParamsError)
         } else {
             match Self::load_abar_to_abar(n_payers, n_payees, address_format) {
                 Ok(vk) => Ok(vk),
@@ -502,21 +503,19 @@ impl VerifierParams {
         ) {
             (Some(c_bytes), Some(s_bytes)) => {
                 let common: VerifierParamsSplitCommon =
-                    bincode::deserialize(c_bytes).c(d!(NoahError::DeserializationError))?;
+                    bincode::deserialize(c_bytes).map_err(|_| NoahError::DeserializationError)?;
                 let specials: BTreeMap<(usize, usize), Vec<u8>> =
                     bincode::deserialize(s_bytes).unwrap();
                 let special_bytes = specials.get(&(n_payers, n_payees));
                 if special_bytes.is_none() {
-                    return Err(SimpleError::new(d!(NoahError::DeserializationError), None).into());
+                    return Err(NoahError::DeserializationError);
                 }
                 let special: VerifierParamsSplitSpecific =
                     bincode::deserialize(special_bytes.unwrap())
-                        .c(d!(NoahError::DeserializationError))?;
+                        .map_err(|_| NoahError::DeserializationError)?;
 
                 if special.label != label {
-                    return Err(
-                        SimpleError::new(d!(NoahError::AXfrVerifierParamsError), None).into(),
-                    );
+                    return Err(NoahError::AXfrVerifierParamsError);
                 }
 
                 Ok(VerifierParams {
@@ -526,7 +525,7 @@ impl VerifierParams {
                     verifier_params: special.verifier_params,
                 })
             }
-            _ => Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into()),
+            _ => Err(NoahError::MissingVerifierParamsError),
         }
     }
 
@@ -557,15 +556,15 @@ impl VerifierParams {
                 };
 
                 if verifier_params.label != label {
-                    Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
+                    Err(NoahError::MissingVerifierParamsError)
                 } else {
                     Ok(verifier_params)
                 }
             } else {
-                Err(SimpleError::new(d!(NoahError::DeserializationError), None).into())
+                Err(NoahError::DeserializationError)
             }
         } else {
-            Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
+            Err(NoahError::MissingVerifierParamsError)
         }
     }
 
@@ -586,15 +585,15 @@ impl VerifierParams {
             let verifier_params = bincode::deserialize::<VerifierParams>(bytes);
             if let Ok(verifier_params) = verifier_params {
                 if verifier_params.label != String::from("bar_to_abar") {
-                    Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
+                    Err(NoahError::MissingVerifierParamsError)
                 } else {
                     Ok(verifier_params)
                 }
             } else {
-                Err(SimpleError::new(d!(NoahError::DeserializationError), None).into())
+                Err(NoahError::DeserializationError)
             }
         } else {
-            Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
+            Err(NoahError::MissingVerifierParamsError)
         }
     }
 
@@ -615,15 +614,15 @@ impl VerifierParams {
             let verifier_params = bincode::deserialize::<VerifierParams>(bytes);
             if let Ok(verifier_params) = verifier_params {
                 if verifier_params.label != String::from("ar_to_abar") {
-                    Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
+                    Err(NoahError::MissingVerifierParamsError)
                 } else {
                     Ok(verifier_params)
                 }
             } else {
-                Err(SimpleError::new(d!(NoahError::DeserializationError), None).into())
+                Err(NoahError::DeserializationError)
             }
         } else {
-            Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
+            Err(NoahError::MissingVerifierParamsError)
         }
     }
 
@@ -654,15 +653,15 @@ impl VerifierParams {
                 };
 
                 if verifier_params.label != label {
-                    Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
+                    Err(NoahError::MissingVerifierParamsError)
                 } else {
                     Ok(verifier_params)
                 }
             } else {
-                Err(SimpleError::new(d!(NoahError::DeserializationError), None).into())
+                Err(NoahError::DeserializationError)
             }
         } else {
-            Err(SimpleError::new(d!(NoahError::MissingVerifierParamsError), None).into())
+            Err(NoahError::MissingVerifierParamsError)
         }
     }
 
@@ -715,13 +714,12 @@ fn load_lagrange_params(size: usize) -> Option<KZGCommitmentSchemeBLS> {
 }
 
 fn load_srs_params(size: usize) -> Result<KZGCommitmentSchemeBLS> {
-    let srs = SRS.c(d!(NoahError::MissingSRSError))?;
+    let srs = SRS.ok_or(NoahError::MissingSRSError)?;
 
     let KZGCommitmentSchemeBLS {
         public_parameter_group_1,
         public_parameter_group_2,
-    } = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)
-        .c(d!(NoahError::DeserializationError))?;
+    } = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)?;
 
     let mut new_group_1 = vec![BLSG1::default(); core::cmp::max(size + 3, 2051)];
     new_group_1[0..2051].copy_from_slice(&public_parameter_group_1[0..2051]);
@@ -735,7 +733,7 @@ fn load_srs_params(size: usize) -> Result<KZGCommitmentSchemeBLS> {
     }
 
     if size > 8192 {
-        return Err(SimpleError::new(d!(NoahError::ParameterError), None).into());
+        return Err(NoahError::ParameterError);
     }
 
     Ok(KZGCommitmentSchemeBLS {

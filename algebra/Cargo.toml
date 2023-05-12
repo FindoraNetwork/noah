@@ -124,6 +124,7 @@ default = [
 std = [
     'curve25519-dalek/std',
     'bulletproofs/std',
+    'ark-bulletproofs/std',
     'ark-ed-on-bls12-381/std',
     'ark-bls12-381/std',
     'ark-secp256k1/std',
@@ -132,8 +133,7 @@ std = [
     'ark-ec/std',
     'ark-std/std',
     'ark-ff/std',
-    'ark-serialize/std',
-    'ark-bulletproofs/std'
+    'ark-serialize/std'
 ]
 alloc = ['curve25519-dalek/alloc']
 nightly = ['curve25519-dalek/nightly']

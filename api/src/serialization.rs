@@ -5,6 +5,8 @@ use crate::{
 use noah_algebra::prelude::*;
 use serde::Serializer;
 
+type Result<T> = core::result::Result<T, AlgebraError>;
+
 impl NoahFromToBytes for AssetType {
     fn noah_to_bytes(&self) -> Vec<u8> {
         self.0.to_vec()
@@ -12,7 +14,7 @@ impl NoahFromToBytes for AssetType {
 
     fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() != ASSET_TYPE_LENGTH {
-            Err(eg!(NoahError::DeserializationError))
+            Err(AlgebraError::DeserializationError)
         } else {
             let mut array = [0u8; ASSET_TYPE_LENGTH];
             array.copy_from_slice(bytes);

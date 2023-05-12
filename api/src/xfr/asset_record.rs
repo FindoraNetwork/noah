@@ -2,6 +2,7 @@ use crate::anon_creds::{
     ac_confidential_open_commitment, ACCommitmentKey, ACUserSecretKey, Attr, AttributeCiphertext,
     ConfidentialAC, Credential,
 };
+use crate::errors::{NoahError, Result};
 use crate::keys::{KeyPair, PublicKey};
 use crate::xfr::structs::{
     AssetRecord, AssetRecordTemplate, AssetType, BlindAssetRecord, OpenAssetRecord, OwnerMemo,
@@ -104,7 +105,7 @@ impl AssetRecord {
         for asset_tracing_policy in asset_tracing_policies.get_policies().iter() {
             // 1. Check for inconsistency.
             if asset_tracing_policy.identity_tracing.is_some() {
-                return Err(eg!(NoahError::ParameterError)); // should use from_open_asset_record_with_identity_tracing method
+                return Err(NoahError::ParameterError); // should use from_open_asset_record_with_identity_tracing method
             }
 
             let (amount_info, asset_type_info) = if asset_tracing_policy.asset_tracing {
@@ -192,7 +193,7 @@ impl AssetRecord {
                 Some(id_policy) => {
                     // 1. Check for inconsistency.
                     if credential.ipk != id_policy.cred_issuer_pub_key {
-                        return Err(eg!(NoahError::ParameterError));
+                        return Err(NoahError::ParameterError);
                     }
                     let open = ac_confidential_open_commitment(
                         prng,
@@ -202,13 +203,11 @@ impl AssetRecord {
                         &asset_tracing_policy.enc_keys.attrs_enc_key,
                         id_policy.reveal_map.as_slice(),
                         &[],
-                    )
-                    .c(d!())?;
+                    )?;
                     let attrs_ctext = open.cts;
                     let proof = open.pok;
-                    let attrs = credential
-                        .get_revealed_attributes(id_policy.reveal_map.as_slice())
-                        .c(d!())?;
+                    let attrs =
+                        credential.get_revealed_attributes(id_policy.reveal_map.as_slice())?;
                     let attrs_and_ctexts: Vec<(Attr, AttributeCiphertext)> =
                         attrs.into_iter().zip(attrs_ctext).collect();
 
@@ -243,11 +242,10 @@ impl AssetRecord {
         let empty_id_proofs_and_ctext = vec![(None, vec![]); template.asset_tracing_policies.len()];
         for policy in template.asset_tracing_policies.get_policies().iter() {
             if policy.identity_tracing.is_some() {
-                return Err(eg!(NoahError::ParameterError));
+                return Err(NoahError::ParameterError);
             }
         }
         build_record_input_from_template(prng, &template, empty_id_proofs_and_ctext.as_slice())
-            .c(d!())
     }
 
     /// Create the asset record using a template, with identity tracing.
@@ -262,28 +260,23 @@ impl AssetRecord {
         for policy in template.asset_tracing_policies.get_policies().iter() {
             let (conf_id, attrs) = if let Some(reveal_policy) = policy.identity_tracing.as_ref() {
                 (
-                    Some(
-                        ac_confidential_open_commitment(
-                            prng,
-                            credential_user_sec_key,
-                            credential,
-                            credential_key,
-                            &policy.enc_keys.attrs_enc_key,
-                            &reveal_policy.reveal_map,
-                            &[],
-                        )
-                        .c(d!())?,
-                    ),
-                    credential
-                        .get_revealed_attributes(reveal_policy.reveal_map.as_slice())
-                        .c(d!())?,
+                    Some(ac_confidential_open_commitment(
+                        prng,
+                        credential_user_sec_key,
+                        credential,
+                        credential_key,
+                        &policy.enc_keys.attrs_enc_key,
+                        &reveal_policy.reveal_map,
+                        &[],
+                    )?),
+                    credential.get_revealed_attributes(reveal_policy.reveal_map.as_slice())?,
                 )
             } else {
                 (None, vec![])
             };
             id_proofs_and_attrs.push((conf_id, attrs));
         }
-        build_record_input_from_template(prng, &template, id_proofs_and_attrs.as_slice()).c(d!())
+        build_record_input_from_template(prng, &template, id_proofs_and_attrs.as_slice())
     }
 }
 
@@ -485,25 +478,25 @@ pub fn open_blind_asset_record(
 ) -> Result<OpenAssetRecord> {
     let (amount, asset_type, amount_blinds, type_blind) = match input.get_record_type() {
         AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType => (
-            input.amount.get_amount().c(d!(NoahError::ParameterError))?,
+            input.amount.get_amount().ok_or(NoahError::ParameterError)?,
             input
                 .asset_type
                 .get_asset_type()
-                .c(d!(NoahError::ParameterError))?,
+                .ok_or(NoahError::ParameterError)?,
             (RistrettoScalar::zero(), RistrettoScalar::zero()),
             RistrettoScalar::zero(),
         ),
 
         AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => {
-            let owner_memo = owner_memo.as_ref().c(d!(NoahError::ParameterError))?;
-            let amount = owner_memo.decrypt_amount(&keypair).c(d!())?;
-            let amount_blinds = owner_memo.derive_amount_blinds(&keypair).c(d!())?;
+            let owner_memo = owner_memo.as_ref().ok_or(NoahError::ParameterError)?;
+            let amount = owner_memo.decrypt_amount(&keypair)?;
+            let amount_blinds = owner_memo.derive_amount_blinds(&keypair)?;
 
             let pc_gens = PedersenCommitmentRistretto::default();
             if input.amount
                 != XfrAmount::from_blinds(&pc_gens, amount, &amount_blinds.0, &amount_blinds.1)
             {
-                return Err(eg!(NoahError::ParameterError));
+                return Err(NoahError::ParameterError);
             }
 
             (
@@ -511,26 +504,26 @@ pub fn open_blind_asset_record(
                 input
                     .asset_type
                     .get_asset_type()
-                    .c(d!(NoahError::ParameterError))?,
+                    .ok_or(NoahError::ParameterError)?,
                 amount_blinds,
                 RistrettoScalar::zero(),
             )
         }
 
         AssetRecordType::NonConfidentialAmount_ConfidentialAssetType => {
-            let owner_memo = owner_memo.as_ref().c(d!(NoahError::ParameterError))?;
-            let asset_type = owner_memo.decrypt_asset_type(&keypair).c(d!())?;
-            let asset_type_blind = owner_memo.derive_asset_type_blind(&keypair).c(d!())?;
+            let owner_memo = owner_memo.as_ref().ok_or(NoahError::ParameterError)?;
+            let asset_type = owner_memo.decrypt_asset_type(&keypair)?;
+            let asset_type_blind = owner_memo.derive_asset_type_blind(&keypair)?;
 
             let pc_gens = PedersenCommitmentRistretto::default();
             if input.asset_type
                 != XfrAssetType::from_blind(&pc_gens, &asset_type, &asset_type_blind)
             {
-                return Err(eg!(NoahError::ParameterError));
+                return Err(NoahError::ParameterError);
             }
 
             (
-                input.amount.get_amount().c(d!(NoahError::ParameterError))?,
+                input.amount.get_amount().ok_or(NoahError::ParameterError)?,
                 asset_type,
                 (RistrettoScalar::zero(), RistrettoScalar::zero()),
                 asset_type_blind,
@@ -538,23 +531,22 @@ pub fn open_blind_asset_record(
         }
 
         AssetRecordType::ConfidentialAmount_ConfidentialAssetType => {
-            let owner_memo = owner_memo.as_ref().c(d!(NoahError::ParameterError))?;
-            let (amount, asset_type) =
-                owner_memo.decrypt_amount_and_asset_type(&keypair).c(d!())?;
-            let amount_blinds = owner_memo.derive_amount_blinds(&keypair).c(d!())?;
-            let asset_type_blind = owner_memo.derive_asset_type_blind(&keypair).c(d!())?;
+            let owner_memo = owner_memo.as_ref().ok_or(NoahError::ParameterError)?;
+            let (amount, asset_type) = owner_memo.decrypt_amount_and_asset_type(&keypair)?;
+            let amount_blinds = owner_memo.derive_amount_blinds(&keypair)?;
+            let asset_type_blind = owner_memo.derive_asset_type_blind(&keypair)?;
 
             let pc_gens = PedersenCommitmentRistretto::default();
             if input.amount
                 != XfrAmount::from_blinds(&pc_gens, amount, &amount_blinds.0, &amount_blinds.1)
             {
-                return Err(eg!(NoahError::ParameterError));
+                return Err(NoahError::ParameterError);
             }
 
             if input.asset_type
                 != XfrAssetType::from_blind(&pc_gens, &asset_type, &asset_type_blind)
             {
-                return Err(eg!(NoahError::ParameterError));
+                return Err(NoahError::ParameterError);
             }
 
             (amount, asset_type, amount_blinds, asset_type_blind)
@@ -577,7 +569,7 @@ fn build_record_input_from_template<R: CryptoRng + RngCore>(
     identity_proofs_and_attrs: &[(Option<ConfidentialAC>, Vec<Attr>)],
 ) -> Result<AssetRecord> {
     if asset_record.asset_tracing_policies.len() != identity_proofs_and_attrs.len() {
-        return Err(eg!(NoahError::ParameterError));
+        return Err(NoahError::ParameterError);
     }
     let pc_gens = PedersenCommitmentRistretto::default();
     let mut attrs_ctexts = vec![];
@@ -587,7 +579,7 @@ fn build_record_input_from_template<R: CryptoRng + RngCore>(
         tracing_policy.iter().zip(identity_proofs_and_attrs.iter())
     {
         if tracing_policy.identity_tracing.is_none() && id_proof_and_attrs.0.is_some() {
-            return Err(eg!(NoahError::ParameterError));
+            return Err(NoahError::ParameterError);
         }
         let (attrs_and_ctexts, reveal_proof) = match id_proof_and_attrs {
             (None, _) => (vec![], None),

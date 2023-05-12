@@ -1,4 +1,5 @@
 use crate::anon_creds::{ac_confidential_verify, ACCommitment, ACConfidentialRevealProof};
+use crate::errors::{NoahError, Result};
 use crate::parameters::bulletproofs::BulletproofParams;
 use crate::parameters::params::{BULLET_PROOF_RANGE, MAX_CONFIDENTIAL_RECORD_NUMBER};
 use crate::xfr::{
@@ -59,8 +60,7 @@ pub(crate) fn asset_amount_tracing_proofs<R: CryptoRng + RngCore>(
             &mut transcript,
             &tracer_pub_key,
             &records_memos,
-        )
-        .c(d!())?;
+        )?;
         proofs.push(proof)
     }
     Ok(proofs)
@@ -85,14 +85,14 @@ fn build_same_key_asset_type_amount_tracing_proof<R: CryptoRng + RngCore>(
             let (lock_amount_low, lock_amount_high) = memo
                 .lock_amount
                 .as_ref()
-                .c(d!(NoahError::InconsistentStructureError))?;
+                .ok_or(NoahError::InconsistentStructureError)?;
             m.push(RistrettoScalar::from(low));
             r.push(open_record.amount_blinds.0);
             ctexts.push(lock_amount_low.clone());
             commitments.push(
                 com_low
                     .decompress()
-                    .c(d!(NoahError::DecompressElementError))?,
+                    .ok_or(NoahError::DecompressElementError)?,
             );
             m.push(RistrettoScalar::from(high));
             r.push(open_record.amount_blinds.1);
@@ -100,18 +100,18 @@ fn build_same_key_asset_type_amount_tracing_proof<R: CryptoRng + RngCore>(
             commitments.push(
                 com_high
                     .decompress()
-                    .c(d!(NoahError::DecompressElementError))?,
+                    .ok_or(NoahError::DecompressElementError)?,
             );
         }
         if let XfrAssetType::Confidential(com) = open_record.blind_asset_record.asset_type {
             let lock_asset_type = memo
                 .lock_asset_type
                 .as_ref()
-                .c(d!(NoahError::InconsistentStructureError))?;
+                .ok_or(NoahError::InconsistentStructureError)?;
             m.push(open_record.asset_type.as_scalar());
             r.push(open_record.type_blind);
             ctexts.push(lock_asset_type.clone());
-            commitments.push(com.decompress().c(d!(NoahError::DecompressElementError))?);
+            commitments.push(com.decompress().ok_or(NoahError::DecompressElementError)?);
         }
     }
     Ok(pedersen_elgamal_aggregate_eq_proof(
@@ -191,7 +191,7 @@ impl<'a> BarMemosPoliciesCollection<'a> {
     /// Check if the collection is well-constructed.
     pub fn check(&self) -> Result<()> {
         if self.policies.len() != self.bars.len() || self.bars.len() != self.memos.len() {
-            Err(eg!(NoahError::ParameterError))
+            Err(NoahError::ParameterError)
         } else {
             Ok(())
         }
@@ -202,7 +202,7 @@ fn collect_bars_and_memos_by_keys<'a>(
     map: &mut LinearMap<RecordDataEncKey, BarMemoVec<'a>>,
     bmp: &BarMemosPoliciesCollection<'a>,
 ) -> Result<()> {
-    bmp.check().c(d!())?;
+    bmp.check()?;
 
     for ((tracing_policies_i, bar_i), memos_i) in bmp.range_over() {
         // If the bar is non-confidential skip memo and bar, since there is no tracing proof.
@@ -231,7 +231,7 @@ pub(crate) fn batch_verify_tracer_tracing_proof<R: CryptoRng + RngCore>(
     instances_policies: &[&XfrNotePoliciesRef<'_>],
 ) -> Result<()> {
     if xfr_bodies.len() != instances_policies.len() {
-        return Err(eg!(NoahError::ParameterError));
+        return Err(NoahError::ParameterError);
     }
 
     // 1. Batch asset_type and amount tracing.
@@ -241,7 +241,7 @@ pub(crate) fn batch_verify_tracer_tracing_proof<R: CryptoRng + RngCore>(
             if policies.valid {
                 Ok(policies.inputs_tracing_policies.as_slice())
             } else {
-                Err(eg!(NoahError::ParameterError))
+                Err(NoahError::ParameterError)
             }
         })
         .collect();
@@ -251,17 +251,16 @@ pub(crate) fn batch_verify_tracer_tracing_proof<R: CryptoRng + RngCore>(
             if policies.valid {
                 Ok(policies.outputs_tracing_policies.as_slice())
             } else {
-                Err(eg!(NoahError::ParameterError))
+                Err(NoahError::ParameterError)
             }
         })
         .collect();
     batch_verify_asset_tracing_proofs(
         prng,
         xfr_bodies,
-        &input_reveal_policies.c(d!())?,
-        &output_reveal_policies.c(d!())?,
-    )
-    .c(d!(NoahError::XfrVerifyAssetTracingAssetAmountError))?;
+        &input_reveal_policies?,
+        &output_reveal_policies?,
+    )?;
 
     // 2. Check the identity proof individually for now.
     for (xfr_body, policies) in xfr_bodies.iter().zip(instances_policies.iter()) {
@@ -272,15 +271,13 @@ pub(crate) fn batch_verify_tracer_tracing_proof<R: CryptoRng + RngCore>(
             &xfr_body.asset_tracing_memos[..inputs_len],
             &xfr_body.proofs.asset_tracing_proof.inputs_identity_proofs,
             &policies.inputs_sig_commitments,
-        )
-        .c(d!())?;
+        )?;
         verify_identity_proofs(
             &policies.outputs_tracing_policies,
             &xfr_body.asset_tracing_memos[inputs_len..],
             &xfr_body.proofs.asset_tracing_proof.outputs_identity_proofs,
             &policies.outputs_sig_commitments,
-        )
-        .c(d!())?;
+        )?;
     }
 
     Ok(())
@@ -311,8 +308,7 @@ fn batch_verify_asset_tracing_proofs<R: CryptoRng + RngCore>(
             .iter()
             .zip(output_reveal_policies.iter()),
     ) {
-        let records_map =
-            collect_records_memos_by_key(xfr_body, input_policies, output_policies).c(d!())?;
+        let records_map = collect_records_memos_by_key(xfr_body, input_policies, output_policies)?;
         let m = records_map.len();
         if m != xfr_body
             .proofs
@@ -320,7 +316,7 @@ fn batch_verify_asset_tracing_proofs<R: CryptoRng + RngCore>(
             .asset_type_and_amount_proofs
             .len()
         {
-            return Err(eg!(NoahError::XfrVerifyAssetTracingAssetAmountError));
+            return Err(NoahError::XfrVerifyAssetTracingAssetAmountError);
         }
         all_records_map.push(records_map);
         all_proofs.push(
@@ -333,8 +329,7 @@ fn batch_verify_asset_tracing_proofs<R: CryptoRng + RngCore>(
 
     for (records_map, proofs) in all_records_map.iter().zip(all_proofs.iter()) {
         for ((key, records_and_memos), proof) in records_map.iter().zip(proofs.iter()) {
-            let (ctexts, commitments) =
-                extract_ciphertext_and_commitments(&records_and_memos.0).c(d!())?;
+            let (ctexts, commitments) = extract_ciphertext_and_commitments(&records_and_memos.0)?;
             let peg_eq_instance = PedersenElGamalProofInstance {
                 public_key: key,
                 cts: ctexts,
@@ -345,7 +340,11 @@ fn batch_verify_asset_tracing_proofs<R: CryptoRng + RngCore>(
         }
     }
     let mut transcript = Transcript::new(b"AssetTracingProofs");
-    pedersen_elgamal_batch_verify(&mut transcript, prng, &instances).c(d!())
+    Ok(pedersen_elgamal_batch_verify(
+        &mut transcript,
+        prng,
+        &instances,
+    )?)
 }
 
 #[derive(Default)]
@@ -369,16 +368,14 @@ fn collect_records_memos_by_key<'a>(
         &xfr_body.asset_tracing_memos[..inputs_len], // only inputs
         input_reveal_policies,
     );
-    collect_bars_and_memos_by_keys(&mut map, &bars_memo_policies_input)
-        .c(d!(NoahError::XfrVerifyAssetTracingIdentityError))?;
+    collect_bars_and_memos_by_keys(&mut map, &bars_memo_policies_input)?;
 
     let bars_memo_policies_output = BarMemosPoliciesCollection::new(
         &xfr_body.outputs,
         &xfr_body.asset_tracing_memos[inputs_len..], // only outputs
         output_reveal_policies,
     );
-    collect_bars_and_memos_by_keys(&mut map, &bars_memo_policies_output)
-        .c(d!(NoahError::XfrVerifyAssetTracingIdentityError))?;
+    collect_bars_and_memos_by_keys(&mut map, &bars_memo_policies_output)?;
     Ok(map)
 }
 
@@ -392,16 +389,16 @@ fn verify_identity_proofs(
     let n = reveal_policies.len();
 
     if memos.len() != proofs.len() || n != sig_commitments.len() {
-        return Err(eg!(NoahError::XfrVerifyAssetTracingIdentityError));
+        return Err(NoahError::XfrVerifyAssetTracingIdentityError);
     }
     // if no policies, memos and proofs should be empty
     if n == 0 {
         // all memos must be empty
         if !memos.iter().all(|vec| vec.is_empty()) || !proofs.iter().all(|vec| vec.is_empty()) {
-            return Err(eg!(NoahError::XfrVerifyAssetTracingIdentityError));
+            return Err(NoahError::XfrVerifyAssetTracingIdentityError);
         }
     } else if n != memos.len() {
-        return Err(eg!(NoahError::XfrVerifyAssetTracingIdentityError));
+        return Err(NoahError::XfrVerifyAssetTracingIdentityError);
     }
 
     // 2. Check proofs.
@@ -411,7 +408,7 @@ fn verify_identity_proofs(
     {
         let m = policies.len();
         if m != memos.len() || m != proofs.len() {
-            return Err(eg!(NoahError::XfrVerifyAssetTracingIdentityError));
+            return Err(NoahError::XfrVerifyAssetTracingIdentityError);
         }
         // for each policy memo and proof
         let policies = policies.get_policies();
@@ -420,7 +417,7 @@ fn verify_identity_proofs(
             match (&policy.identity_tracing, proof) {
                 (Some(policy), Some(proof)) => {
                     let sig_com =
-                        sig_commitment.c(d!(NoahError::XfrVerifyAssetTracingIdentityError))?;
+                        sig_commitment.ok_or(NoahError::XfrVerifyAssetTracingIdentityError)?;
                     ac_confidential_verify(
                         &policy.cred_issuer_pub_key,
                         enc_keys,
@@ -429,12 +426,11 @@ fn verify_identity_proofs(
                         &memo.lock_attributes[..],
                         proof,
                         &[],
-                    )
-                    .c(d!(NoahError::XfrVerifyAssetTracingIdentityError))?
+                    )?;
                 }
                 (None, None) => {}
                 _ => {
-                    return Err(eg!(NoahError::XfrVerifyAssetTracingIdentityError));
+                    return Err(NoahError::XfrVerifyAssetTracingIdentityError);
                 }
             }
         }
@@ -452,7 +448,7 @@ fn extract_ciphertext_and_commitments(
         let asset_tracer_memo = record_and_memo.1;
 
         if asset_tracer_memo.lock_amount.is_none() && record.amount.is_confidential() {
-            return Err(eg!(NoahError::InconsistentStructureError)); // There should be a lock for the amount
+            return Err(NoahError::InconsistentStructureError); // There should be a lock for the amount
         }
         if let Some(lock_amount) = &asset_tracer_memo.lock_amount {
             ctexts.push(lock_amount.0.clone());
@@ -460,21 +456,21 @@ fn extract_ciphertext_and_commitments(
             let commitments = record
                 .amount
                 .get_commitments()
-                .c(d!(NoahError::InconsistentStructureError))?;
+                .ok_or(NoahError::InconsistentStructureError)?;
             coms.push(
                 (commitments.0)
                     .decompress()
-                    .c(d!(NoahError::DecompressElementError))?,
+                    .ok_or(NoahError::DecompressElementError)?,
             );
             coms.push(
                 (commitments.1)
                     .decompress()
-                    .c(d!(NoahError::DecompressElementError))?,
+                    .ok_or(NoahError::DecompressElementError)?,
             );
         }
 
         if asset_tracer_memo.lock_asset_type.is_none() && record.asset_type.is_confidential() {
-            return Err(eg!(NoahError::InconsistentStructureError)); // There should be a lock for the asset type
+            return Err(NoahError::InconsistentStructureError); // There should be a lock for the asset type
         }
         if let Some(lock_type) = &asset_tracer_memo.lock_asset_type {
             ctexts.push(lock_type.clone());
@@ -482,9 +478,9 @@ fn extract_ciphertext_and_commitments(
                 record
                     .asset_type
                     .get_commitment()
-                    .c(d!(NoahError::InconsistentStructureError))?
+                    .ok_or(NoahError::InconsistentStructureError)?
                     .decompress()
-                    .c(d!(NoahError::DecompressElementError))?,
+                    .ok_or(NoahError::DecompressElementError)?,
             );
         }
     }
@@ -501,7 +497,7 @@ pub(crate) fn gen_range_proof(
     let num_output = outputs.len();
     let upper_power2 = min_greater_equal_power_of_two((2 * (num_output + 1)) as u32) as usize;
     if upper_power2 > MAX_CONFIDENTIAL_RECORD_NUMBER {
-        return Err(eg!(NoahError::RangeProofProveError));
+        return Err(NoahError::RangeProofProveError);
     }
 
     let params = BulletproofParams::default();
@@ -513,7 +509,7 @@ pub(crate) fn gen_range_proof(
     let xfr_diff = if in_total >= out_total {
         in_total - out_total
     } else {
-        return Err(eg!(NoahError::RangeProofProveError));
+        return Err(NoahError::RangeProofProveError);
     };
     let mut values = Vec::with_capacity(upper_power2);
     for x in out_amounts {
@@ -552,8 +548,7 @@ pub(crate) fn gen_range_proof(
         values.as_slice(),
         range_proof_blinds.as_slice(),
         BULLET_PROOF_RANGE,
-    )
-    .c(d!(NoahError::RangeProofProveError))?;
+    )?;
 
     let diff_com_low = coms[2 * num_output];
     let diff_com_high = coms[2 * num_output + 1];
@@ -585,19 +580,21 @@ pub(crate) fn batch_verify_confidential_amount<R: CryptoRng + RngCore>(
     let proofs: Vec<&RangeProof> = instances.iter().map(|(_, _, pf)| &pf.range_proof).collect();
     let mut commitments = vec![];
     for (input, output, proof) in instances {
-        commitments
-            .push(extract_value_commitments(input.as_slice(), output.as_slice(), proof).c(d!())?);
+        commitments.push(extract_value_commitments(
+            input.as_slice(),
+            output.as_slice(),
+            proof,
+        )?);
     }
     let value_commitments = commitments.iter().map(|c| c.as_slice()).collect_vec();
-    batch_verify_ranges(
+    Ok(batch_verify_ranges(
         prng,
         &params.bp_gens,
         proofs.as_slice(),
         &mut transcripts,
         &value_commitments,
         BULLET_PROOF_RANGE,
-    )
-    .c(d!(NoahError::XfrVerifyConfidentialAmountError))
+    )?)
 }
 
 fn extract_value_commitments(
@@ -619,10 +616,10 @@ fn extract_value_commitments(
             XfrAmount::Confidential((com_low, com_high)) => (
                 com_low
                     .decompress()
-                    .c(d!(NoahError::XfrVerifyConfidentialAmountError))?,
+                    .ok_or(NoahError::XfrVerifyConfidentialAmountError)?,
                 com_high
                     .decompress()
-                    .c(d!(NoahError::XfrVerifyConfidentialAmountError))?,
+                    .ok_or(NoahError::XfrVerifyConfidentialAmountError)?,
             ),
             XfrAmount::NonConfidential(amount) => {
                 let (low, high) = u64_to_u32_pair(amount);
@@ -640,8 +637,8 @@ fn extract_value_commitments(
     for output in outputs.iter() {
         let (com_low, com_high) = match output.amount {
             XfrAmount::Confidential((com_low, com_high)) => (
-                com_low.decompress().c(d!(NoahError::ParameterError))?,
-                com_high.decompress().c(d!(NoahError::ParameterError))?,
+                com_low.decompress().ok_or(NoahError::ParameterError)?,
+                com_high.decompress().ok_or(NoahError::ParameterError)?,
             ),
             XfrAmount::NonConfidential(amount) => {
                 let (low, high) = u64_to_u32_pair(amount);
@@ -667,15 +664,15 @@ fn extract_value_commitments(
     let proof_xfr_com_low = proof
         .xfr_diff_commitment_low
         .decompress()
-        .c(d!(NoahError::DecompressElementError))?;
+        .ok_or(NoahError::DecompressElementError)?;
     let proof_xfr_com_high = proof
         .xfr_diff_commitment_high
         .decompress()
-        .c(d!(NoahError::DecompressElementError))?;
+        .ok_or(NoahError::DecompressElementError)?;
     let proof_xfr_com_diff = proof_xfr_com_low.add(&proof_xfr_com_high.mul(&pow2_32));
 
     if derived_xfr_diff_com.compress() != proof_xfr_com_diff.compress() {
-        return Err(eg!(NoahError::XfrVerifyConfidentialAmountError));
+        return Err(NoahError::XfrVerifyConfidentialAmountError);
     }
 
     // 3. Push diff commitments.
@@ -702,7 +699,7 @@ pub(crate) fn asset_proof<R: CryptoRng + RngCore>(
 
     for x in open_inputs.iter().chain(open_outputs) {
         let commitment = match x.blind_asset_record.asset_type {
-            XfrAssetType::Confidential(com) => com.decompress().c(d!(NoahError::ParameterError))?,
+            XfrAssetType::Confidential(com) => com.decompress().ok_or(NoahError::ParameterError)?,
             XfrAssetType::NonConfidential(asset_type) => {
                 pc_gens.commit(asset_type.as_scalar(), x.type_blind)
             }
@@ -712,14 +709,13 @@ pub(crate) fn asset_proof<R: CryptoRng + RngCore>(
     }
     let mut transcript = Transcript::new(b"AssetEquality");
 
-    chaum_pedersen_prove_multiple_eq(
+    Ok(chaum_pedersen_prove_multiple_eq(
         &mut transcript,
         prng,
         &open_inputs[0].asset_type.as_scalar(),
         asset_coms.as_slice(),
         asset_blinds.as_slice(),
-    )
-    .c(d!())
+    )?)
 }
 
 pub(crate) fn batch_verify_confidential_asset<R: CryptoRng + RngCore>(
@@ -739,17 +735,20 @@ pub(crate) fn batch_verify_confidential_asset<R: CryptoRng + RngCore>(
             .chain(outputs.iter())
             .map(|x| match x.asset_type {
                 XfrAssetType::Confidential(com) => {
-                    com.decompress().c(d!(NoahError::ParameterError))
+                    com.decompress().ok_or(NoahError::ParameterError)
                 }
                 XfrAssetType::NonConfidential(asset_type) => {
                     Ok(pc_gens.commit(asset_type.as_scalar(), RistrettoScalar::zero()))
                 }
             })
             .collect();
-        proof_instances.push((instance_commitments.c(d!())?, *proof));
+        proof_instances.push((instance_commitments?, *proof));
     }
-    chaum_pedersen_batch_verify_multiple_eq(&mut transcript, prng, &proof_instances)
-        .c(d!(NoahError::XfrVerifyConfidentialAssetError))
+    Ok(chaum_pedersen_batch_verify_multiple_eq(
+        &mut transcript,
+        prng,
+        &proof_instances,
+    )?)
 }
 
 #[cfg(test)]
@@ -776,8 +775,8 @@ mod tests {
             memos.as_slice(),
             proofs.as_slice(),
             sig_commitments.as_slice(),
-        );
-        pnk!(res);
+        )
+        .unwrap();
 
         // fake sig commitment
         let sig_commitment = crate::anon_creds::ACCommitment::default(); // { 0: ACSignature { sigma1: BLSG1::get_identity(),
@@ -792,7 +791,7 @@ mod tests {
             sig_commitments.as_slice(),
         );
 
-        msg_eq!(
+        assert_eq!(
             NoahError::XfrVerifyAssetTracingIdentityError,
             res.unwrap_err()
         );
@@ -814,7 +813,7 @@ mod tests {
             sig_commitments.as_slice(),
         );
 
-        msg_eq!(
+        assert_eq!(
             NoahError::XfrVerifyAssetTracingIdentityError,
             res.unwrap_err()
         );
@@ -837,7 +836,7 @@ mod tests {
             sig_commitments.as_slice(),
         );
 
-        msg_eq!(
+        assert_eq!(
             NoahError::XfrVerifyAssetTracingIdentityError,
             res.unwrap_err()
         );

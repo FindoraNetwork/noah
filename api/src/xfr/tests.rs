@@ -123,12 +123,13 @@ fn do_transfer_tests_single_asset(
     ));
 
     // 1.1 test batching
-    pnk!(batch_verify_xfr_notes(
+    batch_verify_xfr_notes(
         &mut prng,
         params,
         &[&xfr_note, &xfr_note, &xfr_note],
-        &[&policies.to_ref(); 3]
-    ));
+        &[&policies.to_ref(); 3],
+    )
+    .unwrap();
 
     // test 2: overflow transfer
     let old_output3: AssetRecord = outputs[3].clone();
@@ -145,7 +146,7 @@ fn do_transfer_tests_single_asset(
         outputs.as_slice(),
         inkeys_ref.as_slice(),
     );
-    msg_eq!(
+    assert_eq!(
         NoahError::XfrCreationAssetAmountError,
         xfr_note.unwrap_err(),
         "Xfr cannot be build if output total amount is greater than input amounts"
@@ -205,7 +206,7 @@ fn do_transfer_tests_single_asset(
         outputs.as_slice(),
         inkeys_ref.as_slice(),
     );
-    msg_eq!(
+    assert_eq!(
         NoahError::XfrCreationAssetAmountError,
         xfr_note.unwrap_err(),
         "Xfr cannot be build if output asset types are different"
@@ -265,7 +266,7 @@ fn do_transfer_tests_single_asset(
         inkeys_ref.as_slice(),
     );
 
-    msg_eq!(
+    assert_eq!(
         NoahError::XfrCreationAssetAmountError,
         xfr_note.unwrap_err(),
         "Xfr cannot be build if output asset types are different"
@@ -589,19 +590,14 @@ mod multi_asset_no_tracing {
 
         let policies = XfrNotePolicies::empty_policies(input_record.len(), output_record.len());
 
-        pnk!(verify_xfr_note(
-            &mut prng,
-            &mut params,
-            &xfr_note,
-            &policies.to_ref()
-        ));
+        verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies.to_ref()).unwrap();
 
         xfr_note.body.inputs[0].amount = XfrAmount::NonConfidential(8u64);
 
         xfr_note.multisig =
             compute_transfer_multisig(&xfr_note.body, inkeys_ref.as_slice()).unwrap();
 
-        msg_eq!(
+        assert_eq!(
             NoahError::XfrVerifyAssetAmountError,
             verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies.to_ref()).unwrap_err(),
             "Multi asset transfer non confidential"
@@ -667,7 +663,7 @@ mod keys {
             outputs.as_slice(),
             &[], //no keys
         );
-        msg_eq!(NoahError::ParameterError, xfr_note.unwrap_err());
+        assert_eq!(NoahError::ParameterError, xfr_note.unwrap_err());
 
         let key1 = KeyPair::sample(&mut prng, SECP256K1);
         let key2 = KeyPair::sample(&mut prng, SECP256K1);
@@ -766,19 +762,14 @@ mod identity_tracing {
             vec![Some(&sig_commitment)],
         );
 
-        pnk!(verify_xfr_note(
-            &mut prng,
-            &mut params,
-            &xfr_note,
-            &policies
-        ));
+        verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies).unwrap();
         let policies = XfrNotePoliciesRef::new(
             vec![&tracing_policy],
             vec![Some(&sig_commitment)],
             vec![null_policies_input],
             vec![None; 1],
         );
-        msg_eq!(
+        assert_eq!(
             NoahError::XfrVerifyAssetTracingIdentityError,
             verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies).unwrap_err(),
         );
@@ -935,12 +926,7 @@ mod asset_tracing {
         );
 
         // test 1: the verification is successful
-        pnk!(verify_xfr_body(
-            &mut prng,
-            params,
-            &xfr_body.clone(),
-            &policies
-        ));
+        verify_xfr_body(&mut prng, params, &xfr_body.clone(), &policies).unwrap();
 
         // check that we can recover amount and type from memos
         let records_data = trace_assets(&xfr_note.body, &input_templates[0].2).unwrap();
@@ -997,7 +983,7 @@ mod asset_tracing {
                 output_sig_commitment.clone(),
             );
 
-            msg_eq!(
+            assert_eq!(
                 NoahError::XfrVerifyAssetTracingAssetAmountError,
                 verify_xfr_body(&mut prng, params, &new_xfr_body, &policies).unwrap_err(),
                 "Asset tracing verification fails as the ciphertext has been altered."
@@ -1006,7 +992,7 @@ mod asset_tracing {
 
         // Restore body
         let mut new_xfr_body: XfrBody = xfr_body.clone();
-        pnk!(verify_xfr_body(&mut prng, params, &new_xfr_body, &policies));
+        verify_xfr_body(&mut prng, params, &new_xfr_body, &policies).unwrap();
 
         // test 3: without proof
         new_xfr_body
@@ -1016,7 +1002,7 @@ mod asset_tracing {
 
         let check = verify_xfr_body(&mut prng, params, &new_xfr_body, &policies);
 
-        msg_eq!(
+        assert_eq!(
             NoahError::XfrVerifyAssetTracingAssetAmountError,
             check.unwrap_err(),
             "Transfer should fail without proof."
@@ -1026,7 +1012,7 @@ mod asset_tracing {
 
         // Restore body
         let mut new_xfr_body: XfrBody = xfr_body.clone();
-        pnk!(verify_xfr_body(&mut prng, params, &new_xfr_body, &policies));
+        verify_xfr_body(&mut prng, params, &new_xfr_body, &policies).unwrap();
 
         // Assign the first proof to the second proof
         let wrong_proof = create_wrong_proof();
@@ -1038,7 +1024,7 @@ mod asset_tracing {
 
         let check = verify_xfr_body(&mut prng, params, &new_xfr_body, &policies);
 
-        msg_eq!(
+        assert_eq!(
             NoahError::XfrVerifyAssetTracingAssetAmountError,
             check.unwrap_err(),
             "Transfer should fail as the proof is not correctly computed."
@@ -1095,12 +1081,7 @@ mod asset_tracing {
             vec![None; 1],
         );
 
-        pnk!(verify_xfr_note(
-            &mut prng,
-            &mut params,
-            &xfr_note,
-            &policies
-        ));
+        verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies).unwrap();
     }
 
     #[test]
@@ -1593,12 +1574,7 @@ mod asset_tracing {
             output_sig_commitment,
         );
         // test 1: the verification is successful
-        pnk!(verify_xfr_body(
-            &mut prng,
-            &mut params,
-            &xfr_body.clone(),
-            &policies
-        ));
+        verify_xfr_body(&mut prng, &mut params, &xfr_body.clone(), &policies).unwrap();
         let records_data = trace_assets(&xfr_note.body, &tracer1_keypair).unwrap();
         let ids: Vec<u32> = vec![];
         assert_eq!(records_data.len(), 3);
@@ -1678,12 +1654,7 @@ mod asset_tracing {
             &inkeys_ref,
         );
 
-        pnk!(verify_xfr_note(
-            &mut prng,
-            &mut params,
-            &xfr_note,
-            &policies_ref
-        ));
+        verify_xfr_note(&mut prng, &mut params, &xfr_note, &policies_ref).unwrap();
 
         // Modify the input so that we trigger an integer overflow
         let mut xfr_body_new = xfr_note.body;
@@ -1692,7 +1663,7 @@ mod asset_tracing {
         xfr_body_new.outputs[0].amount = NonConfidential(1_u64);
         xfr_body_new.outputs[1].amount = NonConfidential(u64::max_value());
 
-        msg_eq!(
+        assert_eq!(
             NoahError::XfrVerifyAssetAmountError,
             verify_xfr_body(&mut prng, &mut params, &xfr_body_new, &policies_ref).unwrap_err(),
             "An integer overflow error must be raised"

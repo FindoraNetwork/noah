@@ -55,7 +55,7 @@ pub struct NabarAuditorMemo {
 }
 
 impl Serialize for NabarAuditorMemo {
-    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -78,7 +78,7 @@ impl Serialize for NabarAuditorMemo {
 }
 
 impl<'de> Deserialize<'de> for NabarAuditorMemo {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {

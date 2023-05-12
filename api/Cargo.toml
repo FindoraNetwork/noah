@@ -45,7 +45,6 @@ linear-map = '1.2.0'
 merlin = '3.0'
 rand_chacha = '0.3'
 rmp-serde = '1.0.0'
-ruc = '1.0'
 serde = '1.0'
 serde_derive = '1.0'
 serde_str = '0.1.0'
@@ -75,7 +74,11 @@ version = "4.0.0"
 
 [dependencies.bulletproofs]
 package = "noah-bulletproofs"
-version = "4.0.0"
+#version = "4.0.0"
+git = "https://github.com/FindoraNetwork/bulletproofs"
+branch = "no-std"
+default-features = false
+features = ['yoloproofs']
 
 [dependencies.ark-ff]
 version = '0.4.0-alpha'
@@ -94,7 +97,9 @@ version = '0.4.0-alpha'
 default-features = false
 
 [dependencies.ark-bulletproofs]
-version = '4.0.0'
+#version = '4.0.0'
+git = "https://github.com/FindoraNetwork/ark-bulletproofs"
+branch = "no-std"
 default-features = false
 features = ['yoloproofs']
 
@@ -155,7 +160,16 @@ default = [
     'u64_backend',
 ]
 debug = [ 'noah-plonk/debug' ]
-std = ['curve25519-dalek/std', 'bulletproofs/std', 'ark-bulletproofs/std', 'ark-std/std', 'ark-ec/std']
+std = [
+    'noah-algebra/std',
+    'noah-crypto/std',
+    'noah-plonk/std',
+    'curve25519-dalek/std',
+    'bulletproofs/std',
+    'ark-bulletproofs/std',
+    'ark-std/std',
+    'ark-ec/std'
+]
 alloc = ['curve25519-dalek/alloc']
 nightly = [
     'curve25519-dalek/nightly',

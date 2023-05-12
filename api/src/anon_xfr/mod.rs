@@ -1,4 +1,5 @@
 use crate::anon_xfr::structs::Commitment;
+use crate::errors::{NoahError, Result};
 use crate::keys::{KeyPair, PublicKey, PublicKeyInner, SecretKey};
 use crate::{
     anon_xfr::structs::{
@@ -116,7 +117,7 @@ impl AXfrAddressFoldingWitness {
 fn check_inputs(inputs: &[OpenAnonAssetRecord], keypair: &KeyPair) -> Result<()> {
     for input in inputs.iter() {
         if input.mt_leaf_info.is_none() || keypair.get_pk() != input.pub_key {
-            return Err(eg!(NoahError::ParameterError));
+            return Err(NoahError::ParameterError);
         }
     }
     Ok(())
@@ -151,11 +152,11 @@ fn check_asset_amount(
     for (&asset_type, &sum) in balances.iter() {
         if asset_type != fee_asset_type {
             if sum != 0i128 {
-                return Err(eg!(NoahError::XfrCreationAssetAmountError));
+                return Err(NoahError::XfrCreationAssetAmountError);
             }
         } else {
             if sum != fee.into() {
-                return Err(eg!(NoahError::XfrCreationAssetAmountError));
+                return Err(NoahError::XfrCreationAssetAmountError);
             }
         }
     }
@@ -169,17 +170,17 @@ fn check_roots(inputs: &[OpenAnonAssetRecord]) -> Result<()> {
     let root = inputs[0]
         .mt_leaf_info
         .as_ref()
-        .c(d!(NoahError::ParameterError))?
+        .ok_or(NoahError::ParameterError)?
         .root;
     for input in inputs.iter().skip(1) {
         if input
             .mt_leaf_info
             .as_ref()
-            .c(d!(NoahError::ParameterError))?
+            .ok_or(NoahError::ParameterError)?
             .root
             != root
         {
-            return Err(eg!(NoahError::AXfrVerificationError));
+            return Err(NoahError::AXfrVerificationError);
         }
     }
     Ok(())
@@ -197,7 +198,7 @@ pub fn parse_memo(
     abar: &AnonAssetRecord,
 ) -> Result<(u64, AssetType, BLSScalar)> {
     if bytes.len() != 8 + ASSET_TYPE_LENGTH + BLS12_381_SCALAR_LEN {
-        return Err(eg!(NoahError::ParameterError));
+        return Err(NoahError::ParameterError);
     }
     let amount = u8_le_slice_to_u64(&bytes[0..8]);
     let mut i = 8;
@@ -205,13 +206,12 @@ pub fn parse_memo(
     asset_type_array.copy_from_slice(&bytes[i..i + ASSET_TYPE_LENGTH]);
     let asset_type = AssetType(asset_type_array);
     i += ASSET_TYPE_LENGTH;
-    let blind = BLSScalar::from_bytes(&bytes[i..i + BLS12_381_SCALAR_LEN])
-        .c(d!(NoahError::ParameterError))?;
+    let blind = BLSScalar::from_bytes(&bytes[i..i + BLS12_381_SCALAR_LEN])?;
 
     let (expected_commitment, _) =
         commit(&key_pair.get_pk(), blind, amount, asset_type.as_scalar())?;
     if expected_commitment != abar.commitment {
-        return Err(eg!(NoahError::CommitmentVerificationError));
+        return Err(NoahError::CommitmentVerificationError);
     }
 
     Ok((amount, asset_type, blind))
@@ -322,7 +322,7 @@ pub fn commit(
             address_format_number = BLSScalar::zero();
         }
         PublicKeyInner::EthAddress(_) => {
-            return Err(eg!(NoahError::ParameterError));
+            return Err(NoahError::ParameterError);
         }
     };
 
@@ -554,7 +554,7 @@ pub fn axfr_hybrid_encrypt<R: CryptoRng + RngCore>(
         let res = aes_gcm::Aes256Gcm::new_from_slice(key.as_slice());
 
         if res.is_err() {
-            return Err(eg!(NoahError::EncryptionError));
+            return Err(NoahError::EncryptionError);
         }
 
         res.unwrap()
@@ -564,7 +564,7 @@ pub fn axfr_hybrid_encrypt<R: CryptoRng + RngCore>(
         let res = gcm.encrypt(nonce, msg);
 
         if res.is_err() {
-            return Err(eg!(NoahError::EncryptionError));
+            return Err(NoahError::EncryptionError);
         }
 
         res.unwrap()
@@ -582,7 +582,7 @@ pub fn axfr_hybrid_decrypt(sk: &SecretKey, ctext: &[u8]) -> Result<Vec<u8>> {
 
             let share_len = Ed25519Point::COMPRESSED_LEN;
             if ctext.len() < share_len {
-                return Err(eg!(NoahError::DecryptionError));
+                return Err(NoahError::DecryptionError);
             }
             let share = Ed25519Point::from_compressed_bytes(&ctext[..share_len])?;
             let dh = share.mul(&sk);
@@ -596,7 +596,7 @@ pub fn axfr_hybrid_decrypt(sk: &SecretKey, ctext: &[u8]) -> Result<Vec<u8>> {
 
             let share_len = SECP256K1G1::COMPRESSED_LEN;
             if ctext.len() < share_len {
-                return Err(eg!(NoahError::DecryptionError));
+                return Err(NoahError::DecryptionError);
             }
             let share = SECP256K1G1::from_compressed_bytes(&ctext[..share_len])?;
             let dh = share.mul(&sk);
@@ -616,7 +616,7 @@ pub fn axfr_hybrid_decrypt(sk: &SecretKey, ctext: &[u8]) -> Result<Vec<u8>> {
         let res = aes_gcm::Aes256Gcm::new_from_slice(key.as_slice());
 
         if res.is_err() {
-            return Err(eg!(NoahError::DecryptionError));
+            return Err(NoahError::DecryptionError);
         }
 
         res.unwrap()
@@ -626,7 +626,7 @@ pub fn axfr_hybrid_decrypt(sk: &SecretKey, ctext: &[u8]) -> Result<Vec<u8>> {
         let res = gcm.decrypt(nonce, &ctext[share_len..]);
 
         if res.is_err() {
-            return Err(eg!(NoahError::DecryptionError));
+            return Err(NoahError::DecryptionError);
         }
 
         res.unwrap()

@@ -12,6 +12,7 @@ use crate::anon_xfr::{
     structs::{AccElemVars, Nullifier, OpenAnonAssetRecord, PayerWitness},
     AXfrAddressFoldingInstance, AXfrAddressFoldingWitness, AXfrPlonkPf, TurboPlonkCS, TWO_POW_32,
 };
+use crate::errors::{NoahError, Result};
 use crate::keys::{KeyPair, PublicKey, SecretKey};
 use crate::parameters::params::ProverParams;
 use crate::parameters::params::VerifierParams;
@@ -110,13 +111,13 @@ pub fn init_abar_to_bar_note<R: CryptoRng + RngCore>(
     asset_record_type: AssetRecordType,
 ) -> Result<AbarToBarPreNote> {
     if oabar.mt_leaf_info.is_none() || abar_keypair.get_pk() != oabar.pub_key {
-        return Err(eg!(NoahError::ParameterError));
+        return Err(NoahError::ParameterError);
     }
 
     // Reject anonymous-to-confidential note that actually has transparent output.
     // Should direct to AbarToAr.
     if asset_record_type == AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType {
-        return Err(eg!(NoahError::ParameterError));
+        return Err(NoahError::ParameterError);
     }
 
     let obar_amount = oabar.amount;
@@ -172,8 +173,7 @@ pub fn init_abar_to_bar_note<R: CryptoRng + RngCore>(
             &pc_gens,
             &vec![point_p, point_q],
             &mut transcript,
-        )
-        .c(d!())?
+        )?
     };
 
     // 5. Build the Plonk proof.
@@ -259,8 +259,7 @@ pub fn finish_abar_to_bar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U6
         &beta,
         &lambda,
         &folding_witness,
-    )
-    .c(d!())?;
+    )?;
 
     Ok(AbarToBarNote {
         body,
@@ -277,7 +276,7 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     hash: D,
 ) -> Result<()> {
     if *merkle_root != note.body.merkle_root {
-        return Err(eg!(NoahError::AXfrVerificationError));
+        return Err(NoahError::AXfrVerificationError);
     }
 
     // Check the memo size.
@@ -290,19 +289,15 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     if note.body.output.get_record_type()
         == AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
     {
-        return Err(eg!(NoahError::AXfrVerificationError));
+        return Err(NoahError::AXfrVerificationError);
     }
 
     // 1. Get commitments.
     // 1.1 Reconstruct total amount commitment from bar.
     let (com_low, com_high) = match bar.amount {
         XfrAmount::Confidential((low, high)) => (
-            low.decompress()
-                .ok_or(NoahError::DecompressElementError)
-                .c(d!())?,
-            high.decompress()
-                .ok_or(NoahError::DecompressElementError)
-                .c(d!())?,
+            low.decompress().ok_or(NoahError::DecompressElementError)?,
+            high.decompress().ok_or(NoahError::DecompressElementError)?,
         ),
         XfrAmount::NonConfidential(amount) => {
             // Use a trivial commitment
@@ -317,10 +312,7 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     // 1.2 Get asset type commitment.
     let com_amount = com_low.add(&com_high.mul(&RistrettoScalar::from(TWO_POW_32)));
     let com_asset_type = match bar.asset_type {
-        XfrAssetType::Confidential(a) => a
-            .decompress()
-            .ok_or(NoahError::DecompressElementError)
-            .c(d!())?,
+        XfrAssetType::Confidential(a) => a.decompress().ok_or(NoahError::DecompressElementError)?,
         XfrAssetType::NonConfidential(a) => {
             // Use a trivial commitment
             pc_gens.commit(a.as_scalar(), RistrettoScalar::zero())
@@ -340,8 +332,7 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
         &vec![com_amount, com_asset_type],
         &note.body.delegated_schnorr_proof,
         &mut transcript,
-    )
-    .c(d!())?;
+    )?;
 
     let mut transcript = Transcript::new(ABAR_TO_BAR_FOLDING_PROOF_TRANSCRIPT);
 
@@ -383,15 +374,14 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     online_inputs.extend_from_slice(&s1_plus_lambda_s2_sim_fr.limbs);
     online_inputs.extend_from_slice(&address_folding_public_input);
 
-    verifier(
+    Ok(verifier(
         &mut transcript,
         &params.shrunk_vk,
         &params.shrunk_cs,
         &params.verifier_params,
         &online_inputs,
         &note.proof,
-    )
-    .c(d!(NoahError::AXfrVerificationError))
+    )?)
 }
 
 /// Batch verify the anonymous-to-confidential notes.
@@ -408,7 +398,7 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
         .zip(notes)
         .any(|(x, y)| **x != y.body.merkle_root)
     {
-        return Err(eg!(NoahError::AXfrVerificationError));
+        return Err(NoahError::AXfrVerificationError);
     }
 
     // Check the memo size.
@@ -421,7 +411,7 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
         note.body.output.get_record_type()
             == AssetRecordType::NonConfidentialAmount_NonConfidentialAssetType
     }) {
-        return Err(eg!(NoahError::AXfrVerificationError));
+        return Err(NoahError::AXfrVerificationError);
     }
 
     let pc_gens = PedersenCommitmentRistretto::default();
@@ -437,12 +427,8 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
             // 1.1 Reconstruct total amount commitment from bar.
             let (com_low, com_high) = match bar.amount {
                 XfrAmount::Confidential((low, high)) => (
-                    low.decompress()
-                        .ok_or(NoahError::DecompressElementError)
-                        .c(d!())?,
-                    high.decompress()
-                        .ok_or(NoahError::DecompressElementError)
-                        .c(d!())?,
+                    low.decompress().ok_or(NoahError::DecompressElementError)?,
+                    high.decompress().ok_or(NoahError::DecompressElementError)?,
                 ),
                 XfrAmount::NonConfidential(amount) => {
                     // Use a trivial commitment
@@ -457,10 +443,9 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
             // 1.2 Get asset type commitment.
             let com_amount = com_low.add(&com_high.mul(&RistrettoScalar::from(TWO_POW_32)));
             let com_asset_type = match bar.asset_type {
-                XfrAssetType::Confidential(a) => a
-                    .decompress()
-                    .ok_or(NoahError::DecompressElementError)
-                    .c(d!())?,
+                XfrAssetType::Confidential(a) => {
+                    a.decompress().ok_or(NoahError::DecompressElementError)?
+                }
                 XfrAssetType::NonConfidential(a) => {
                     // Use a trivial commitment
                     pc_gens.commit(a.as_scalar(), RistrettoScalar::zero())
@@ -480,8 +465,7 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
                 &vec![com_amount, com_asset_type],
                 &note.body.delegated_schnorr_proof,
                 &mut transcript,
-            )
-            .c(d!())?;
+            )?;
 
             let mut transcript = Transcript::new(ABAR_TO_BAR_FOLDING_PROOF_TRANSCRIPT);
 
@@ -540,7 +524,7 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
     if is_ok {
         Ok(())
     } else {
-        Err(eg!(NoahError::AXfrVerificationError))
+        Err(NoahError::AXfrVerificationError)
     }
 }
 
@@ -570,7 +554,7 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
     );
     let witness = cs.get_and_clear_witness();
 
-    prover_with_lagrange(
+    Ok(prover_with_lagrange(
         rng,
         &mut transcript,
         &params.pcs,
@@ -578,8 +562,7 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
         &params.cs,
         &params.prover_params,
         &witness,
-    )
-    .c(d!(NoahError::AXfrProofError))
+    )?)
 }
 
 /// Construct the anonymous-to-confidential constraint system.

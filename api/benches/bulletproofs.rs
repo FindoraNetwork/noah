@@ -73,12 +73,13 @@ fn bench_verify_asset_mixer() {
 }
 
 fn bench_batch_verify_asset_mixer(batch_size: usize) {
+    let mut prng = test_rng();
     let mut asset_mix_instances = vec![];
     let mut proofs = vec![];
     let mut inputs_outputs = vec![];
     for _ in 0..batch_size {
         let (inputs, outputs) = gen_inputs_outputs();
-        let proof = prove_asset_mixing(&inputs, &outputs).unwrap();
+        let proof = prove_asset_mixing(&mut prng, &inputs, &outputs).unwrap();
         proofs.push(proof);
         inputs_outputs.push((inputs, outputs));
     }
@@ -115,7 +116,6 @@ fn bench_batch_verify_asset_mixer(batch_size: usize) {
         });
     }
 
-    let mut prng = test_rng();
     let mut params = BulletproofParams::default();
 
     let mut max_circuit_size = 0;
