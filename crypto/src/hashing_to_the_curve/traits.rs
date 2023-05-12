@@ -1,5 +1,5 @@
+use crate::errors::Result;
 use noah_algebra::traits::Scalar;
-use ruc::*;
 
 /// Trait for the Shallue-van de Woestijne map
 pub trait SW<S: Scalar> {
@@ -48,16 +48,16 @@ pub trait SW<S: Scalar> {
 }
 
 /// Trait for the simplified SWU map
-pub trait SSWU<S: Scalar> {
+pub trait SimplifiedSWU<S: Scalar> {
     /// first candidate for solution x
-    fn x1(&self, t: &S) -> Result<S>;
+    fn isogeny_x1(&self, t: &S) -> Result<S>;
 
     /// second candidate for solution x
-    fn x2(&self, t: &S, x1: &S) -> Result<S>;
+    fn isogeny_x2(&self, t: &S, x1: &S) -> Result<S>;
 
     /// check whether candidate x lies on the curve
-    fn is_x_on_curve(&self, x: &S) -> bool;
+    fn is_x_on_isogeny_curve(&self, x: &S) -> bool;
 
-    ///
-    fn convert_x(&self, x: &S) -> Result<S>;
+    /// map x back to the original curve
+    fn isogeny_map_x(&self, x: &S) -> Result<S>;
 }

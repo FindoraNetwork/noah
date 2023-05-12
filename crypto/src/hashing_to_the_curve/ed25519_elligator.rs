@@ -1,3 +1,4 @@
+use crate::errors::Result;
 use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq, prelude::*};
 
 /// Elligator map for Ed25519

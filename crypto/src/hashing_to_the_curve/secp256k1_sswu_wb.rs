@@ -1,11 +1,10 @@
-use crate::hashing_to_the_curve::traits::SSWU;
+use crate::errors::Result;
+use crate::hashing_to_the_curve::traits::SimplifiedSWU;
 use ark_ff::LegendreSymbol;
 use noah_algebra::{new_secp256k1_fq, prelude::*, secp256k1::SECP256K1Fq};
-use num_traits::One;
-use std::ops::{Mul, Neg};
 
-///
-pub type Secp256k1SSWU = SECP256K1Fq;
+/// The simplified SWU map for secp256k1.
+pub struct Secp256k1SSWU;
 
 const K10: SECP256K1Fq = new_secp256k1_fq!(
     "64328938465175664124206102782604393251816658147578091133031991115504908150983"
@@ -31,8 +30,8 @@ const A_PRIME: SECP256K1Fq = new_secp256k1_fq!(
     "28734576633528757162648956269730739219262246272443394170905244663053633733939"
 );
 
-impl SSWU<SECP256K1Fq> for Secp256k1SSWU {
-    fn x1(&self, t: &SECP256K1Fq) -> Result<SECP256K1Fq> {
+impl SimplifiedSWU<SECP256K1Fq> for Secp256k1SSWU {
+    fn isogeny_x1(&self, t: &SECP256K1Fq) -> Result<SECP256K1Fq> {
         let t2 = t.square();
         let t4 = t2.square();
 
@@ -41,13 +40,13 @@ impl SSWU<SECP256K1Fq> for Secp256k1SSWU {
         Ok(a_prime_inv.mul(SECP256K1Fq::from(1771u32)).mul(temp).neg())
     }
 
-    fn x2(&self, t: &SECP256K1Fq, x1: &SECP256K1Fq) -> Result<SECP256K1Fq> {
+    fn isogeny_x2(&self, t: &SECP256K1Fq, x1: &SECP256K1Fq) -> Result<SECP256K1Fq> {
         let t2 = t.square();
 
-        x1.mul(t2).inv()
+        Ok(x1.mul(t2).inv()?)
     }
 
-    fn is_x_on_curve(&self, x: &SECP256K1Fq) -> bool {
+    fn is_x_on_isogeny_curve(&self, x: &SECP256K1Fq) -> bool {
         let mut y_squared = x.pow(&[3u64]).add(SECP256K1Fq::from(1771u32));
         y_squared = y_squared.add(A_PRIME.mul(x));
 
@@ -58,7 +57,7 @@ impl SSWU<SECP256K1Fq> for Secp256k1SSWU {
         }
     }
 
-    fn convert_x(&self, x: &SECP256K1Fq) -> Result<SECP256K1Fq> {
+    fn isogeny_map_x(&self, x: &SECP256K1Fq) -> Result<SECP256K1Fq> {
         let x_squared = x.pow(&[2u64]);
         let x_cubed = x_squared.mul(x);
 
