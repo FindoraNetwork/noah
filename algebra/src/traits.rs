@@ -1,5 +1,6 @@
 use crate::prelude::*;
 use ark_ff::FftField;
+pub use ark_ff::LegendreSymbol;
 use ark_std::{fmt::Debug, vec, vec::Vec};
 use digest::{generic_array::typenum::U64, Digest};
 use num_bigint::BigUint;
@@ -83,6 +84,9 @@ pub trait Scalar:
 
     /// Return the square of the field element
     fn square(&self) -> Self;
+
+    /// Return the legendre symbol of the field element
+    fn legendre(&self) -> LegendreSymbol;
 
     /// exponent form: least significant limb first, with u64 limbs
     fn pow(&self, exponent: &[u64]) -> Self {

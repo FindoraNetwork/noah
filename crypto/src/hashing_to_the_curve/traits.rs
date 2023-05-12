@@ -1,8 +1,8 @@
 use crate::errors::Result;
-use noah_algebra::traits::Scalar;
+use noah_algebra::prelude::*;
 
 /// Trait for the Shallue-van de Woestijne map
-pub trait SW<S: Scalar> {
+pub trait SWParameters<S: Scalar> {
     /// Constant Z0 of Shallue-van de Woestijne map
     const Z0: S;
     /// Constant C1 of Shallue-van de Woestijne map
@@ -48,15 +48,42 @@ pub trait SW<S: Scalar> {
 }
 
 /// Trait for the simplified SWU map
-pub trait SimplifiedSWU<S: Scalar> {
+pub trait SimplifiedSWUParameters<S: Scalar> {
+    /// The -b/a of the isogeny curve.
+    const C1: S;
+    /// The A of the isogeny curve.
+    const A: S;
+    /// The B of the isogeny curve.
+    const B: S;
+    /// A quadratic nonresidue.
+    const QNR: S;
+
     /// first candidate for solution x
-    fn isogeny_x1(&self, t: &S) -> Result<S>;
+    fn isogeny_x1(&self, t: &S) -> Result<S> {
+        let t2 = t.square();
+        let t4 = t2.square();
+
+        let temp = t4.sub(&t2).inv()?.add(S::one());
+        Ok(Self::C1.mul(temp).neg())
+    }
 
     /// second candidate for solution x
-    fn isogeny_x2(&self, t: &S, x1: &S) -> Result<S>;
+    fn isogeny_x2(&self, t: &S, x1: &S) -> Result<S> {
+        let t2 = t.square();
+        Ok(x1.mul(t2).mul(Self::QNR))
+    }
 
     /// check whether candidate x lies on the curve
-    fn is_x_on_isogeny_curve(&self, x: &S) -> bool;
+    fn is_x_on_isogeny_curve(&self, x: &S) -> bool {
+        let mut y_squared = (*x * x * x).add(Self::B);
+        y_squared = y_squared.add(Self::A.mul(x));
+
+        if y_squared.legendre() == LegendreSymbol::QuadraticNonResidue {
+            false
+        } else {
+            true
+        }
+    }
 
     /// map x back to the original curve
     fn isogeny_map_x(&self, x: &S) -> Result<S>;

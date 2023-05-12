@@ -1,7 +1,7 @@
 use crate::ed25519::{Ed25519Point, ED25519_SCALAR_LEN};
 use crate::prelude::*;
 use ark_ed25519::Fr;
-use ark_ff::{BigInteger, FftField, Field, PrimeField};
+use ark_ff::{BigInteger, FftField, Field, LegendreSymbol, PrimeField};
 use ark_std::{vec, vec::Vec};
 use digest::consts::U64;
 use digest::Digest;
@@ -237,6 +237,11 @@ impl Scalar for Ed25519Scalar {
     #[inline]
     fn square(&self) -> Self {
         Self(self.0.square())
+    }
+
+    #[inline]
+    fn legendre(&self) -> LegendreSymbol {
+        self.0.legendre()
     }
 }
 

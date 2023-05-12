@@ -1,11 +1,10 @@
-use crate::hashing_to_the_curve::traits::SW;
-use ark_ff::LegendreSymbol;
+use crate::hashing_to_the_curve::traits::SWParameters;
 use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq, prelude::*};
 
 /// The SW map for ed25519.
 pub struct Ed25519SW;
 
-impl SW<Ed25519Fq> for Ed25519SW {
+impl SWParameters<Ed25519Fq> for Ed25519SW {
     const Z0: Ed25519Fq = new_ed25519_fq!(
         "7351004470711496783299639200077825248508346112056564349554070979984169706335"
     );

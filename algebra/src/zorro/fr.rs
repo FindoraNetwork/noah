@@ -176,11 +176,6 @@ impl ZorroScalar {
     pub const fn new(is_positive: bool, limbs: &[u64]) -> Self {
         ZorroScalar(Fr::from_sign_and_limbs(is_positive, &limbs))
     }
-
-    /// Legendre
-    pub fn legendre(&self) -> LegendreSymbol {
-        self.0.legendre()
-    }
 }
 
 impl Scalar for ZorroScalar {
@@ -270,5 +265,10 @@ impl Scalar for ZorroScalar {
     #[inline]
     fn square(&self) -> Self {
         Self(self.0.square())
+    }
+
+    #[inline]
+    fn legendre(&self) -> LegendreSymbol {
+        self.0.legendre()
     }
 }

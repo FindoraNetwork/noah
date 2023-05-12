@@ -1,11 +1,10 @@
-use crate::hashing_to_the_curve::traits::SW;
-use ark_ff::LegendreSymbol;
+use crate::hashing_to_the_curve::traits::SWParameters;
 use noah_algebra::{new_secp256k1_fq, prelude::*, secp256k1::SECP256K1Fq};
 
 /// The SW map for secp256k1.
 pub struct Secp256k1SW;
 
-impl SW<SECP256K1Fq> for Secp256k1SW {
+impl SWParameters<SECP256K1Fq> for Secp256k1SW {
     const Z0: SECP256K1Fq = new_secp256k1_fq!(
         "2301468970328204842700089520541121182249040118132057797950280022211810753577"
     );
