@@ -1,8 +1,6 @@
 use crate::hashing_to_the_curve::traits::SSWU;
 use ark_ff::LegendreSymbol;
 use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq, prelude::*};
-use num_traits::One;
-use std::ops::{Add, Mul, Neg, Sub};
 
 ///
 pub type Ed25519SSWU = Ed25519Fq;
