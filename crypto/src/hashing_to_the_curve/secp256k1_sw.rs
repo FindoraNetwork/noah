@@ -1,7 +1,6 @@
 use crate::hashing_to_the_curve::traits::SW;
 use ark_ff::LegendreSymbol;
 use noah_algebra::{new_secp256k1_fq, prelude::*, secp256k1::SECP256K1Fq};
-use std::ops::Add;
 
 ///
 pub type Secp256k1SW = SECP256K1Fq;
