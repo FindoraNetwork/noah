@@ -88,9 +88,7 @@ version = '0.4.0-alpha'
 default-features = false
 
 [dependencies.ark-bulletproofs]
-#version = '4.0.0'
-git = "https://github.com/FindoraNetwork/ark-bulletproofs"
-branch = "no-std"
+version = '4.1.0'
 default-features = false
 features = ['yoloproofs']
 
