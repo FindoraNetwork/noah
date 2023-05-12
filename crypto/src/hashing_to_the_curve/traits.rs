@@ -23,7 +23,6 @@ pub trait SW<S: Scalar> {
         let t_sq_inv = t.square().inv()?;
         let c3t_sq_inv = Self::C3.mul(t_sq_inv);
         let temp = S::one().add(c3t_sq_inv);
-
         let temp2 = Self::C2.mul(temp.inv()?);
         Ok(Self::C1.sub(&temp2))
     }
@@ -39,7 +38,6 @@ pub trait SW<S: Scalar> {
         let t_sq_inv = t_sq.inv()?;
         let c3t_sq_inv = Self::C3.mul(t_sq_inv);
         let temp = S::one().add(c3t_sq_inv);
-
         let temp2 = t_sq.mul(temp.square());
 
         Ok(Self::C5.add(Self::C6.mul(temp2)))
@@ -57,7 +55,7 @@ pub trait SSWU<S: Scalar> {
     /// second candidate for solution x
     fn x2(&self, t: &S, x1: &S) -> Result<S>;
 
-    ///
+    /// check whether candidate x lies on the curve
     fn is_x_on_curve(&self, x: &S) -> bool;
 
     ///
