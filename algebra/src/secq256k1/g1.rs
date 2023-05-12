@@ -1,13 +1,10 @@
-use crate::errors::AlgebraError;
 use crate::prelude::*;
 use crate::secq256k1::SECQ256K1Scalar;
 use ark_ec::{AffineRepr, CurveGroup, Group as ArkGroup, VariableBaseMSM};
 use ark_secq256k1::{Affine, Projective};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use ark_std::{
-    boxed::Box,
     fmt::{Debug, Formatter},
-    format,
     vec::Vec,
 };
 use digest::consts::U64;
@@ -83,7 +80,7 @@ impl Group for SECQ256K1G1 {
         if affine.is_ok() {
             Ok(Self(Projective::from(affine.unwrap()))) // safe unwrap
         } else {
-            Err(eg!(AlgebraError::DeserializationError))
+            Err(AlgebraError::DeserializationError)
         }
     }
 
@@ -94,7 +91,7 @@ impl Group for SECQ256K1G1 {
         if affine.is_ok() {
             Ok(Self(Projective::from(affine.unwrap()))) // safe unwrap
         } else {
-            Err(eg!(AlgebraError::DeserializationError))
+            Err(AlgebraError::DeserializationError)
         }
     }
 

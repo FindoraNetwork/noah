@@ -1,14 +1,12 @@
 use crate::bls12_381::{BLSPairingEngine, BLSScalar, BLSG1, BLSG2};
-use crate::errors::AlgebraError;
-use crate::prelude::{derive_prng_from_hash, *};
+use crate::prelude::*;
 use crate::traits::Pairing;
 use ark_bls12_381::{Bls12_381, Fq12Config};
 use ark_ec::pairing::PairingOutput;
 use ark_ff::{BigInteger, Fp12, PrimeField};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
-use ark_std::{boxed::Box, format, vec::Vec, UniformRand};
+use ark_std::{vec::Vec, UniformRand};
 use digest::{consts::U64, Digest};
-use ruc::*;
 use wasm_bindgen::prelude::*;
 
 /// The wrapped struct for [`Fp12<ark_bls12_381::Fq12Parameters>`](https://docs.rs/ark-bls12-381/0.3.0/ark_bls12_381/fq12/struct.Fq12Parameters.html),
@@ -146,7 +144,7 @@ impl Group for BLSGt {
         if res.is_ok() {
             Ok(Self(res.unwrap()))
         } else {
-            Err(eg!(AlgebraError::DeserializationError))
+            Err(AlgebraError::DeserializationError)
         }
     }
 
@@ -157,7 +155,7 @@ impl Group for BLSGt {
         if res.is_ok() {
             Ok(Self(res.unwrap()))
         } else {
-            Err(eg!(AlgebraError::DeserializationError))
+            Err(AlgebraError::DeserializationError)
         }
     }
 

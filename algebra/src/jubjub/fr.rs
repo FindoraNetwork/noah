@@ -1,8 +1,8 @@
 use crate::jubjub::JUBJUB_SCALAR_LEN;
-use crate::{errors::AlgebraError, hash::Hash, prelude::*};
+use crate::{hash::Hash, prelude::*};
 use ark_ed_on_bls12_381::Fr;
 use ark_ff::{BigInteger, FftField, Field, PrimeField};
-use ark_std::{boxed::Box, format, vec, vec::Vec};
+use ark_std::{vec, vec::Vec};
 use digest::{generic_array::typenum::U64, Digest};
 use num_bigint::BigUint;
 use num_traits::Num;
@@ -215,7 +215,7 @@ impl Scalar for JubjubScalar {
     #[inline]
     fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() > Self::bytes_len() {
-            return Err(eg!(AlgebraError::DeserializationError));
+            return Err(AlgebraError::DeserializationError);
         }
         let mut array = vec![0u8; Self::bytes_len()];
         array[0..bytes.len()].copy_from_slice(bytes);
@@ -227,7 +227,7 @@ impl Scalar for JubjubScalar {
     fn inv(&self) -> Result<Self> {
         let a = self.0.inverse();
         if a.is_none() {
-            return Err(eg!(AlgebraError::GroupInversionError));
+            return Err(AlgebraError::GroupInversionError);
         }
         Ok(Self(a.unwrap()))
     }

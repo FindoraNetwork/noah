@@ -1,15 +1,11 @@
-use crate::errors::AlgebraError;
 use crate::prelude::*;
-use crate::prelude::{derive_prng_from_hash, CryptoRng, Group, RngCore};
 use crate::secp256k1::SECP256K1Scalar;
 use crate::secq256k1::SECQ256K1Scalar;
 use ark_ec::{AffineRepr, CurveGroup as ArkCurveGroup, Group as ArkGroup, VariableBaseMSM};
 use ark_secp256k1::{Affine, Projective};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use ark_std::{
-    boxed::Box,
     fmt::{Debug, Formatter},
-    format,
     vec::Vec,
 };
 use digest::consts::U64;
@@ -35,7 +31,7 @@ impl SECP256K1G1 {
     /// Obtain a point using the x coordinate (which would be SECQ256K1Scalar).
     pub fn get_point_from_x(x: &SECQ256K1Scalar) -> Result<Self> {
         let point = Affine::get_point_from_x_unchecked(x.0.clone(), false)
-            .ok_or(eg!(NoahError::DeserializationError))?
+            .ok_or(AlgebraError::DeserializationError)?
             .into_group();
         Ok(Self(point))
     }
@@ -107,7 +103,7 @@ impl Group for SECP256K1G1 {
         if affine.is_ok() {
             Ok(Self(Projective::from(affine.unwrap()))) // safe unwrap
         } else {
-            Err(eg!(AlgebraError::DeserializationError))
+            Err(AlgebraError::DeserializationError)
         }
     }
 
@@ -118,7 +114,7 @@ impl Group for SECP256K1G1 {
         if affine.is_ok() {
             Ok(Self(Projective::from(affine.unwrap()))) // safe unwrap
         } else {
-            Err(eg!(AlgebraError::DeserializationError))
+            Err(AlgebraError::DeserializationError)
         }
     }
 

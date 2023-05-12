@@ -1,11 +1,8 @@
-use crate::errors::AlgebraError;
-use crate::prelude::{derive_prng_from_hash, *};
+use crate::prelude::*;
 use ark_bls12_381::Fq;
 use ark_ff::{BigInteger, BigInteger384, FftField, Field, PrimeField};
 use ark_std::{
-    boxed::Box,
     fmt::{Debug, Formatter},
-    format,
     result::Result as StdResult,
     str::FromStr,
     vec,
@@ -250,7 +247,7 @@ impl Scalar for BLSFq {
     #[inline]
     fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() > Self::bytes_len() {
-            return Err(eg!(AlgebraError::DeserializationError));
+            return Err(AlgebraError::DeserializationError);
         }
         let mut array = vec![0u8; Self::bytes_len()];
         array[0..bytes.len()].copy_from_slice(bytes);
@@ -261,7 +258,7 @@ impl Scalar for BLSFq {
     fn inv(&self) -> Result<Self> {
         let a = self.0.inverse();
         if a.is_none() {
-            return Err(eg!(AlgebraError::GroupInversionError));
+            return Err(AlgebraError::GroupInversionError);
         }
         Ok(Self(a.unwrap()))
     }

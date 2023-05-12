@@ -1,5 +1,4 @@
 use crate::ed25519::Ed25519Scalar;
-use crate::errors::AlgebraError;
 use crate::prelude::*;
 use crate::zorro::ZorroScalar;
 use crate::{
@@ -9,7 +8,7 @@ use crate::{
 use ark_ec::{AffineRepr, CurveGroup as ArkCurveGroup, Group as ArkGroup};
 use ark_ed25519::{EdwardsAffine, EdwardsProjective};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
-use ark_std::{boxed::Box, format, string::ToString, vec::Vec};
+use ark_std::{string::ToString, vec::Vec};
 use digest::consts::U64;
 use digest::Digest;
 use wasm_bindgen::prelude::*;
@@ -108,7 +107,7 @@ impl Group for Ed25519Point {
         if let Ok(affine) = affine {
             Ok(Self(EdwardsProjective::from(affine))) // safe unwrap
         } else {
-            Err(eg!(AlgebraError::DecompressElementError))
+            Err(AlgebraError::DecompressElementError)
         }
     }
 
@@ -119,7 +118,7 @@ impl Group for Ed25519Point {
         if let Ok(affine) = affine {
             Ok(Self(EdwardsProjective::from(affine))) // safe unwrap
         } else {
-            Err(eg!(AlgebraError::DecompressElementError))
+            Err(AlgebraError::DecompressElementError)
         }
     }
 
@@ -205,7 +204,7 @@ impl Ed25519Point {
     /// Obtain a point using the y coordinate (which would be ZorroScalar).
     pub fn get_point_from_y(y: &ZorroScalar) -> Result<Self> {
         let point = EdwardsAffine::get_point_from_y_unchecked(y.0.clone(), false)
-            .ok_or(eg!(NoahError::DeserializationError))?
+            .ok_or(AlgebraError::DeserializationError)?
             .into_group();
         Ok(Self(point))
     }

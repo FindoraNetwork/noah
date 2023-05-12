@@ -1,5 +1,5 @@
 pub use crate::borrow::Borrow;
-pub use crate::errors::NoahError;
+pub use crate::errors::{AlgebraError, NoahError};
 pub use crate::fmt::Formatter;
 pub use crate::iter::Sum;
 pub use crate::ops::*;
@@ -10,4 +10,5 @@ pub use crate::traits::{CurveGroup, Group, Scalar};
 pub use crate::utils::*;
 pub use crate::{msg_eq, not_matches, serialize_deserialize, One, UniformRand, Zero};
 pub use itertools::Itertools;
-pub use ruc::*;
+
+pub type Result<T> = core::result::Result<T, AlgebraError>;

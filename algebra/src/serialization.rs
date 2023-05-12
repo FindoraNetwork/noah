@@ -10,7 +10,7 @@ use crate::{
     zorro::{ZorroFq, ZorroG1, ZorroProof, ZorroScalar},
 };
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
-use ark_std::{boxed::Box, format, io::Cursor, vec, vec::Vec};
+use ark_std::{io::Cursor, vec, vec::Vec};
 use bulletproofs::RangeProof;
 use serde::Serializer;
 
@@ -23,8 +23,7 @@ macro_rules! to_from_bytes_scalar {
                 v
             }
             fn noah_from_bytes(bytes: &[u8]) -> Result<$t> {
-                $t::from_bytes(bytes)
-                    .map_err(|_| eg!(crate::errors::NoahError::DeserializationError))
+                $t::from_bytes(bytes).map_err(|_| crate::errors::AlgebraError::DeserializationError)
             }
         }
     };
@@ -86,7 +85,7 @@ macro_rules! to_from_bytes_group {
             }
             fn noah_from_bytes(bytes: &[u8]) -> Result<$g> {
                 $g::from_compressed_bytes(bytes)
-                    .map_err(|_| eg!(crate::errors::NoahError::SerializationError))
+                    .map_err(|_| crate::errors::AlgebraError::DeserializationError)
             }
         }
     };
@@ -127,7 +126,7 @@ impl NoahFromToBytes for RangeProof {
         v
     }
     fn noah_from_bytes(bytes: &[u8]) -> Result<RangeProof> {
-        RangeProof::from_bytes(bytes).map_err(|_| eg!(NoahError::DeserializationError))
+        RangeProof::from_bytes(bytes).map_err(|_| AlgebraError::DeserializationError)
     }
 }
 
@@ -137,7 +136,7 @@ impl NoahFromToBytes for bulletproofs::r1cs::R1CSProof {
     }
     fn noah_from_bytes(bytes: &[u8]) -> Result<bulletproofs::r1cs::R1CSProof> {
         bulletproofs::r1cs::R1CSProof::from_bytes(bytes)
-            .map_err(|_| eg!(NoahError::DeserializationError))
+            .map_err(|_| AlgebraError::DeserializationError)
     }
 }
 
@@ -154,7 +153,7 @@ impl NoahFromToBytes for SECQ256K1Proof {
             Compress::Yes,
             Validate::Yes,
         )
-        .map_err(|_| eg!(NoahError::DeserializationError))
+        .map_err(|_| AlgebraError::DeserializationError)
     }
 }
 
@@ -171,7 +170,7 @@ impl NoahFromToBytes for ZorroProof {
             Compress::Yes,
             Validate::Yes,
         )
-        .map_err(|_| eg!(NoahError::DeserializationError))
+        .map_err(|_| AlgebraError::DeserializationError)
     }
 }
 
@@ -183,7 +182,7 @@ impl NoahFromToBytes for x25519_dalek::PublicKey {
     }
     fn noah_from_bytes(bytes: &[u8]) -> Result<x25519_dalek::PublicKey> {
         if bytes.len() < 32 {
-            return Err(eg!(NoahError::SerializationError));
+            return Err(AlgebraError::SerializationError);
         }
         let mut array = [0u8; 32];
         array.copy_from_slice(&bytes[0..32]);
@@ -199,7 +198,7 @@ impl NoahFromToBytes for x25519_dalek::StaticSecret {
     }
     fn noah_from_bytes(bytes: &[u8]) -> Result<x25519_dalek::StaticSecret> {
         if bytes.len() < 32 {
-            return Err(eg!(NoahError::SerializationError));
+            return Err(AlgebraError::SerializationError);
         }
         let mut array = [0u8; 32];
         array.copy_from_slice(&bytes[0..32]);

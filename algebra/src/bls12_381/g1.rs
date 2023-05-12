@@ -1,13 +1,10 @@
 use crate::bls12_381::{BLSFq, BLSScalar};
-use crate::errors::AlgebraError;
-use crate::prelude::{derive_prng_from_hash, *};
+use crate::prelude::*;
 use ark_bls12_381::{Fq, G1Affine, G1Projective};
 use ark_ec::{CurveGroup, Group as ArkGroup};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use ark_std::{
-    boxed::Box,
     fmt::{Debug, Display, Formatter},
-    format,
     vec::Vec,
 };
 use digest::{consts::U64, Digest};
@@ -106,7 +103,7 @@ impl Group for BLSG1 {
         if affine.is_ok() {
             Ok(Self(G1Projective::from(affine.unwrap()))) // safe unwrap
         } else {
-            Err(eg!(AlgebraError::DeserializationError))
+            Err(AlgebraError::DeserializationError)
         }
     }
 
@@ -117,7 +114,7 @@ impl Group for BLSG1 {
         if affine.is_ok() {
             Ok(Self(G1Projective::from(affine.unwrap()))) // safe unwrap
         } else {
-            Err(eg!(AlgebraError::DeserializationError))
+            Err(AlgebraError::DeserializationError)
         }
     }
 

@@ -1,11 +1,10 @@
-use crate::errors::AlgebraError;
 use crate::fmt::{Debug, Formatter};
 use crate::prelude::*;
 use crate::zorro::ZorroScalar;
 use ark_bulletproofs::curve::zorro::{G1Affine, G1Projective};
 use ark_ec::{AffineRepr, CurveGroup as ArkCurveGroup, Group as ArkGroup, VariableBaseMSM};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
-use ark_std::{boxed::Box, format, vec::Vec};
+use ark_std::vec::Vec;
 use digest::consts::U64;
 use digest::Digest;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -144,7 +143,7 @@ impl Group for ZorroG1 {
         if affine.is_ok() {
             Ok(Self(G1Projective::from(affine.unwrap()))) // safe unwrap
         } else {
-            Err(eg!(AlgebraError::DeserializationError))
+            Err(AlgebraError::DeserializationError)
         }
     }
 
@@ -155,7 +154,7 @@ impl Group for ZorroG1 {
         if affine.is_ok() {
             Ok(Self(G1Projective::from(affine.unwrap()))) // safe unwrap
         } else {
-            Err(eg!(AlgebraError::DeserializationError))
+            Err(AlgebraError::DeserializationError)
         }
     }
 

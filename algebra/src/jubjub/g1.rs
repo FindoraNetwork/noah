@@ -1,5 +1,4 @@
 use crate::bls12_381::BLSScalar;
-use crate::errors::AlgebraError;
 use crate::jubjub::JubjubScalar;
 use crate::prelude::*;
 use crate::{
@@ -10,7 +9,7 @@ use crate::{
 use ark_ec::{AffineRepr, CurveGroup as ArkCurveGroup, Group as ArkGroup};
 use ark_ed_on_bls12_381::{EdwardsAffine as AffinePoint, EdwardsProjective};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
-use ark_std::{boxed::Box, format, string::ToString, vec::Vec};
+use ark_std::{string::ToString, vec::Vec};
 use digest::consts::U64;
 use digest::Digest;
 
@@ -107,7 +106,7 @@ impl Group for JubjubPoint {
         if let Ok(affine) = affine {
             Ok(Self(EdwardsProjective::from(affine))) // safe unwrap
         } else {
-            Err(eg!(AlgebraError::DecompressElementError))
+            Err(AlgebraError::DecompressElementError)
         }
     }
 
@@ -118,7 +117,7 @@ impl Group for JubjubPoint {
         if let Ok(affine) = affine {
             Ok(Self(EdwardsProjective::from(affine))) // safe unwrap
         } else {
-            Err(eg!(AlgebraError::DecompressElementError))
+            Err(AlgebraError::DecompressElementError)
         }
     }
 

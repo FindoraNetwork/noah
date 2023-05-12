@@ -1,13 +1,9 @@
-use crate::errors::AlgebraError;
 use crate::prelude::*;
-use crate::prelude::{derive_prng_from_hash, u8_le_slice_to_u64, CryptoRng, RngCore, Scalar};
 use crate::secq256k1::SECQ256K1_SCALAR_LEN;
 use ark_ff::{BigInteger, BigInteger256, FftField, Field, PrimeField};
 use ark_secq256k1::Fr;
 use ark_std::{
-    boxed::Box,
     fmt::{Debug, Formatter},
-    format,
     iter::Sum,
     result::Result as StdResult,
     str::FromStr,
@@ -237,7 +233,7 @@ impl Scalar for SECQ256K1Scalar {
     #[inline]
     fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() > Self::bytes_len() {
-            return Err(eg!(AlgebraError::DeserializationError));
+            return Err(AlgebraError::DeserializationError);
         }
         let mut array = vec![0u8; Self::bytes_len()];
         array[0..bytes.len()].copy_from_slice(bytes);
@@ -248,7 +244,7 @@ impl Scalar for SECQ256K1Scalar {
     fn inv(&self) -> Result<Self> {
         let a = self.0.inverse();
         if a.is_none() {
-            return Err(eg!(AlgebraError::GroupInversionError));
+            return Err(AlgebraError::GroupInversionError);
         }
         Ok(Self(a.unwrap()))
     }

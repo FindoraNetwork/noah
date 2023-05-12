@@ -1,7 +1,8 @@
 #![deny(warnings)]
 #![allow(clippy::upper_case_acronyms)]
 
-use crate::{fs::File, io::Write, path::PathBuf, prelude::*, rand::SeedableRng};
+use crate::prelude::*;
+use ark_std::{string::String, vec, vec::Vec};
 use base64::alphabet::URL_SAFE;
 use base64::engine::{DecodePaddingMode, GeneralPurpose, GeneralPurposeConfig};
 use base64::Engine;
@@ -59,7 +60,9 @@ pub fn b64enc<T: ?Sized + AsRef<[u8]>>(input: &T) -> String {
 
 /// Reconstruct from the base64 encoding
 pub fn b64dec<T: ?Sized + AsRef<[u8]>>(input: &T) -> Result<Vec<u8>> {
-    BASE64_ENGINE.decode(input).c(d!())
+    BASE64_ENGINE
+        .decode(input)
+        .map_err(|_| AlgebraError::DeserializationError)
 }
 
 /// Derive a ChaCha20Rng PRNG from a digest from a hash function
@@ -124,7 +127,6 @@ pub fn u64_limbs_from_bytes(slice: &[u8]) -> Vec<u64> {
 #[cfg(feature = "std")]
 pub fn save_to_file(params_ser: &[u8], out_filename: ark_std::path::PathBuf) {
     use ark_std::io::Write;
-
     let filename = out_filename.to_str().unwrap();
     let mut f = ark_std::fs::File::create(&filename).expect("Unable to create file");
     f.write_all(params_ser).expect("Unable to write data");
