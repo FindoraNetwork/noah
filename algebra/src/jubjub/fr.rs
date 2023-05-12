@@ -1,7 +1,7 @@
 use crate::jubjub::JUBJUB_SCALAR_LEN;
 use crate::{hash::Hash, prelude::*};
 use ark_ed_on_bls12_381::Fr;
-use ark_ff::{BigInteger, FftField, Field, PrimeField};
+use ark_ff::{BigInteger, FftField, Field, LegendreSymbol, PrimeField};
 use ark_std::{vec, vec::Vec};
 use digest::{generic_array::typenum::U64, Digest};
 use num_bigint::BigUint;
@@ -235,5 +235,10 @@ impl Scalar for JubjubScalar {
     #[inline]
     fn square(&self) -> Self {
         Self(self.0.square())
+    }
+
+    #[inline]
+    fn legendre(&self) -> LegendreSymbol {
+        self.0.legendre()
     }
 }

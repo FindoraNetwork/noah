@@ -1,6 +1,6 @@
 use crate::anemoi_jive::{AnemoiJive, AnemoiJive381, ApplicableMDSMatrix, MDSMatrix};
 use noah_algebra::bls12_381::BLSScalar;
-use noah_algebra::new_bls12_381;
+use noah_algebra::new_bls12_381_fr;
 use noah_algebra::prelude::Scalar;
 use num_traits::{One, Zero};
 
@@ -14,7 +14,7 @@ fn test_jive() {
     let res = AnemoiJive381::eval_jive(&input_x, &input_y);
     assert_eq!(
         res,
-        new_bls12_381!(
+        new_bls12_381_fr!(
             "40534080031161498828112599909199108154146698842441932527619782321134903095510"
         )
     );
@@ -133,7 +133,7 @@ fn test_anemoi_variable_length_hash() {
     let res = AnemoiJive381::eval_variable_length_hash(&input);
     assert_eq!(
         res,
-        new_bls12_381!(
+        new_bls12_381_fr!(
             "17913626440896376279858183231538520765146521393387279167163788217724133906091"
         )
     );
@@ -292,25 +292,25 @@ fn test_eval_stream_cipher() {
     let input = [F::from(1u64), F::from(2u64), F::from(3u64), F::from(4u64)];
 
     let expect = vec![
-        new_bls12_381!(
+        new_bls12_381_fr!(
             "17913626440896376279858183231538520765146521393387279167163788217724133906091"
         ),
-        new_bls12_381!(
+        new_bls12_381_fr!(
             "10924245457851299776834230964411301097341144242601887717142622193318101873637"
         ),
-        new_bls12_381!(
+        new_bls12_381_fr!(
             "6663276913883111708418423034586768363551398850143421296540382885186078060823"
         ),
-        new_bls12_381!(
+        new_bls12_381_fr!(
             "128933536200405882247940224412197398867767114327852757460179676316357563269"
         ),
-        new_bls12_381!(
+        new_bls12_381_fr!(
             "15258059505200652487595045292898459322384722588445714078850235188840375113869"
         ),
-        new_bls12_381!(
+        new_bls12_381_fr!(
             "12414736053374635364289834327316238573924204459455623330533024897044327146967"
         ),
-        new_bls12_381!(
+        new_bls12_381_fr!(
             "2350377255947715518656472684633767529020826112660644861786637039916779504126"
         ),
     ];

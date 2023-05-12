@@ -1,6 +1,7 @@
 use crate::fmt::{Debug, Formatter};
 use crate::prelude::*;
 use crate::traits::PedersenCommitment;
+use ark_ff::LegendreSymbol;
 use ark_std::{vec, vec::Vec};
 use byteorder::ByteOrder;
 use curve25519_dalek::traits::MultiscalarMul;
@@ -268,6 +269,12 @@ impl Scalar for RistrettoScalar {
     #[inline]
     fn square(&self) -> Self {
         *self * self
+    }
+
+    #[inline]
+    fn legendre(&self) -> LegendreSymbol {
+        let biguint: BigUint = (*self).into();
+        crate::ed25519::Ed25519Scalar::from(&biguint).legendre()
     }
 }
 

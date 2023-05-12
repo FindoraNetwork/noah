@@ -12,3 +12,6 @@ pub mod ed25519_sswu_wb;
 
 /// Module for the ed25519 elligator.
 pub mod ed25519_elligator;
+
+/// Module for the traits of maps.
+pub mod traits;

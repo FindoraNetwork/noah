@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use crate::secp256k1::{SECP256K1G1, SECP256K1_SCALAR_LEN};
-use ark_ff::{BigInteger, BigInteger256, FftField, Field, PrimeField};
+use ark_ff::{BigInteger, BigInteger256, FftField, Field, LegendreSymbol, PrimeField};
 use ark_secp256k1::Fr;
 use ark_std::{
     fmt::{Debug, Formatter},
@@ -287,6 +287,11 @@ impl Scalar for SECP256K1Scalar {
     #[inline]
     fn square(&self) -> Self {
         Self(self.0.square())
+    }
+
+    #[inline]
+    fn legendre(&self) -> LegendreSymbol {
+        self.0.legendre()
     }
 }
 

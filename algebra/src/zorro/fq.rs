@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use ark_bulletproofs::curve::zorro::Fq;
-use ark_ff::{BigInteger, FftField, Field, PrimeField};
+use ark_ff::{BigInteger, FftField, Field, LegendreSymbol, PrimeField};
 use ark_std::{vec, vec::Vec};
 use digest::consts::U64;
 use digest::Digest;
@@ -235,5 +235,10 @@ impl Scalar for ZorroFq {
     #[inline]
     fn square(&self) -> Self {
         Self(self.0.square())
+    }
+
+    #[inline]
+    fn legendre(&self) -> LegendreSymbol {
+        self.0.legendre()
     }
 }

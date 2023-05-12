@@ -1,7 +1,7 @@
 use crate::prelude::*;
 use crate::zorro::{ZorroG1, ZORRO_SCALAR_LEN};
 use ark_bulletproofs::curve::zorro::Fr;
-use ark_ff::{BigInteger, FftField, Field, PrimeField};
+use ark_ff::{BigInteger, FftField, Field, LegendreSymbol, PrimeField};
 use ark_std::{vec, vec::Vec};
 use digest::consts::U64;
 use digest::Digest;
@@ -171,6 +171,11 @@ impl ZorroScalar {
     pub fn from_raw(raw: Fr) -> Self {
         Self(raw)
     }
+
+    /// Create a new scalar element from the arkworks-rs representation.
+    pub const fn new(is_positive: bool, limbs: &[u64]) -> Self {
+        ZorroScalar(Fr::from_sign_and_limbs(is_positive, &limbs))
+    }
 }
 
 impl Scalar for ZorroScalar {
@@ -260,5 +265,10 @@ impl Scalar for ZorroScalar {
     #[inline]
     fn square(&self) -> Self {
         Self(self.0.square())
+    }
+
+    #[inline]
+    fn legendre(&self) -> LegendreSymbol {
+        self.0.legendre()
     }
 }

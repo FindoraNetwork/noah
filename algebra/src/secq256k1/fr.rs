@@ -1,6 +1,6 @@
 use crate::prelude::*;
 use crate::secq256k1::SECQ256K1_SCALAR_LEN;
-use ark_ff::{BigInteger, BigInteger256, FftField, Field, PrimeField};
+use ark_ff::{BigInteger, BigInteger256, FftField, Field, LegendreSymbol, PrimeField};
 use ark_secq256k1::Fr;
 use ark_std::{
     fmt::{Debug, Formatter},
@@ -261,6 +261,11 @@ impl Scalar for SECQ256K1Scalar {
     fn square(&self) -> Self {
         Self(self.0.square())
     }
+
+    #[inline]
+    fn legendre(&self) -> LegendreSymbol {
+        self.0.legendre()
+    }
 }
 
 impl SECQ256K1Scalar {
@@ -272,6 +277,11 @@ impl SECQ256K1Scalar {
     /// From the raw data.
     pub fn from_raw(raw: Fr) -> Self {
         Self(raw)
+    }
+
+    /// Create a new scalar element from the arkworks-rs representation.
+    pub const fn new(is_positive: bool, limbs: &[u64]) -> Self {
+        SECQ256K1Scalar(Fr::from_sign_and_limbs(is_positive, &limbs))
     }
 }
 

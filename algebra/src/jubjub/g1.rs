@@ -4,7 +4,7 @@ use crate::prelude::*;
 use crate::{
     cmp::Ordering,
     hash::{Hash, Hasher},
-    new_bls12_381,
+    new_bls12_381_fr,
 };
 use ark_ec::{AffineRepr, CurveGroup as ArkCurveGroup, Group as ArkGroup};
 use ark_ed_on_bls12_381::{EdwardsAffine as AffinePoint, EdwardsProjective};
@@ -209,10 +209,10 @@ impl CurveGroup for JubjubPoint {
         //
         // This is because among all the 8 points for P such as 8P = G,
         // one of them is in the subgroup spanned by G.
-        let x = new_bls12_381!(
+        let x = new_bls12_381_fr!(
             "37283441954580174170554388175493150130054720173248049475226975321836017924287"
         );
-        let y = new_bls12_381!(
+        let y = new_bls12_381_fr!(
             "38161757907713225632814750034917660204320126559701604632199511537313216752811"
         );
 

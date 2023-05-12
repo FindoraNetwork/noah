@@ -2,7 +2,7 @@ use crate::bls12_381::BLS12_381_SCALAR_LEN;
 use crate::prelude::*;
 use crate::traits::Domain;
 use ark_bls12_381::Fr;
-use ark_ff::{BigInteger, BigInteger256, FftField, Field, PrimeField};
+use ark_ff::{BigInteger, BigInteger256, FftField, Field, LegendreSymbol, PrimeField};
 use ark_std::{
     fmt::{Debug, Formatter},
     result::Result as StdResult,
@@ -284,8 +284,14 @@ impl Scalar for BLSScalar {
         Self(self.0.pow(&array))
     }
 
+    #[inline]
     fn square(&self) -> Self {
         Self(self.0.square())
+    }
+
+    #[inline]
+    fn legendre(&self) -> LegendreSymbol {
+        self.0.legendre()
     }
 }
 
