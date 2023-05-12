@@ -1,9 +1,9 @@
+use ark_std::marker::PhantomData;
 use noah_algebra::bls12_381::BLSScalar;
 use noah_algebra::prelude::*;
 use noah_algebra::str::FromStr;
 use num_bigint::BigUint;
 use num_integer::Integer;
-use std::marker::PhantomData;
 
 /// The trait for parameters for field simulation.
 pub trait SimFrParams: Clone + Default {

@@ -9,6 +9,7 @@ pub use crate::serialization::*;
 pub use crate::traits::{CurveGroup, Group, Scalar};
 pub use crate::utils::*;
 pub use crate::{msg_eq, not_matches, serialize_deserialize, One, UniformRand, Zero};
+pub use ark_std::{string::String, vec, vec::Vec};
 pub use itertools::Itertools;
 
-pub type Result<T> = core::result::Result<T, AlgebraError>;
+pub(crate) type Result<T> = core::result::Result<T, AlgebraError>;

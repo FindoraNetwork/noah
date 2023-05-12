@@ -4,6 +4,7 @@ use crate::anon_creds::{
     Credential, CredentialComm, CredentialCommRandomizer, CredentialIssuerPK, CredentialPoK,
     CredentialUserSK, POK_LABEL,
 };
+use crate::errors::{CryptoError, Result};
 use crate::{
     elgamal::{elgamal_encrypt, ElGamalCiphertext, ElGamalEncKey},
     matrix_sigma::SigmaTranscript,
@@ -146,7 +147,7 @@ pub fn confidential_open_comm<R: CryptoRng + RngCore, P: Pairing>(
     let mut ct_rands = vec![];
     let mut revealed_attrs = vec![];
     if credential.attrs.len() != reveal_map.len() {
-        return Err(eg!(NoahError::ParameterError));
+        return Err(CryptoError::ParameterError);
     }
     for (attr, b) in credential.attrs.iter().zip(reveal_map.iter()) {
         if *b {
@@ -200,19 +201,19 @@ pub fn confidential_verify_open<P: Pairing>(
         .iter()
         .fold(0, |sum, b| if *b { sum + 1 } else { sum });
     if reveal_map.len() != ipk.num_attrs() {
-        return Err(eg!(NoahError::ParameterError));
+        return Err(CryptoError::ParameterError);
     }
     if n > ipk.num_attrs()
         || n != pok.cm_ct.len()
         || n != pok.response_rands.len()
         || n != revealed_count
     {
-        return Err(eg!(NoahError::IdentityRevealVerifyError));
+        return Err(CryptoError::IdentityRevealVerifyError);
     }
 
     let mut transcript = Transcript::new(CAC_REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE);
 
-    confidential_verify_pok::<P>(&mut transcript, ipk, ek, cm, cts, pok, reveal_map, m).c(d!())
+    confidential_verify_pok::<P>(&mut transcript, ipk, ek, cm, cts, pok, reveal_map, m)
 }
 
 pub(crate) fn confidential_prove_pok<R: CryptoRng + RngCore, P: Pairing>(
@@ -321,12 +322,11 @@ fn confidential_verify_pok<P: Pairing>(
         attr_resps.as_slice(),
         pok.response_rands.as_slice(),
         ek,
-    )
-    .c(d!())?;
+    )?;
 
     // 3. verify credential proof
     let hidden_attrs = vec![Hidden(None); ipk.num_attrs()];
-    verify_pok::<P>(ipk, cm, &pok.pok, hidden_attrs.as_slice(), &challenge).c(d!())
+    verify_pok::<P>(ipk, cm, &pok.pok, hidden_attrs.as_slice(), &challenge)
 }
 
 fn verify_ciphertext<P: Pairing>(
@@ -340,10 +340,10 @@ fn verify_ciphertext<P: Pairing>(
     for (ct, ct_cm, attr, rand) in izip!(cts.iter(), ct_cms.iter(), attrs.iter(), rands.iter()) {
         let enc = elgamal_encrypt::<P::G1>(attr, rand, ek);
         if enc.e1 != ct.e1.mul(challenge).add(&ct_cm.e1) {
-            return Err(eg!(NoahError::IdentityRevealVerifyError));
+            return Err(CryptoError::IdentityRevealVerifyError);
         }
         if enc.e2 != ct.e2.mul(challenge).add(&ct_cm.e2) {
-            return Err(eg!(NoahError::IdentityRevealVerifyError));
+            return Err(CryptoError::IdentityRevealVerifyError);
         }
     }
     Ok(())

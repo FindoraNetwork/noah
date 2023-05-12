@@ -4,7 +4,6 @@ use aes::{
 };
 use curve25519_dalek::edwards::CompressedEdwardsY;
 use ed25519_dalek::{ExpandedSecretKey, PublicKey, SecretKey};
-use noah_algebra::errors::NoahError;
 use noah_algebra::prelude::*;
 use noah_algebra::ristretto::RistrettoScalar;
 use serde::Serializer;
@@ -12,6 +11,7 @@ use sha2::Digest;
 use wasm_bindgen::prelude::*;
 
 type Aes256Ctr = ctr::Ctr64BE<Aes256>;
+type Result<T> = core::result::Result<T, AlgebraError>;
 
 #[wasm_bindgen]
 #[derive(Debug, Clone)]
@@ -27,7 +27,7 @@ impl NoahFromToBytes for XPublicKey {
 
     fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() != 32 {
-            Err(eg!(NoahError::DeserializationError))
+            Err(AlgebraError::DeserializationError)
         } else {
             let mut array = [0u8; 32];
             array.copy_from_slice(bytes);
@@ -71,7 +71,7 @@ impl NoahFromToBytes for XSecretKey {
 
     fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() != 32 {
-            Err(eg!(NoahError::DeserializationError))
+            Err(AlgebraError::DeserializationError)
         } else {
             let mut array = [0u8; 32];
             array.copy_from_slice(bytes);
@@ -132,7 +132,7 @@ impl NoahFromToBytes for NoahHybridCiphertext {
 
     fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() < 32 {
-            Err(eg!(NoahError::DeserializationError))
+            Err(AlgebraError::DeserializationError)
         } else {
             let ephemeral_public_key = XPublicKey::noah_from_bytes(&bytes[0..32])?;
             let ciphertext = Ctext::noah_from_bytes(&bytes[32..])?;

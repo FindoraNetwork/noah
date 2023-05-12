@@ -1,5 +1,6 @@
 //! The crate implements the cryptography primitives (except TurboPlonk) for the Noah library,
 //! including Bulletproofs.
+#![cfg_attr(not(feature = "std"), no_std)]
 #![deny(unused_import_braces, unused_qualifications, trivial_casts)]
 #![deny(trivial_numeric_casts, private_in_public)]
 #![deny(stable_features, unreachable_pub, non_shorthand_field_patterns)]
@@ -39,6 +40,8 @@ pub mod delegated_schnorr;
 pub mod doubly_snark_friendly;
 /// The module for the ElGamal encryption.
 pub mod elgamal;
+/// The module for error handling
+pub mod errors;
 /// The module for field simulation.
 pub mod field_simulation;
 /// The module for hashing to the curve.

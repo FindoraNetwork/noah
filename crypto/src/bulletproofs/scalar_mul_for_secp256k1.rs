@@ -1,5 +1,6 @@
 //! Module for the Bulletproof scalar mul proof scheme
 //!
+use crate::errors::Result;
 use ark_bulletproofs::r1cs::{
     LinearCombination, Prover, RandomizableConstraintSystem, Variable, Verifier,
 };
@@ -41,8 +42,8 @@ impl PointVar {
         x: &Option<Fq>,
         y: &Option<Fq>,
     ) -> Result<Self> {
-        let x_var = cs.allocate((*x).clone()).c(d!(NoahError::R1CSProofError))?;
-        let y_var = cs.allocate((*y).clone()).c(d!(NoahError::R1CSProofError))?;
+        let x_var = cs.allocate((*x).clone())?;
+        let y_var = cs.allocate((*y).clone())?;
 
         Ok(Self { x_var, y_var })
     }
@@ -110,9 +111,8 @@ impl ScalarMulProof {
             bits.truncate(Fr::MODULUS_BIT_SIZE as usize);
 
             for bit in bits.iter() {
-                let (bit_var, one_minus_bit_var, product) = cs
-                    .allocate_multiplier(Some((Fq::from(*bit), Fq::from(1 - (*bit as u8)))))
-                    .c(d!(NoahError::R1CSProofError))?;
+                let (bit_var, one_minus_bit_var, product) =
+                    cs.allocate_multiplier(Some((Fq::from(*bit), Fq::from(1 - (*bit as u8)))))?;
                 cs.constrain(product.into());
                 cs.constrain(bit_var + one_minus_bit_var - Fq::one());
 
@@ -126,9 +126,7 @@ impl ScalarMulProof {
             let mut bits_var = Vec::new();
 
             for _ in 0..Fr::MODULUS_BIT_SIZE {
-                let (bit_var, one_minus_bit_var, product) = cs
-                    .allocate_multiplier(None)
-                    .c(d!(NoahError::R1CSProofError))?;
+                let (bit_var, one_minus_bit_var, product) = cs.allocate_multiplier(None)?;
                 cs.constrain(product.into());
                 cs.constrain(bit_var + one_minus_bit_var - Fq::one());
 
@@ -186,7 +184,7 @@ impl ScalarMulProof {
     ) -> Result<(Option<Affine>, PointVar)> {
         let (s_var, res_var, res) = if let Some(left) = left {
             let s = (left.y - &right.y) * (left.x - &right.x).inverse().unwrap();
-            let s_var = cs.allocate(Some(s)).c(d!(NoahError::R1CSProofError))?;
+            let s_var = cs.allocate(Some(s))?;
 
             let new_x = s * &s - &left.x - &right.x;
             let new_y = s * (left.x - &new_x) - &left.y;
@@ -196,8 +194,8 @@ impl ScalarMulProof {
 
             (s_var, res_var, Some(res))
         } else {
-            let s_var = cs.allocate(None).c(d!(NoahError::R1CSProofError))?;
-            let res_var = PointVar::allocate(cs, &None, &None).c(d!(NoahError::R1CSProofError))?;
+            let s_var = cs.allocate(None)?;
+            let res_var = PointVar::allocate(cs, &None, &None)?;
 
             (s_var, res_var, None)
         };
@@ -295,9 +293,7 @@ impl ScalarMulProof {
             &Some(secret_key),
         )?;
 
-        let proof = prover
-            .prove(prng, &bp_gens)
-            .c(d!(NoahError::R1CSProofError))?;
+        let proof = prover.prove(prng, &bp_gens)?;
 
         Ok((
             ScalarMulProof(proof),
@@ -347,13 +343,10 @@ impl ScalarMulProof {
             &secret_key_var,
             &None,
             &None,
-        )
-        .c(d!(NoahError::R1CSProofError))?;
+        )?;
 
         let pc_gens_for_verifier = PedersenGens::<AffineBig>::from(&pc_gens);
-        verifier
-            .verify(&self.0, &pc_gens_for_verifier, &bp_gens)
-            .c(d!(NoahError::R1CSProofError))?;
+        verifier.verify(&self.0, &pc_gens_for_verifier, &bp_gens)?;
         Ok(())
     }
 }

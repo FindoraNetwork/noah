@@ -30,6 +30,8 @@
 //!
 //! Details of the cryptographic protocol will follow.
 
+use crate::errors::{CryptoError, Result};
+use ark_std::string::ToString;
 use bulletproofs::r1cs::{
     ConstraintSystem, LinearCombination, Prover, R1CSError, RandomizableConstraintSystem,
     RandomizedConstraintSystem, Variable, Verifier,
@@ -146,21 +148,20 @@ pub fn mix<CS: RandomizableConstraintSystem>(
     let mut n_gates = 0;
 
     // sort and merge values by type
-    let (n, mut merged_input_vars) = sort_and_merge(cs, input_vars, input_values).c(d!())?;
-    let (m, mut merged_output_vars) = sort_and_merge(cs, output_vars, output_values).c(d!())?;
+    let (n, mut merged_input_vars) = sort_and_merge(cs, input_vars, input_values)?;
+    let (m, mut merged_output_vars) = sort_and_merge(cs, output_vars, output_values)?;
 
     n_gates += n + m;
 
     // pad input or output to be of same length
     if input_len < output_len {
-        pad(cs, output_len, &mut merged_input_vars).c(d!(NoahError::R1CSProofError))?;
+        pad(cs, output_len, &mut merged_input_vars)?;
     } else {
-        pad(cs, input_len, &mut merged_output_vars).c(d!(NoahError::R1CSProofError))?;
+        pad(cs, input_len, &mut merged_output_vars)?;
     }
 
     // do a proof of shuffle
-    n_gates += mix_shuffle_gadget(cs, merged_input_vars, merged_output_vars)
-        .c(d!(NoahError::R1CSProofError))?;
+    n_gates += mix_shuffle_gadget(cs, merged_input_vars, merged_output_vars)?;
 
     // final range proof
     for (i, out) in output_vars.iter().enumerate() {
@@ -168,8 +169,7 @@ pub fn mix<CS: RandomizableConstraintSystem>(
             cs,
             out.amount.into(),
             output_values.map(|out_values| out_values[i].amount),
-        )
-        .c(d!(NoahError::R1CSProofError))?;
+        )?;
     }
 
     Ok(n_gates)
@@ -184,8 +184,8 @@ fn pad<CS: ConstraintSystem>(
     let zero_scalar = Some(RistrettoScalar::zero().0);
     for _ in list.len()..expected_len {
         list.push(MixVariable {
-            amount: cs.allocate(zero_scalar).c(d!())?,
-            asset_type: cs.allocate(zero_scalar).c(d!())?,
+            amount: cs.allocate(zero_scalar)?,
+            asset_type: cs.allocate(zero_scalar)?,
         })
     }
     Ok(())
@@ -275,7 +275,7 @@ fn sort_and_merge<CS: RandomizableConstraintSystem>(
     }
     if len == 1 {
         let v = values.map(|v| v.to_vec());
-        let vars = allocate_mix_vector(cs, v.as_ref(), 1).c(d!())?;
+        let vars = allocate_mix_vector(cs, v.as_ref(), 1)?;
         return Ok((0, vars));
     }
     let mut n_gates = 0;
@@ -283,20 +283,17 @@ fn sort_and_merge<CS: RandomizableConstraintSystem>(
     let merged_values = sorted_values
         .as_ref()
         .map(|sorted| merge(sorted.as_slice()));
-    let sorted_vars = allocate_mix_vector(cs, sorted_values.as_ref(), len).c(d!())?;
+    let sorted_vars = allocate_mix_vector(cs, sorted_values.as_ref(), len)?;
     let intermediate_vars = allocate_mix_vector(
         cs,
         merged_values.as_ref().map(|(intermediate, _)| intermediate),
         len - 2,
-    )
-    .c(d!())?;
+    )?;
     let merged_vars =
-        allocate_mix_vector(cs, merged_values.as_ref().map(|(_, merged)| merged), len).c(d!())?;
+        allocate_mix_vector(cs, merged_values.as_ref().map(|(_, merged)| merged), len)?;
 
-    n_gates += mix_shuffle_gadget(cs, vars.to_vec(), sorted_vars.clone())
-        .c(d!(NoahError::R1CSProofError))?;
-    n_gates += mix_merge_or_not_gadget(cs, &sorted_vars, &intermediate_vars, &merged_vars)
-        .c(d!(NoahError::R1CSProofError))?;
+    n_gates += mix_shuffle_gadget(cs, vars.to_vec(), sorted_vars.clone())?;
+    n_gates += mix_merge_or_not_gadget(cs, &sorted_vars, &intermediate_vars, &merged_vars)?;
 
     Ok((n_gates, merged_vars))
 }
@@ -312,8 +309,8 @@ fn allocate_mix_vector<CS: ConstraintSystem>(
             let mut v = vec![];
             for _ in 0..len {
                 v.push(MixVariable {
-                    amount: cs.allocate(None).c(d!(NoahError::R1CSProofError))?,
-                    asset_type: cs.allocate(None).c(d!(NoahError::R1CSProofError))?,
+                    amount: cs.allocate(None)?,
+                    asset_type: cs.allocate(None)?,
                 });
             }
             v
@@ -322,12 +319,8 @@ fn allocate_mix_vector<CS: ConstraintSystem>(
             let mut vars = vec![];
             for v in values.iter() {
                 vars.push(MixVariable {
-                    amount: cs
-                        .allocate(Some(v.amount.0))
-                        .c(d!(NoahError::R1CSProofError))?,
-                    asset_type: cs
-                        .allocate(Some(v.asset_type.0))
-                        .c(d!(NoahError::R1CSProofError))?,
+                    amount: cs.allocate(Some(v.amount.0))?,
+                    asset_type: cs.allocate(Some(v.asset_type.0))?,
                 });
             }
             vars
@@ -371,7 +364,7 @@ fn mix_merge_or_not_gadget<CS: RandomizableConstraintSystem>(
     // and consider `in1` and `out2` to be the immediate state that is being updated.
 
     for (((in1, in2), out1), out2) in in1iter.zip(in2iter).zip(out1iter).zip(out2iter) {
-        n_gates += gate_mix_or_not(cs, *in1, *in2, *out1, *out2).c(d!())?;
+        n_gates += gate_mix_or_not(cs, *in1, *in2, *out1, *out2)?;
     }
 
     Ok(n_gates)
@@ -410,8 +403,7 @@ fn gate_mix_or_not<CS: RandomizableConstraintSystem>(
         );
         cs.constrain(out.into());
         Ok(())
-    })
-    .c(d!())?;
+    })?;
     Ok(1usize)
 }
 
@@ -424,7 +416,7 @@ fn mix_shuffle_gadget<CS: RandomizableConstraintSystem>(
 ) -> Result<usize> {
     let l = input.len();
     if l != permuted.len() {
-        return Err(eg!(R1CSError::GadgetError {
+        return Err(CryptoError::R1CS(R1CSError::GadgetError {
             description: "list shuffle error, input and output list differ in length".to_string(),
         }));
     }
@@ -452,14 +444,8 @@ fn mix_shuffle_gadget<CS: RandomizableConstraintSystem>(
             single_perm.push(single_pe);
         }
 
-        list_shuffle(cs, &single_input[..], &single_perm[..])
-            .c(d!())
-            .map_err(|e| R1CSError::GadgetError {
-                description: e.to_string(),
-            })
-            .map(|_| ())
-    })
-    .c(d!())?;
+        list_shuffle(cs, &single_input[..], &single_perm[..]).map(|_| ())
+    })?;
 
     // list_shuffle does 2*(l-1) multiplications
     Ok(l + 2 * (l - 1))
@@ -471,12 +457,12 @@ fn list_shuffle<CS: RandomizedConstraintSystem>(
     cs: &mut CS,
     input: &[Variable],
     permuted: &[Variable],
-) -> Result<usize> {
+) -> core::result::Result<usize, R1CSError> {
     let l = input.len();
     if l != permuted.len() {
-        return Err(eg!(R1CSError::GadgetError {
+        return Err(R1CSError::GadgetError {
             description: "list shuffle error, input and output list differ in length".to_string(),
-        }));
+        });
     }
     if l == 0 {
         return Ok(0usize);
@@ -532,7 +518,7 @@ fn range_proof_64<CS: ConstraintSystem>(
                 let index = i >> 3;
                 if index > bytes.len() {
                     // This could happen due to the scalar's representation
-                    return Err(eg!(R1CSError::FormatError));
+                    return Err(CryptoError::R1CS(R1CSError::FormatError));
                 }
                 let bit = ((bytes[index] >> (i & 7)) & 1u8) as i8;
                 let assignment = (
@@ -542,8 +528,7 @@ fn range_proof_64<CS: ConstraintSystem>(
                 cs.allocate_multiplier(Some(assignment).map(|(a, b)| (a.0, b.0)))
             }
             None => cs.allocate_multiplier(None),
-        }
-        .c(d!())?;
+        }?;
 
         // Enforce a * b = 0, so one of (a,b) is zero
         cs.constrain(o.into());

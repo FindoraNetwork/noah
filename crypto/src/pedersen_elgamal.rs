@@ -1,4 +1,5 @@
 use crate::elgamal::{ElGamalCiphertext, ElGamalEncKey};
+use crate::errors::{CryptoError, Result};
 use crate::matrix_sigma::{sigma_prove, sigma_verify_scalars, SigmaProof, SigmaTranscript};
 use curve25519_dalek::traits::{Identity, MultiscalarMul};
 use merlin::Transcript;
@@ -169,7 +170,7 @@ fn pedersen_elgamal_eq_verify<R: CryptoRng + RngCore>(
     );
 
     if multi_exp != curve25519_dalek::ristretto::RistrettoPoint::identity() {
-        Err(eg!(NoahError::ZKProofVerificationError))
+        Err(CryptoError::ZKProofVerificationError)
     } else {
         Ok(())
     }
@@ -320,7 +321,7 @@ pub fn pedersen_elgamal_batch_verify<'a, R: CryptoRng + RngCore>(
         all_elems.iter().map(|x| x.0),
     );
     if multi_exp != curve25519_dalek::ristretto::RistrettoPoint::identity() {
-        return Err(eg!(NoahError::ZKProofBatchVerificationError));
+        return Err(CryptoError::ZKProofBatchVerificationError);
     }
 
     Ok(())
@@ -342,13 +343,13 @@ pub fn pedersen_elgamal_aggregate_eq_verify<R: CryptoRng + RngCore>(
     };
 
     pedersen_elgamal_batch_verify(transcript, prng, &[instance])
-        .c(d!(NoahError::ZKProofVerificationError))
 }
 
 #[cfg(test)]
 mod test {
     use super::PedersenElGamalEqProof;
     use crate::elgamal::{elgamal_encrypt, elgamal_key_gen, ElGamalCiphertext, ElGamalEncKey};
+    use crate::errors::CryptoError;
     use crate::pedersen_elgamal::{
         pedersen_elgamal_aggregate_eq_proof, pedersen_elgamal_aggregate_eq_verify,
         pedersen_elgamal_batch_verify, PedersenElGamalProofInstance,
@@ -426,7 +427,7 @@ mod test {
             &proof,
         );
         assert_eq!(true, verify.is_err());
-        msg_eq!(NoahError::ZKProofVerificationError, verify.unwrap_err());
+        assert_eq!(CryptoError::ZKProofVerificationError, verify.unwrap_err());
     }
 
     #[test]
@@ -474,8 +475,8 @@ mod test {
             &ctexts,
             &commitments,
             &proof,
-        );
-        pnk!(verify);
+        )
+        .unwrap();
 
         let mut prover_transcript = Transcript::new(b"test");
         let mut verifier_transcript = Transcript::new(b"test");
@@ -495,8 +496,8 @@ mod test {
             &ctexts[..1],
             &commitments[..1],
             &proof,
-        );
-        pnk!(verify);
+        )
+        .unwrap();
 
         let mut prover_transcript = Transcript::new(b"test");
         let mut verifier_transcript = Transcript::new(b"test");
@@ -516,8 +517,8 @@ mod test {
             &ctexts[1..2],
             &commitments[1..2],
             &proof,
-        );
-        pnk!(verify);
+        )
+        .unwrap();
 
         let mut prover_transcript = Transcript::new(b"test");
         let mut verifier_transcript = Transcript::new(b"test");
@@ -560,8 +561,8 @@ mod test {
             &proof,
         );
         assert!(verify.is_err());
-        msg_eq!(
-            NoahError::ZKProofBatchVerificationError,
+        assert_eq!(
+            CryptoError::ZKProofBatchVerificationError,
             verify.unwrap_err()
         );
 
@@ -585,8 +586,8 @@ mod test {
             &proof,
         );
         assert!(verify.is_err());
-        msg_eq!(
-            NoahError::ZKProofBatchVerificationError,
+        assert_eq!(
+            CryptoError::ZKProofBatchVerificationError,
             verify.unwrap_err()
         );
 
@@ -611,8 +612,8 @@ mod test {
             &proof,
         );
         assert!(verify.is_err());
-        msg_eq!(
-            NoahError::ZKProofBatchVerificationError,
+        assert_eq!(
+            CryptoError::ZKProofBatchVerificationError,
             verify.unwrap_err()
         );
     }

@@ -40,21 +40,7 @@ impl fmt::Display for AlgebraError {
 impl error::Error for AlgebraError {
     #[cfg(feature = "std")]
     fn description(&self) -> &str {
-        use AlgebraError::*;
-        match self {
-            ArgumentVerificationError => "Proof(argument) not valid for statement",
-            BitConversionError => "Bit conversion is not valid",
-            CommitmentInputError => "The number of messages to be committed is invalid",
-            CommitmentVerificationError => "Commitment verification failed",
-            DecompressElementError => "Could not decompress group Element",
-            DeserializationError => "Could not deserialize object",
-            SerializationError => "Could not serialize object",
-            IndexError => "Index out of bounds",
-            ParameterError => "Unexpected parameter for method or function",
-            SignatureError => "Signature verification failed",
-            InconsistentStructureError => "Noah Structure is inconsistent",
-            GroupInversionError => "Group Element not invertible",
-        }
+        Box::leak(format!("{}", self).into_boxed_str())
     }
 }
 

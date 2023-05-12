@@ -1,3 +1,4 @@
+use crate::errors::{CryptoError, Result};
 use noah_algebra::ristretto::RistrettoPoint;
 use noah_algebra::{
     hash::{Hash, Hasher},
@@ -34,11 +35,9 @@ impl NoahFromToBytes for ElGamalCiphertext<RistrettoPoint> {
         v.extend_from_slice(self.e2.to_compressed_bytes().as_slice());
         v
     }
-    fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
-        let e1 = RistrettoPoint::from_compressed_bytes(&bytes[0..RistrettoPoint::COMPRESSED_LEN])
-            .c(d!(NoahError::DeserializationError))?;
-        let e2 = RistrettoPoint::from_compressed_bytes(&bytes[RistrettoPoint::COMPRESSED_LEN..])
-            .c(d!(NoahError::DeserializationError))?;
+    fn noah_from_bytes(bytes: &[u8]) -> core::result::Result<Self, AlgebraError> {
+        let e1 = RistrettoPoint::from_compressed_bytes(&bytes[0..RistrettoPoint::COMPRESSED_LEN])?;
+        let e2 = RistrettoPoint::from_compressed_bytes(&bytes[RistrettoPoint::COMPRESSED_LEN..])?;
         Ok(ElGamalCiphertext { e1, e2 })
     }
 }
@@ -76,7 +75,7 @@ pub fn elgamal_verify<G: Group>(
     if base.mul(m).add(&ctext.e1.mul(&sec_key.0)) == ctext.e2 {
         Ok(())
     } else {
-        Err(eg!(NoahError::ElGamalVerificationError))
+        Err(CryptoError::ElGamalVerificationError)
     }
 }
 
@@ -96,6 +95,8 @@ mod elgamal_test {
     use noah_algebra::prelude::*;
     use noah_algebra::ristretto::RistrettoPoint;
 
+    use crate::errors::CryptoError;
+
     fn verification<G: Group>() {
         let mut prng = test_rng();
 
@@ -104,13 +105,13 @@ mod elgamal_test {
         let m = G::ScalarType::from(100u32);
         let r = G::ScalarType::random(&mut prng);
         let ctext = super::elgamal_encrypt::<G>(&m, &r, &public_key);
-        pnk!(super::elgamal_verify::<G>(&m, &ctext, &secret_key));
+        super::elgamal_verify::<G>(&m, &ctext, &secret_key).unwrap();
 
         let wrong_m = G::ScalarType::from(99u32);
         let err = super::elgamal_verify(&wrong_m, &ctext, &secret_key)
             .err()
             .unwrap();
-        msg_eq!(NoahError::ElGamalVerificationError, err);
+        assert_eq!(CryptoError::ElGamalVerificationError, err);
     }
 
     fn decryption<G: Group>() {
@@ -121,11 +122,11 @@ mod elgamal_test {
         let m = G::ScalarType::from(mu32);
         let r = G::ScalarType::random(&mut prng);
         let ctext = super::elgamal_encrypt(&m, &r, &public_key);
-        pnk!(super::elgamal_verify(&m, &ctext, &secret_key));
+        super::elgamal_verify(&m, &ctext, &secret_key).unwrap();
 
         let m = G::ScalarType::from(u64::MAX);
         let ctext = super::elgamal_encrypt(&m, &r, &public_key);
-        pnk!(super::elgamal_verify(&m, &ctext, &secret_key));
+        super::elgamal_verify(&m, &ctext, &secret_key).unwrap();
     }
 
     #[test]
