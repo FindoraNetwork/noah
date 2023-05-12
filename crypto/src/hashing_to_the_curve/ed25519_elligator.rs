@@ -1,7 +1,7 @@
 use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq, prelude::*};
 
 /// Elligator map for Ed25519
-pub struct Ed25519Elligator(Ed25519Fq);
+pub struct Ed25519Elligator;
 
 const C: Ed25519Fq = new_ed25519_fq!("486662");
 

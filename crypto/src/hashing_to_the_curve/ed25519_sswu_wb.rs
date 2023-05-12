@@ -2,8 +2,8 @@ use crate::hashing_to_the_curve::traits::SSWU;
 use ark_ff::LegendreSymbol;
 use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq, prelude::*};
 
-///
-pub type Ed25519SSWU = Ed25519Fq;
+/// The simplified SWU map for ed25519.
+pub struct Ed25519SSWU;
 
 const B: Ed25519Fq = new_ed25519_fq!(
     "35145622091990963912007590500565757691096108475092975709449221291113343398787"
