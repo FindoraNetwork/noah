@@ -8,12 +8,15 @@ use mix::MixValue;
 use noah::parameters::bulletproofs::BulletproofParams;
 use noah::parameters::bulletproofs::BulletproofURS;
 use noah::xfr::asset_mixer::{prove_asset_mixing, AssetMixingInstance};
+use noah::NoahError;
 use noah_algebra::{
     prelude::*,
     ristretto::{CompressedRistretto, PedersenCommitmentRistretto, RistrettoScalar},
     traits::PedersenCommitment,
 };
 use noah_crypto::bulletproofs::mix::{self, MixCommitment, MixVariable};
+
+type Result<T> = core::result::Result<T, NoahError>;
 
 fn main() {
     // Measurement of the verification time and batch verification time of Mix Bulletproofs
@@ -33,6 +36,7 @@ fn main() {
 }
 
 fn bench_verify_asset_mixer() {
+    let mut prng = test_rng();
     const COUNT: usize = 20;
     let mut transcripts = Vec::with_capacity(COUNT);
     let mut verifiers = Vec::with_capacity(COUNT);
@@ -64,7 +68,10 @@ fn bench_verify_asset_mixer() {
 
     let start = Instant::now();
     for v in verifiers {
-        assert!(v.0.verify(&v.1, &pc_gens, &bp_circuit_gens).is_ok());
+        assert!(v
+            .0
+            .verify(&mut prng, &v.1, &pc_gens, &bp_circuit_gens)
+            .is_ok());
     }
     println!(
         "mix bulletproofs/non batch verify : {:.2} ms",
@@ -288,6 +295,7 @@ fn bench_batch_verify_range(batch_size: usize) {
 }
 
 fn create_asset_mixer_proof() -> (R1CSProof, Vec<MixCommitment>, Vec<MixCommitment>) {
+    let mut prng = test_rng();
     let (inputs, outputs) = gen_inputs_outputs();
     let mut in_mix_value = vec![];
     let mut out_mix_value = vec![];
@@ -360,7 +368,7 @@ fn create_asset_mixer_proof() -> (R1CSProof, Vec<MixCommitment>, Vec<MixCommitme
     let bp_circuit_gens = BulletproofGens::new(1024, 1);
     assert!(n_gates <= bp_circuit_gens.gens_capacity);
 
-    let proof = prover.prove(&bp_circuit_gens).unwrap();
+    let proof = prover.prove(&mut prng, &bp_circuit_gens).unwrap();
     (proof, input_coms, output_coms)
 }
 
@@ -423,8 +431,7 @@ fn prepare_asset_mixer_verifier(
         .map(|com| com.commit_verifier(verifier))
         .collect_vec();
 
-    mix::mix(verifier, &in_vars, None, &out_vars, None)
-        .c(d!(NoahError::AssetMixerVerificationError))
+    Ok(mix::mix(verifier, &in_vars, None, &out_vars, None)?)
 }
 
 fn asset_mix_num_generators(n_input: usize, n_output: usize) -> usize {
