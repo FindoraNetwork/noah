@@ -177,7 +177,7 @@ mod test {
         cs.insert_ecc_add_gate(&p1_var, &p1_var, &p2_var);
         cs.insert_ecc_add_gate(&p1_var, &p2_var, &p3_var);
         let witness = cs.get_and_clear_witness();
-        pnk!(cs.verify_witness(&witness[..], &[]));
+        cs.verify_witness(&witness[..], &[]).unwrap();
 
         let p3_double_ext = p3_ext.double();
         assert!(cs
@@ -214,7 +214,7 @@ mod test {
         let scalar_var = cs.new_variable(scalar);
         let p_out_var = cs.const_base_scalar_mul(base_ext, scalar_var, 256);
         let mut witness = cs.get_and_clear_witness();
-        pnk!(cs.verify_witness(&witness[..], &[]));
+        cs.verify_witness(&witness[..], &[]).unwrap();
 
         // wrong witness: point = GENERATOR * (jubjub_scalar + 1)
         witness[p_out_var.0] = p_out_plus_ext.get_x();
@@ -233,7 +233,7 @@ mod test {
         // check p_out is an identity point
         assert_eq!(witness[p_out_var.0], BLSScalar::zero());
         assert_eq!(witness[p_out_var.1], BLSScalar::one());
-        pnk!(cs.verify_witness(&witness[..], &[]));
+        cs.verify_witness(&witness[..], &[]).unwrap();
 
         // wrong witness: p_out = GENERATOR
         witness[p_out_var.0] = base_ext.get_x();

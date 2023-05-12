@@ -6,9 +6,6 @@ pub(crate) mod helpers;
 /// Module for the constraint system.
 pub mod constraint_system;
 
-/// Module for error handling.
-pub mod errors;
-
 /// Module for prover.
 pub mod prover;
 

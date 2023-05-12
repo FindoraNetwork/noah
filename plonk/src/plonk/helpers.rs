@@ -1,6 +1,6 @@
+use crate::errors::{PlonkError, Result};
 use crate::plonk::{
     constraint_system::ConstraintSystem,
-    errors::PlonkError,
     indexer::{PlonkPK, PlonkPf, PlonkVK},
 };
 use crate::poly_commit::{
@@ -40,7 +40,7 @@ impl<F: Scalar> PlonkChallenges<F> {
             self.challenges.push(gamma);
             Ok(())
         } else {
-            Err(eg!())
+            Err(PlonkError::ChallengeError)
         }
     }
 
@@ -50,7 +50,7 @@ impl<F: Scalar> PlonkChallenges<F> {
             self.challenges.push(alpha);
             Ok(())
         } else {
-            Err(eg!())
+            Err(PlonkError::ChallengeError)
         }
     }
 
@@ -60,7 +60,7 @@ impl<F: Scalar> PlonkChallenges<F> {
             self.challenges.push(zeta);
             Ok(())
         } else {
-            Err(eg!())
+            Err(PlonkError::ChallengeError)
         }
     }
 
@@ -70,7 +70,7 @@ impl<F: Scalar> PlonkChallenges<F> {
             self.challenges.push(u);
             Ok(())
         } else {
-            Err(eg!())
+            Err(PlonkError::ChallengeError)
         }
     }
 
@@ -79,7 +79,7 @@ impl<F: Scalar> PlonkChallenges<F> {
         if self.challenges.len() > 1 {
             Ok((&self.challenges[0], &self.challenges[1]))
         } else {
-            Err(eg!())
+            Err(PlonkError::ChallengeError)
         }
     }
 
@@ -88,7 +88,7 @@ impl<F: Scalar> PlonkChallenges<F> {
         if self.challenges.len() > 2 {
             Ok(&self.challenges[2])
         } else {
-            Err(eg!())
+            Err(PlonkError::ChallengeError)
         }
     }
 
@@ -97,7 +97,7 @@ impl<F: Scalar> PlonkChallenges<F> {
         if self.challenges.len() > 3 {
             Ok(&self.challenges[3])
         } else {
-            Err(eg!())
+            Err(PlonkError::ChallengeError)
         }
     }
 
@@ -106,7 +106,7 @@ impl<F: Scalar> PlonkChallenges<F> {
         if self.challenges.len() > 4 {
             Ok(&self.challenges[4])
         } else {
-            Err(eg!())
+            Err(PlonkError::ChallengeError)
         }
     }
 }
@@ -240,11 +240,11 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
     let m = cs.quot_eval_dom_size();
     let factor = m / n;
     if n * factor != m {
-        return Err(eg!(PlonkError::SetupError));
+        return Err(PlonkError::SetupError);
     }
 
     let domain_m = FpPolynomial::<PCS::Field>::quotient_evaluation_domain(m)
-        .c(d!(PlonkError::GroupNotFound(n)))?;
+        .ok_or(PlonkError::GroupNotFound(n))?;
     let k = &prover_params.verifier_params.k;
 
     let mut z_h_inv_coset_evals: Vec<<PCS::Field as Domain>::Field> = Vec::with_capacity(factor);
@@ -420,7 +420,7 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
         })
         .collect::<Vec<PCS::Field>>();
 
-    let k_inv = k[1].inv().c(d!(PlonkError::DivisionByZero))?;
+    let k_inv = k[1].inv().map_err(|_| PlonkError::DivisionByZero)?;
 
     Ok(FpPolynomial::coset_ifft_with_domain(
         &domain_m,
@@ -934,15 +934,17 @@ pub(crate) fn split_t_and_commit<R: CryptoRng + RngCore, PCS: PolyComScheme>(
             }
 
             let sub_q = FpPolynomial::from_coefs(new_coefs);
-            let q_eval = FpPolynomial::fft(&sub_q, max_power_of_2).c(d!())?;
+            let q_eval = FpPolynomial::fft(&sub_q, max_power_of_2).ok_or(PlonkError::ProofError)?;
             let q_eval = FpPolynomial::from_coefs(q_eval);
 
-            let cm = lagrange_pcs.commit(&q_eval).c(d!())?;
+            let cm = lagrange_pcs.commit(&q_eval)?;
             let cm_t = pcs.apply_blind_factors(&cm, &blinds, max_power_of_2);
             (cm_t, FpPolynomial::from_coefs(coefs))
         } else {
             let t_poly = FpPolynomial::from_coefs(coefs);
-            let cm_t = pcs.commit(&t_poly).c(d!(PlonkError::CommitmentError))?;
+            let cm_t = pcs
+                .commit(&t_poly)
+                .map_err(|_| PlonkError::CommitmentError)?;
             (cm_t, t_poly)
         };
 

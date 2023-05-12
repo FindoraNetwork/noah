@@ -1,7 +1,8 @@
 //! It also implements a set of arithmetic/boolean/range gates that
 //! will be used in anonymous transfer.
 use super::{ConstraintSystem, CsIndex, VarIndex};
-use crate::plonk::errors::PlonkError;
+use crate::errors::{PlonkError, Result};
+use ark_std::{borrow::ToOwned, format};
 use noah_algebra::prelude::*;
 
 use noah_crypto::anemoi_jive::AnemoiJive;
@@ -99,7 +100,7 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
 
     fn selector(&self, index: usize) -> Result<&[F]> {
         if index >= self.selectors.len() {
-            return Err(eg!(PlonkError::FuncParamsError));
+            return Err(PlonkError::FuncParamsError);
         }
         Ok(&self.selectors[index])
     }
@@ -112,7 +113,7 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
     /// ```
     fn eval_gate_func(wire_vals: &[&F], sel_vals: &[&F], pub_input: &F) -> Result<F> {
         if wire_vals.len() != N_WIRES_PER_GATE || sel_vals.len() != N_SELECTORS {
-            return Err(eg!(PlonkError::FuncParamsError));
+            return Err(PlonkError::FuncParamsError);
         }
         let add1 = sel_vals[0].mul(wire_vals[0]);
         let add2 = sel_vals[1].mul(wire_vals[1]);
@@ -144,7 +145,7 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
     /// (w1, w2, w3, w4, w1*w2, w3*w4, 1, w1*w2*w3*w4*wo, -w4)
     fn eval_selector_multipliers(wire_vals: &[&F]) -> Result<Vec<F>> {
         if wire_vals.len() < N_WIRES_PER_GATE {
-            return Err(eg!(PlonkError::FuncParamsError));
+            return Err(PlonkError::FuncParamsError);
         }
 
         let mut w0w1w2w3w4 = *wire_vals[0];
@@ -256,7 +257,7 @@ impl<F: Scalar> TurboCS<F> {
     /// Create a TurboPLONK constraint system with a certain field size.
     /// With default witness [F::zero(), F::one()].
     pub fn new() -> TurboCS<F> {
-        let selectors: Vec<Vec<F>> = std::iter::repeat(vec![]).take(N_SELECTORS).collect();
+        let selectors: Vec<Vec<F>> = core::iter::repeat(vec![]).take(N_SELECTORS).collect();
         Self {
             selectors,
             wiring: [vec![], vec![], vec![], vec![], vec![]],
@@ -803,7 +804,7 @@ impl<F: Scalar> TurboCS<F> {
     /// Verify the given witness and publics.
     pub fn verify_witness(&self, witness: &[F], online_vars: &[F]) -> Result<()> {
         if witness.len() != self.num_vars {
-            return Err(eg!(format!(
+            return Err(PlonkError::Message(format!(
                 "witness len = {}, num_vars = {}",
                 witness.len(),
                 self.num_vars
@@ -812,7 +813,9 @@ impl<F: Scalar> TurboCS<F> {
         if online_vars.len() != self.public_vars_witness_indices.len()
             || online_vars.len() != self.public_vars_constraint_indices.len()
         {
-            return Err(eg!("wrong number of online variables"));
+            return Err(PlonkError::Message(
+                "wrong number of online variables".to_owned(),
+            ));
         }
 
         for cs_index in 0..self.size() {
@@ -829,7 +832,7 @@ impl<F: Scalar> TurboCS<F> {
                     // found
                     public_online = *online_var;
                     if witness[*w_i] != *online_var {
-                        return Err(eg!(format!(
+                        return Err(PlonkError::Message(format!(
                             "cs index {}: online var {:?} does not match witness {:?}",
                             cs_index, *online_var, witness[*w_i]
                         )));
@@ -845,10 +848,9 @@ impl<F: Scalar> TurboCS<F> {
             let sel_vals: Vec<&F> = (0..self.num_selectors())
                 .map(|i| &self.selectors[i][cs_index])
                 .collect();
-            let eval_gate = Self::eval_gate_func(&wire_vals, &sel_vals, &public_online)
-                .c(d!("wrong func params for eval_gate_func()"))?;
+            let eval_gate = Self::eval_gate_func(&wire_vals, &sel_vals, &public_online)?;
             if eval_gate != F::zero() {
-                return Err(eg!(format!(
+                return Err(PlonkError::Message(format!(
                     "cs index {}: wire_vals = ({:?}), sel_vals = ({:?})",
                     cs_index, wire_vals, sel_vals
                 )));
@@ -856,21 +858,21 @@ impl<F: Scalar> TurboCS<F> {
 
             if self.boolean_constraint_indices.contains(&cs_index) {
                 if !w2_value.is_zero() && !w2_value.is_one() {
-                    return Err(eg!(format!(
+                    return Err(PlonkError::Message(format!(
                         "cs index {}: the second wire {:?} is not one or zero",
                         cs_index, w2_value
                     )));
                 }
 
                 if !w3_value.is_zero() && !w3_value.is_one() {
-                    return Err(eg!(format!(
+                    return Err(PlonkError::Message(format!(
                         "cs index {}: the third wire {:?} is not one or zero",
                         cs_index, w3_value
                     )));
                 }
 
                 if !w4_value.is_zero() && !w4_value.is_one() {
-                    return Err(eg!(format!(
+                    return Err(PlonkError::Message(format!(
                         "cs index {}: the fourth wire {:?} is not one or zero",
                         cs_index, w4_value
                     )));
@@ -896,7 +898,7 @@ impl<F: Scalar> TurboCS<F> {
                 let d_i_next = witness[self.get_witness_index(3, cs_index + 1 + r)];
 
                 if o_i != d_i_next {
-                    return Err(eg!(format!(
+                    return Err(PlonkError::Message(format!(
                         "cs index {} round {}: the output wire {:?} does not equal to the fourth wire {:?} in the next constraint",
                             cs_index,
                             r,
@@ -918,7 +920,7 @@ impl<F: Scalar> TurboCS<F> {
                     + g * (d_i + g * c_i + prk_i_c).square();
                 let right = a_i + g * b_i + prk_i_a;
                 if left != right {
-                    return Err(eg!(format!(
+                    return Err(PlonkError::Message(format!(
                         "cs index {} round {}: the first equation does not equal: {:?} != {:?}",
                         cs_index, r, left, right
                     )));
@@ -929,7 +931,7 @@ impl<F: Scalar> TurboCS<F> {
                     + g * (g * d_i + g2 * c_i + prk_i_d).square();
                 let right = g * a_i + g2 * b_i + prk_i_b;
                 if left != right {
-                    return Err(eg!(format!(
+                    return Err(PlonkError::Message(format!(
                         "cs index {} round {}: the second equation does not equal: {:?} != {:?}",
                         cs_index, r, left, right
                     )));
@@ -941,7 +943,7 @@ impl<F: Scalar> TurboCS<F> {
                     + self.anemoi_generator_inv;
                 let right = a_i_next;
                 if left != right {
-                    return Err(eg!(format!(
+                    return Err(PlonkError::Message(format!(
                         "cs index {} round {}: the third equation does not equal: {:?} != {:?}",
                         cs_index, r, left, right
                     )));
@@ -953,7 +955,7 @@ impl<F: Scalar> TurboCS<F> {
                     + self.anemoi_generator_inv;
                 let right = b_i_next;
                 if left != right {
-                    return Err(eg!(format!(
+                    return Err(PlonkError::Message(format!(
                         "cs index {} round {}: the fourth equation does not equal: {:?} != {:?}",
                         cs_index, r, left, right
                     )));
@@ -1068,7 +1070,7 @@ mod test {
         cs.equal(add, sub);
 
         let witness = cs.get_and_clear_witness();
-        pnk!(cs.verify_witness(&witness[..], &[]));
+        cs.verify_witness(&witness[..], &[]).unwrap();
 
         assert!(cs
             .verify_witness(&[zero, one, two, two, two, one, zero], &[])
@@ -1090,7 +1092,7 @@ mod test {
         assert_eq!(cs.witness[two_equals_two], one);
 
         let mut witness = cs.get_and_clear_witness();
-        pnk!(cs.verify_witness(&witness, &[]));
+        cs.verify_witness(&witness, &[]).unwrap();
 
         witness[0] = two;
         assert!(cs.verify_witness(&witness, &[]).is_err());
@@ -1122,7 +1124,7 @@ mod test {
         cs.range_check(e_idx, 3);
 
         let witness = cs.get_and_clear_witness();
-        pnk!(cs.verify_witness(&witness[..], &[]));
+        cs.verify_witness(&witness[..], &[]).unwrap();
 
         let eight = num[3].add(&num[5]);
         // Bad witness: [a, b] = [1, 2], [c, d, e] = [3, 2, 8] and e >= 8
@@ -1178,30 +1180,31 @@ mod test {
         let twelve = num[8].add(&num[4]);
         // Good witness: [1, 2, 3, 1, 7, 6], e_binary_le = [1, 1, 1], f_binary_le = [0, 1, 1]
         let witness = cs.get_and_clear_witness();
-        pnk!(cs.verify_witness(&witness[..], &[]));
+        cs.verify_witness(&witness[..], &[]).unwrap();
 
         // Another good witness also satisfies the circuit:
         // [0, 2, 2, 1, 5, 4], e_binary_le = [1, 0, 1], f_binary_le = [0, 0, 1]
-        let verify = cs.verify_witness(
-            &[
-                F::zero(),
-                F::one(),
-                num[0],
-                num[2],
-                num[2],
-                num[1],
-                num[5],
-                num[4],
-                num[1],
-                num[0],
-                num[1],
-                num[0],
-                num[0],
-                num[1],
-            ],
-            &[],
-        );
-        pnk!(verify);
+        let verify = cs
+            .verify_witness(
+                &[
+                    F::zero(),
+                    F::one(),
+                    num[0],
+                    num[2],
+                    num[2],
+                    num[1],
+                    num[5],
+                    num[4],
+                    num[1],
+                    num[0],
+                    num[1],
+                    num[0],
+                    num[0],
+                    num[1],
+                ],
+                &[],
+            )
+            .unwrap();
 
         // Bad witness: a is not boolean
         assert!(cs
