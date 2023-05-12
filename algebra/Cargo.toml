@@ -43,11 +43,7 @@ default-features = false
 
 [dependencies.bulletproofs]
 package = "noah-bulletproofs"
-#version = "4.0.0"
-git = "https://github.com/FindoraNetwork/bulletproofs"
-branch = "no-std"
-default-features = false
-features = ['yoloproofs']
+version = "4.1.0"
 
 [dependencies.ark-ec]
 version = '0.4.0-alpha'
