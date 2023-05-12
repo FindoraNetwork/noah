@@ -12,6 +12,7 @@ use crate::anon_xfr::{
     structs::{AccElemVars, Nullifier, OpenAnonAssetRecord, PayerWitness},
     AXfrAddressFoldingInstance, AXfrAddressFoldingWitness, AXfrPlonkPf, TurboPlonkCS,
 };
+use crate::errors::{NoahError, Result};
 use crate::keys::{KeyPair, PublicKey, SecretKey};
 use crate::parameters::params::ProverParams;
 use crate::parameters::params::VerifierParams;
@@ -88,7 +89,7 @@ pub fn init_abar_to_ar_note<R: CryptoRng + RngCore>(
     ar_pub_key: &PublicKey,
 ) -> Result<AbarToArPreNote> {
     if oabar.mt_leaf_info.is_none() || abar_keypair.get_pk() != oabar.pub_key {
-        return Err(eg!(NoahError::ParameterError));
+        return Err(NoahError::ParameterError);
     }
 
     let oar_amount = oabar.amount;
@@ -190,8 +191,7 @@ pub fn finish_abar_to_ar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
         &nullifier_trace,
         &input_commitment_trace,
         &folding_witness,
-    )
-    .c(d!())?;
+    )?;
 
     Ok(AbarToArNote {
         body,
@@ -209,12 +209,12 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
 ) -> Result<()> {
     // require the output amount & asset type are non-confidential
     if note.body.output.amount.is_confidential() || note.body.output.asset_type.is_confidential() {
-        return Err(eg!(NoahError::ParameterError));
+        return Err(NoahError::ParameterError);
     }
 
     // Require the output memo is none.
     if note.body.memo.is_some() {
-        return Err(eg!(NoahError::ParameterError));
+        return Err(NoahError::ParameterError);
     }
 
     let mut transcript = Transcript::new(ABAR_TO_AR_FOLDING_PROOF_TRANSCRIPT);
@@ -234,7 +234,7 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
     let payer_asset_type = note.body.output.asset_type.get_asset_type().unwrap();
 
     if *merkle_root != note.body.merkle_root {
-        return Err(eg!(NoahError::AXfrVerificationError));
+        return Err(NoahError::AXfrVerificationError);
     }
 
     let mut transcript = Transcript::new(ABAR_TO_AR_PLONK_PROOF_TRANSCRIPT);
@@ -245,15 +245,14 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
     online_inputs.push(payer_asset_type.as_scalar());
     online_inputs.extend_from_slice(&address_folding_public_input);
 
-    verifier(
+    Ok(verifier(
         &mut transcript,
         &params.shrunk_vk,
         &params.shrunk_cs,
         &params.verifier_params,
         &online_inputs,
         &note.proof,
-    )
-    .c(d!(NoahError::AXfrVerificationError))
+    )?)
 }
 
 /// Batch verify the anonymous-to-transparent notes.
@@ -269,13 +268,13 @@ pub fn batch_verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default + Sync
     if notes.par_iter().any(|note| {
         note.body.output.amount.is_confidential() || note.body.output.asset_type.is_confidential()
     }) {
-        return Err(eg!(NoahError::ParameterError));
+        return Err(NoahError::ParameterError);
     }
 
     // Require the output memo is none.
     for note in notes.iter() {
         if note.body.memo.is_some() {
-            return Err(eg!(NoahError::ParameterError));
+            return Err(NoahError::ParameterError);
         }
     }
 
@@ -284,7 +283,7 @@ pub fn batch_verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default + Sync
         .zip(notes)
         .any(|(x, y)| **x != y.body.merkle_root)
     {
-        return Err(eg!(NoahError::AXfrVerificationError));
+        return Err(NoahError::AXfrVerificationError);
     }
 
     let is_ok = notes
@@ -317,21 +316,21 @@ pub fn batch_verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default + Sync
             online_inputs.push(payer_asset_type.as_scalar());
             online_inputs.extend_from_slice(&address_folding_public_input);
 
-            verifier(
+            Ok(verifier(
                 &mut transcript,
                 &params.shrunk_vk,
                 &params.shrunk_cs,
                 &params.verifier_params,
                 &online_inputs,
                 &note.proof,
-            )
+            )?)
         })
-        .all(|x| x.is_ok());
+        .all(|x: Result<()>| x.is_ok());
 
     if is_ok {
         Ok(())
     } else {
-        Err(eg!(NoahError::AXfrVerificationError))
+        Err(NoahError::AXfrVerificationError)
     }
 }
 fn prove_abar_to_ar<R: CryptoRng + RngCore>(
@@ -352,7 +351,7 @@ fn prove_abar_to_ar<R: CryptoRng + RngCore>(
     );
     let witness = cs.get_and_clear_witness();
 
-    prover_with_lagrange(
+    Ok(prover_with_lagrange(
         rng,
         &mut transcript,
         &params.pcs,
@@ -360,8 +359,7 @@ fn prove_abar_to_ar<R: CryptoRng + RngCore>(
         &params.cs,
         &params.prover_params,
         &witness,
-    )
-    .c(d!(NoahError::AXfrProofError))
+    )?)
 }
 
 /// Construct the anonymous-to-transparent constraint system.

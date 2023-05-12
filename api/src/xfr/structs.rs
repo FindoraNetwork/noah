@@ -2,6 +2,7 @@ use crate::anon_creds::{
     ACConfidentialRevealProof, ACIssuerPublicKey, AttributeCiphertext, AttributeDecKey,
     AttributeEncKey,
 };
+use crate::errors::{NoahError, Result};
 use crate::keys::{KeyPair, KeyType, PublicKey, PublicKeyInner, SignatureList};
 use crate::xfr::{
     asset_mixer::AssetMixProof,
@@ -9,6 +10,7 @@ use crate::xfr::{
     asset_tracer::{RecordDataCiphertext, RecordDataDecKey, RecordDataEncKey},
     xfr_hybrid_decrypt, xfr_hybrid_encrypt,
 };
+use ark_std::boxed::Box;
 use bulletproofs::RangeProof;
 use digest::Digest;
 use noah_algebra::{
@@ -493,7 +495,7 @@ impl OwnerMemo {
         let decrypted_bytes = self.decrypt(&keypair)?;
         // amount is u64, thus u64.to_be_bytes should be 8 bytes
         if decrypted_bytes.len() != 8 {
-            return Err(eg!(NoahError::InconsistentStructureError));
+            return Err(NoahError::InconsistentStructureError);
         }
         let mut amt_be_bytes: [u8; 8] = Default::default();
         amt_be_bytes.copy_from_slice(&decrypted_bytes[..]);
@@ -505,7 +507,7 @@ impl OwnerMemo {
     pub fn decrypt_asset_type(&self, keypair: &KeyPair) -> Result<AssetType> {
         let decrypted_bytes = self.decrypt(&keypair)?;
         if decrypted_bytes.len() != ASSET_TYPE_LENGTH {
-            return Err(eg!(NoahError::InconsistentStructureError));
+            return Err(NoahError::InconsistentStructureError);
         }
         let mut asset_type_bytes: [u8; ASSET_TYPE_LENGTH] = Default::default();
         asset_type_bytes.copy_from_slice(&decrypted_bytes[..]);
@@ -517,7 +519,7 @@ impl OwnerMemo {
     pub fn decrypt_amount_and_asset_type(&self, keypair: &KeyPair) -> Result<(u64, AssetType)> {
         let decrypted_bytes = self.decrypt(&keypair)?;
         if decrypted_bytes.len() != ASSET_TYPE_LENGTH + 8 {
-            return Err(eg!(NoahError::InconsistentStructureError));
+            return Err(NoahError::InconsistentStructureError);
         }
         let mut amt_be_bytes: [u8; 8] = Default::default();
         amt_be_bytes.copy_from_slice(&decrypted_bytes[..8]);
@@ -582,7 +584,7 @@ impl OwnerMemo {
                 let shared_point = point.mul(&scalar);
                 Ok(shared_point.to_compressed_bytes())
             }
-            KeyType::EthAddress => Err(eg!("Address not supported")),
+            KeyType::EthAddress => Err(NoahError::ParameterError),
         }
     }
 
@@ -599,7 +601,7 @@ impl OwnerMemo {
 pub fn check_memo_size(output: &BlindAssetRecord, memo: &Option<OwnerMemo>) -> Result<()> {
     if !output.amount.is_confidential() && !output.asset_type.is_confidential() {
         if memo.is_some() {
-            return Err(eg!(NoahError::AXfrVerifierParamsError));
+            return Err(NoahError::AXfrVerifierParamsError);
         }
         return Ok(());
     }
@@ -619,7 +621,7 @@ pub fn check_memo_size(output: &BlindAssetRecord, memo: &Option<OwnerMemo>) -> R
                     && !output.asset_type.is_confidential()
                     && memo.lock_bytes.len() > MAX_LOCK_BYTES_CON_NON_ED25519)
             {
-                return Err(eg!(NoahError::AXfrVerifierParamsError));
+                return Err(NoahError::AXfrVerifierParamsError);
             }
 
             Ok(())
@@ -636,12 +638,12 @@ pub fn check_memo_size(output: &BlindAssetRecord, memo: &Option<OwnerMemo>) -> R
                     && !output.asset_type.is_confidential()
                     && memo.lock_bytes.len() > MAX_LOCK_BYTES_CON_NON_SECP256K1)
             {
-                return Err(eg!(NoahError::AXfrVerificationError));
+                return Err(NoahError::AXfrVerificationError);
             }
 
             Ok(())
         }
-        _ => return Err(eg!(NoahError::AXfrVerificationError)),
+        _ => return Err(NoahError::AXfrVerificationError),
     }
 }
 
@@ -794,7 +796,7 @@ enum CompatibleLock {
 use serde::de::{self, Deserialize, Deserializer, MapAccess, SeqAccess, Visitor};
 
 impl<'de> Deserialize<'de> for OwnerMemo {
-    fn deserialize<D>(deserializer: D) -> std::result::Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -807,7 +809,7 @@ impl<'de> Deserialize<'de> for OwnerMemo {
         }
 
         impl<'de> Deserialize<'de> for Field {
-            fn deserialize<D>(deserializer: D) -> std::result::Result<Field, D::Error>
+            fn deserialize<D>(deserializer: D) -> core::result::Result<Field, D::Error>
             where
                 D: Deserializer<'de>,
             {
@@ -816,11 +818,11 @@ impl<'de> Deserialize<'de> for OwnerMemo {
                 impl<'de> Visitor<'de> for FieldVisitor {
                     type Value = Field;
 
-                    fn expecting(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+                    fn expecting(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
                         formatter.write_str("`blind_share` or `lock` or `key_type`")
                     }
 
-                    fn visit_str<E>(self, value: &str) -> std::result::Result<Field, E>
+                    fn visit_str<E>(self, value: &str) -> core::result::Result<Field, E>
                     where
                         E: de::Error,
                     {
@@ -844,11 +846,11 @@ impl<'de> Deserialize<'de> for OwnerMemo {
         impl<'de> Visitor<'de> for OwnerMemoVisitor {
             type Value = OwnerMemo;
 
-            fn expecting(&self, formatter: &mut Formatter<'_>) -> std::fmt::Result {
+            fn expecting(&self, formatter: &mut Formatter<'_>) -> core::fmt::Result {
                 formatter.write_str("struct OwnerMemo")
             }
 
-            fn visit_seq<V>(self, mut seq: V) -> std::result::Result<OwnerMemo, V::Error>
+            fn visit_seq<V>(self, mut seq: V) -> core::result::Result<OwnerMemo, V::Error>
             where
                 V: SeqAccess<'de>,
             {
@@ -880,7 +882,7 @@ impl<'de> Deserialize<'de> for OwnerMemo {
                 })
             }
 
-            fn visit_map<V>(self, mut map: V) -> std::result::Result<OwnerMemo, V::Error>
+            fn visit_map<V>(self, mut map: V) -> core::result::Result<OwnerMemo, V::Error>
             where
                 V: MapAccess<'de>,
             {

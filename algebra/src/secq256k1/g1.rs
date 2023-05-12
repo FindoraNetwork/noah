@@ -1,10 +1,12 @@
-use crate::errors::AlgebraError;
 use crate::prelude::*;
 use crate::secq256k1::SECQ256K1Scalar;
 use ark_ec::{AffineRepr, CurveGroup, Group as ArkGroup, VariableBaseMSM};
 use ark_secq256k1::{Affine, Projective};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
-use ark_std::fmt::{Debug, Formatter};
+use ark_std::{
+    fmt::{Debug, Formatter},
+    vec::Vec,
+};
 use digest::consts::U64;
 use digest::Digest;
 use wasm_bindgen::prelude::*;
@@ -23,7 +25,7 @@ impl Neg for SECQ256K1G1 {
 }
 
 impl Debug for SECQ256K1G1 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> ark_std::fmt::Result {
         Debug::fmt(&self.0.into_affine(), f)
     }
 }
@@ -73,27 +75,23 @@ impl Group for SECQ256K1G1 {
 
     #[inline]
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
-        let mut reader = ark_std::io::BufReader::new(bytes);
-
-        let affine = Affine::deserialize_with_mode(&mut reader, Compress::Yes, Validate::Yes);
+        let affine = Affine::deserialize_with_mode(bytes, Compress::Yes, Validate::Yes);
 
         if affine.is_ok() {
             Ok(Self(Projective::from(affine.unwrap()))) // safe unwrap
         } else {
-            Err(eg!(AlgebraError::DeserializationError))
+            Err(AlgebraError::DeserializationError)
         }
     }
 
     #[inline]
     fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
-        let mut reader = ark_std::io::BufReader::new(bytes);
-
-        let affine = Affine::deserialize_with_mode(&mut reader, Compress::No, Validate::No);
+        let affine = Affine::deserialize_with_mode(bytes, Compress::No, Validate::No);
 
         if affine.is_ok() {
             Ok(Self(Projective::from(affine.unwrap()))) // safe unwrap
         } else {
-            Err(eg!(AlgebraError::DeserializationError))
+            Err(AlgebraError::DeserializationError)
         }
     }
 

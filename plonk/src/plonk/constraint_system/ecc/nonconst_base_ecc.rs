@@ -91,7 +91,7 @@ mod test {
         let scalar_var = cs.new_variable(scalar);
         let p_out_var = cs.nonconst_base_scalar_mul(base_var, base_ext, scalar_var, 256);
         let mut witness = cs.get_and_clear_witness();
-        pnk!(cs.verify_witness(&witness[..], &[]));
+        cs.verify_witness(&witness[..], &[]).unwrap();
 
         // wrong witness: point = GENERATOR * (jubjub_scalar + 1)
         witness[p_out_var.0] = p_out_plus_ext.get_x();
@@ -112,7 +112,7 @@ mod test {
         // check p_out is an identity point
         assert_eq!(witness[p_out_var.0], BLSScalar::zero());
         assert_eq!(witness[p_out_var.1], BLSScalar::one());
-        pnk!(cs.verify_witness(&witness[..], &[]));
+        cs.verify_witness(&witness[..], &[]).unwrap();
 
         // wrong witness: p_out = GENERATOR
         witness[p_out_var.0] = base_ext.get_x();

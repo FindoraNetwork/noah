@@ -1,7 +1,7 @@
-use crate::errors::AlgebraError;
 use crate::prelude::*;
 use ark_bulletproofs::curve::zorro::Fq;
 use ark_ff::{BigInteger, FftField, Field, PrimeField};
+use ark_std::{vec, vec::Vec};
 use digest::consts::U64;
 use digest::Digest;
 use num_bigint::BigUint;
@@ -215,7 +215,7 @@ impl Scalar for ZorroFq {
     #[inline]
     fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() > Self::bytes_len() {
-            return Err(eg!(AlgebraError::DeserializationError));
+            return Err(AlgebraError::DeserializationError);
         }
         let mut array = vec![0u8; Self::bytes_len()];
         array[0..bytes.len()].copy_from_slice(bytes);
@@ -227,7 +227,7 @@ impl Scalar for ZorroFq {
     fn inv(&self) -> Result<Self> {
         let a = self.0.inverse();
         if a.is_none() {
-            return Err(eg!(AlgebraError::GroupInversionError));
+            return Err(AlgebraError::GroupInversionError);
         }
         Ok(Self(a.unwrap()))
     }

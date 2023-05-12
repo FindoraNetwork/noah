@@ -1,3 +1,4 @@
+use crate::errors::Result;
 use noah_algebra::prelude::*;
 
 /// Module for Field Simulation Constrain System.

@@ -5,12 +5,13 @@ use crate::anon_xfr::{
     },
     AXfrPlonkPf, TurboPlonkCS, MAX_AXFR_MEMO_SIZE,
 };
+use crate::errors::{NoahError, Result};
 use crate::keys::{KeyPair, PublicKey, PublicKeyInner, Signature};
 use crate::parameters::params::ProverParams;
 use crate::parameters::params::VerifierParams;
 use crate::xfr::structs::{BlindAssetRecord, OpenAssetRecord};
 use merlin::Transcript;
-use noah_algebra::{bls12_381::BLSScalar, errors::NoahError, prelude::*};
+use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 use noah_crypto::anemoi_jive::{AnemoiJive381, AnemoiVLHTrace};
 use noah_plonk::plonk::{
     constraint_system::TurboCS, prover::prover_with_lagrange, verifier::verifier,
@@ -52,11 +53,9 @@ pub fn gen_ar_to_abar_note<R: CryptoRng + RngCore>(
     abar_pubkey: &PublicKey,
 ) -> Result<ArToAbarNote> {
     // generate body
-    let body = gen_ar_to_abar_body(prng, params, record, &abar_pubkey).c(d!())?;
+    let body = gen_ar_to_abar_body(prng, params, record, &abar_pubkey)?;
 
-    let msg = bincode::serialize(&body)
-        .map_err(|_| NoahError::SerializationError)
-        .c(d!())?;
+    let msg = bincode::serialize(&body).map_err(|_| NoahError::SerializationError)?;
     let signature = bar_keypair.sign(&msg)?;
 
     let note = ArToAbarNote { body, signature };
@@ -67,17 +66,13 @@ pub fn gen_ar_to_abar_note<R: CryptoRng + RngCore>(
 pub fn verify_ar_to_abar_note(params: &VerifierParams, note: &ArToAbarNote) -> Result<()> {
     // Check the memo size.
     if note.body.memo.size() > MAX_AXFR_MEMO_SIZE {
-        return Err(eg!(NoahError::AXfrVerificationError));
+        return Err(NoahError::AXfrVerificationError);
     }
 
-    let msg = bincode::serialize(&note.body).c(d!(NoahError::SerializationError))?;
-    note.body
-        .input
-        .public_key
-        .verify(&msg, &note.signature)
-        .c(d!())?;
+    let msg = bincode::serialize(&note.body).map_err(|_| NoahError::SerializationError)?;
+    note.body.input.public_key.verify(&msg, &note.signature)?;
 
-    verify_ar_to_abar_body(params, &note.body).c(d!())
+    verify_ar_to_abar_body(params, &note.body)
 }
 
 /// Batch verify the transparent-to-anonymous notes.
@@ -89,28 +84,24 @@ pub fn batch_verify_ar_to_abar_note(
     // Check the memo size.
     for note in notes.iter() {
         if note.body.memo.size() > MAX_AXFR_MEMO_SIZE {
-            return Err(eg!(NoahError::AXfrVerificationError));
+            return Err(NoahError::AXfrVerificationError);
         }
     }
 
     let is_ok = notes
         .par_iter()
         .map(|note| {
-            let msg = bincode::serialize(&note.body).c(d!(NoahError::SerializationError))?;
-            note.body
-                .input
-                .public_key
-                .verify(&msg, &note.signature)
-                .c(d!())?;
+            let msg = bincode::serialize(&note.body).map_err(|_| NoahError::SerializationError)?;
+            note.body.input.public_key.verify(&msg, &note.signature)?;
 
-            verify_ar_to_abar_body(params, &note.body).c(d!())
+            verify_ar_to_abar_body(params, &note.body)
         })
         .all(|x| x.is_ok());
 
     if is_ok {
         Ok(())
     } else {
-        Err(eg!())
+        Err(NoahError::AXfrVerificationError)
     }
 }
 
@@ -128,10 +119,8 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
         .amount(oabar_amount)
         .asset_type(obar.asset_type)
         .pub_key(abar_pubkey)
-        .finalize(prng)
-        .c(d!())?
-        .build()
-        .c(d!())?;
+        .finalize(prng)?
+        .build()?;
 
     let payee_witness = PayeeWitness {
         amount: oabar.get_amount(),
@@ -160,8 +149,7 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
         &params.cs,
         &params.prover_params,
         &witness,
-    )
-    .c(d!(NoahError::AXfrProofError))?;
+    )?;
 
     let body = ArToAbarBody {
         input: obar.blind_asset_record.clone(),
@@ -175,7 +163,7 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
 /// Verify the transparent-to-anonymous body.
 pub fn verify_ar_to_abar_body(params: &VerifierParams, body: &ArToAbarBody) -> Result<()> {
     if body.input.amount.is_confidential() || body.input.asset_type.is_confidential() {
-        return Err(eg!(NoahError::ParameterError));
+        return Err(NoahError::ParameterError);
     }
 
     let amount = body.input.amount.get_amount().unwrap();
@@ -187,15 +175,14 @@ pub fn verify_ar_to_abar_body(params: &VerifierParams, body: &ArToAbarBody) -> R
     online_inputs.push(asset_type.as_scalar());
     online_inputs.push(body.output.commitment);
 
-    verifier(
+    Ok(verifier(
         &mut transcript,
         &params.shrunk_vk,
         &params.shrunk_cs,
         &params.verifier_params,
         &online_inputs,
         &body.proof,
-    )
-    .c(d!(NoahError::AXfrVerificationError))
+    )?)
 }
 
 /// Construct the transparent-to-anonymous constraint system.

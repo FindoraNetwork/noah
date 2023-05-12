@@ -1,3 +1,4 @@
+use crate::errors::Result;
 use noah_algebra::bls12_381::BLSPairingEngine;
 use noah_algebra::bls12_381::BLSG2;
 use noah_algebra::{
@@ -96,13 +97,10 @@ pub fn ac_sign<R: CryptoRng + RngCore>(
     attrs: &[Attr],
 ) -> Result<ACSignature> {
     let attrs_scalar: Vec<BLSScalar> = attrs.iter().map(|x| BLSScalar::from(*x)).collect();
-    noah_crypto::anon_creds::grant_credential::<_, BLSPairingEngine>(
-        prng,
-        issuer_sk,
-        user_pk,
-        attrs_scalar.as_slice(),
-    )
-    .c(d!())
+    Ok(noah_crypto::anon_creds::grant_credential::<
+        _,
+        BLSPairingEngine,
+    >(prng, issuer_sk, user_pk, attrs_scalar.as_slice())?)
 }
 
 /// Produce an opening key for credential commitment creation and attribute opening
@@ -162,10 +160,10 @@ pub fn ac_commit<R: CryptoRng + RngCore>(
             .collect_vec(),
         ipk: credential.ipk.clone(),
     };
-    noah_crypto::anon_creds::commit_without_randomizer::<_, BLSPairingEngine>(
-        prng, user_sk, &c, msg,
-    )
-    .c(d!())
+    Ok(noah_crypto::anon_creds::commit_without_randomizer::<
+        _,
+        BLSPairingEngine,
+    >(prng, user_sk, &c, msg)?)
 }
 
 /// Produce an AttrsRevealProof, bitmap indicates which attributes are revealed
@@ -213,7 +211,9 @@ pub fn ac_commit_with_key<R: CryptoRng + RngCore>(
             .collect_vec(),
         ipk: credential.ipk.clone(),
     };
-    noah_crypto::anon_creds::commit::<_, BLSPairingEngine>(prng, user_sk, &c, key, msg).c(d!())
+    Ok(noah_crypto::anon_creds::commit::<_, BLSPairingEngine>(
+        prng, user_sk, &c, key, msg,
+    )?)
 }
 
 /// Verify that the underlying credential is valid and that the commitment was issued using the
@@ -224,13 +224,12 @@ pub fn ac_verify_commitment(
     sok: &ACPoK,
     msg: &[u8],
 ) -> Result<()> {
-    noah_crypto::anon_creds::check_comm::<BLSPairingEngine>(
+    Ok(noah_crypto::anon_creds::check_comm::<BLSPairingEngine>(
         issuer_pub_key,
         sig_commitment,
         sok,
         msg,
-    )
-    .c(d!())
+    )?)
 }
 
 /// Produce an AttrsRevealProof for a committed credential produced using key.
@@ -273,8 +272,9 @@ pub fn ac_open_commitment<R: CryptoRng + RngCore>(
 
     let cm = ACCommitment::new(&credential.sig, &rand);
 
-    noah_crypto::anon_creds::open_comm::<_, BLSPairingEngine>(prng, usk, &c, &cm, &rand, reveal_map)
-        .c(d!())
+    Ok(noah_crypto::anon_creds::open_comm::<_, BLSPairingEngine>(
+        prng, usk, &c, &cm, &rand, reveal_map,
+    )?)
 }
 
 /// Produce a ACRevealSig for a credential.
@@ -293,13 +293,10 @@ pub fn ac_reveal<R: CryptoRng + RngCore>(
             .collect_vec(),
         ipk: credential.ipk.clone(),
     };
-    noah_crypto::anon_creds::open_credential::<_, BLSPairingEngine>(
-        prng,
-        user_sk,
-        &c,
-        reveal_bitmap,
-    )
-    .c(d!())
+    Ok(noah_crypto::anon_creds::open_credential::<
+        _,
+        BLSPairingEngine,
+    >(prng, user_sk, &c, reveal_bitmap)?)
 }
 /// Verifies an anonymous credential reveal proof.
 /// # Example
@@ -343,13 +340,12 @@ pub fn ac_verify(
         })
         .collect();
 
-    noah_crypto::anon_creds::verify_open::<BLSPairingEngine>(
+    Ok(noah_crypto::anon_creds::verify_open::<BLSPairingEngine>(
         issuer_pub_key,
         &cm,
         &proof_open,
         attrs_scalar.as_slice(),
-    )
-    .c(d!())
+    )?)
 }
 
 /// The attribute encryption key.
@@ -408,10 +404,11 @@ pub fn ac_confidential_open_commitment<R: CryptoRng + RngCore>(
         ipk: credential.ipk.clone(),
     };
     let cm = ACCommitment::new(&credential.sig, &rand);
-    noah_crypto::confidential_anon_creds::confidential_open_comm::<R, BLSPairingEngine>(
-        prng, usk, &c, &cm, rand, reveal_map, enc_key, msg,
+    Ok(
+        noah_crypto::confidential_anon_creds::confidential_open_comm::<R, BLSPairingEngine>(
+            prng, usk, &c, &cm, rand, reveal_map, enc_key, msg,
+        )?,
     )
-    .c(d!())
 }
 
 /// Verify a confidential anonymous credential reveal proof.
@@ -424,16 +421,17 @@ pub fn ac_confidential_verify(
     cac_proof: &ACConfidentialRevealProof,
     msg: &[u8],
 ) -> Result<()> {
-    noah_crypto::confidential_anon_creds::confidential_verify_open::<BLSPairingEngine>(
-        issuer_pk,
-        enc_key,
-        reveal_map,
-        sig_commitment,
-        attr_ctext,
-        cac_proof,
-        msg,
+    Ok(
+        noah_crypto::confidential_anon_creds::confidential_verify_open::<BLSPairingEngine>(
+            issuer_pk,
+            enc_key,
+            reveal_map,
+            sig_commitment,
+            attr_ctext,
+            cac_proof,
+            msg,
+        )?,
     )
-    .c(d!())
 }
 
 /// Generate encryptiion key for confidential anonymous credentials.

@@ -1,5 +1,7 @@
 use crate::anemoi_jive::{AnemoiJive, AnemoiJive381};
+use crate::errors::{CryptoError, Result};
 use crate::field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto};
+use ark_std::marker::PhantomData;
 use merlin::Transcript;
 use noah_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 use noah_algebra::traits::PedersenCommitment;
@@ -7,7 +9,6 @@ use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 use num_bigint::BigUint;
 use rand_chacha::ChaChaRng;
 use serde::Deserialize;
-use std::marker::PhantomData;
 
 #[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone)]
 /// The non-interactive proof provided to the verifier.
@@ -312,7 +313,7 @@ pub fn verify_delegated_schnorr<
         let eqn_right = committed_data.mul(&beta).add(&randomizer);
 
         if eqn_left.ne(&eqn_right) {
-            return Err(eg!(NoahError::ZKProofVerificationError));
+            return Err(CryptoError::ZKProofVerificationError);
         }
     }
 

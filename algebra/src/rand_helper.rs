@@ -14,7 +14,7 @@ fn test_rng_helper() -> ChaChaRng {
 
 /// Should be used only for tests, not for any real world usage.
 #[cfg(not(feature = "std"))]
-pub fn test_rng() -> impl rand::Rng {
+pub fn test_rng() -> impl RngCore + CryptoRng {
     test_rng_helper()
 }
 

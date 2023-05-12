@@ -18,7 +18,6 @@ crate-type = ['rlib']
 base64 = "0.21"
 digest = '0.10'
 itertools = '0.10.0'
-ruc = '1.0'
 serde = '1.0'
 serde_derive = '1.0'
 rayon = { version = "1", optional = true }
@@ -40,51 +39,52 @@ features = ['serde']
 [dependencies.x25519-dalek]
 package = "noah-x25519-dalek"
 version = "4.0.0"
+default-features = false
 
 [dependencies.bulletproofs]
 package = "noah-bulletproofs"
-version = "4.0.0"
+version = "4.1.0"
 
 [dependencies.ark-ec]
-version = '0.4.0-alpha'
+version = '0.4.0'
 default-features = false
 
 [dependencies.ark-ff]
-version = '0.4.0-alpha'
+version = '0.4.0'
 default-features = false
 features = ['asm']
 
 [dependencies.ark-std]
-version = '0.4.0-alpha'
+version = '0.4.0'
 default-features = false
 
 [dependencies.ark-serialize]
-version = '0.4.0-alpha'
+version = '0.4.0'
 default-features = false
 
 [dependencies.ark-ed-on-bls12-381]
-version = '0.4.0-alpha'
+version = '0.4.0'
 default-features = false
 
 [dependencies.ark-bls12-381]
-version = '0.4.0-alpha'
+version = '0.4.0'
 default-features = false
 features = ['curve']
 
 [dependencies.ark-secp256k1]
-version = '0.4.0-alpha'
+version = '0.4.0'
 default-features = false
 
 [dependencies.ark-secq256k1]
-version = '0.4.0-alpha'
+version = '0.4.0'
 default-features = false
 
 [dependencies.ark-ed25519]
-version = '0.4.0-alpha'
+version = '0.4.0'
 default-features = false
 
 [dependencies.ark-bulletproofs]
-version = '4.0.0'
+version = '4.1.0'
 default-features = false
 features = ['yoloproofs']
 
@@ -117,6 +117,8 @@ default = [
 ]
 std = [
     'curve25519-dalek/std',
+    'bulletproofs/std',
+    'ark-bulletproofs/std',
     'ark-ed-on-bls12-381/std',
     'ark-bls12-381/std',
     'ark-secp256k1/std',
@@ -125,8 +127,7 @@ std = [
     'ark-ec/std',
     'ark-std/std',
     'ark-ff/std',
-    'ark-serialize/std',
-    'ark-bulletproofs/std'
+    'ark-serialize/std'
 ]
 alloc = ['curve25519-dalek/alloc']
 nightly = ['curve25519-dalek/nightly']

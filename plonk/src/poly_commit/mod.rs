@@ -9,6 +9,3 @@ pub mod pcs;
 
 /// Module for polynomial commitment transcript.
 pub mod transcript;
-
-/// Module for error handling.
-pub mod errors;

@@ -1,3 +1,4 @@
+use crate::errors::{NoahError, Result};
 use crate::parameters::bulletproofs::BulletproofParams;
 use crate::parameters::bulletproofs::BulletproofURS;
 use bulletproofs::{
@@ -45,11 +46,12 @@ impl Eq for AssetMixProof {}
 ///            (10u64, RistrettoScalar::zero(), RistrettoScalar::from(10009u32), RistrettoScalar::from(200009u32)),
 ///            (30u64, RistrettoScalar::from(2u32), RistrettoScalar::from(10010u32), RistrettoScalar::from(200010u32)),
 ///        ];
-///
-/// let proof = prove_asset_mixing(&input, &output).unwrap();
+/// let mut prng = test_rng();
+/// let proof = prove_asset_mixing(&mut prng, &input, &output).unwrap();
 ///
 /// ```
-pub fn prove_asset_mixing(
+pub fn prove_asset_mixing<R: CryptoRng + RngCore>(
+    prng: &mut R,
     inputs: &[(u64, RistrettoScalar, RistrettoScalar, RistrettoScalar)],
     outputs: &[(u64, RistrettoScalar, RistrettoScalar, RistrettoScalar)],
 ) -> Result<AssetMixProof> {
@@ -88,7 +90,7 @@ pub fn prove_asset_mixing(
         out_set.insert(out_value.asset_type.0);
     }
     if in_set != out_set {
-        return Err(eg!(NoahError::ParameterError));
+        return Err(NoahError::ParameterError);
     }
 
     let in_vars = in_values
@@ -110,14 +112,11 @@ pub fn prove_asset_mixing(
         Some(&in_values),
         &out_vars,
         Some(&out_values),
-    )
-    .c(d!(NoahError::AssetMixerVerificationError))?;
+    )?;
 
     let num_gates = asset_mix_num_generators(n, m);
     let bp_gens = BulletproofGens::new(num_gates.next_power_of_two(), 1);
-    let proof = prover
-        .prove(&bp_gens)
-        .c(d!(NoahError::AssetMixerVerificationError))?;
+    let proof = prover.prove(prng, &bp_gens)?;
     Ok(AssetMixProof(proof))
 }
 
@@ -139,7 +138,6 @@ pub struct AssetMixingInstance<'a> {
 /// use noah::xfr::asset_mixer::{prove_asset_mixing, AssetMixingInstance, batch_verify_asset_mixing};
 /// use bulletproofs::PedersenGens;
 /// use rand::thread_rng;
-/// use ruc::err::*;
 /// use noah::parameters::bulletproofs::BulletproofParams;
 /// use noah_algebra::traits::PedersenCommitment;
 /// let input = [
@@ -158,7 +156,7 @@ pub struct AssetMixingInstance<'a> {
 ///            (30u64, RistrettoScalar::from(2u32), RistrettoScalar::from(10010u32), RistrettoScalar::from(200010u32)),
 ///        ];
 ///
-/// let proof = prove_asset_mixing(&input, &output).unwrap();
+/// let proof = prove_asset_mixing(&mut thread_rng(), &input, &output).unwrap();
 /// let pc_gens = PedersenCommitmentRistretto::default();
 /// let input_coms: Vec<(CompressedRistretto, CompressedRistretto)> =
 ///      input.iter()
@@ -181,7 +179,7 @@ pub struct AssetMixingInstance<'a> {
 ///    };
 ///    let mut prng = thread_rng();
 ///    let mut params = BulletproofParams::default();
-///    pnk!(batch_verify_asset_mixing(&mut prng, &mut params, &[instance]));
+///    batch_verify_asset_mixing(&mut prng, &mut params, &[instance]).unwrap();
 /// ```
 pub fn batch_verify_asset_mixing<R: CryptoRng + RngCore>(
     prng: &mut R,
@@ -196,7 +194,7 @@ pub fn batch_verify_asset_mixing<R: CryptoRng + RngCore>(
     }
     for (instance, transcript) in instances.iter().zip(transcripts.iter_mut()) {
         let mut verifier = Verifier::new(transcript);
-        prepare_asset_mixer_verifier(&mut verifier, instance).c(d!())?;
+        prepare_asset_mixer_verifier(&mut verifier, instance)?;
         let circuit_size = asset_mix_num_generators(instance.inputs.len(), instance.outputs.len());
         if circuit_size > max_circuit_size {
             max_circuit_size = circuit_size;
@@ -209,8 +207,12 @@ pub fn batch_verify_asset_mixing<R: CryptoRng + RngCore>(
         params.increase_circuit_gens(max_circuit_size);
     }
     let pc_gens = PedersenGens::default();
-    batch_verify(prng, verifiers, &pc_gens, &params.bp_circuit_gens)
-        .c(d!(NoahError::AssetMixerVerificationError))
+    Ok(batch_verify(
+        prng,
+        verifiers,
+        &pc_gens,
+        &params.bp_circuit_gens,
+    )?)
 }
 
 pub(crate) fn prepare_asset_mixer_verifier(
@@ -244,12 +246,12 @@ pub(crate) fn prepare_asset_mixer_verifier(
         .map(|com| com.commit_verifier(verifier))
         .collect_vec();
 
-    mix(verifier, &in_vars, None, &out_vars, None).c(d!(NoahError::AssetMixerVerificationError))
+    Ok(mix(verifier, &in_vars, None, &out_vars, None)?)
 }
 
 fn asset_mix_num_generators(n_input: usize, n_output: usize) -> usize {
-    let max = std::cmp::max(n_input, n_output);
-    let min = std::cmp::min(n_input, n_output);
+    let max = core::cmp::max(n_input, n_output);
+    let min = core::cmp::min(n_input, n_output);
 
     let input_wires = n_input + n_output;
     let pad = max - min; // extra wires needed for padding merged input or merged output length
@@ -285,6 +287,7 @@ mod test {
 
     #[test]
     fn test_asset_mixer() {
+        let mut prng = test_rng();
         let pc_gens = PedersenCommitmentRistretto::default();
 
         // asset type set to not match errors
@@ -316,7 +319,7 @@ mod test {
                 RistrettoScalar::from(200004u32),
             ),
         ];
-        let proof_result = super::prove_asset_mixing(&input, &output);
+        let proof_result = super::prove_asset_mixing(&mut prng, &input, &output);
         assert!(proof_result.is_err());
 
         let output = [(
@@ -325,7 +328,7 @@ mod test {
             RistrettoScalar::from(10004u32),
             RistrettoScalar::from(200004u32),
         )];
-        let proof_result = super::prove_asset_mixing(&input, &output);
+        let proof_result = super::prove_asset_mixing(&mut prng, &input, &output);
         assert!(proof_result.is_err());
 
         let input = [
@@ -399,7 +402,7 @@ mod test {
             ),
         ];
 
-        let proof = super::prove_asset_mixing(&input, &output).unwrap();
+        let proof = super::prove_asset_mixing(&mut prng, &input, &output).unwrap();
 
         let input_coms: Vec<(CompressedRistretto, CompressedRistretto)> = input
             .iter()
@@ -429,12 +432,7 @@ mod test {
             outputs: output_coms,
             proof: &proof,
         };
-        let mut prng = test_rng();
         let mut params = BulletproofParams::default();
-        pnk!(super::batch_verify_asset_mixing(
-            &mut prng,
-            &mut params,
-            &[instance]
-        ));
+        super::batch_verify_asset_mixing(&mut prng, &mut params, &[instance]).unwrap();
     }
 }

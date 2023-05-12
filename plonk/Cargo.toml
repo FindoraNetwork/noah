@@ -37,19 +37,19 @@ path = '../algebra'
 path = '../crypto'
 
 [dependencies.ark-ff]
-version = '0.4.0-alpha'
+version = '0.4.0'
 default-features = false
 
 [dependencies.ark-poly]
-version = '0.4.0-alpha'
+version = '0.4.0'
 default-features = false
 
 [dependencies.ark-serialize]
-version = '0.4.0-alpha'
+version = '0.4.0'
 default-features = false
 
 [dependencies.ark-std]
-version = '0.4.0-alpha'
+version = '0.4.0'
 default-features = false
 
 [dependencies.rayon]
@@ -75,7 +75,7 @@ features = ['rand']
 [features]
 default = ["std"]
 debug = []
-std = ['ark-std/std']
+std = ['ark-std/std', 'noah-algebra/std']
 asm = ['noah-algebra/asm']
 parallel = ['rayon', 'noah-algebra/parallel', 'ark-poly/parallel']
 print-trace = ['noah-algebra/print-trace']

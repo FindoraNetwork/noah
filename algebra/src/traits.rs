@@ -1,10 +1,6 @@
-use crate::{
-    errors::AlgebraError,
-    prelude::*,
-    rand::{CryptoRng, RngCore},
-};
+use crate::prelude::*;
 use ark_ff::FftField;
-use ark_std::fmt::Debug;
+use ark_std::{fmt::Debug, vec, vec::Vec};
 use digest::{generic_array::typenum::U64, Digest};
 use num_bigint::BigUint;
 use serde::{Deserialize, Serialize};
@@ -294,7 +290,7 @@ pub fn pippenger<G: Group>(scalars: &[&G::ScalarType], elems: &[&G]) -> Result<G
     let size = scalars.len();
 
     if size == 0 {
-        return Err(eg!(AlgebraError::ParameterError));
+        return Err(AlgebraError::ParameterError);
     }
 
     let w = if size < 500 {

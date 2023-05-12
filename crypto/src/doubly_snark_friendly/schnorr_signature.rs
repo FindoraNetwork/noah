@@ -1,9 +1,6 @@
 use crate::anemoi_jive::AnemoiJive;
-use noah_algebra::{
-    prelude::*,
-    traits::{CurveGroup, Scalar},
-};
-use rand_core::{CryptoRng, RngCore};
+use crate::errors::{CryptoError, Result};
+use noah_algebra::prelude::*;
 
 /// The Schnorr signing key is often also called private key.
 #[derive(Clone, Default, Debug, Eq, PartialEq)]
@@ -122,7 +119,7 @@ impl<G: CurveGroup> SchnorrVerifyingKey<G> {
         let e: G::BaseType = H::eval_variable_length_hash(&input);
 
         if e != signature.schnorr_e {
-            Err(eg!(NoahError::SignatureError))
+            Err(CryptoError::SignatureError)
         } else {
             Ok(())
         }

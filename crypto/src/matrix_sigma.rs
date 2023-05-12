@@ -1,3 +1,4 @@
+use crate::errors::{CryptoError, Result};
 use digest::Digest;
 use merlin::Transcript;
 use noah_algebra::prelude::*;
@@ -214,7 +215,7 @@ pub fn sigma_verify<R: CryptoRng + RngCore, G: Group>(
     }
     let result = G::multi_exp(scalars_as_ref.as_slice(), me_elems.as_slice());
     if result != G::get_identity() {
-        Err(eg!(NoahError::ZKProofVerificationError))
+        Err(CryptoError::ZKProofVerificationError)
     } else {
         Ok(())
     }

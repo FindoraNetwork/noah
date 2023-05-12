@@ -1,5 +1,5 @@
+use crate::errors::{PlonkError, Result};
 use crate::poly_commit::{
-    errors::PolyComSchemeError,
     field_polynomial::FpPolynomial,
     pcs::{HomomorphicPolyComElem, PolyComScheme, ToBytes},
 };
@@ -167,7 +167,7 @@ impl<P: Pairing> KZGCommitmentScheme<P> {
     /// Deserialize the parameters from unchecked bytes.
     pub fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() < 8 {
-            return Err(eg!(NoahError::DeserializationError));
+            return Err(PlonkError::Algebra(AlgebraError::DeserializationError));
         }
         let mut len_1_bytes = [0u8; 4];
         let mut len_2_bytes = [0u8; 4];
@@ -219,7 +219,7 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         let degree = polynomial.degree();
 
         if degree + 1 > self.public_parameter_group_1.len() {
-            return Err(eg!(PolyComSchemeError::DegreeError));
+            return Err(PlonkError::DegreeError);
         }
 
         let coefs_poly_bls_scalar_ref: Vec<&BLSScalar> = coefs.iter().collect();
@@ -264,12 +264,7 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         let eval = poly.eval(x);
 
         if poly.degree() > max_degree {
-            println!(
-                "polynomial degree = {}, max_degree = {}",
-                poly.degree(),
-                max_degree
-            );
-            return Err(eg!(PolyComSchemeError::DegreeError));
+            return Err(PlonkError::DegreeError);
         }
 
         let nominator = poly.sub(&FpPolynomial::from_coefs(vec![eval]));
@@ -283,7 +278,7 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         let (q_poly, r_poly) = nominator.div_rem(&vanishing_poly); // P(X)-P(x) / (X-x)
 
         if !r_poly.is_zero() {
-            return Err(eg!(PolyComSchemeError::PCSProveEvalError));
+            return Err(PlonkError::PCSProveEvalError);
         }
 
         let proof = self.commit(&q_poly).unwrap();
@@ -316,7 +311,7 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         if left_pairing_eval == right_pairing_eval {
             Ok(())
         } else {
-            Err(eg!(PolyComSchemeError::PCSProveEvalError))
+            Err(PlonkError::PCSProveEvalError)
         }
     }
 
@@ -369,7 +364,7 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         if pairing_eval == BLSGt::get_identity() {
             Ok(())
         } else {
-            Err(eg!(PolyComSchemeError::PCSProveEvalError))
+            Err(PlonkError::PCSProveEvalError)
         }
     }
 
@@ -530,12 +525,13 @@ mod tests_kzg_impl {
 
         let proof = pcs.prove(&fq_poly, &point, max_degree).unwrap();
 
-        let res = pcs.verify(&commitment_value, degree, &point, &seven, &proof);
-        pnk!(res);
+        pcs.verify(&commitment_value, degree, &point, &seven, &proof)
+            .unwrap();
 
         let new_pcs = pcs.shrink_to_verifier_only();
-        let res = new_pcs.verify(&commitment_value, degree, &point, &seven, &proof);
-        pnk!(res);
+        new_pcs
+            .verify(&commitment_value, degree, &point, &seven, &proof)
+            .unwrap();
 
         let wrong_eval = one;
         let res = pcs.verify(&commitment_value, degree, &point, &wrong_eval, &proof);

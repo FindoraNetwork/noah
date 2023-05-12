@@ -5,6 +5,8 @@ use crate::{
 use noah_algebra::prelude::*;
 use serde::Serializer;
 
+type Result<T> = core::result::Result<T, AlgebraError>;
+
 impl NoahFromToBytes for AssetType {
     fn noah_to_bytes(&self) -> Vec<u8> {
         self.0.to_vec()
@@ -12,7 +14,7 @@ impl NoahFromToBytes for AssetType {
 
     fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() != ASSET_TYPE_LENGTH {
-            Err(eg!(NoahError::DeserializationError))
+            Err(AlgebraError::DeserializationError)
         } else {
             let mut array = [0u8; ASSET_TYPE_LENGTH];
             array.copy_from_slice(bytes);
@@ -213,12 +215,12 @@ mod test {
         let as_json = if let Ok(res) = serde_json::to_string(&test_struct) {
             res
         } else {
-            pnk!(Err(eg!("Failed to serialize PublicKey to JSON")))
+            panic!("Failed to serialize PublicKey to JSON");
         };
         if let Ok(restored) = serde_json::from_str::<StructWithPubKey>(&as_json) {
             assert_eq!(test_struct.key, restored.key);
         } else {
-            pnk!(Err(eg!("Failed to deserialize PublicKey from JSON")));
+            panic!("Failed to deserialize PublicKey from JSON");
         }
 
         let test_struct = StructWithSecKey {
@@ -227,7 +229,7 @@ mod test {
         let as_json = if let Ok(res) = serde_json::to_string(&test_struct) {
             res
         } else {
-            pnk!(Err(eg!("Failed to serialize SecretKey to JSON")))
+            panic!("Failed to serialize SecretKey to JSON");
         };
         if let Ok(restored) = serde_json::from_str::<StructWithSecKey>(&as_json) {
             assert_eq!(
@@ -235,7 +237,7 @@ mod test {
                 restored.key.noah_to_bytes()
             );
         } else {
-            pnk!(Err(eg!("Failed to deserialize SecretKey from JSON")));
+            panic!("Failed to deserialize SecretKey from JSON");
         }
     }
 
@@ -246,12 +248,12 @@ mod test {
         let serialized = if let Ok(res) = serde_json::to_string(&xfr_pub_key) {
             res
         } else {
-            pnk!(Err(eg!("Failed to serialize Elgamal public key")))
+            panic!("Failed to serialize Elgamal public key");
         };
         if let Ok(restored) = serde_json::from_str::<RecordDataEncKey>(&serialized) {
             assert_eq!(xfr_pub_key, restored);
         } else {
-            pnk!(Err(eg!("Failed to deserialize PublicKey from JSON")));
+            panic!("Failed to deserialize PublicKey from JSON");
         }
     }
 }

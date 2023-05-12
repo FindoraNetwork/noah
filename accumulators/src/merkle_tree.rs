@@ -1,5 +1,7 @@
+use crate::errors::{AccumulatorError, Result};
 use noah_algebra::{
     bls12_381::BLSScalar,
+    borrow::ToOwned,
     collections::{hash_map::Iter, HashMap},
     prelude::*,
 };
@@ -73,10 +75,10 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
             if !store.state_mut().cache_mut().good2_commit() {
                 store.state_mut().discard_session();
 
-                return Err(eg!("store commit no good"));
+                return Err(AccumulatorError::Message("store commit no good".to_owned()));
             }
 
-            store.state_mut().commit(0).c(d!())?;
+            store.state_mut().commit(0)?;
         }
 
         Ok(PersistentMerkleTree { entry_count, store })
@@ -97,12 +99,12 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
         for (index, (node_key, path)) in keys[0..TREE_DEPTH].iter().enumerate() {
             let parse_hash = |key: u64| -> Result<BLSScalar> {
                 if let Some(b) = cache.get(&key) {
-                    return BLSScalar::noah_from_bytes(b.as_slice());
+                    return Ok(BLSScalar::noah_from_bytes(b.as_slice())?);
                 }
                 let mut store_key = KEY_PAD.to_vec();
                 store_key.extend(key.to_be_bytes());
                 match self.store.get(&store_key)? {
-                    Some(b) => BLSScalar::noah_from_bytes(b.as_slice()),
+                    Some(b) => Ok(BLSScalar::noah_from_bytes(b.as_slice())?),
                     None => Ok(BLSScalar::zero()),
                 }
             };
@@ -150,7 +152,9 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
     /// generate leaf's merkle proof by uid and the depth.
     pub fn generate_proof_with_depth(&self, id: u64, depth: usize) -> Result<Proof> {
         if depth > TREE_DEPTH || id > 3u64.pow(depth as u32) {
-            return Err(eg!("tree depth is invalid for generate proof"));
+            return Err(AccumulatorError::Message(
+                "tree depth is invalid for generate proof".to_owned(),
+            ));
         }
 
         let keys = get_path_keys(id);
@@ -175,7 +179,9 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
                 let mut cur_key = KEY_PAD.to_vec();
                 cur_key.extend(key_id.to_be_bytes());
                 if !self.store.exists(&cur_key)? {
-                    return Err(eg!("uid not found in tree, cannot generate proof"));
+                    return Err(AccumulatorError::Message(
+                        "uid not found in tree, cannot generate proof".to_owned(),
+                    ));
                 }
 
                 let mut left_key = KEY_PAD.to_vec();
@@ -223,8 +229,10 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
         store_key.extend(pos.to_be_bytes());
 
         match self.store.get(&store_key)? {
-            Some(hash) => BLSScalar::noah_from_bytes(hash.as_slice()),
-            None => Err(eg!("root hash key not found at this depth")),
+            Some(hash) => Ok(BLSScalar::noah_from_bytes(hash.as_slice())?),
+            None => Err(AccumulatorError::Message(
+                "root hash key not found at this depth".to_owned(),
+            )),
         }
     }
 
@@ -241,8 +249,10 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
         let mut store_key = KEY_PAD.to_vec();
         store_key.extend(pos.to_be_bytes());
         match self.store.get_v(&store_key, version)? {
-            Some(hash) => BLSScalar::noah_from_bytes(hash.as_slice()),
-            None => Err(eg!("root hash key not found at this depth and version")),
+            Some(hash) => Ok(BLSScalar::noah_from_bytes(hash.as_slice())?),
+            None => Err(AccumulatorError::Message(
+                "root hash key not found at this depth and version".to_owned(),
+            )),
         }
     }
 
@@ -253,10 +263,10 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
         if !self.store.state_mut().cache_mut().good2_commit() {
             self.store.state_mut().discard_session();
 
-            return Err(eg!("store commit no good"));
+            return Err(AccumulatorError::Message("store commit no good".to_owned()));
         }
 
-        let (_, ver) = self.store.state_mut().commit(height + 1).c(d!())?;
+        let (_, ver) = self.store.state_mut().commit(height + 1)?;
         Ok(ver)
     }
 
@@ -314,7 +324,9 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
     /// generate leaf's merkle proof by uid and the depth
     pub fn generate_proof_with_depth(&self, id: u64, depth: usize) -> Result<Proof> {
         if depth > TREE_DEPTH || id > 3u64.pow(depth as u32) {
-            return Err(eg!("tree depth is invalid for generate proof"));
+            return Err(AccumulatorError::Message(
+                "tree depth is invalid for generate proof".to_owned(),
+            ));
         }
         let v = self.version();
 
@@ -340,7 +352,9 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
                 let mut cur_key = KEY_PAD.to_vec();
                 cur_key.extend(key_id.to_be_bytes());
                 if !self.store.exists(&cur_key)? {
-                    return Err(eg!("uid not found in tree, cannot generate proof"));
+                    return Err(AccumulatorError::Message(
+                        "uid not found in tree, cannot generate proof".to_owned(),
+                    ));
                 }
 
                 let mut left_key = KEY_PAD.to_vec();
@@ -397,8 +411,10 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
         let mut store_key = KEY_PAD.to_vec();
         store_key.extend(pos.to_be_bytes());
         match self.store.get_v(&store_key, version)? {
-            Some(hash) => BLSScalar::noah_from_bytes(hash.as_slice()),
-            None => Err(eg!("root hash key not found at this depth and version")),
+            Some(hash) => Ok(BLSScalar::noah_from_bytes(hash.as_slice())?),
+            None => Err(AccumulatorError::Message(
+                "root hash key not found at this depth and version".to_owned(),
+            )),
         }
     }
 
@@ -458,12 +474,12 @@ impl EphemeralMerkleTree {
         for (index, (node_key, path)) in keys[0..TREE_DEPTH].iter().enumerate() {
             let parse_hash = |key: u64| -> Result<BLSScalar> {
                 if let Some(b) = cache.get(&key) {
-                    return BLSScalar::noah_from_bytes(b.as_slice());
+                    return Ok(BLSScalar::noah_from_bytes(b.as_slice())?);
                 }
                 let mut store_key = KEY_PAD.to_vec();
                 store_key.extend(key.to_be_bytes());
                 match self.store.get(&store_key) {
-                    Some(b) => BLSScalar::noah_from_bytes(b.as_slice()),
+                    Some(b) => Ok(BLSScalar::noah_from_bytes(b.as_slice())?),
                     None => Ok(BLSScalar::zero()),
                 }
             };
@@ -513,7 +529,9 @@ impl EphemeralMerkleTree {
     /// generate leaf's merkle proof by uid and the depth.
     pub fn generate_proof_with_depth(&self, id: u64, depth: usize) -> Result<Proof> {
         if depth > TREE_DEPTH || id > 3u64.pow(depth as u32) {
-            return Err(eg!("tree depth is invalid for generate proof"));
+            return Err(AccumulatorError::Message(
+                "tree depth is invalid for generate proof".to_owned(),
+            ));
         }
 
         let keys = get_path_keys(id);
@@ -538,7 +556,9 @@ impl EphemeralMerkleTree {
                 let mut cur_key = KEY_PAD.to_vec();
                 cur_key.extend(key_id.to_be_bytes());
                 if !self.store.contains_key(&cur_key) {
-                    return Err(eg!("uid not found in tree, cannot generate proof"));
+                    return Err(AccumulatorError::Message(
+                        "uid not found in tree, cannot generate proof".to_owned(),
+                    ));
                 }
 
                 let mut left_key = KEY_PAD.to_vec();
@@ -586,8 +606,10 @@ impl EphemeralMerkleTree {
         store_key.extend(pos.to_be_bytes());
 
         match self.store.get(&store_key) {
-            Some(hash) => BLSScalar::noah_from_bytes(hash.as_slice()),
-            None => Err(eg!("root hash key not found at this depth")),
+            Some(hash) => Ok(BLSScalar::noah_from_bytes(hash.as_slice())?),
+            None => Err(AccumulatorError::Message(
+                "root hash key not found at this depth".to_owned(),
+            )),
         }
     }
 

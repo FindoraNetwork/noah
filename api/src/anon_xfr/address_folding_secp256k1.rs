@@ -1,4 +1,5 @@
 use crate::anon_xfr::TurboPlonkCS;
+use crate::errors::Result;
 use crate::keys::KeyPair;
 use crate::parameters::bulletproofs::BulletproofURS;
 use crate::parameters::params::AddressFormat::SECP256K1;
@@ -131,8 +132,7 @@ pub fn create_address_folding_secp256k1<
             &pc_gens,
             &scalar_mul_commitments,
             transcript,
-        )
-        .c(d!())?
+        )?
     };
 
     let instance = AXfrAddressFoldingInstanceSecp256k1 {

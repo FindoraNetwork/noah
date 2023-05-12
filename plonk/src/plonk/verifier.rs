@@ -1,8 +1,8 @@
+use crate::errors::{PlonkError, Result};
 use crate::poly_commit::{pcs::PolyComScheme, transcript::PolyComTranscript};
 use crate::{
     plonk::{
         constraint_system::ConstraintSystem,
-        errors::PlonkError,
         helpers::{eval_pi_poly, first_lagrange_poly, r_commitment, r_eval_zeta, PlonkChallenges},
         indexer::{PlonkPf, PlonkVK},
         transcript::{
@@ -26,7 +26,7 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     proof: &PlonkPf<PCS>,
 ) -> Result<()> {
     let domain = FpPolynomial::<PCS::Field>::evaluation_domain(cs.size())
-        .c(d!(PlonkError::GroupNotFound(cs.size())))?;
+        .ok_or(PlonkError::GroupNotFound(cs.size()))?;
     let root = PCS::Field::from_field(domain.group_gen);
 
     transcript_init_plonk(transcript, verifier_params, pi, &root);
@@ -139,7 +139,7 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
         ],
         challenges.get_u().unwrap(),
     )
-    .c(d!(PlonkError::VerificationError))
+    .map_err(|_| PlonkError::VerificationError)
 }
 
 fn compute_challenges<PCS: PolyComScheme>(

@@ -33,7 +33,9 @@ extern crate lazy_static;
 pub mod anon_creds;
 /// Module for anonymous transfer.
 pub mod anon_xfr;
-/// module for anonymous and confidential keys
+/// Module for error handling
+pub mod errors;
+/// Module for anonymous and confidential keys
 pub mod keys;
 /// Module for next-generation anonymous transfer.
 pub mod nextgen;
@@ -44,5 +46,5 @@ pub mod serialization;
 /// Module for confidential transfer.
 pub mod xfr;
 
-pub use noah_algebra::errors;
+pub use errors::NoahError;
 pub use noah_algebra::ristretto;

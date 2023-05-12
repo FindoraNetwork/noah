@@ -1,7 +1,11 @@
 //! Anonymous credentials enable a credential issuer to issue a credential (with some attributes)
 //! to a user, and the user can later, with anonymity, selectively disclose some attributes.
 
-use crate::{confidential_anon_creds::CACTranscript, matrix_sigma::SigmaTranscript};
+use crate::{
+    confidential_anon_creds::CACTranscript,
+    errors::{CryptoError, Result},
+    matrix_sigma::SigmaTranscript,
+};
 use merlin::Transcript;
 use noah_algebra::{prelude::*, traits::Pairing};
 use serde_derive::{Deserialize, Serialize};
@@ -77,7 +81,7 @@ impl<G1: Group, G2: Group, AttrType: Copy> Credential<G1, G2, AttrType> {
     /// Apply the reveal map to get revealed attributes.
     pub fn get_revealed_attributes(&self, reveal_map: &[bool]) -> Result<Vec<AttrType>> {
         if reveal_map.len() != self.attrs.len() {
-            return Err(eg!(NoahError::ParameterError));
+            return Err(CryptoError::ParameterError);
         }
         Ok(self
             .attrs
@@ -230,7 +234,7 @@ pub fn grant_credential<R: CryptoRng + RngCore, P: Pairing>(
     let number_attributes_from_issuer_sk = isk.y.len();
     let n = attrs.len();
     if number_attributes_from_issuer_sk != n {
-        return Err(eg!(NoahError::AnonymousCredentialSignError));
+        return Err(CryptoError::AnonymousCredentialSignError);
     }
 
     let u = P::ScalarField::random(prng);
@@ -279,7 +283,7 @@ pub fn commit_without_randomizer<R: CryptoRng + RngCore, P: Pairing>(
     m: &[u8],
 ) -> Result<CommOutput<P::G1, P::G2, P::ScalarField>> {
     let rand = randomizer_gen::<_, P>(prng);
-    let output = commit::<_, P>(prng, usk, credential, &rand, m).c(d!())?;
+    let output = commit::<_, P>(prng, usk, credential, &rand, m)?;
     let cm = output.0;
     let proof_valid = output.1;
 
@@ -314,8 +318,7 @@ pub fn commit<R: CryptoRng + RngCore, P: Pairing>(
         &credential.ipk,
         &rand.t,
         hidden_attrs.as_slice(),
-    )
-    .c(d!())?;
+    )?;
 
     Ok((cm, proof_valid, None))
 }
@@ -352,7 +355,7 @@ pub fn open_comm<R: CryptoRng + RngCore, P: Pairing>(
     reveal_map: &[bool],
 ) -> Result<CredentialCommOpenProof<P::G2, P::ScalarField>> {
     if credential.attrs.len() != reveal_map.len() {
-        return Err(eg!(NoahError::ParameterError));
+        return Err(CryptoError::ParameterError);
     }
 
     let revealed_attrs = credential
@@ -377,8 +380,7 @@ pub fn open_comm<R: CryptoRng + RngCore, P: Pairing>(
         &credential.ipk,
         &rand.t,
         revealed_attrs.as_slice(),
-    )
-    .c(d!())?;
+    )?;
 
     Ok(pok)
 }
@@ -439,7 +441,7 @@ fn prove_pok<R: CryptoRng + RngCore, P: Pairing>(
                 gamma.push(gamma_i);
             }
             Attribute::Hidden(None) => {
-                return Err(eg!(NoahError::ParameterError));
+                return Err(CryptoError::ParameterError);
             }
             _ => {}
         }
@@ -497,7 +499,7 @@ pub(crate) fn verify_pok<P: Pairing>(
                 scalars.push(a);
             }
             None => {
-                let response = resp_attr_iter.next().c(d!(NoahError::ParameterError))?;
+                let response = resp_attr_iter.next().ok_or(CryptoError::ParameterError)?;
                 scalars.push(response);
             }
         }
@@ -515,7 +517,7 @@ pub(crate) fn verify_pok<P: Pairing>(
     if lhs == rhs {
         Ok(())
     } else {
-        Err(eg!(NoahError::IdentityRevealVerifyError))
+        Err(CryptoError::IdentityRevealVerifyError)
     }
 }
 

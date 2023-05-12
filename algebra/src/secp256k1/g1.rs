@@ -1,12 +1,13 @@
-use crate::errors::AlgebraError;
 use crate::prelude::*;
-use crate::prelude::{derive_prng_from_hash, CryptoRng, Group, RngCore};
 use crate::secp256k1::SECP256K1Scalar;
 use crate::secq256k1::SECQ256K1Scalar;
 use ark_ec::{AffineRepr, CurveGroup as ArkCurveGroup, Group as ArkGroup, VariableBaseMSM};
 use ark_secp256k1::{Affine, Projective};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
-use ark_std::fmt::{Debug, Formatter};
+use ark_std::{
+    fmt::{Debug, Formatter},
+    vec::Vec,
+};
 use digest::consts::U64;
 use digest::Digest;
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -30,7 +31,7 @@ impl SECP256K1G1 {
     /// Obtain a point using the x coordinate (which would be SECQ256K1Scalar).
     pub fn get_point_from_x(x: &SECQ256K1Scalar) -> Result<Self> {
         let point = Affine::get_point_from_x_unchecked(x.0.clone(), false)
-            .ok_or(eg!(NoahError::DeserializationError))?
+            .ok_or(AlgebraError::DeserializationError)?
             .into_group();
         Ok(Self(point))
     }
@@ -47,8 +48,8 @@ impl SECP256K1G1 {
 }
 
 impl Debug for SECP256K1G1 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        std::fmt::Debug::fmt(&self.0.into_affine(), f)
+    fn fmt(&self, f: &mut Formatter<'_>) -> ark_std::fmt::Result {
+        ark_std::fmt::Debug::fmt(&self.0.into_affine(), f)
     }
 }
 
@@ -97,27 +98,23 @@ impl Group for SECP256K1G1 {
 
     #[inline]
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
-        let mut reader = ark_std::io::BufReader::new(bytes);
-
-        let affine = Affine::deserialize_with_mode(&mut reader, Compress::Yes, Validate::Yes);
+        let affine = Affine::deserialize_with_mode(bytes, Compress::Yes, Validate::Yes);
 
         if affine.is_ok() {
             Ok(Self(Projective::from(affine.unwrap()))) // safe unwrap
         } else {
-            Err(eg!(AlgebraError::DeserializationError))
+            Err(AlgebraError::DeserializationError)
         }
     }
 
     #[inline]
     fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
-        let mut reader = ark_std::io::BufReader::new(bytes);
-
-        let affine = Affine::deserialize_with_mode(&mut reader, Compress::No, Validate::No);
+        let affine = Affine::deserialize_with_mode(bytes, Compress::No, Validate::No);
 
         if affine.is_ok() {
             Ok(Self(Projective::from(affine.unwrap()))) // safe unwrap
         } else {
-            Err(eg!(AlgebraError::DeserializationError))
+            Err(AlgebraError::DeserializationError)
         }
     }
 

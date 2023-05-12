@@ -1,6 +1,5 @@
 use crate::bls12_381::BLS12_381_SCALAR_LEN;
-use crate::errors::AlgebraError;
-use crate::prelude::{derive_prng_from_hash, *};
+use crate::prelude::*;
 use crate::traits::Domain;
 use ark_bls12_381::Fr;
 use ark_ff::{BigInteger, BigInteger256, FftField, Field, PrimeField};
@@ -8,6 +7,8 @@ use ark_std::{
     fmt::{Debug, Formatter},
     result::Result as StdResult,
     str::FromStr,
+    vec,
+    vec::Vec,
 };
 use digest::{consts::U64, Digest};
 use num_bigint::BigUint;
@@ -20,7 +21,7 @@ use wasm_bindgen::prelude::*;
 pub struct BLSScalar(pub(crate) Fr);
 
 impl Debug for BLSScalar {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut Formatter<'_>) -> ark_std::fmt::Result {
         <BigUint as Debug>::fmt(
             &<BigInteger256 as Into<BigUint>>::into(self.0.into_bigint()),
             f,
@@ -185,6 +186,13 @@ impl From<u64> for BLSScalar {
     }
 }
 
+impl From<u128> for BLSScalar {
+    #[inline]
+    fn from(value: u128) -> Self {
+        Self(Fr::from(value))
+    }
+}
+
 impl Scalar for BLSScalar {
     #[inline]
     fn random<R: CryptoRng + RngCore>(rng: &mut R) -> Self {
@@ -252,7 +260,7 @@ impl Scalar for BLSScalar {
     #[inline]
     fn from_bytes(bytes: &[u8]) -> Result<Self> {
         if bytes.len() > Self::bytes_len() {
-            return Err(eg!(AlgebraError::DeserializationError));
+            return Err(AlgebraError::DeserializationError);
         }
         let mut array = vec![0u8; Self::bytes_len()];
         array[0..bytes.len()].copy_from_slice(bytes);
@@ -263,7 +271,7 @@ impl Scalar for BLSScalar {
     fn inv(&self) -> Result<Self> {
         let a = self.0.inverse();
         if a.is_none() {
-            return Err(eg!(AlgebraError::GroupInversionError));
+            return Err(AlgebraError::GroupInversionError);
         }
         Ok(Self(a.unwrap()))
     }

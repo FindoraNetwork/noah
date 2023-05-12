@@ -2,6 +2,7 @@
 //!
 //! This is mostly a wrapper.
 
+use crate::errors::Result;
 use bulletproofs::{BulletproofGens, PedersenGens, RangeProof};
 use merlin::Transcript;
 use noah_algebra::prelude::*;
@@ -26,8 +27,7 @@ pub fn prove_ranges(
         values,
         &blindings,
         log_range_upper_bound,
-    )
-    .c(d!(NoahError::RangeProofProveError))?;
+    )?;
     let commitments = coms.iter().map(|x| CompressedRistretto(*x)).collect_vec();
     Ok((proof, commitments))
 }
@@ -61,6 +61,6 @@ pub fn batch_verify_ranges<R: CryptoRng + RngCore>(
         bp_gens,
         &pc_gens,
         log_range_upper_bound,
-    )
-    .c(d!(NoahError::RangeProofVerifyError))
+    )?;
+    Ok(())
 }

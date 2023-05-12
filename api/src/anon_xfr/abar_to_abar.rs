@@ -16,7 +16,7 @@ use crate::anon_xfr::{
     AXfrAddressFoldingInstance, AXfrAddressFoldingWitness, AXfrPlonkPf, TurboPlonkCS, AMOUNT_LEN,
     FEE_TYPE, MAX_AXFR_MEMO_SIZE, TREE_DEPTH,
 };
-use crate::errors::NoahError;
+use crate::errors::{NoahError, Result};
 use crate::keys::{KeyPair, PublicKey, PublicKeyInner, SecretKey};
 use crate::parameters::params::ProverParams;
 use crate::parameters::params::{AddressFormat, VerifierParams};
@@ -99,11 +99,11 @@ pub fn init_anon_xfr_note(
 ) -> Result<AXfrPreNote> {
     // 1. check input correctness
     if inputs.is_empty() || outputs.is_empty() {
-        return Err(eg!(NoahError::AXfrProverParamsError));
+        return Err(NoahError::AXfrProverParamsError);
     }
-    check_inputs(inputs, input_keypair).c(d!())?;
-    check_asset_amount(inputs, outputs, fee).c(d!())?;
-    check_roots(inputs).c(d!())?;
+    check_inputs(inputs, input_keypair)?;
+    check_asset_amount(inputs, outputs, fee)?;
+    check_roots(inputs)?;
 
     // 2. build input witness information
     let mut nullifiers = Vec::new();
@@ -171,7 +171,7 @@ pub fn init_anon_xfr_note(
         .collect_vec();
     let out_memos: Result<Vec<AxfrOwnerMemo>> = outputs
         .iter()
-        .map(|output| output.owner_memo.clone().c(d!(NoahError::ParameterError)))
+        .map(|output| output.owner_memo.clone().ok_or(NoahError::ParameterError))
         .collect();
 
     let output_commitments_traces: Vec<AnemoiVLHTrace<BLSScalar, 2, 12>> = outputs
@@ -196,7 +196,7 @@ pub fn init_anon_xfr_note(
         merkle_root: mt_info_temp.root,
         merkle_root_version: mt_info_temp.root_version,
         fee,
-        owner_memos: out_memos.c(d!())?,
+        owner_memos: out_memos?,
     };
 
     Ok(AXfrPreNote {
@@ -254,8 +254,7 @@ pub fn finish_anon_xfr_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64> 
         &input_commitments_traces,
         &output_commitments_traces,
         &folding_witness,
-    )
-    .c(d!())?;
+    )?;
 
     Ok(AXfrNote {
         body,
@@ -272,7 +271,7 @@ pub fn verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default>(
     hash: D,
 ) -> Result<()> {
     if *merkle_root != note.body.merkle_root {
-        return Err(eg!(NoahError::AXfrVerificationError));
+        return Err(NoahError::AXfrVerificationError);
     }
 
     // Check the memo size.
@@ -289,12 +288,12 @@ pub fn verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default>(
     if note.body.owner_memos.len() != note.body.outputs.len()
         || note.body.owner_memos.len() > max_memo_len
     {
-        return Err(eg!(NoahError::AXfrVerificationError));
+        return Err(NoahError::AXfrVerificationError);
     }
 
     for memo in note.body.owner_memos.iter() {
         if memo.size() > MAX_AXFR_MEMO_SIZE {
-            return Err(eg!(NoahError::AXfrVerificationError));
+            return Err(NoahError::AXfrVerificationError);
         }
     }
 
@@ -330,7 +329,6 @@ pub fn verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default>(
         &note.proof,
         &address_folding_public_input,
     )
-    .c(d!(NoahError::AXfrVerificationError))
 }
 
 /// Batch verify the anonymous transfer notes.
@@ -347,7 +345,7 @@ pub fn batch_verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default + Sync +
         .zip(notes)
         .any(|(x, y)| **x != y.body.merkle_root)
     {
-        return Err(eg!(NoahError::AXfrVerificationError));
+        return Err(NoahError::AXfrVerificationError);
     }
 
     // Check the memo size.
@@ -365,12 +363,12 @@ pub fn batch_verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default + Sync +
         if note.body.owner_memos.len() != note.body.outputs.len()
             || note.body.owner_memos.len() > max_memo_len
         {
-            return Err(eg!(NoahError::AXfrVerificationError));
+            return Err(NoahError::AXfrVerificationError);
         }
 
         for memo in note.body.owner_memos.iter() {
             if memo.size() > MAX_AXFR_MEMO_SIZE {
-                return Err(eg!(NoahError::AXfrVerificationError));
+                return Err(NoahError::AXfrVerificationError);
             }
         }
     }
@@ -420,7 +418,7 @@ pub fn batch_verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default + Sync +
     if is_ok {
         Ok(())
     } else {
-        Err(eg!(NoahError::AXfrVerificationError))
+        Err(NoahError::AXfrVerificationError)
     }
 }
 
@@ -455,7 +453,7 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     );
     let witness = cs.get_and_clear_witness();
 
-    prover_with_lagrange(
+    Ok(prover_with_lagrange(
         rng,
         &mut transcript,
         &params.pcs,
@@ -463,8 +461,7 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
         &params.cs,
         &params.prover_params,
         &witness,
-    )
-    .c(d!(NoahError::AXfrProofError))
+    )?)
 }
 
 /// Verify a Plonk proof for anonymous transfer.
@@ -484,15 +481,14 @@ pub(crate) fn verify_xfr(
     let mut online_inputs = pub_inputs.to_vec();
     online_inputs.extend_from_slice(address_folding_public_input);
 
-    verifier(
+    Ok(verifier(
         &mut transcript,
         &params.shrunk_vk,
         &params.shrunk_cs,
         &params.verifier_params,
         &online_inputs,
         proof,
-    )
-    .c(d!(NoahError::ZKProofVerificationError))
+    )?)
 }
 
 /// The witness of an anonymous transfer.
@@ -2242,7 +2238,7 @@ mod tests {
 
         let verify = cs.verify_witness(&witness, &online_inputs);
         if witness_is_valid {
-            pnk!(verify);
+            verify.unwrap();
         } else {
             assert!(verify.is_err());
         }
