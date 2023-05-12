@@ -74,32 +74,26 @@ version = "4.0.0"
 
 [dependencies.bulletproofs]
 package = "noah-bulletproofs"
-#version = "4.0.0"
-git = "https://github.com/FindoraNetwork/bulletproofs"
-branch = "no-std"
-default-features = false
-features = ['yoloproofs']
+version = "4.1.0"
 
 [dependencies.ark-ff]
-version = '0.4.0-alpha'
+version = '0.4.0'
 default-features = false
 
 [dependencies.ark-serialize]
-version = '0.4.0-alpha'
+version = '0.4.0'
 default-features = false
 
 [dependencies.ark-std]
-version = '0.4.0-alpha'
+version = '0.4.0'
 default-features = false
 
 [dependencies.ark-ec]
-version = '0.4.0-alpha'
+version = '0.4.0'
 default-features = false
 
 [dependencies.ark-bulletproofs]
-#version = '4.0.0'
-git = "https://github.com/FindoraNetwork/ark-bulletproofs"
-branch = "no-std"
+version = '4.0.0'
 default-features = false
 features = ['yoloproofs']
 
