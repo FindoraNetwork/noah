@@ -41,7 +41,7 @@ version = "4.0.0"
 
 [dependencies.bulletproofs]
 package = "noah-bulletproofs"
-version = "4.0.0"
+version = "=4.0.0"
 
 [dependencies.ark-ec]
 version = '0.4.0-alpha'
@@ -65,7 +65,7 @@ version = '0.4.0-alpha'
 default-features = false
 
 [dependencies.ark-bulletproofs]
-version = '4.0.0'
+version = '=4.0.0'
 default-features = false
 features = ['yoloproofs']
 
