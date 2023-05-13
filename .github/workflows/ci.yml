@@ -278,7 +278,7 @@ jobs:
           cd smoke-tests/
           cargo nextest run --features=parallel
           cargo test --doc
-  
+
   xfr_tracing_check:
     name: Check xfr_tracing
     runs-on: ubuntu-latest
@@ -347,3 +347,48 @@ jobs:
             echo "$file was changed"
           done
           exit 1
+
+  check_no_std:
+    name: Check no_std
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: thumbv6m-none-eabi
+          override: true
+
+      - name: Install Rust ARM64
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          target: aarch64-unknown-none
+          override: true
+
+      - uses: actions/cache@v2
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: check
+        uses: actions-rs/cargo@v1
+        with:
+            command: check
+            args: "--examples --workspace \
+                  --exclude accumulators \
+                  --target thumbv6m-none-eabi"
+
+      - name: build
+        uses: actions-rs/cargo@v1
+        with:
+            command: build
+            args: "--examples --workspace \
+                  --exclude accumulators \
+                  --target thumbv6m-none-eabi"
