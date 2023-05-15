@@ -28,8 +28,12 @@ pub trait SWParameters<S: Scalar> {
     }
 
     /// second candidate for solution x
-    fn x2(&self, x1: &S) -> S {
-        Self::C4.sub(x1)
+    fn x2(&self, t: &S) -> Result<S> {
+        let t_sq_inv = t.square().inv()?;
+        let c3t_sq_inv = Self::C3.mul(t_sq_inv);
+        let temp = S::one().add(c3t_sq_inv);
+        let temp2 = Self::C2.mul(temp.inv()?);
+        Ok(Self::C4.add(&temp2))
     }
 
     /// third candidate for solution x
