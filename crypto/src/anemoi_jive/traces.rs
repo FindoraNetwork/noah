@@ -39,44 +39,48 @@ impl<F: Scalar, const N: usize, const NUM_ROUNDS: usize> noah_algebra::fmt::Debu
             f.write_fmt(format_args!("\r x[{}] = {:?}\n", i, elem))?;
         }
 
-        for r in 0..NUM_ROUNDS {
-            f.write_fmt(format_args!("round {}:\n", r))?;
+        let chunk_len = if self.input.len() % (2 * N - 1) == 0 {
+            self.input.len() / (2 * N - 1)
+        } else {
+            self.input.len() / (2 * N - 1) + 1
+        };
 
-            f.write_str("\r before permutation:")?;
+        for i in 0..chunk_len {
+            f.write_fmt(format_args!("before permutation: {}\n", i))?;
 
-            for (i, elem) in self.before_permutation[r].0.iter().enumerate() {
+            for (i, elem) in self.before_permutation[i].0.iter().enumerate() {
                 f.write_fmt(format_args!("\r\r x[{}] = {:?}\n", i, elem))?;
             }
 
-            for (i, elem) in self.before_permutation[r].1.iter().enumerate() {
+            for (i, elem) in self.before_permutation[i].1.iter().enumerate() {
                 f.write_fmt(format_args!("\r \r y[{}] = {:?}\n", i, elem))?;
             }
 
-            f.write_str("\r intermediate permutation:")?;
+            for r in 0..NUM_ROUNDS {
+                f.write_fmt(format_args!("round {}: intermediate permutation\n", r))?;
 
-            for (i, elem) in self.intermediate_values_before_constant_additions[r]
-                .0
-                .iter()
-                .enumerate()
-            {
+                for (i, elem) in self.intermediate_values_before_constant_additions[i].0[r]
+                    .iter()
+                    .enumerate()
+                {
+                    f.write_fmt(format_args!("\r\r x[{}] = {:?}\n", i, elem))?;
+                }
+
+                for (i, elem) in self.intermediate_values_before_constant_additions[i].1[r]
+                    .iter()
+                    .enumerate()
+                {
+                    f.write_fmt(format_args!("\r\r y[{}] = {:?}\n", i, elem))?;
+                }
+            }
+
+            f.write_fmt(format_args!("after permutation: {}\n", i))?;
+
+            for (i, elem) in self.after_permutation[i].0.iter().enumerate() {
                 f.write_fmt(format_args!("\r\r x[{}] = {:?}\n", i, elem))?;
             }
 
-            for (i, elem) in self.intermediate_values_before_constant_additions[r]
-                .1
-                .iter()
-                .enumerate()
-            {
-                f.write_fmt(format_args!("\r\r y[{}] = {:?}\n", i, elem))?;
-            }
-
-            f.write_str("\r after permutation:")?;
-
-            for (i, elem) in self.after_permutation[r].0.iter().enumerate() {
-                f.write_fmt(format_args!("\r\r x[{}] = {:?}\n", i, elem))?;
-            }
-
-            for (i, elem) in self.after_permutation[r].1.iter().enumerate() {
+            for (i, elem) in self.after_permutation[i].1.iter().enumerate() {
                 f.write_fmt(format_args!("\r \r y[{}] = {:?}\n", i, elem))?;
             }
         }
@@ -202,45 +206,48 @@ impl<F: Scalar, const N: usize, const NUM_ROUNDS: usize> noah_algebra::fmt::Debu
         for (i, elem) in self.input.iter().enumerate() {
             f.write_fmt(format_args!("\r x[{}] = {:?}\n", i, elem))?;
         }
+        let chunk_len = if self.input.len() % (2 * N - 1) == 0 {
+            self.input.len() / (2 * N - 1)
+        } else {
+            self.input.len() / (2 * N - 1) + 1
+        };
 
-        for r in 0..NUM_ROUNDS {
-            f.write_fmt(format_args!("round {}:\n", r))?;
+        for i in 0..chunk_len {
+            f.write_fmt(format_args!("before permutation: {}\n", i))?;
 
-            f.write_str("\r before permutation:")?;
-
-            for (i, elem) in self.before_permutation[r].0.iter().enumerate() {
+            for (i, elem) in self.before_permutation[i].0.iter().enumerate() {
                 f.write_fmt(format_args!("\r\r x[{}] = {:?}\n", i, elem))?;
             }
 
-            for (i, elem) in self.before_permutation[r].1.iter().enumerate() {
+            for (i, elem) in self.before_permutation[i].1.iter().enumerate() {
                 f.write_fmt(format_args!("\r \r y[{}] = {:?}\n", i, elem))?;
             }
 
-            f.write_str("\r intermediate permutation:")?;
+            for r in 0..NUM_ROUNDS {
+                f.write_fmt(format_args!("round {}: intermediate permutation\n", r))?;
 
-            for (i, elem) in self.intermediate_values_before_constant_additions[r]
-                .0
-                .iter()
-                .enumerate()
-            {
+                for (i, elem) in self.intermediate_values_before_constant_additions[i].0[r]
+                    .iter()
+                    .enumerate()
+                {
+                    f.write_fmt(format_args!("\r\r x[{}] = {:?}\n", i, elem))?;
+                }
+
+                for (i, elem) in self.intermediate_values_before_constant_additions[i].1[r]
+                    .iter()
+                    .enumerate()
+                {
+                    f.write_fmt(format_args!("\r\r y[{}] = {:?}\n", i, elem))?;
+                }
+            }
+
+            f.write_fmt(format_args!("after permutation: {}\n", i))?;
+
+            for (i, elem) in self.after_permutation[i].0.iter().enumerate() {
                 f.write_fmt(format_args!("\r\r x[{}] = {:?}\n", i, elem))?;
             }
 
-            for (i, elem) in self.intermediate_values_before_constant_additions[r]
-                .1
-                .iter()
-                .enumerate()
-            {
-                f.write_fmt(format_args!("\r\r y[{}] = {:?}\n", i, elem))?;
-            }
-
-            f.write_str("\r after permutation:")?;
-
-            for (i, elem) in self.after_permutation[r].0.iter().enumerate() {
-                f.write_fmt(format_args!("\r\r x[{}] = {:?}\n", i, elem))?;
-            }
-
-            for (i, elem) in self.after_permutation[r].1.iter().enumerate() {
+            for (i, elem) in self.after_permutation[i].1.iter().enumerate() {
                 f.write_fmt(format_args!("\r \r y[{}] = {:?}\n", i, elem))?;
             }
         }
