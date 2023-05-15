@@ -72,7 +72,7 @@ mod tests {
     fn test_random_t() {
 
         let sw = Secp256k1SW;
-        for i in 0..10000 {
+        for _i in 0..10000 {
             let mut rng = test_rng();
             let t = SECP256K1Fq::random(&mut rng);
 
@@ -85,7 +85,6 @@ mod tests {
             if sw.is_x_on_curve(&x2) {
                 continue
             }
-
 
             let x3 = sw.x3(&t).unwrap();
             assert!(sw.is_x_on_curve(&x3))
