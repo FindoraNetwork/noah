@@ -25,7 +25,6 @@ impl Ed25519Elligator {
 
     ///
     fn is_x_on_curve(&self, x: &Ed25519Fq) -> bool {
-
         let temp = x.pow(&[2u64]).mul(Ed25519Fq::from(486662u32));
         let y_squared = x.pow(&[3u64]).add(x).add(temp);
 
@@ -37,16 +36,14 @@ impl Ed25519Elligator {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use noah_algebra::ed25519::Ed25519Fq;
-    use noah_algebra::prelude::{Scalar, test_rng};
     use crate::hashing_to_the_curve::ed25519_elligator::Ed25519Elligator;
+    use noah_algebra::ed25519::Ed25519Fq;
+    use noah_algebra::prelude::{test_rng, Scalar};
 
     #[test]
     fn test_random_t() {
-
         let eg = Ed25519Elligator;
         for _i in 0..10000 {
             let mut rng = test_rng();
@@ -54,12 +51,11 @@ mod tests {
 
             let x1 = eg.x1(&t).unwrap();
             if eg.is_x_on_curve(&x1) {
-                continue
+                continue;
             }
 
             let x2 = eg.x2(&x1).unwrap();
             assert!(eg.is_x_on_curve(&x2))
-
         }
     }
 }

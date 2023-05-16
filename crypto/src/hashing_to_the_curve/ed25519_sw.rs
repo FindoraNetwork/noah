@@ -36,14 +36,13 @@ impl SWParameters<Ed25519Fq> for Ed25519SW {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
-    use noah_algebra::ed25519::Ed25519Fq;
-    use noah_algebra::new_ed25519_fq;
-    use noah_algebra::prelude::{Scalar, test_rng};
     use crate::hashing_to_the_curve::ed25519_sw::Ed25519SW;
     use crate::hashing_to_the_curve::traits::SWParameters;
+    use noah_algebra::ed25519::Ed25519Fq;
+    use noah_algebra::new_ed25519_fq;
+    use noah_algebra::prelude::{test_rng, Scalar};
 
     #[test]
     fn test_x_derivation() {
@@ -54,24 +53,55 @@ mod tests {
         let x2 = sw.x2(&t).unwrap();
         let x3 = sw.x3(&t).unwrap();
 
-        assert_eq!(x1, new_ed25519_fq!("35052544075417610700660092540301712605483067939443826766625142601993311385282"));
-        assert_eq!(x2, new_ed25519_fq!("22843500543240487011125399964042241321151924393376455253103649401963252948003"));
-        assert_eq!(x3, new_ed25519_fq!("55628280783676121122135371125950213811806717931300590918014233701929027895981"));
+        assert_eq!(
+            x1,
+            new_ed25519_fq!(
+                "35052544075417610700660092540301712605483067939443826766625142601993311385282"
+            )
+        );
+        assert_eq!(
+            x2,
+            new_ed25519_fq!(
+                "22843500543240487011125399964042241321151924393376455253103649401963252948003"
+            )
+        );
+        assert_eq!(
+            x3,
+            new_ed25519_fq!(
+                "55628280783676121122135371125950213811806717931300590918014233701929027895981"
+            )
+        );
 
-        t = new_ed25519_fq!("26261490946361586592261280563100114235157954222781295781974865328952772526824");
+        t = new_ed25519_fq!(
+            "26261490946361586592261280563100114235157954222781295781974865328952772526824"
+        );
 
         let x1 = sw.x1(&t).unwrap();
         let x2 = sw.x2(&t).unwrap();
         let x3 = sw.x3(&t).unwrap();
 
-        assert_eq!(x1, new_ed25519_fq!("55662970774143248676152068296021054624113686786963469155330127785619018187083"));
-        assert_eq!(x2, new_ed25519_fq!("2233073844514849035633424208322899302521305545856812864398664218337546146202"));
-        assert_eq!(x3, new_ed25519_fq!("53840827294954389625880150540438237547370106120164461777668468238174198448700"));
+        assert_eq!(
+            x1,
+            new_ed25519_fq!(
+                "55662970774143248676152068296021054624113686786963469155330127785619018187083"
+            )
+        );
+        assert_eq!(
+            x2,
+            new_ed25519_fq!(
+                "2233073844514849035633424208322899302521305545856812864398664218337546146202"
+            )
+        );
+        assert_eq!(
+            x3,
+            new_ed25519_fq!(
+                "53840827294954389625880150540438237547370106120164461777668468238174198448700"
+            )
+        );
     }
 
     #[test]
     fn test_random_t() {
-
         let sw = Ed25519SW;
         for _i in 0..10000 {
             let mut rng = test_rng();
@@ -79,17 +109,16 @@ mod tests {
 
             let x1 = sw.x1(&t).unwrap();
             if sw.is_x_on_curve(&x1) {
-                continue
+                continue;
             }
 
             let x2 = sw.x2(&t).unwrap();
             if sw.is_x_on_curve(&x2) {
-                continue
+                continue;
             }
 
             let x3 = sw.x3(&t).unwrap();
             assert!(sw.is_x_on_curve(&x3))
-
         }
     }
 }
