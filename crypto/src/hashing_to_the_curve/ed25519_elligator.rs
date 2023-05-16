@@ -24,6 +24,7 @@ impl Ed25519Elligator {
     }
 
     /// check if x lies on the curve
+    #[allow(unused)]
     fn is_x_on_curve(&self, x: &Ed25519Fq) -> bool {
         let temp = x.pow(&[2u64]).mul(Ed25519Fq::from(486662u32));
         let y_squared = x.pow(&[3u64]).add(x).add(temp);
