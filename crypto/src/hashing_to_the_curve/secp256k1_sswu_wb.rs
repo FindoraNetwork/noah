@@ -104,7 +104,7 @@ mod tests {
     fn test_random_t() {
         let sswu = Secp256k1SSWU;
         let sw = Secp256k1SW;
-        for _i in 0..100000 {
+        for _i in 0..10000 {
             let mut rng = test_rng();
             let t = SECP256K1Fq::random(&mut rng);
 

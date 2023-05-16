@@ -64,10 +64,10 @@ pub trait SimplifiedSWUParameters<S: Scalar> {
 
     /// first candidate for solution x
     fn isogeny_x1(&self, t: &S) -> Result<S> {
-        let t2 = t.square();
+        let t2 = t.square().mul(Self::QNR);
         let t4 = t2.square();
 
-        let temp = t4.sub(&t2).inv()?.add(S::one());
+        let temp = t4.add(&t2).inv()?.add(S::one());
         Ok(Self::C1.mul(temp))
     }
 

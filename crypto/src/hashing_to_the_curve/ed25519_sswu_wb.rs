@@ -40,13 +40,13 @@ mod tests {
         assert_eq!(
             x1,
             new_ed25519_fq!(
-                "33821190375296719008508280622781480091993943653389170324589199485103136885022"
+                "7457287917660312610502022429244984294187063250777089098680404356212894903224"
             )
         );
         assert_eq!(
             x2,
             new_ed25519_fq!(
-                "30025209482082666434513164466705496093028098632716614425685296620510493126106"
+                "20419531772605805968014286708006493082455024474557275692874981839751918710082"
             )
         );
 
@@ -60,38 +60,37 @@ mod tests {
         assert_eq!(
             x1,
             new_ed25519_fq!(
-                "34982774390495799875250315523171766522468818892991829848824023076855122861807"
+                "18242114560107859291669116711737021445542340546877785663857283795718913401958"
             )
         );
         assert_eq!(
             x2,
             new_ed25519_fq!(
-                "8860628524403289011878347206615908715790477551639145320170475832347442378824"
+                "8810771453702010396430590702953341512697278170129472741126134566236416256139"
             )
         );
     }
 
-    // #[test]
-    // fn test_random_t() {
-    //     let sswu = Ed25519SSWU;
-    //     let _sw = Ed25519SW;
-    //     for i in 0..10000 {
-    //         println!("{i}");
-    //         let mut rng = test_rng();
-    //         let t = Ed25519Fq::random(&mut rng);
-    //
-    //         let x1 = sswu.isogeny_x1(&t).unwrap();
-    //         if sswu.is_x_on_isogeny_curve(&x1) {
-    //
-    //             // let d1 = sswu.isogeny_map_x(&x1).unwrap();
-    //             // assert!(sw.is_x_on_curve(&d1));
-    //         } else {
-    //             let x2 = sswu.isogeny_x2(&t, &x1).unwrap();
-    //             assert!(sswu.is_x_on_isogeny_curve(&x2));
-    //
-    //             // let d2 = sswu.isogeny_map_x(&x2).unwrap();
-    //             // assert!(sw.is_x_on_curve(&d2));
-    //         }
-    //     }
-    // }
+    #[test]
+    fn test_random_t() {
+        let sswu = Ed25519SSWU;
+        let _sw = Ed25519SW;
+        for _i in 0..10000 {
+            let mut rng = test_rng();
+            let t = Ed25519Fq::random(&mut rng);
+
+            let x1 = sswu.isogeny_x1(&t).unwrap();
+            if sswu.is_x_on_isogeny_curve(&x1) {
+
+                // let d1 = sswu.isogeny_map_x(&x1).unwrap();
+                // assert!(sw.is_x_on_curve(&d1));
+            } else {
+                let x2 = sswu.isogeny_x2(&t, &x1).unwrap();
+                assert!(sswu.is_x_on_isogeny_curve(&x2));
+
+                // let d2 = sswu.isogeny_map_x(&x2).unwrap();
+                // assert!(sw.is_x_on_curve(&d2));
+            }
+        }
+    }
 }
