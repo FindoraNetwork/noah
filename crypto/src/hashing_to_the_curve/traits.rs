@@ -68,7 +68,7 @@ pub trait SimplifiedSWUParameters<S: Scalar> {
         let t4 = t2.square();
 
         let temp = t4.sub(&t2).inv()?.add(S::one());
-        Ok(Self::C1.mul(temp).neg())
+        Ok(Self::C1.mul(temp))
     }
 
     /// second candidate for solution x
