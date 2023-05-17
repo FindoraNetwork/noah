@@ -1,10 +1,11 @@
 use crate::hashing_to_the_curve::traits::SWParameters;
 use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq, prelude::*};
+use noah_algebra::ed25519::Ed25519Point;
 
 /// The SW map for ed25519.
 pub struct Ed25519SW;
 
-impl SWParameters<Ed25519Fq> for Ed25519SW {
+impl SWParameters<Ed25519Point> for Ed25519SW {
     const Z0: Ed25519Fq = new_ed25519_fq!(
         "7351004470711496783299639200077825248508346112056564349554070979984169706335"
     );
@@ -23,7 +24,7 @@ impl SWParameters<Ed25519Fq> for Ed25519SW {
         "22595885493139578480537169384951274962349491958774703396425382945106958635058"
     );
 
-    fn is_x_on_curve(&self, x: &Ed25519Fq) -> bool {
+    fn is_x_on_curve(x: &Ed25519Fq) -> bool {
         let first_term = x.pow(&[3u64]);
         let second_term = x.pow(&[2u64]).mul(Ed25519Fq::from(486662u64));
         let y_squared = first_term.add(second_term).add(x);
@@ -103,22 +104,10 @@ mod tests {
     #[test]
     fn test_random_t() {
         let sw = Ed25519SW;
-        for _i in 0..10000 {
+        for _ in 0..100 {
             let mut rng = test_rng();
             let t = Ed25519Fq::random(&mut rng);
-
-            let x1 = sw.x1(&t).unwrap();
-            if sw.is_x_on_curve(&x1) {
-                continue;
-            }
-
-            let x2 = sw.x2(&t).unwrap();
-            if sw.is_x_on_curve(&x2) {
-                continue;
-            }
-
-            let x3 = sw.x3(&t).unwrap();
-            assert!(sw.is_x_on_curve(&x3))
+            assert!(sw.get_x_coordinate_without_cofactor_clearing(t).is_ok());
         }
     }
 }

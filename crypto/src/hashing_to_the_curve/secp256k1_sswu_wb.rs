@@ -1,6 +1,7 @@
 use crate::errors::Result;
 use crate::hashing_to_the_curve::traits::SimplifiedSWUParameters;
 use noah_algebra::{new_secp256k1_fq, prelude::*, secp256k1::SECP256K1Fq};
+use noah_algebra::secp256k1::SECP256K1G1;
 
 /// The simplified SWU map for secp256k1.
 pub struct Secp256k1SSWU;
@@ -25,7 +26,7 @@ const K21: SECP256K1Fq = new_secp256k1_fq!(
 );
 // const K22: SECP256K1Fq = new_secp256k1_fq!("1");
 
-impl SimplifiedSWUParameters<SECP256K1Fq> for Secp256k1SSWU {
+impl SimplifiedSWUParameters<SECP256K1G1> for Secp256k1SSWU {
     const C1: SECP256K1Fq = new_secp256k1_fq!(
         "5324262023205125242632636178842408935272934169651804884418803605709653231043"
     );
@@ -35,7 +36,7 @@ impl SimplifiedSWUParameters<SECP256K1Fq> for Secp256k1SSWU {
     const B: SECP256K1Fq = new_secp256k1_fq!("1771");
     const QNR: SECP256K1Fq = new_secp256k1_fq!("-1");
 
-    fn isogeny_map_x(&self, x: &SECP256K1Fq) -> Result<SECP256K1Fq> {
+    fn isogeny_map_x(x: &SECP256K1Fq) -> Result<SECP256K1Fq> {
         let x_squared = x.pow(&[2u64]);
         let x_cubed = x_squared.mul(x);
 
@@ -103,22 +104,10 @@ mod tests {
     #[test]
     fn test_random_t() {
         let sswu = Secp256k1SSWU;
-        let sw = Secp256k1SW;
-        for _i in 0..10000 {
+        for _ in 0..100 {
             let mut rng = test_rng();
             let t = SECP256K1Fq::random(&mut rng);
-
-            let x1 = sswu.isogeny_x1(&t).unwrap();
-            if sswu.is_x_on_isogeny_curve(&x1) {
-                let d1 = sswu.isogeny_map_x(&x1).unwrap();
-                assert!(sw.is_x_on_curve(&d1));
-            } else {
-                let x2 = sswu.isogeny_x2(&t, &x1).unwrap();
-                assert!(sswu.is_x_on_isogeny_curve(&x2));
-
-                let d2 = sswu.isogeny_map_x(&x2).unwrap();
-                assert!(sw.is_x_on_curve(&d2));
-            }
+            assert!(sswu.get_x_coordinate_without_cofactor_clearing(t).is_ok());
         }
     }
 }

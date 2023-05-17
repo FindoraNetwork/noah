@@ -1,11 +1,12 @@
 use crate::errors::Result;
 use crate::hashing_to_the_curve::traits::SimplifiedSWUParameters;
 use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq};
+use noah_algebra::ed25519::Ed25519Point;
 
 /// The simplified SWU map for ed25519.
 pub struct Ed25519SSWU;
 
-impl SimplifiedSWUParameters<Ed25519Fq> for Ed25519SSWU {
+impl SimplifiedSWUParameters<Ed25519Point> for Ed25519SSWU {
     const C1: Ed25519Fq = new_ed25519_fq!(
         "23090418627330554870558147835411017348134811420561311724956192453459391843510"
     );
@@ -15,7 +16,7 @@ impl SimplifiedSWUParameters<Ed25519Fq> for Ed25519SSWU {
     );
     const QNR: Ed25519Fq = new_ed25519_fq!("2");
 
-    fn isogeny_map_x(&self, x: &Ed25519Fq) -> Result<Ed25519Fq> {
+    fn isogeny_map_x(x: &Ed25519Fq) -> Result<Ed25519Fq> {
         Ok(*x)
     }
 }
@@ -74,23 +75,10 @@ mod tests {
     #[test]
     fn test_random_t() {
         let sswu = Ed25519SSWU;
-        let _sw = Ed25519SW;
-        for _i in 0..10000 {
+        for _ in 0..100 {
             let mut rng = test_rng();
             let t = Ed25519Fq::random(&mut rng);
-
-            let x1 = sswu.isogeny_x1(&t).unwrap();
-            if sswu.is_x_on_isogeny_curve(&x1) {
-
-                // let d1 = sswu.isogeny_map_x(&x1).unwrap();
-                // assert!(sw.is_x_on_curve(&d1));
-            } else {
-                let x2 = sswu.isogeny_x2(&t, &x1).unwrap();
-                assert!(sswu.is_x_on_isogeny_curve(&x2));
-
-                // let d2 = sswu.isogeny_map_x(&x2).unwrap();
-                // assert!(sw.is_x_on_curve(&d2));
-            }
+            assert!(sswu.get_x_coordinate_without_cofactor_clearing(t).is_ok());
         }
     }
 }

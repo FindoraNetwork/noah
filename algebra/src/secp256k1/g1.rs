@@ -1,5 +1,5 @@
 use crate::prelude::*;
-use crate::secp256k1::SECP256K1Scalar;
+use crate::secp256k1::{SECP256K1Fq, SECP256K1Scalar};
 use crate::secq256k1::SECQ256K1Scalar;
 use ark_ec::{AffineRepr, CurveGroup as ArkCurveGroup, Group as ArkGroup, VariableBaseMSM};
 use ark_secp256k1::{Affine, Projective};
@@ -18,16 +18,6 @@ use wasm_bindgen::prelude::wasm_bindgen;
 pub struct SECP256K1G1(pub(crate) Projective);
 
 impl SECP256K1G1 {
-    /// Obtain the x coordinate in the affine representation.
-    pub fn get_x(&self) -> SECQ256K1Scalar {
-        SECQ256K1Scalar((self.0.into_affine().x).clone())
-    }
-
-    /// Obtain the y coordinate in the affine representation.
-    pub fn get_y(&self) -> SECQ256K1Scalar {
-        SECQ256K1Scalar((self.0.into_affine().y).clone())
-    }
-
     /// Obtain a point using the x coordinate (which would be SECQ256K1Scalar).
     pub fn get_point_from_x(x: &SECQ256K1Scalar) -> Result<Self> {
         let point = Affine::get_point_from_x_unchecked(x.0.clone(), false)
@@ -196,5 +186,29 @@ impl<'a> MulAssign<&'a SECP256K1Scalar> for SECP256K1G1 {
     #[inline]
     fn mul_assign(&mut self, rhs: &'a SECP256K1Scalar) {
         self.0.mul_assign(rhs.0.clone())
+    }
+}
+
+impl CurveGroup for SECP256K1G1 {
+    type BaseType = SECP256K1Fq;
+
+    #[inline]
+    fn get_x(&self) -> Self::BaseType {
+        SECQ256K1Scalar((self.0.into_affine().x).clone())
+    }
+
+    #[inline]
+    fn get_y(&self) -> Self::BaseType {
+        SECQ256K1Scalar((self.0.into_affine().y).clone())
+    }
+
+    #[inline]
+    fn get_point_div_by_cofactor() -> Self {
+        Self::get_base()
+    }
+
+    #[inline]
+    fn multiply_by_cofactor(&self) -> Self {
+        *self
     }
 }

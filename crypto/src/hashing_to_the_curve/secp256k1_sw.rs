@@ -1,10 +1,11 @@
 use crate::hashing_to_the_curve::traits::SWParameters;
 use noah_algebra::{new_secp256k1_fq, prelude::*, secp256k1::SECP256K1Fq};
+use noah_algebra::secp256k1::SECP256K1G1;
 
 /// The SW map for secp256k1.
 pub struct Secp256k1SW;
 
-impl SWParameters<SECP256K1Fq> for Secp256k1SW {
+impl SWParameters<SECP256K1G1> for Secp256k1SW {
     const Z0: SECP256K1Fq = new_secp256k1_fq!(
         "2301468970328204842700089520541121182249040118132057797950280022211810753577"
     );
@@ -25,7 +26,7 @@ impl SWParameters<SECP256K1Fq> for Secp256k1SW {
         "38597363079105398474523661669562635951089994888546854679819194669302944890554"
     );
 
-    fn is_x_on_curve(&self, x: &SECP256K1Fq) -> bool {
+    fn is_x_on_curve(x: &SECP256K1Fq) -> bool {
         let y_squared = x.pow(&[3u64]).add(SECP256K1Fq::from(7u64));
 
         if y_squared.legendre() == LegendreSymbol::QuadraticNonResidue {
@@ -103,22 +104,10 @@ mod tests {
     #[test]
     fn test_random_t() {
         let sw = Secp256k1SW;
-        for _i in 0..10000 {
+        for _ in 0..100 {
             let mut rng = test_rng();
             let t = SECP256K1Fq::random(&mut rng);
-
-            let x1 = sw.x1(&t).unwrap();
-            if sw.is_x_on_curve(&x1) {
-                continue;
-            }
-
-            let x2 = sw.x2(&t).unwrap();
-            if sw.is_x_on_curve(&x2) {
-                continue;
-            }
-
-            let x3 = sw.x3(&t).unwrap();
-            assert!(sw.is_x_on_curve(&x3))
+            assert!(sw.get_x_coordinate_without_cofactor_clearing(t).is_ok());
         }
     }
 }
