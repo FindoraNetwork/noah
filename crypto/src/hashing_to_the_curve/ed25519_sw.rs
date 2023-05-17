@@ -1,6 +1,6 @@
 use crate::hashing_to_the_curve::traits::SWParameters;
-use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq, prelude::*};
 use noah_algebra::ed25519::Ed25519Point;
+use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq, prelude::*};
 
 /// The SW map for ed25519.
 pub struct Ed25519SW;

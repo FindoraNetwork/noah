@@ -117,7 +117,6 @@ pub trait SimplifiedSWUParameters<G: CurveGroup> {
     }
 }
 
-
 /// Trait for the Elligator
 pub trait ElligatorParameters<G: CurveGroup> {
     /// Constant A of the curve for Elligator
@@ -129,10 +128,7 @@ pub trait ElligatorParameters<G: CurveGroup> {
     /// first candidate for solution x
     fn x1(t: &G::BaseType) -> Result<G::BaseType> {
         let t_sq = t.square();
-        let temp = t_sq
-            .mul(Self::QNR)
-            .add(G::BaseType::one())
-            .inv()?;
+        let temp = t_sq.mul(Self::QNR).add(G::BaseType::one()).inv()?;
 
         Ok(temp.mul(Self::A).neg())
     }

@@ -1,7 +1,11 @@
 use crate::ed25519::{Ed25519Fq, Ed25519Scalar};
 use crate::prelude::*;
 use crate::zorro::ZorroScalar;
-use crate::{cmp::Ordering, hash::{Hash, Hasher}, new_ed25519_fq};
+use crate::{
+    cmp::Ordering,
+    hash::{Hash, Hasher},
+    new_ed25519_fq,
+};
 use ark_ec::{AffineRepr, CurveGroup as ArkCurveGroup, Group as ArkGroup};
 use ark_ed25519::{EdwardsAffine, EdwardsProjective};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
@@ -213,8 +217,12 @@ impl CurveGroup for Ed25519Point {
 
     #[inline]
     fn get_point_div_by_cofactor() -> Self {
-        let x: Ed25519Fq = new_ed25519_fq!("35604061283131262236237912080593388040538131583714990752973521819155773715252");
-        let y: Ed25519Fq = new_ed25519_fq!("27851808521341356751558414065160235650345903714080310552172372736657214748571");
+        let x: Ed25519Fq = new_ed25519_fq!(
+            "35604061283131262236237912080593388040538131583714990752973521819155773715252"
+        );
+        let y: Ed25519Fq = new_ed25519_fq!(
+            "27851808521341356751558414065160235650345903714080310552172372736657214748571"
+        );
         Self(EdwardsAffine::new(x.0, y.0).into_group())
     }
 
@@ -236,4 +244,3 @@ mod test {
         );
     }
 }
-

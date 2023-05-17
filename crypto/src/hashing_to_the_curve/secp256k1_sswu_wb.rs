@@ -1,7 +1,7 @@
 use crate::errors::Result;
 use crate::hashing_to_the_curve::traits::SimplifiedSWUParameters;
-use noah_algebra::{new_secp256k1_fq, prelude::*, secp256k1::SECP256K1Fq};
 use noah_algebra::secp256k1::SECP256K1G1;
+use noah_algebra::{new_secp256k1_fq, prelude::*, secp256k1::SECP256K1Fq};
 
 /// The simplified SWU map for secp256k1.
 pub struct Secp256k1SSWU;

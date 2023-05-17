@@ -1,7 +1,7 @@
 use crate::errors::Result;
 use crate::hashing_to_the_curve::traits::SimplifiedSWUParameters;
-use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq};
 use noah_algebra::ed25519::Ed25519Point;
+use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq};
 
 /// The simplified SWU map for ed25519.
 pub struct Ed25519SSWU;

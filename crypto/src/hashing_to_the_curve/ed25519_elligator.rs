@@ -1,6 +1,6 @@
-use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq, prelude::*};
-use noah_algebra::ed25519::Ed25519Point;
 use crate::hashing_to_the_curve::traits::ElligatorParameters;
+use noah_algebra::ed25519::Ed25519Point;
+use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq, prelude::*};
 
 /// Elligator map for Ed25519
 pub struct Ed25519Elligator;
