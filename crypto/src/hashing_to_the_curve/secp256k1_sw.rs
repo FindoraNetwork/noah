@@ -49,10 +49,9 @@ mod tests {
     fn test_x_derivation() {
         let mut t: SECP256K1Fq = new_secp256k1_fq!("7836");
 
-        let sw = Secp256k1SW;
-        let x1 = sw.x1(&t).unwrap();
-        let x2 = sw.x2(&t).unwrap();
-        let x3 = sw.x3(&t).unwrap();
+        let x1 = Secp256k1SW::x1(&t).unwrap();
+        let x2 = Secp256k1SW::x2(&t).unwrap();
+        let x3 = Secp256k1SW::x3(&t).unwrap();
 
         assert_eq!(
             x1,
@@ -77,9 +76,9 @@ mod tests {
             "26261490946361586592261280563100114235157954222781295781974865328952772526824"
         );
 
-        let x1 = sw.x1(&t).unwrap();
-        let x2 = sw.x2(&t).unwrap();
-        let x3 = sw.x3(&t).unwrap();
+        let x1 = Secp256k1SW::x1(&t).unwrap();
+        let x2 = Secp256k1SW::x2(&t).unwrap();
+        let x3 = Secp256k1SW::x3(&t).unwrap();
 
         assert_eq!(
             x1,
@@ -103,11 +102,10 @@ mod tests {
 
     #[test]
     fn test_random_t() {
-        let sw = Secp256k1SW;
         for _ in 0..100 {
             let mut rng = test_rng();
             let t = SECP256K1Fq::random(&mut rng);
-            assert!(sw.get_x_coordinate_without_cofactor_clearing(t).is_ok());
+            assert!(Secp256k1SW::get_x_coordinate_without_cofactor_clearing(&t).is_ok());
         }
     }
 }

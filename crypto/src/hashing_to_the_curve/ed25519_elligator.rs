@@ -26,16 +26,16 @@ impl ElligatorParameters<Ed25519Point> for Ed25519Elligator {
 #[cfg(test)]
 mod tests {
     use crate::hashing_to_the_curve::ed25519_elligator::Ed25519Elligator;
+    use crate::hashing_to_the_curve::traits::ElligatorParameters;
     use noah_algebra::ed25519::Ed25519Fq;
     use noah_algebra::prelude::{test_rng, Scalar};
 
     #[test]
     fn test_random_t() {
-        let eg = Ed25519Elligator;
         for _ in 0..100 {
             let mut rng = test_rng();
             let t = Ed25519Fq::random(&mut rng);
-            assert!(eg.get_x_coordinate_without_cofactor_clearing(t).is_ok());
+            assert!(Ed25519Elligator::get_x_coordinate_without_cofactor_clearing(&t).is_ok());
         }
     }
 }

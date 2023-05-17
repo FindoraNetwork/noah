@@ -53,8 +53,7 @@ impl SimplifiedSWUParameters<SECP256K1G1> for Secp256k1SSWU {
 #[cfg(test)]
 mod tests {
     use crate::hashing_to_the_curve::secp256k1_sswu_wb::Secp256k1SSWU;
-    use crate::hashing_to_the_curve::secp256k1_sw::Secp256k1SW;
-    use crate::hashing_to_the_curve::traits::{SWParameters, SimplifiedSWUParameters};
+    use crate::hashing_to_the_curve::traits::SimplifiedSWUParameters;
     use noah_algebra::new_secp256k1_fq;
     use noah_algebra::prelude::{test_rng, Scalar};
     use noah_algebra::secp256k1::SECP256K1Fq;
@@ -63,9 +62,8 @@ mod tests {
     fn test_x_derivation() {
         let mut t: SECP256K1Fq = new_secp256k1_fq!("7836");
 
-        let sswu = Secp256k1SSWU;
-        let x1 = sswu.isogeny_x1(&t).unwrap();
-        let x2 = sswu.isogeny_x2(&t, &x1).unwrap();
+        let x1 = Secp256k1SSWU::isogeny_x1(&t).unwrap();
+        let x2 = Secp256k1SSWU::isogeny_x2(&t, &x1).unwrap();
 
         assert_eq!(
             x1,
@@ -84,8 +82,8 @@ mod tests {
             "26261490946361586592261280563100114235157954222781295781974865328952772526824"
         );
 
-        let x1 = sswu.isogeny_x1(&t).unwrap();
-        let x2 = sswu.isogeny_x2(&t, &x1).unwrap();
+        let x1 = Secp256k1SSWU::isogeny_x1(&t).unwrap();
+        let x2 = Secp256k1SSWU::isogeny_x2(&t, &x1).unwrap();
 
         assert_eq!(
             x1,
@@ -103,11 +101,10 @@ mod tests {
 
     #[test]
     fn test_random_t() {
-        let sswu = Secp256k1SSWU;
         for _ in 0..100 {
             let mut rng = test_rng();
             let t = SECP256K1Fq::random(&mut rng);
-            assert!(sswu.get_x_coordinate_without_cofactor_clearing(t).is_ok());
+            assert!(Secp256k1SSWU::get_x_coordinate_without_cofactor_clearing(&t).is_ok());
         }
     }
 }
