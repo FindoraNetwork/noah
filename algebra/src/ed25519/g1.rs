@@ -1,9 +1,10 @@
-use crate::ed25519::Ed25519Scalar;
+use crate::ed25519::{Ed25519Fq, Ed25519Scalar};
 use crate::prelude::*;
 use crate::zorro::ZorroScalar;
 use crate::{
     cmp::Ordering,
     hash::{Hash, Hasher},
+    new_ed25519_fq,
 };
 use ark_ec::{AffineRepr, CurveGroup as ArkCurveGroup, Group as ArkGroup};
 use ark_ed25519::{EdwardsAffine, EdwardsProjective};
@@ -50,14 +51,6 @@ impl PartialOrd for Ed25519Point {
 }
 
 impl Eq for Ed25519Point {}
-
-impl Ed25519Point {
-    /// Multiply the point by the cofactor
-    #[inline]
-    pub fn mul_by_cofactor(&self) -> Self {
-        Self(self.0.into_affine().mul_by_cofactor_to_group())
-    }
-}
 
 impl Group for Ed25519Point {
     type ScalarType = Ed25519Scalar;
@@ -188,19 +181,6 @@ impl Neg for Ed25519Point {
 }
 
 impl Ed25519Point {
-    /// Get the x-coordinate of the ed25519 affine point.
-    #[inline]
-    pub fn get_x(&self) -> ZorroScalar {
-        let affine_point = EdwardsAffine::from(self.0);
-        ZorroScalar(affine_point.x)
-    }
-    /// Get the y-coordinate of the ed25519 affine point.
-    #[inline]
-    pub fn get_y(&self) -> ZorroScalar {
-        let affine_point = EdwardsAffine::from(self.0);
-        ZorroScalar(affine_point.y)
-    }
-
     /// Obtain a point using the y coordinate (which would be ZorroScalar).
     pub fn get_point_from_y(y: &ZorroScalar) -> Result<Self> {
         let point = EdwardsAffine::get_point_from_y_unchecked(y.0.clone(), false)
@@ -217,5 +197,50 @@ impl Ed25519Point {
     /// From the raw data.
     pub fn from_raw(raw: EdwardsAffine) -> Self {
         Self(raw.into_group())
+    }
+}
+
+impl CurveGroup for Ed25519Point {
+    type BaseType = ZorroScalar;
+
+    #[inline]
+    fn get_x(&self) -> ZorroScalar {
+        let affine_point = EdwardsAffine::from(self.0);
+        ZorroScalar(affine_point.x)
+    }
+
+    #[inline]
+    fn get_y(&self) -> ZorroScalar {
+        let affine_point = EdwardsAffine::from(self.0);
+        ZorroScalar(affine_point.y)
+    }
+
+    #[inline]
+    fn get_point_div_by_cofactor() -> Self {
+        let x: Ed25519Fq = new_ed25519_fq!(
+            "35604061283131262236237912080593388040538131583714990752973521819155773715252"
+        );
+        let y: Ed25519Fq = new_ed25519_fq!(
+            "27851808521341356751558414065160235650345903714080310552172372736657214748571"
+        );
+        Self(EdwardsAffine::new(x.0, y.0).into_group())
+    }
+
+    #[inline]
+    fn multiply_by_cofactor(&self) -> Self {
+        Self(self.0.into_affine().mul_by_cofactor_to_group())
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::prelude::*;
+
+    #[test]
+    fn correctness_div_by_cofactor() {
+        assert_eq!(
+            super::Ed25519Point::get_point_div_by_cofactor().multiply_by_cofactor(),
+            super::Ed25519Point::get_base()
+        );
     }
 }

@@ -1,10 +1,11 @@
 use crate::hashing_to_the_curve::traits::SWParameters;
+use noah_algebra::secp256k1::SECP256K1G1;
 use noah_algebra::{new_secp256k1_fq, prelude::*, secp256k1::SECP256K1Fq};
 
 /// The SW map for secp256k1.
 pub struct Secp256k1SW;
 
-impl SWParameters<SECP256K1Fq> for Secp256k1SW {
+impl SWParameters<SECP256K1G1> for Secp256k1SW {
     const Z0: SECP256K1Fq = new_secp256k1_fq!(
         "2301468970328204842700089520541121182249040118132057797950280022211810753577"
     );
@@ -25,13 +26,86 @@ impl SWParameters<SECP256K1Fq> for Secp256k1SW {
         "38597363079105398474523661669562635951089994888546854679819194669302944890554"
     );
 
-    fn is_x_on_curve(&self, x: &SECP256K1Fq) -> bool {
+    fn is_x_on_curve(x: &SECP256K1Fq) -> bool {
         let y_squared = x.pow(&[3u64]).add(SECP256K1Fq::from(7u64));
 
         if y_squared.legendre() == LegendreSymbol::QuadraticNonResidue {
             false
         } else {
             true
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::hashing_to_the_curve::secp256k1_sw::Secp256k1SW;
+    use crate::hashing_to_the_curve::traits::SWParameters;
+    use noah_algebra::new_secp256k1_fq;
+    use noah_algebra::prelude::{test_rng, Scalar};
+    use noah_algebra::secp256k1::SECP256K1Fq;
+
+    #[test]
+    fn test_x_derivation() {
+        let mut t: SECP256K1Fq = new_secp256k1_fq!("7836");
+
+        let x1 = Secp256k1SW::x1(&t).unwrap();
+        let x2 = Secp256k1SW::x2(&t).unwrap();
+        let x3 = Secp256k1SW::x3(&t).unwrap();
+
+        assert_eq!(
+            x1,
+            new_secp256k1_fq!(
+                "12173361532131623274578764961252033537537011288282760545929785782471408876466"
+            )
+        );
+        assert_eq!(
+            x2,
+            new_secp256k1_fq!(
+                "103618727705184572148992220047435874315732973377357803493527798225437425795198"
+            )
+        );
+        assert_eq!(
+            x3,
+            new_secp256k1_fq!(
+                "74087608966983262623115840088572810691661208660740673962981321521047702830003"
+            )
+        );
+
+        t = new_secp256k1_fq!(
+            "26261490946361586592261280563100114235157954222781295781974865328952772526824"
+        );
+
+        let x1 = Secp256k1SW::x1(&t).unwrap();
+        let x2 = Secp256k1SW::x2(&t).unwrap();
+        let x3 = Secp256k1SW::x3(&t).unwrap();
+
+        assert_eq!(
+            x1,
+            new_secp256k1_fq!(
+                "26139849459076662048090509060200323109571459447699535307492857403137446071407"
+            )
+        );
+        assert_eq!(
+            x2,
+            new_secp256k1_fq!(
+                "89652239778239533375480475948487584743698525217941028731964726604771388600257"
+            )
+        );
+        assert_eq!(
+            x3,
+            new_secp256k1_fq!(
+                "57498912498287391356729542970652380787836579419942546263322241630256315967730"
+            )
+        );
+    }
+
+    #[test]
+    fn test_random_t() {
+        for _ in 0..100 {
+            let mut rng = test_rng();
+            let t = SECP256K1Fq::random(&mut rng);
+            assert!(Secp256k1SW::get_x_coordinate_without_cofactor_clearing(&t).is_ok());
         }
     }
 }
