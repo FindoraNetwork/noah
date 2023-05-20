@@ -2,14 +2,14 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use noah_algebra::ed25519::{Ed25519Fq, Ed25519Point};
 use noah_algebra::prelude::{test_rng, Scalar};
 use noah_algebra::secp256k1::{SECP256K1Fq, SECP256K1G1};
-use noah_crypto::hashing_to_the_curve::ed25519_elligator::Ed25519ElligatorParameters;
-use noah_crypto::hashing_to_the_curve::ed25519_sswu_wb::Ed25519SSWUParameters;
+use noah_crypto::hashing_to_the_curve::ed25519::elligator::Ed25519ElligatorParameters;
+use noah_crypto::hashing_to_the_curve::ed25519::sswu::Ed25519SSWUParameters;
+use noah_crypto::hashing_to_the_curve::ed25519::sw::Ed25519SWParameters;
 use noah_crypto::hashing_to_the_curve::models::elligator::Elligator;
 use noah_crypto::hashing_to_the_curve::models::sswu::SimplifiedSWUMap;
 use noah_crypto::hashing_to_the_curve::models::sw::SWMap;
-use noah_crypto::hashing_to_the_curve::secp256k1_sw::Secp256k1SWParameters;
-use noah_crypto::hashing_to_the_curve::sswu::Secp256k1SSWUParameters;
-use noah_crypto::hashing_to_the_curve::sw::Ed25519SWParameters;
+use noah_crypto::hashing_to_the_curve::secp256k1::sswu::Secp256k1SSWUParameters;
+use noah_crypto::hashing_to_the_curve::secp256k1::sw::Secp256k1SWParameters;
 use noah_crypto::hashing_to_the_curve::traits::HashingToCurve;
 
 fn bench_ed25519_elligator(c: &mut Criterion) {
