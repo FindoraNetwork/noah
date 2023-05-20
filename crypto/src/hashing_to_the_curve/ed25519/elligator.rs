@@ -1,4 +1,4 @@
-use crate::hashing_to_the_curve::traits::ElligatorParameters;
+use crate::hashing_to_the_curve::models::elligator::ElligatorParameters;
 use noah_algebra::ed25519::Ed25519Point;
 use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq};
 
@@ -13,8 +13,9 @@ impl ElligatorParameters<Ed25519Point> for Ed25519ElligatorParameters {
 
 #[cfg(test)]
 mod tests {
-    use crate::hashing_to_the_curve::ed25519_elligator::Ed25519ElligatorParameters;
-    use crate::hashing_to_the_curve::traits::{Elligator, HashingToCurve};
+    use crate::hashing_to_the_curve::ed25519::elligator::Ed25519ElligatorParameters;
+    use crate::hashing_to_the_curve::models::elligator::Elligator;
+    use crate::hashing_to_the_curve::traits::HashingToCurve;
     use noah_algebra::ed25519::{Ed25519Fq, Ed25519Point};
     use noah_algebra::prelude::{test_rng, Scalar};
 
