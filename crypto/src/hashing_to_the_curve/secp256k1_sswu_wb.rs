@@ -4,7 +4,7 @@ use noah_algebra::secp256k1::SECP256K1G1;
 use noah_algebra::{new_secp256k1_fq, prelude::*, secp256k1::SECP256K1Fq};
 
 /// The simplified SWU map for secp256k1.
-pub struct Secp256k1SSWU;
+pub struct Secp256k1SSWUParameters;
 
 const K10: SECP256K1Fq = new_secp256k1_fq!(
     "64328938465175664124206102782604393251816658147578091133031991115504908150983"
@@ -26,7 +26,7 @@ const K21: SECP256K1Fq = new_secp256k1_fq!(
 );
 // const K22: SECP256K1Fq = new_secp256k1_fq!("1");
 
-impl SimplifiedSWUParameters<SECP256K1G1> for Secp256k1SSWU {
+impl SimplifiedSWUParameters<SECP256K1G1> for Secp256k1SSWUParameters {
     const C1: SECP256K1Fq = new_secp256k1_fq!(
         "5324262023205125242632636178842408935272934169651804884418803605709653231043"
     );
@@ -52,18 +52,20 @@ impl SimplifiedSWUParameters<SECP256K1G1> for Secp256k1SSWU {
 
 #[cfg(test)]
 mod tests {
-    use crate::hashing_to_the_curve::secp256k1_sswu_wb::Secp256k1SSWU;
-    use crate::hashing_to_the_curve::traits::SimplifiedSWUParameters;
+    use crate::hashing_to_the_curve::secp256k1_sswu_wb::Secp256k1SSWUParameters;
+    use crate::hashing_to_the_curve::traits::{HashingToCurve, SimplifiedSWUMap};
     use noah_algebra::new_secp256k1_fq;
     use noah_algebra::prelude::{test_rng, Scalar};
-    use noah_algebra::secp256k1::SECP256K1Fq;
+    use noah_algebra::secp256k1::{SECP256K1Fq, SECP256K1G1};
+
+    type M = SimplifiedSWUMap<SECP256K1G1, Secp256k1SSWUParameters>;
 
     #[test]
     fn test_x_derivation() {
         let mut t: SECP256K1Fq = new_secp256k1_fq!("7836");
 
-        let x1 = Secp256k1SSWU::isogeny_x1(&t).unwrap();
-        let x2 = Secp256k1SSWU::isogeny_x2(&t, &x1).unwrap();
+        let x1 = M::isogeny_x1(&t).unwrap();
+        let x2 = M::isogeny_x2(&t, &x1).unwrap();
 
         assert_eq!(
             x1,
@@ -82,8 +84,8 @@ mod tests {
             "26261490946361586592261280563100114235157954222781295781974865328952772526824"
         );
 
-        let x1 = Secp256k1SSWU::isogeny_x1(&t).unwrap();
-        let x2 = Secp256k1SSWU::isogeny_x2(&t, &x1).unwrap();
+        let x1 = M::isogeny_x1(&t).unwrap();
+        let x2 = M::isogeny_x2(&t, &x1).unwrap();
 
         assert_eq!(
             x1,
@@ -104,7 +106,7 @@ mod tests {
         for _ in 0..100 {
             let mut rng = test_rng();
             let t = SECP256K1Fq::random(&mut rng);
-            assert!(Secp256k1SSWU::get_x_coordinate_without_cofactor_clearing(&t).is_ok());
+            assert!(M::get_x_coordinate_without_cofactor_clearing(&t).is_ok());
         }
     }
 }

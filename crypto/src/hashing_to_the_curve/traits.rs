@@ -1,7 +1,14 @@
 use crate::errors::Result;
 use noah_algebra::prelude::*;
+use std::marker::PhantomData;
 
-/// Trait for the Shallue-van de Woestijne map
+/// Trait for hashing to the curve.
+pub trait HashingToCurve<G: CurveGroup> {
+    /// get the x coordinate directly
+    fn get_x_coordinate_without_cofactor_clearing(t: &G::BaseType) -> Result<G::BaseType>;
+}
+
+/// Trait for the parameters for Shallue-van de Woestijne map.
 pub trait SWParameters<G: CurveGroup> {
     /// Constant Z0 of Shallue-van de Woestijne map
     const Z0: G::BaseType;
@@ -17,40 +24,70 @@ pub trait SWParameters<G: CurveGroup> {
     const C5: G::BaseType;
     /// Constant C6 of Shallue-van de Woestijne map
     const C6: G::BaseType;
+    /// Constant A of the curve
+    const A: G::BaseType;
+    /// Constant B of the curve
+    const B: G::BaseType;
+    /// Constant C of the curve
+    const C: G::BaseType;
+}
 
+/// The Shallue-van de Woestijne map
+#[derive(Default)]
+pub struct SWMap<G: CurveGroup, P: SWParameters<G>> {
+    curve_phantom: PhantomData<G>,
+    param_phantom: PhantomData<P>,
+}
+
+impl<G: CurveGroup, P: SWParameters<G>> SWMap<G, P> {
     /// first candidate for solution x
-    fn x1(t: &G::BaseType) -> Result<G::BaseType> {
+    pub fn x1(t: &G::BaseType) -> Result<G::BaseType> {
         let t_sq_inv = t.square().inv()?;
-        let c3t_sq_inv = Self::C3.mul(t_sq_inv);
+        let c3t_sq_inv = P::C3.mul(t_sq_inv);
         let temp = G::BaseType::one().add(c3t_sq_inv);
-        let temp2 = Self::C2.mul(temp.inv()?);
-        Ok(Self::C1.sub(&temp2))
+        let temp2 = P::C2.mul(temp.inv()?);
+        Ok(P::C1.sub(&temp2))
     }
 
     /// second candidate for solution x
-    fn x2(t: &G::BaseType) -> Result<G::BaseType> {
+    pub fn x2(t: &G::BaseType) -> Result<G::BaseType> {
         let t_sq_inv = t.square().inv()?;
-        let c3t_sq_inv = Self::C3.mul(t_sq_inv);
+        let c3t_sq_inv = P::C3.mul(t_sq_inv);
         let temp = G::BaseType::one().add(c3t_sq_inv);
-        let temp2 = Self::C2.mul(temp.inv()?);
-        Ok(Self::C4.add(&temp2))
+        let temp2 = P::C2.mul(temp.inv()?);
+        Ok(P::C4.add(&temp2))
     }
 
     /// third candidate for solution x
-    fn x3(t: &G::BaseType) -> Result<G::BaseType> {
+    pub fn x3(t: &G::BaseType) -> Result<G::BaseType> {
         let t_sq = t.square();
         let t_sq_inv = t_sq.inv()?;
-        let c3t_sq_inv = Self::C3.mul(t_sq_inv);
+        let c3t_sq_inv = P::C3.mul(t_sq_inv);
         let temp = G::BaseType::one().add(c3t_sq_inv);
         let temp2 = t_sq.mul(temp.square());
 
-        Ok(Self::C5.add(Self::C6.mul(temp2)))
+        Ok(P::C5.add(P::C6.mul(temp2)))
     }
 
     /// check whether candidate x lies on the curve
-    fn is_x_on_curve(x: &G::BaseType) -> bool;
+    pub fn is_x_on_curve(x: &G::BaseType) -> bool {
+        let mut rhs = x.pow(&[3u64]) + P::C;
+        if !P::A.is_zero() {
+            rhs += &(*x * x * P::A);
+        }
+        if !P::B.is_zero() {
+            rhs += &(*x * P::B);
+        }
 
-    /// get the x coordinate directly
+        if rhs.legendre() == LegendreSymbol::QuadraticNonResidue {
+            false
+        } else {
+            true
+        }
+    }
+}
+
+impl<G: CurveGroup, P: SWParameters<G>> HashingToCurve<G> for SWMap<G, P> {
     fn get_x_coordinate_without_cofactor_clearing(t: &G::BaseType) -> Result<G::BaseType> {
         let x1 = Self::x1(&t)?;
         if Self::is_x_on_curve(&x1) {
@@ -65,7 +102,7 @@ pub trait SWParameters<G: CurveGroup> {
     }
 }
 
-/// Trait for the simplified SWU map
+/// Trait for the parameters for the simplified SWU map.
 pub trait SimplifiedSWUParameters<G: CurveGroup> {
     /// The -b/a of the isogeny curve.
     const C1: G::BaseType;
@@ -76,25 +113,38 @@ pub trait SimplifiedSWUParameters<G: CurveGroup> {
     /// A quadratic nonresidue.
     const QNR: G::BaseType;
 
+    /// The isogeny map for x.
+    fn isogeny_map_x(x: &G::BaseType) -> Result<G::BaseType>;
+}
+
+/// The simplified SWU map
+#[derive(Default)]
+pub struct SimplifiedSWUMap<G: CurveGroup, P: SimplifiedSWUParameters<G>> {
+    curve_phantom: PhantomData<G>,
+    param_phantom: PhantomData<P>,
+}
+
+/// Trait for the simplified SWU map.
+impl<G: CurveGroup, P: SimplifiedSWUParameters<G>> SimplifiedSWUMap<G, P> {
     /// first candidate for solution x
-    fn isogeny_x1(t: &G::BaseType) -> Result<G::BaseType> {
-        let t2 = t.square().mul(Self::QNR);
+    pub fn isogeny_x1(t: &G::BaseType) -> Result<G::BaseType> {
+        let t2 = t.square().mul(P::QNR);
         let t4 = t2.square();
 
         let temp = t4.add(&t2).inv()?.add(G::BaseType::one());
-        Ok(Self::C1.mul(temp))
+        Ok(P::C1.mul(temp))
     }
 
     /// second candidate for solution x
-    fn isogeny_x2(t: &G::BaseType, x1: &G::BaseType) -> Result<G::BaseType> {
+    pub fn isogeny_x2(t: &G::BaseType, x1: &G::BaseType) -> Result<G::BaseType> {
         let t2 = t.square();
-        Ok(x1.mul(t2).mul(Self::QNR))
+        Ok(x1.mul(t2).mul(P::QNR))
     }
 
     /// check whether candidate x lies on the curve
-    fn is_x_on_isogeny_curve(x: &G::BaseType) -> bool {
-        let mut y_squared = (*x * x * x).add(Self::B);
-        y_squared = y_squared.add(Self::A.mul(x));
+    pub fn is_x_on_isogeny_curve(x: &G::BaseType) -> bool {
+        let mut y_squared = (*x * x * x).add(P::B);
+        y_squared = y_squared.add(P::A.mul(x));
 
         if y_squared.legendre() == LegendreSymbol::QuadraticNonResidue {
             false
@@ -104,9 +154,12 @@ pub trait SimplifiedSWUParameters<G: CurveGroup> {
     }
 
     /// map x back to the original curve
-    fn isogeny_map_x(x: &G::BaseType) -> Result<G::BaseType>;
+    pub fn isogeny_map_x(x: &G::BaseType) -> Result<G::BaseType> {
+        P::isogeny_map_x(x)
+    }
+}
 
-    /// get the x coordinate directly
+impl<G: CurveGroup, P: SimplifiedSWUParameters<G>> HashingToCurve<G> for SimplifiedSWUMap<G, P> {
     fn get_x_coordinate_without_cofactor_clearing(t: &G::BaseType) -> Result<G::BaseType> {
         let x1 = Self::isogeny_x1(&t)?;
         if Self::is_x_on_isogeny_curve(&x1) {
@@ -119,29 +172,55 @@ pub trait SimplifiedSWUParameters<G: CurveGroup> {
 
 /// Trait for the Elligator
 pub trait ElligatorParameters<G: CurveGroup> {
-    /// Constant A of the curve for Elligator
+    /// Constant A of the curve for Elligator.
     const A: G::BaseType;
 
-    /// A quadratic nonresidue
+    /// Constant B of the curve for Elligator.
+    const B: G::BaseType;
+
+    /// A quadratic nonresidue.
     const QNR: G::BaseType;
+}
+
+/// The elligator.
+pub struct Elligator<G: CurveGroup, P: ElligatorParameters<G>> {
+    curve_phantom: PhantomData<G>,
+    param_phantom: PhantomData<P>,
+}
+
+impl<G: CurveGroup, P: ElligatorParameters<G>> Elligator<G, P> {
+    /// check whether candidate x lies on the curve
+    fn is_x_on_curve(x: &G::BaseType) -> bool {
+        let mut y_squared = *x * x * x;
+        if !P::A.is_zero() {
+            y_squared += &(*x * x * P::A);
+        }
+        if !P::B.is_zero() {
+            y_squared += &(*x * &P::B);
+        }
+
+        if y_squared.legendre() == LegendreSymbol::QuadraticNonResidue {
+            false
+        } else {
+            true
+        }
+    }
 
     /// first candidate for solution x
     fn x1(t: &G::BaseType) -> Result<G::BaseType> {
         let t_sq = t.square();
-        let temp = t_sq.mul(Self::QNR).add(G::BaseType::one()).inv()?;
+        let temp = t_sq.mul(P::QNR).add(G::BaseType::one()).inv()?;
 
-        Ok(temp.mul(Self::A).neg())
+        Ok(temp.mul(P::A).neg())
     }
 
     /// second candidate for solution x
     fn x2(x1: &G::BaseType) -> Result<G::BaseType> {
-        Ok(Self::A.add(x1).neg())
+        Ok(P::A.add(x1).neg())
     }
+}
 
-    /// check whether candidate x lies on the curve
-    fn is_x_on_curve(x: &G::BaseType) -> bool;
-
-    /// get the x coordinate directly
+impl<G: CurveGroup, P: ElligatorParameters<G>> HashingToCurve<G> for Elligator<G, P> {
     fn get_x_coordinate_without_cofactor_clearing(t: &G::BaseType) -> Result<G::BaseType> {
         let x1 = Self::x1(&t)?;
         if Self::is_x_on_curve(&x1) {

@@ -4,9 +4,9 @@ use noah_algebra::ed25519::Ed25519Point;
 use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq};
 
 /// The simplified SWU map for ed25519.
-pub struct Ed25519SSWU;
+pub struct Ed25519SSWUParameters;
 
-impl SimplifiedSWUParameters<Ed25519Point> for Ed25519SSWU {
+impl SimplifiedSWUParameters<Ed25519Point> for Ed25519SSWUParameters {
     const C1: Ed25519Fq = new_ed25519_fq!(
         "23090418627330554870558147835411017348134811420561311724956192453459391843510"
     );
@@ -23,18 +23,20 @@ impl SimplifiedSWUParameters<Ed25519Point> for Ed25519SSWU {
 
 #[cfg(test)]
 mod tests {
-    use crate::hashing_to_the_curve::ed25519_sswu_wb::Ed25519SSWU;
-    use crate::hashing_to_the_curve::traits::SimplifiedSWUParameters;
-    use noah_algebra::ed25519::Ed25519Fq;
+    use crate::hashing_to_the_curve::ed25519_sswu_wb::Ed25519SSWUParameters;
+    use crate::hashing_to_the_curve::traits::{HashingToCurve, SimplifiedSWUMap};
+    use noah_algebra::ed25519::{Ed25519Fq, Ed25519Point};
     use noah_algebra::new_ed25519_fq;
     use noah_algebra::prelude::{test_rng, Scalar};
+
+    type M = SimplifiedSWUMap<Ed25519Point, Ed25519SSWUParameters>;
 
     #[test]
     fn test_x_derivation() {
         let mut t: Ed25519Fq = new_ed25519_fq!("7836");
 
-        let x1 = Ed25519SSWU::isogeny_x1(&t).unwrap();
-        let x2 = Ed25519SSWU::isogeny_x2(&t, &x1).unwrap();
+        let x1 = M::isogeny_x1(&t).unwrap();
+        let x2 = M::isogeny_x2(&t, &x1).unwrap();
 
         assert_eq!(
             x1,
@@ -53,8 +55,8 @@ mod tests {
             "26261490946361586592261280563100114235157954222781295781974865328952772526824"
         );
 
-        let x1 = Ed25519SSWU::isogeny_x1(&t).unwrap();
-        let x2 = Ed25519SSWU::isogeny_x2(&t, &x1).unwrap();
+        let x1 = M::isogeny_x1(&t).unwrap();
+        let x2 = M::isogeny_x2(&t, &x1).unwrap();
 
         assert_eq!(
             x1,
@@ -75,7 +77,7 @@ mod tests {
         for _ in 0..100 {
             let mut rng = test_rng();
             let t = Ed25519Fq::random(&mut rng);
-            assert!(Ed25519SSWU::get_x_coordinate_without_cofactor_clearing(&t).is_ok());
+            assert!(M::get_x_coordinate_without_cofactor_clearing(&t).is_ok());
         }
     }
 }
