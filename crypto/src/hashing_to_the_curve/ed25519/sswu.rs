@@ -1,5 +1,5 @@
 use crate::errors::Result;
-use crate::hashing_to_the_curve::traits::SimplifiedSWUParameters;
+use crate::hashing_to_the_curve::models::sswu::SimplifiedSWUParameters;
 use noah_algebra::ed25519::Ed25519Point;
 use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq};
 
@@ -23,8 +23,9 @@ impl SimplifiedSWUParameters<Ed25519Point> for Ed25519SSWUParameters {
 
 #[cfg(test)]
 mod tests {
-    use crate::hashing_to_the_curve::ed25519_sswu_wb::Ed25519SSWUParameters;
-    use crate::hashing_to_the_curve::traits::{HashingToCurve, SimplifiedSWUMap};
+    use crate::hashing_to_the_curve::ed25519::sswu::Ed25519SSWUParameters;
+    use crate::hashing_to_the_curve::models::sswu::SimplifiedSWUMap;
+    use crate::hashing_to_the_curve::traits::HashingToCurve;
     use noah_algebra::ed25519::{Ed25519Fq, Ed25519Point};
     use noah_algebra::new_ed25519_fq;
     use noah_algebra::prelude::{test_rng, Scalar};

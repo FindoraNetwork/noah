@@ -67,7 +67,7 @@ pub mod rand_helper;
 #[doc(hidden)]
 pub use ark_std::{
     borrow, cfg_into_iter, cmp, collections, end_timer, fmt, hash, io, iter, ops, rand, result,
-    start_timer, str, One, UniformRand, Zero,
+    start_timer, str, One, UniformRand, Zero, marker,
 };
 
 /// Implement serialization and deserialization

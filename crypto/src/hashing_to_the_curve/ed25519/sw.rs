@@ -1,4 +1,4 @@
-use crate::hashing_to_the_curve::traits::SWParameters;
+use crate::hashing_to_the_curve::models::sw::SWParameters;
 use noah_algebra::ed25519::Ed25519Point;
 use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq};
 
@@ -30,8 +30,9 @@ impl SWParameters<Ed25519Point> for Ed25519SWParameters {
 
 #[cfg(test)]
 mod tests {
-    use crate::hashing_to_the_curve::ed25519_sw::Ed25519SWParameters;
-    use crate::hashing_to_the_curve::traits::{HashingToCurve, SWMap};
+    use crate::hashing_to_the_curve::ed25519::sw::Ed25519SWParameters;
+    use crate::hashing_to_the_curve::models::sw::SWMap;
+    use crate::hashing_to_the_curve::traits::HashingToCurve;
     use noah_algebra::ed25519::{Ed25519Fq, Ed25519Point};
     use noah_algebra::new_ed25519_fq;
     use noah_algebra::prelude::{test_rng, Scalar};

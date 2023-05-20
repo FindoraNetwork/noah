@@ -1,4 +1,4 @@
-use crate::hashing_to_the_curve::traits::SWParameters;
+use crate::hashing_to_the_curve::models::sw::SWParameters;
 use noah_algebra::secp256k1::SECP256K1G1;
 use noah_algebra::{new_secp256k1_fq, secp256k1::SECP256K1Fq};
 
@@ -32,8 +32,9 @@ impl SWParameters<SECP256K1G1> for Secp256k1SWParameters {
 
 #[cfg(test)]
 mod tests {
-    use crate::hashing_to_the_curve::secp256k1_sw::Secp256k1SWParameters;
-    use crate::hashing_to_the_curve::traits::{HashingToCurve, SWMap};
+    use crate::hashing_to_the_curve::models::sw::SWMap;
+    use crate::hashing_to_the_curve::secp256k1::sw::Secp256k1SWParameters;
+    use crate::hashing_to_the_curve::traits::HashingToCurve;
     use noah_algebra::new_secp256k1_fq;
     use noah_algebra::prelude::{test_rng, Scalar};
     use noah_algebra::secp256k1::{SECP256K1Fq, SECP256K1G1};
