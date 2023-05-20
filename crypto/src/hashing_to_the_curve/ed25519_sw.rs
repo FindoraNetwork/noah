@@ -1,11 +1,11 @@
 use crate::hashing_to_the_curve::traits::SWParameters;
 use noah_algebra::ed25519::Ed25519Point;
-use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq, prelude::*};
+use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq};
 
 /// The SW map for ed25519.
-pub struct Ed25519SW;
+pub struct Ed25519SWParameters;
 
-impl SWParameters<Ed25519Point> for Ed25519SW {
+impl SWParameters<Ed25519Point> for Ed25519SWParameters {
     const Z0: Ed25519Fq = new_ed25519_fq!(
         "7351004470711496783299639200077825248508346112056564349554070979984169706335"
     );
@@ -23,35 +23,28 @@ impl SWParameters<Ed25519Point> for Ed25519SW {
     const C6: Ed25519Fq = new_ed25519_fq!(
         "22595885493139578480537169384951274962349491958774703396425382945106958635058"
     );
-
-    fn is_x_on_curve(x: &Ed25519Fq) -> bool {
-        let first_term = x.pow(&[3u64]);
-        let second_term = x.pow(&[2u64]).mul(Ed25519Fq::from(486662u64));
-        let y_squared = first_term.add(second_term).add(x);
-
-        if y_squared.legendre() == LegendreSymbol::QuadraticNonResidue {
-            false
-        } else {
-            true
-        }
-    }
+    const A: Ed25519Fq = new_ed25519_fq!("486662");
+    const B: Ed25519Fq = new_ed25519_fq!("1");
+    const C: Ed25519Fq = new_ed25519_fq!("0");
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::hashing_to_the_curve::ed25519_sw::Ed25519SW;
-    use crate::hashing_to_the_curve::traits::SWParameters;
-    use noah_algebra::ed25519::Ed25519Fq;
+    use crate::hashing_to_the_curve::ed25519_sw::Ed25519SWParameters;
+    use crate::hashing_to_the_curve::traits::{HashingToCurve, SWMap};
+    use noah_algebra::ed25519::{Ed25519Fq, Ed25519Point};
     use noah_algebra::new_ed25519_fq;
     use noah_algebra::prelude::{test_rng, Scalar};
+
+    type M = SWMap<Ed25519Point, Ed25519SWParameters>;
 
     #[test]
     fn test_x_derivation() {
         let mut t: Ed25519Fq = new_ed25519_fq!("7836");
 
-        let x1 = Ed25519SW::x1(&t).unwrap();
-        let x2 = Ed25519SW::x2(&t).unwrap();
-        let x3 = Ed25519SW::x3(&t).unwrap();
+        let x1 = M::x1(&t).unwrap();
+        let x2 = M::x2(&t).unwrap();
+        let x3 = M::x3(&t).unwrap();
 
         assert_eq!(
             x1,
@@ -76,9 +69,9 @@ mod tests {
             "26261490946361586592261280563100114235157954222781295781974865328952772526824"
         );
 
-        let x1 = Ed25519SW::x1(&t).unwrap();
-        let x2 = Ed25519SW::x2(&t).unwrap();
-        let x3 = Ed25519SW::x3(&t).unwrap();
+        let x1 = M::x1(&t).unwrap();
+        let x2 = M::x2(&t).unwrap();
+        let x3 = M::x3(&t).unwrap();
 
         assert_eq!(
             x1,
@@ -105,7 +98,7 @@ mod tests {
         for _ in 0..100 {
             let mut rng = test_rng();
             let t = Ed25519Fq::random(&mut rng);
-            assert!(Ed25519SW::get_x_coordinate_without_cofactor_clearing(&t).is_ok());
+            assert!(M::get_x_coordinate_without_cofactor_clearing(&t).is_ok());
         }
     }
 }

@@ -1,11 +1,11 @@
 use crate::hashing_to_the_curve::traits::SWParameters;
 use noah_algebra::secp256k1::SECP256K1G1;
-use noah_algebra::{new_secp256k1_fq, prelude::*, secp256k1::SECP256K1Fq};
+use noah_algebra::{new_secp256k1_fq, secp256k1::SECP256K1Fq};
 
 /// The SW map for secp256k1.
-pub struct Secp256k1SW;
+pub struct Secp256k1SWParameters;
 
-impl SWParameters<SECP256K1G1> for Secp256k1SW {
+impl SWParameters<SECP256K1G1> for Secp256k1SWParameters {
     const Z0: SECP256K1Fq = new_secp256k1_fq!(
         "2301468970328204842700089520541121182249040118132057797950280022211810753577"
     );
@@ -25,33 +25,28 @@ impl SWParameters<SECP256K1G1> for Secp256k1SW {
     const C6: SECP256K1Fq = new_secp256k1_fq!(
         "38597363079105398474523661669562635951089994888546854679819194669302944890554"
     );
-
-    fn is_x_on_curve(x: &SECP256K1Fq) -> bool {
-        let y_squared = x.pow(&[3u64]).add(SECP256K1Fq::from(7u64));
-
-        if y_squared.legendre() == LegendreSymbol::QuadraticNonResidue {
-            false
-        } else {
-            true
-        }
-    }
+    const A: SECP256K1Fq = new_secp256k1_fq!("0");
+    const B: SECP256K1Fq = new_secp256k1_fq!("0");
+    const C: SECP256K1Fq = new_secp256k1_fq!("7");
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::hashing_to_the_curve::secp256k1_sw::Secp256k1SW;
-    use crate::hashing_to_the_curve::traits::SWParameters;
+    use crate::hashing_to_the_curve::secp256k1_sw::Secp256k1SWParameters;
+    use crate::hashing_to_the_curve::traits::{HashingToCurve, SWMap};
     use noah_algebra::new_secp256k1_fq;
     use noah_algebra::prelude::{test_rng, Scalar};
-    use noah_algebra::secp256k1::SECP256K1Fq;
+    use noah_algebra::secp256k1::{SECP256K1Fq, SECP256K1G1};
+
+    type M = SWMap<SECP256K1G1, Secp256k1SWParameters>;
 
     #[test]
     fn test_x_derivation() {
         let mut t: SECP256K1Fq = new_secp256k1_fq!("7836");
 
-        let x1 = Secp256k1SW::x1(&t).unwrap();
-        let x2 = Secp256k1SW::x2(&t).unwrap();
-        let x3 = Secp256k1SW::x3(&t).unwrap();
+        let x1 = M::x1(&t).unwrap();
+        let x2 = M::x2(&t).unwrap();
+        let x3 = M::x3(&t).unwrap();
 
         assert_eq!(
             x1,
@@ -76,9 +71,9 @@ mod tests {
             "26261490946361586592261280563100114235157954222781295781974865328952772526824"
         );
 
-        let x1 = Secp256k1SW::x1(&t).unwrap();
-        let x2 = Secp256k1SW::x2(&t).unwrap();
-        let x3 = Secp256k1SW::x3(&t).unwrap();
+        let x1 = M::x1(&t).unwrap();
+        let x2 = M::x2(&t).unwrap();
+        let x3 = M::x3(&t).unwrap();
 
         assert_eq!(
             x1,
@@ -105,7 +100,7 @@ mod tests {
         for _ in 0..100 {
             let mut rng = test_rng();
             let t = SECP256K1Fq::random(&mut rng);
-            assert!(Secp256k1SW::get_x_coordinate_without_cofactor_clearing(&t).is_ok());
+            assert!(M::get_x_coordinate_without_cofactor_clearing(&t).is_ok());
         }
     }
 }
