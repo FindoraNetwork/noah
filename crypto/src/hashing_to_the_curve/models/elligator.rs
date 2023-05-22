@@ -54,7 +54,9 @@ impl<G: CurveGroup, P: ElligatorParameters<G>> Elligator<G, P> {
 }
 
 impl<G: CurveGroup, P: ElligatorParameters<G>> HashingToCurve<G> for Elligator<G, P> {
-    fn get_x_coordinate_without_cofactor_clearing(t: &G::BaseType) -> Result<G::BaseType> {
+    type Trace = ElligatorTrace<G>;
+
+    fn get_cofactor_uncleared_x(t: &G::BaseType) -> Result<G::BaseType> {
         let x1 = Self::x1(&t)?;
         if Self::is_x_on_curve(&x1) {
             return Ok(x1);
@@ -62,4 +64,42 @@ impl<G: CurveGroup, P: ElligatorParameters<G>> HashingToCurve<G> for Elligator<G
         let x2 = Self::x2(&x1)?;
         return Ok(x2);
     }
+
+    fn get_cofactor_uncleared_x_and_trace(t: &G::BaseType) -> Result<(G::BaseType, Self::Trace)> {
+        let t_sq = t.square();
+        let a2 = t_sq.mul(P::QNR).add(G::BaseType::one()).inv()?;
+        let x1 = a2.mul(P::A).neg();
+
+        let mut y_squared: G::BaseType = *x * x * x;
+        if !P::A.is_zero() {
+            y_squared += &(*x * x * P::A);
+        }
+        if !P::B.is_zero() {
+            y_squared += &(*x * &P::B);
+        }
+
+        let b1 = y_squared.legendre() != LegendreSymbol::QuadraticNonResidue;
+
+        if b1 {
+            let a3 = y_squared.sqrt().unwrap();
+            let trace = Self::Trace { a2, b1, a3 };
+            return Ok((x1, trace));
+        } else {
+            let x2 = Self::x2(&x1)?;
+            let a3 = (*y_squared * Self::QNR).sqrt().unwrap();
+            let trace = Self::Trace { a2, b1, a3 };
+            return Ok((x2, trace));
+        }
+    }
+}
+
+/// Struct for the trace.
+pub struct ElligatorTrace<G: CurveGroup> {
+    /// a2 is A / (1 + qnr * t^2).
+    pub a2: G::BaseType,
+    /// b1 is the Legendre symbol of f(x1):
+    /// false for quadratic nonresidue, true for quadratic residue
+    pub b1: bool,
+    /// a3 is the witness of square root (or adjusted square root).
+    pub a3: G::BaseType,
 }

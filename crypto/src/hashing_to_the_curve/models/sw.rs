@@ -83,7 +83,7 @@ impl<G: CurveGroup, P: SWParameters<G>> SWMap<G, P> {
 }
 
 impl<G: CurveGroup, P: SWParameters<G>> HashingToCurve<G> for SWMap<G, P> {
-    fn get_x_coordinate_without_cofactor_clearing(t: &G::BaseType) -> Result<G::BaseType> {
+    fn get_cofactor_uncleared_x(t: &G::BaseType) -> Result<G::BaseType> {
         let x1 = Self::x1(&t)?;
         if Self::is_x_on_curve(&x1) {
             return Ok(x1);

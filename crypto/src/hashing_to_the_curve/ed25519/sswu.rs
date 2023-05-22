@@ -1,12 +1,12 @@
 use crate::errors::Result;
-use crate::hashing_to_the_curve::models::sswu::SimplifiedSWUParameters;
+use crate::hashing_to_the_curve::models::sswu::SSWUParameters;
 use noah_algebra::ed25519::Ed25519Point;
 use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq};
 
 /// The simplified SWU map for ed25519.
 pub struct Ed25519SSWUParameters;
 
-impl SimplifiedSWUParameters<Ed25519Point> for Ed25519SSWUParameters {
+impl SSWUParameters<Ed25519Point> for Ed25519SSWUParameters {
     const C1: Ed25519Fq = new_ed25519_fq!(
         "23090418627330554870558147835411017348134811420561311724956192453459391843510"
     );
@@ -24,13 +24,13 @@ impl SimplifiedSWUParameters<Ed25519Point> for Ed25519SSWUParameters {
 #[cfg(test)]
 mod tests {
     use crate::hashing_to_the_curve::ed25519::sswu::Ed25519SSWUParameters;
-    use crate::hashing_to_the_curve::models::sswu::SimplifiedSWUMap;
+    use crate::hashing_to_the_curve::models::sswu::SSWUMap;
     use crate::hashing_to_the_curve::traits::HashingToCurve;
     use noah_algebra::ed25519::{Ed25519Fq, Ed25519Point};
     use noah_algebra::new_ed25519_fq;
     use noah_algebra::prelude::{test_rng, Scalar};
 
-    type M = SimplifiedSWUMap<Ed25519Point, Ed25519SSWUParameters>;
+    type M = SSWUMap<Ed25519Point, Ed25519SSWUParameters>;
 
     #[test]
     fn test_x_derivation() {
@@ -78,7 +78,7 @@ mod tests {
         for _ in 0..100 {
             let mut rng = test_rng();
             let t = Ed25519Fq::random(&mut rng);
-            assert!(M::get_x_coordinate_without_cofactor_clearing(&t).is_ok());
+            assert!(M::get_cofactor_uncleared_x(&t).is_ok());
         }
     }
 }

@@ -4,7 +4,7 @@ use noah_algebra::marker::PhantomData;
 use noah_algebra::prelude::*;
 
 /// Trait for the parameters for the simplified SWU map.
-pub trait SimplifiedSWUParameters<G: CurveGroup> {
+pub trait SSWUParameters<G: CurveGroup> {
     /// The -b/a of the isogeny curve.
     const C1: G::BaseType;
     /// The A of the isogeny curve.
@@ -20,13 +20,13 @@ pub trait SimplifiedSWUParameters<G: CurveGroup> {
 
 /// The simplified SWU map
 #[derive(Default)]
-pub struct SimplifiedSWUMap<G: CurveGroup, P: SimplifiedSWUParameters<G>> {
+pub struct SSWUMap<G: CurveGroup, P: SSWUParameters<G>> {
     curve_phantom: PhantomData<G>,
     param_phantom: PhantomData<P>,
 }
 
 /// Trait for the simplified SWU map.
-impl<G: CurveGroup, P: SimplifiedSWUParameters<G>> SimplifiedSWUMap<G, P> {
+impl<G: CurveGroup, P: SSWUParameters<G>> SSWUMap<G, P> {
     /// first candidate for solution x
     pub fn isogeny_x1(t: &G::BaseType) -> Result<G::BaseType> {
         let t2 = t.square().mul(P::QNR);
@@ -60,8 +60,10 @@ impl<G: CurveGroup, P: SimplifiedSWUParameters<G>> SimplifiedSWUMap<G, P> {
     }
 }
 
-impl<G: CurveGroup, P: SimplifiedSWUParameters<G>> HashingToCurve<G> for SimplifiedSWUMap<G, P> {
-    fn get_x_coordinate_without_cofactor_clearing(t: &G::BaseType) -> Result<G::BaseType> {
+impl<G: CurveGroup, P: SSWUParameters<G>> HashingToCurve<G> for SSWUMap<G, P> {
+    type Trace = ();
+
+    fn get_cofactor_uncleared_x(t: &G::BaseType) -> Result<G::BaseType> {
         let x1 = Self::isogeny_x1(&t)?;
         if Self::is_x_on_isogeny_curve(&x1) {
             return Self::isogeny_map_x(&x1);
@@ -69,4 +71,13 @@ impl<G: CurveGroup, P: SimplifiedSWUParameters<G>> HashingToCurve<G> for Simplif
         let x2 = Self::isogeny_x2(&t, &x1)?;
         return Self::isogeny_map_x(&x2);
     }
+
+    fn get_cofactor_uncleared_x_and_trace(t: &G::BaseType) -> Result<(G::BaseType, Self::Trace)> {
+        todo!()
+    }
+}
+
+pub struct SSWUTrace<G: CurveGroup> {
+    /// a3 = 1 / (qnr^4 * t^4 + qnr^2 · t^2)
+    pub a3: G::BaseType,
 }

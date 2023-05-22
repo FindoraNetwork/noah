@@ -26,7 +26,7 @@ mod tests {
         for _ in 0..100 {
             let mut rng = test_rng();
             let t = Ed25519Fq::random(&mut rng);
-            assert!(M::get_x_coordinate_without_cofactor_clearing(&t).is_ok());
+            assert!(M::get_cofactor_uncleared_x(&t).is_ok());
         }
     }
 }

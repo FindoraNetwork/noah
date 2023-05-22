@@ -241,4 +241,14 @@ impl Scalar for ZorroFq {
     fn legendre(&self) -> LegendreSymbol {
         self.0.legendre()
     }
+
+    #[inline]
+    fn sqrt(&self) -> Option<Self> {
+        let res = self.0.sqrt();
+        if res.is_some() {
+            Some(Self(res.unwrap()))
+        } else {
+            None
+        }
+    }
 }
