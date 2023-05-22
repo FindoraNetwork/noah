@@ -1,5 +1,5 @@
 use crate::errors::Result;
-use crate::hashing_to_the_curve::models::sswu::SimplifiedSWUParameters;
+use crate::hashing_to_the_curve::models::sswu::SSWUParameters;
 use noah_algebra::secp256k1::SECP256K1G1;
 use noah_algebra::{new_secp256k1_fq, prelude::*, secp256k1::SECP256K1Fq};
 
@@ -26,7 +26,7 @@ const K21: SECP256K1Fq = new_secp256k1_fq!(
 );
 // const K22: SECP256K1Fq = new_secp256k1_fq!("1");
 
-impl SimplifiedSWUParameters<SECP256K1G1> for Secp256k1SSWUParameters {
+impl SSWUParameters<SECP256K1G1> for Secp256k1SSWUParameters {
     const C1: SECP256K1Fq = new_secp256k1_fq!(
         "5324262023205125242632636178842408935272934169651804884418803605709653231043"
     );
@@ -52,14 +52,14 @@ impl SimplifiedSWUParameters<SECP256K1G1> for Secp256k1SSWUParameters {
 
 #[cfg(test)]
 mod tests {
-    use crate::hashing_to_the_curve::models::sswu::SimplifiedSWUMap;
+    use crate::hashing_to_the_curve::models::sswu::SSWUMap;
     use crate::hashing_to_the_curve::secp256k1::sswu::Secp256k1SSWUParameters;
     use crate::hashing_to_the_curve::traits::HashingToCurve;
     use noah_algebra::new_secp256k1_fq;
     use noah_algebra::prelude::{test_rng, Scalar};
     use noah_algebra::secp256k1::{SECP256K1Fq, SECP256K1G1};
 
-    type M = SimplifiedSWUMap<SECP256K1G1, Secp256k1SSWUParameters>;
+    type M = SSWUMap<SECP256K1G1, Secp256k1SSWUParameters>;
 
     #[test]
     fn test_x_derivation() {
@@ -107,7 +107,12 @@ mod tests {
         for _ in 0..100 {
             let mut rng = test_rng();
             let t = SECP256K1Fq::random(&mut rng);
-            assert!(M::get_x_coordinate_without_cofactor_clearing(&t).is_ok());
+
+            let final_x = M::get_cofactor_uncleared_x(&t).unwrap();
+            let (final_x2, trace) = M::get_cofactor_uncleared_x_and_trace(&t).unwrap();
+
+            assert_eq!(final_x, final_x2);
+            assert!(M::verify_trace(&t, &final_x, &trace));
         }
     }
 }

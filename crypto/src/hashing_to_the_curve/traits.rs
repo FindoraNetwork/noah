@@ -3,10 +3,16 @@ use noah_algebra::prelude::*;
 
 /// Trait for hashing to the curve.
 pub trait HashingToCurve<G: CurveGroup> {
-    /// get the x coordinate directly
-    fn get_x_coordinate_without_cofactor_clearing(t: &G::BaseType) -> Result<G::BaseType>;
-}
+    /// the type of the trace of the hashing to the curve.
+    /// It would be used both for the hardware wallet and for the witness generation in SNARK.
+    type Trace;
 
-/// Trait for the trace of the hashing to the curve.
-/// It would be used both for the hardware wallet and for the witness generation in SNARK.
-pub trait HashingToCurveTrace<G: CurveGroup, H: HashingToCurve<G>> {}
+    /// get the x coordinate directly.
+    fn get_cofactor_uncleared_x(t: &G::BaseType) -> Result<G::BaseType>;
+
+    /// get the x coordinate as well as the trace.
+    fn get_cofactor_uncleared_x_and_trace(t: &G::BaseType) -> Result<(G::BaseType, Self::Trace)>;
+
+    /// verify the trace.
+    fn verify_trace(t: &G::BaseType, final_x: &G::BaseType, trace: &Self::Trace) -> bool;
+}

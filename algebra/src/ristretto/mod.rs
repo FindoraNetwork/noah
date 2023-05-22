@@ -276,6 +276,18 @@ impl Scalar for RistrettoScalar {
         let biguint: BigUint = (*self).into();
         crate::ed25519::Ed25519Scalar::from(&biguint).legendre()
     }
+
+    #[inline]
+    fn sqrt(&self) -> Option<Self> {
+        let biguint: BigUint = (*self).into();
+        let res = crate::ed25519::Ed25519Scalar::from(&biguint).sqrt();
+        if res.is_some() {
+            let v: BigUint = res.unwrap().0.into();
+            Some(Self::from(&v))
+        } else {
+            None
+        }
+    }
 }
 
 impl RistrettoScalar {

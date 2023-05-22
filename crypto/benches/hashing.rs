@@ -6,7 +6,7 @@ use noah_crypto::hashing_to_the_curve::ed25519::elligator::Ed25519ElligatorParam
 use noah_crypto::hashing_to_the_curve::ed25519::sswu::Ed25519SSWUParameters;
 use noah_crypto::hashing_to_the_curve::ed25519::sw::Ed25519SWParameters;
 use noah_crypto::hashing_to_the_curve::models::elligator::Elligator;
-use noah_crypto::hashing_to_the_curve::models::sswu::SimplifiedSWUMap;
+use noah_crypto::hashing_to_the_curve::models::sswu::SSWUMap;
 use noah_crypto::hashing_to_the_curve::models::sw::SWMap;
 use noah_crypto::hashing_to_the_curve::secp256k1::sswu::Secp256k1SSWUParameters;
 use noah_crypto::hashing_to_the_curve::secp256k1::sw::Secp256k1SWParameters;
@@ -20,7 +20,7 @@ fn bench_ed25519_elligator(c: &mut Criterion) {
 
             let mut rng = test_rng();
             let t = Ed25519Fq::random(&mut rng);
-            let _ = M::get_x_coordinate_without_cofactor_clearing(&t);
+            let _ = M::get_cofactor_uncleared_x(&t);
         });
     });
     single_group.finish();
@@ -30,11 +30,11 @@ fn bench_ed25519_sswu_wb(c: &mut Criterion) {
     let mut single_group = c.benchmark_group("ed25519_sswu_wb");
     single_group.bench_function("ed25519 simplified SWU map".to_string(), |b| {
         b.iter(|| {
-            type M = SimplifiedSWUMap<Ed25519Point, Ed25519SSWUParameters>;
+            type M = SSWUMap<Ed25519Point, Ed25519SSWUParameters>;
 
             let mut rng = test_rng();
             let t = Ed25519Fq::random(&mut rng);
-            let _ = M::get_x_coordinate_without_cofactor_clearing(&t);
+            let _ = M::get_cofactor_uncleared_x(&t);
         });
     });
     single_group.finish();
@@ -48,7 +48,7 @@ fn bench_ed25519_sw(c: &mut Criterion) {
 
             let mut rng = test_rng();
             let t = Ed25519Fq::random(&mut rng);
-            let _ = M::get_x_coordinate_without_cofactor_clearing(&t);
+            let _ = M::get_cofactor_uncleared_x(&t);
         });
     });
     single_group.finish();
@@ -58,11 +58,11 @@ fn bench_secp256k1_sswu_wb(c: &mut Criterion) {
     let mut single_group = c.benchmark_group("secp256k1_sswu_wb");
     single_group.bench_function("secp256k1 simplified SWU map".to_string(), |b| {
         b.iter(|| {
-            type M = SimplifiedSWUMap<SECP256K1G1, Secp256k1SSWUParameters>;
+            type M = SSWUMap<SECP256K1G1, Secp256k1SSWUParameters>;
 
             let mut rng = test_rng();
             let t = SECP256K1Fq::random(&mut rng);
-            let _ = M::get_x_coordinate_without_cofactor_clearing(&t);
+            let _ = M::get_cofactor_uncleared_x(&t);
         });
     });
     single_group.finish();
@@ -76,7 +76,7 @@ fn bench_secp256k1_sw(c: &mut Criterion) {
 
             let mut rng = test_rng();
             let t = SECP256K1Fq::random(&mut rng);
-            let _ = M::get_x_coordinate_without_cofactor_clearing(&t);
+            let _ = M::get_cofactor_uncleared_x(&t);
         });
     });
     single_group.finish();
