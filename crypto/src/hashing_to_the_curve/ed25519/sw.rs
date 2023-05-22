@@ -16,9 +16,7 @@ impl SWParameters<Ed25519Point> for Ed25519SWParameters {
         "14702008941422993566599278400155650497016692224113128699108141959968339412670"
     );
     const C3: Ed25519Fq = new_ed25519_fq!("1946658");
-    const C4: Ed25519Fq = new_ed25519_fq!(
-        "50545040147946600928485853304266128678126646220763717670174721023972394870282"
-    );
+    const C4: Ed25519Fq = new_ed25519_fq!("-486664");
     const C5: Ed25519Fq = new_ed25519_fq!("2");
     const C6: Ed25519Fq = new_ed25519_fq!(
         "22595885493139578480537169384951274962349491958774703396425382945106958635058"
@@ -26,6 +24,7 @@ impl SWParameters<Ed25519Point> for Ed25519SWParameters {
     const A: Ed25519Fq = new_ed25519_fq!("486662");
     const B: Ed25519Fq = new_ed25519_fq!("1");
     const C: Ed25519Fq = new_ed25519_fq!("0");
+    const QNR: Ed25519Fq = new_ed25519_fq!("2");
 }
 
 #[cfg(test)]
@@ -44,7 +43,7 @@ mod tests {
         let mut t: Ed25519Fq = new_ed25519_fq!("7836");
 
         let x1 = M::x1(&t).unwrap();
-        let x2 = M::x2(&t).unwrap();
+        let x2 = M::x2(&t, &x1).unwrap();
         let x3 = M::x3(&t).unwrap();
 
         assert_eq!(
@@ -71,7 +70,7 @@ mod tests {
         );
 
         let x1 = M::x1(&t).unwrap();
-        let x2 = M::x2(&t).unwrap();
+        let x2 = M::x2(&t, &x1).unwrap();
         let x3 = M::x3(&t).unwrap();
 
         assert_eq!(
@@ -99,7 +98,12 @@ mod tests {
         for _ in 0..100 {
             let mut rng = test_rng();
             let t = Ed25519Fq::random(&mut rng);
-            assert!(M::get_cofactor_uncleared_x(&t).is_ok());
+
+            let final_x = M::get_cofactor_uncleared_x(&t).unwrap();
+            let (final_x2, trace) = M::get_cofactor_uncleared_x_and_trace(&t).unwrap();
+
+            assert_eq!(final_x, final_x2);
+            assert!(M::verify_trace(&t, &final_x, &trace));
         }
     }
 }

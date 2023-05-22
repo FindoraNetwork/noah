@@ -16,9 +16,7 @@ impl SWParameters<SECP256K1G1> for Secp256k1SWParameters {
         "4602937940656409685400179041082242364498080236264115595900560044423621507154"
     );
     const C3: SECP256K1Fq = new_secp256k1_fq!("6");
-    const C4: SECP256K1Fq = new_secp256k1_fq!(
-        "55594575648329892869085402983802832744385952214688224221778511981742606582255"
-    );
+    const C4: SECP256K1Fq = new_secp256k1_fq!("1");
     const C5: SECP256K1Fq = new_secp256k1_fq!(
         "115792089237316195423570985008687907853269984665640564039457584007908834671662"
     );
@@ -28,6 +26,7 @@ impl SWParameters<SECP256K1G1> for Secp256k1SWParameters {
     const A: SECP256K1Fq = new_secp256k1_fq!("0");
     const B: SECP256K1Fq = new_secp256k1_fq!("0");
     const C: SECP256K1Fq = new_secp256k1_fq!("7");
+    const QNR: SECP256K1Fq = new_secp256k1_fq!("-1");
 }
 
 #[cfg(test)]
@@ -46,7 +45,7 @@ mod tests {
         let mut t: SECP256K1Fq = new_secp256k1_fq!("7836");
 
         let x1 = M::x1(&t).unwrap();
-        let x2 = M::x2(&t).unwrap();
+        let x2 = M::x2(&t, &x1).unwrap();
         let x3 = M::x3(&t).unwrap();
 
         assert_eq!(
@@ -73,7 +72,7 @@ mod tests {
         );
 
         let x1 = M::x1(&t).unwrap();
-        let x2 = M::x2(&t).unwrap();
+        let x2 = M::x2(&t, &x1).unwrap();
         let x3 = M::x3(&t).unwrap();
 
         assert_eq!(
@@ -101,7 +100,12 @@ mod tests {
         for _ in 0..100 {
             let mut rng = test_rng();
             let t = SECP256K1Fq::random(&mut rng);
-            assert!(M::get_cofactor_uncleared_x(&t).is_ok());
+
+            let final_x = M::get_cofactor_uncleared_x(&t).unwrap();
+            let (final_x2, trace) = M::get_cofactor_uncleared_x_and_trace(&t).unwrap();
+
+            assert_eq!(final_x, final_x2);
+            assert!(M::verify_trace(&t, &final_x, &trace));
         }
     }
 }

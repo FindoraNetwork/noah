@@ -107,7 +107,12 @@ mod tests {
         for _ in 0..100 {
             let mut rng = test_rng();
             let t = SECP256K1Fq::random(&mut rng);
-            assert!(M::get_cofactor_uncleared_x(&t).is_ok());
+
+            let final_x = M::get_cofactor_uncleared_x(&t).unwrap();
+            let (final_x2, trace) = M::get_cofactor_uncleared_x_and_trace(&t).unwrap();
+
+            assert_eq!(final_x, final_x2);
+            assert!(M::verify_trace(&t, &final_x, &trace));
         }
     }
 }
