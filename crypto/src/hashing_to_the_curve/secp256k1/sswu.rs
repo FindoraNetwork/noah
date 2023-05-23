@@ -24,7 +24,6 @@ const K20: SECP256K1Fq = new_secp256k1_fq!(
 const K21: SECP256K1Fq = new_secp256k1_fq!(
     "107505182841474506714709588670204841388457878609653642868747406790547894725908"
 );
-// const K22: SECP256K1Fq = new_secp256k1_fq!("1");
 
 impl SSWUParameters<SECP256K1G1> for Secp256k1SSWUParameters {
     const C1: SECP256K1Fq = new_secp256k1_fq!(
@@ -36,17 +35,25 @@ impl SSWUParameters<SECP256K1G1> for Secp256k1SSWUParameters {
     const B: SECP256K1Fq = new_secp256k1_fq!("1771");
     const QNR: SECP256K1Fq = new_secp256k1_fq!("-1");
 
-    fn isogeny_map_x(x: &SECP256K1Fq) -> Result<SECP256K1Fq> {
-        let x_squared = x.pow(&[2u64]);
-        let x_cubed = x_squared.mul(x);
+    const ISOGENY_DEGREE: u32 = 3;
 
-        let numerator = K10
-            .add(K11.mul(x))
-            .add(K12.mul(x_squared))
-            .add(K13.mul(x_cubed));
-        let denominator = K20.add(K21.mul(x)).add(x_squared);
+    fn get_isogeny_numerator_term<'a>(i: usize) -> &'a SECP256K1G1::BaseType {
+        match i {
+            0 => &K10,
+            1 => &K11,
+            2 => &K12,
+            3 => &K13,
+            _ => &SECP256K1Fq::zero()
+        }
+    }
 
-        Ok(numerator.mul(denominator.inv()?))
+    fn get_isogeny_denominator_term<'a>(i: usize) -> &'a SECP256K1G1::BaseType {
+        match i {
+            0 => &K20,
+            1 => &K21,
+            2 => &SECP256K1Fq::one(),
+            _ => &SECP256K1Fq::zero()
+        }
     }
 }
 

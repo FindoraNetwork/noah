@@ -16,6 +16,8 @@ impl SSWUParameters<Ed25519Point> for Ed25519SSWUParameters {
     );
     const QNR: Ed25519Fq = new_ed25519_fq!("2");
 
+
+
     fn isogeny_map_x(x: &Ed25519Fq) -> Result<Ed25519Fq> {
         Ok(*x)
     }

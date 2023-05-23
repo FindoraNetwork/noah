@@ -14,8 +14,14 @@ pub trait SSWUParameters<G: CurveGroup> {
     /// A quadratic nonresidue.
     const QNR: G::BaseType;
 
-    /// The isogeny map for x.
-    fn isogeny_map_x(x: &G::BaseType) -> Result<G::BaseType>;
+    /// Degree of the isogeny map.
+    const ISOGENY_DEGREE: u32;
+
+    /// Get a numerator term in the isogeny parameters.
+    fn get_isogeny_numerator_term<'a>(i: usize) -> &'a G::BaseType;
+
+    /// Get a denominator term in the isogeny parameters.
+    fn get_isogeny_denominator_term<'a>(i: usize) -> &'a G::BaseType;
 }
 
 /// The simplified SWU map
@@ -27,6 +33,25 @@ pub struct SSWUMap<G: CurveGroup, P: SSWUParameters<G>> {
 
 /// Trait for the simplified SWU map.
 impl<G: CurveGroup, P: SSWUParameters<G>> SSWUMap<G, P> {
+    /// map the point from the isogenous curve to the original curve.
+    pub fn isogeny_map_x(x: &G::BaseType) -> Result<G::BaseType> {
+        let degree = P::ISOGENY_DEGREE;
+
+        let mut numerator = P::get_isogeny_numerator_term(0);
+        let mut denumerator = P::get_isogeny_denominator_term(0);
+
+        let mut cur = x;
+        for i in 1u32..degree {
+            numerator += P::get_isogeny_numerator_term(i as usize) * cur;
+            denumerator += P::get_isogeny_denominator_term(i as usize) * cur;
+
+            cur *= x;
+        }
+        numerator += P::get_isogeny_numerator_term(degree as usize) * cur;
+
+        Ok(numerator.mul(denominator.inv()?))
+    }
+
     /// first candidate for solution x
     pub fn isogeny_x1(t: &G::BaseType) -> Result<G::BaseType> {
         let t2 = t.square().mul(P::QNR);
@@ -52,11 +77,6 @@ impl<G: CurveGroup, P: SSWUParameters<G>> SSWUMap<G, P> {
         } else {
             true
         }
-    }
-
-    /// map x back to the original curve
-    pub fn isogeny_map_x(x: &G::BaseType) -> Result<G::BaseType> {
-        P::isogeny_map_x(x)
     }
 }
 
