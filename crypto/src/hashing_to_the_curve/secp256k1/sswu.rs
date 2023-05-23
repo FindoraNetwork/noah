@@ -1,7 +1,6 @@
-use crate::errors::Result;
 use crate::hashing_to_the_curve::models::sswu::SSWUParameters;
 use noah_algebra::secp256k1::SECP256K1G1;
-use noah_algebra::{new_secp256k1_fq, prelude::*, secp256k1::SECP256K1Fq};
+use noah_algebra::{new_secp256k1_fq, secp256k1::SECP256K1Fq};
 
 /// The simplified SWU map for secp256k1.
 pub struct Secp256k1SSWUParameters;
@@ -24,6 +23,7 @@ const K20: SECP256K1Fq = new_secp256k1_fq!(
 const K21: SECP256K1Fq = new_secp256k1_fq!(
     "107505182841474506714709588670204841388457878609653642868747406790547894725908"
 );
+const K22: SECP256K1Fq = new_secp256k1_fq!("1");
 
 impl SSWUParameters<SECP256K1G1> for Secp256k1SSWUParameters {
     const C1: SECP256K1Fq = new_secp256k1_fq!(
@@ -37,22 +37,22 @@ impl SSWUParameters<SECP256K1G1> for Secp256k1SSWUParameters {
 
     const ISOGENY_DEGREE: u32 = 3;
 
-    fn get_isogeny_numerator_term<'a>(i: usize) -> &'a SECP256K1G1::BaseType {
+    fn get_isogeny_numerator_term<'a>(i: usize) -> &'a SECP256K1Fq {
         match i {
             0 => &K10,
             1 => &K11,
             2 => &K12,
             3 => &K13,
-            _ => &SECP256K1Fq::zero()
+            _ => unimplemented!(),
         }
     }
 
-    fn get_isogeny_denominator_term<'a>(i: usize) -> &'a SECP256K1G1::BaseType {
+    fn get_isogeny_denominator_term<'a>(i: usize) -> &'a SECP256K1Fq {
         match i {
             0 => &K20,
             1 => &K21,
-            2 => &SECP256K1Fq::one(),
-            _ => &SECP256K1Fq::zero()
+            2 => &K22,
+            _ => unimplemented!(),
         }
     }
 }

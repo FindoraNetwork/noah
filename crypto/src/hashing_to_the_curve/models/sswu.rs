@@ -37,19 +37,23 @@ impl<G: CurveGroup, P: SSWUParameters<G>> SSWUMap<G, P> {
     pub fn isogeny_map_x(x: &G::BaseType) -> Result<G::BaseType> {
         let degree = P::ISOGENY_DEGREE;
 
-        let mut numerator = P::get_isogeny_numerator_term(0);
-        let mut denumerator = P::get_isogeny_denominator_term(0);
+        if degree == 0 {
+            return Ok(*x);
+        }
 
-        let mut cur = x;
+        let mut numerator: G::BaseType = P::get_isogeny_numerator_term(0).clone();
+        let mut denumerator: G::BaseType = P::get_isogeny_denominator_term(0).clone();
+
+        let mut cur = *x;
         for i in 1u32..degree {
-            numerator += P::get_isogeny_numerator_term(i as usize) * cur;
-            denumerator += P::get_isogeny_denominator_term(i as usize) * cur;
+            numerator = numerator + cur * P::get_isogeny_numerator_term(i as usize);
+            denumerator = denumerator + cur * P::get_isogeny_denominator_term(i as usize);
 
             cur *= x;
         }
-        numerator += P::get_isogeny_numerator_term(degree as usize) * cur;
+        numerator = numerator + cur * P::get_isogeny_numerator_term(degree as usize);
 
-        Ok(numerator.mul(denominator.inv()?))
+        Ok(numerator.mul(denumerator.inv()?))
     }
 
     /// first candidate for solution x
@@ -151,7 +155,7 @@ impl<G: CurveGroup, P: SSWUParameters<G>> HashingToCurve<G> for SSWUMap<G, P> {
         let b1 = trace.b1;
 
         if b1 {
-            if *final_x != P::isogeny_map_x(&x1).unwrap() {
+            if *final_x != Self::isogeny_map_x(&x1).unwrap() {
                 return false;
             } else {
                 return true;
@@ -160,7 +164,7 @@ impl<G: CurveGroup, P: SSWUParameters<G>> HashingToCurve<G> for SSWUMap<G, P> {
 
         let x2 = x1.mul(t2).mul(P::QNR);
 
-        if *final_x != P::isogeny_map_x(&x2).unwrap() {
+        if *final_x != Self::isogeny_map_x(&x2).unwrap() {
             return false;
         }
 

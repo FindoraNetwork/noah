@@ -1,4 +1,3 @@
-use crate::errors::Result;
 use crate::hashing_to_the_curve::models::sswu::SSWUParameters;
 use noah_algebra::ed25519::Ed25519Point;
 use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq};
@@ -16,10 +15,14 @@ impl SSWUParameters<Ed25519Point> for Ed25519SSWUParameters {
     );
     const QNR: Ed25519Fq = new_ed25519_fq!("2");
 
+    const ISOGENY_DEGREE: u32 = 0;
 
+    fn get_isogeny_numerator_term<'a>(_: usize) -> &'a Ed25519Fq {
+        unimplemented!()
+    }
 
-    fn isogeny_map_x(x: &Ed25519Fq) -> Result<Ed25519Fq> {
-        Ok(*x)
+    fn get_isogeny_denominator_term<'a>(_: usize) -> &'a Ed25519Fq {
+        unimplemented!()
     }
 }
 
