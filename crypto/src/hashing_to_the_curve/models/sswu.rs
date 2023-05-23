@@ -14,8 +14,14 @@ pub trait SSWUParameters<G: CurveGroup> {
     /// A quadratic nonresidue.
     const QNR: G::BaseType;
 
-    /// The isogeny map for x.
-    fn isogeny_map_x(x: &G::BaseType) -> Result<G::BaseType>;
+    /// Degree of the isogeny map.
+    const ISOGENY_DEGREE: u32;
+
+    /// Get a numerator term in the isogeny parameters.
+    fn get_isogeny_numerator_term<'a>(i: usize) -> &'a G::BaseType;
+
+    /// Get a denominator term in the isogeny parameters.
+    fn get_isogeny_denominator_term<'a>(i: usize) -> &'a G::BaseType;
 }
 
 /// The simplified SWU map
@@ -27,6 +33,29 @@ pub struct SSWUMap<G: CurveGroup, P: SSWUParameters<G>> {
 
 /// Trait for the simplified SWU map.
 impl<G: CurveGroup, P: SSWUParameters<G>> SSWUMap<G, P> {
+    /// map the point from the isogenous curve to the original curve.
+    pub fn isogeny_map_x(x: &G::BaseType) -> Result<G::BaseType> {
+        let degree = P::ISOGENY_DEGREE;
+
+        if degree == 0 {
+            return Ok(*x);
+        }
+
+        let mut numerator: G::BaseType = P::get_isogeny_numerator_term(0).clone();
+        let mut denumerator: G::BaseType = P::get_isogeny_denominator_term(0).clone();
+
+        let mut cur = *x;
+        for i in 1u32..degree {
+            numerator = numerator + cur * P::get_isogeny_numerator_term(i as usize);
+            denumerator = denumerator + cur * P::get_isogeny_denominator_term(i as usize);
+
+            cur *= x;
+        }
+        numerator = numerator + cur * P::get_isogeny_numerator_term(degree as usize);
+
+        Ok(numerator.mul(denumerator.inv()?))
+    }
+
     /// first candidate for solution x
     pub fn isogeny_x1(t: &G::BaseType) -> Result<G::BaseType> {
         let t2 = t.square().mul(P::QNR);
@@ -52,11 +81,6 @@ impl<G: CurveGroup, P: SSWUParameters<G>> SSWUMap<G, P> {
         } else {
             true
         }
-    }
-
-    /// map x back to the original curve
-    pub fn isogeny_map_x(x: &G::BaseType) -> Result<G::BaseType> {
-        P::isogeny_map_x(x)
     }
 }
 
@@ -131,7 +155,7 @@ impl<G: CurveGroup, P: SSWUParameters<G>> HashingToCurve<G> for SSWUMap<G, P> {
         let b1 = trace.b1;
 
         if b1 {
-            if *final_x != P::isogeny_map_x(&x1).unwrap() {
+            if *final_x != Self::isogeny_map_x(&x1).unwrap() {
                 return false;
             } else {
                 return true;
@@ -140,7 +164,7 @@ impl<G: CurveGroup, P: SSWUParameters<G>> HashingToCurve<G> for SSWUMap<G, P> {
 
         let x2 = x1.mul(t2).mul(P::QNR);
 
-        if *final_x != P::isogeny_map_x(&x2).unwrap() {
+        if *final_x != Self::isogeny_map_x(&x2).unwrap() {
             return false;
         }
 
