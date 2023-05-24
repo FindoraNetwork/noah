@@ -33,6 +33,8 @@ impl SSWUParameters<SECP256K1G1> for Secp256k1SSWUParameters {
         "28734576633528757162648956269730739219262246272443394170905244663053633733939"
     );
     const B: SECP256K1Fq = new_secp256k1_fq!("1771");
+    const A_ORG: SECP256K1Fq = new_secp256k1_fq!("0");
+    const B_ORG: SECP256K1Fq = new_secp256k1_fq!("7");
     const QNR: SECP256K1Fq = new_secp256k1_fq!("-1");
 
     const ISOGENY_DEGREE: u32 = 3;
@@ -135,6 +137,7 @@ mod tests {
 
             assert_eq!(final_x, final_x2);
             assert!(M::verify_trace(&t, &final_x, &trace));
+            assert!(M::is_x_on_original_curve(&final_x));
         }
     }
 }

@@ -32,6 +32,7 @@ mod tests {
 
             assert_eq!(final_x, final_x2);
             assert!(M::verify_trace(&t, &final_x, &trace));
+            assert!(M::is_x_on_curve(&final_x));
         }
     }
 }
