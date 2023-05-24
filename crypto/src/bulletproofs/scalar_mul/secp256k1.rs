@@ -1,5 +1,3 @@
-//! Module for the Bulletproof scalar mul proof scheme
-//!
 use crate::errors::Result;
 use ark_bulletproofs::r1cs::{
     LinearCombination, Prover, RandomizableConstraintSystem, Variable, Verifier,
@@ -11,14 +9,12 @@ use ark_secp256k1::{Affine, Fq, Fr, Projective};
 use ark_secq256k1::Affine as AffineBig;
 use digest::Digest;
 use merlin::Transcript;
-use noah_algebra::secq256k1::{PedersenCommitmentSecq256k1, SECQ256K1Proof, SECQ256K1Scalar};
-use noah_algebra::{
-    prelude::*,
-    secp256k1::{SECP256K1Scalar, SECP256K1G1},
-    secq256k1::SECQ256K1G1,
+use noah_algebra::prelude::*;
+use noah_algebra::secp256k1::{SECP256K1Scalar, SECP256K1G1};
+use noah_algebra::secq256k1::{
+    PedersenCommitmentSecq256k1, SECQ256K1Proof, SECQ256K1Scalar, SECQ256K1G1,
 };
 use rand_chacha::ChaChaRng;
-use rand_core::{CryptoRng, RngCore, SeedableRng};
 use sha3::Sha3_512;
 
 /// A scalar variable.
@@ -354,6 +350,7 @@ impl ScalarMulProof {
 #[test]
 fn scalar_mul_test() {
     use ark_secp256k1::Fr;
+    use noah_algebra::secp256k1::SECP256K1Scalar;
 
     let bp_gens = BulletproofGens::new(2048, 1);
 

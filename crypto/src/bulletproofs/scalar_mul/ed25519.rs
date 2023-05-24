@@ -1,9 +1,7 @@
-//! Module for the Bulletproof scalar mul proof scheme
-//!
 use crate::errors::Result;
-use ark_bulletproofs::{
-    curve::zorro::G1Affine as G1AffineBig,
-    r1cs::{LinearCombination, Prover, RandomizableConstraintSystem, Variable, Verifier},
+use ark_bulletproofs::curve::zorro::G1Affine as G1AffineBig;
+use ark_bulletproofs::r1cs::{
+    LinearCombination, Prover, RandomizableConstraintSystem, Variable, Verifier,
 };
 use ark_bulletproofs::{BulletproofGens, PedersenGens};
 use ark_ec::{AffineRepr, CurveGroup, Group as ArkGroup};
@@ -11,14 +9,10 @@ use ark_ed25519::{EdwardsAffine, EdwardsProjective, Fq, Fr};
 use ark_ff::{BigInteger, Field, PrimeField};
 use digest::Digest;
 use merlin::Transcript;
-use noah_algebra::zorro::{PedersenCommitmentZorro, ZorroProof, ZorroScalar};
-use noah_algebra::{
-    ed25519::{Ed25519Point, Ed25519Scalar, ED25519_D},
-    prelude::*,
-    zorro::ZorroG1,
-};
+use noah_algebra::ed25519::{Ed25519Point, Ed25519Scalar, ED25519_D};
+use noah_algebra::prelude::*;
+use noah_algebra::zorro::{PedersenCommitmentZorro, ZorroG1, ZorroProof, ZorroScalar};
 use rand_chacha::ChaChaRng;
-use rand_core::{CryptoRng, RngCore, SeedableRng};
 use sha3::Sha3_512;
 
 /// A scalar variable.
