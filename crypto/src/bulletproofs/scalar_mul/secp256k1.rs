@@ -1,6 +1,4 @@
-//! Module for the Bulletproof scalar mul proof scheme
-//!
-use crate::errors::Result;
+use crate::errors;
 use ark_bulletproofs::r1cs::{
     LinearCombination, Prover, RandomizableConstraintSystem, Variable, Verifier,
 };
@@ -11,14 +9,12 @@ use ark_secp256k1::{Affine, Fq, Fr, Projective};
 use ark_secq256k1::Affine as AffineBig;
 use digest::Digest;
 use merlin::Transcript;
-use noah_algebra::secq256k1::{PedersenCommitmentSecq256k1, SECQ256K1Proof, SECQ256K1Scalar};
-use noah_algebra::{
-    prelude::*,
-    secp256k1::{SECP256K1Scalar, SECP256K1G1},
-    secq256k1::SECQ256K1G1,
+use noah_algebra::prelude::*;
+use noah_algebra::secp256k1::{SECP256K1Scalar, SECP256K1G1};
+use noah_algebra::secq256k1::{
+    PedersenCommitmentSecq256k1, SECQ256K1Proof, SECQ256K1Scalar, SECQ256K1G1,
 };
 use rand_chacha::ChaChaRng;
-use rand_core::{CryptoRng, RngCore, SeedableRng};
 use sha3::Sha3_512;
 
 /// A scalar variable.
@@ -41,7 +37,7 @@ impl PointVar {
         cs: &mut CS,
         x: &Option<Fq>,
         y: &Option<Fq>,
-    ) -> Result<Self> {
+    ) -> errors::Result<Self> {
         let x_var = cs.allocate((*x).clone())?;
         let y_var = cs.allocate((*y).clone())?;
 
@@ -68,7 +64,7 @@ impl ScalarMulProof {
         secret_key_var: &ScalarVar,
         public_key: &Option<Affine>,
         secret_key: &Option<Fr>,
-    ) -> Result<()> {
+    ) -> errors::Result<()> {
         assert_eq!(public_key.is_some(), secret_key.is_some());
 
         // 1. Initialize the point.
@@ -181,7 +177,7 @@ impl ScalarMulProof {
         left_var: &PointVar,
         left: &Option<Affine>,
         right: &Affine,
-    ) -> Result<(Option<Affine>, PointVar)> {
+    ) -> errors::Result<(Option<Affine>, PointVar)> {
         let (s_var, res_var, res) = if let Some(left) = left {
             let s = (left.y - &right.y) * (left.x - &right.x).inverse().unwrap();
             let s_var = cs.allocate(Some(s))?;
@@ -217,7 +213,7 @@ impl ScalarMulProof {
         yes: &Option<Affine>,
         no_var: &PointVar,
         no: &Option<Affine>,
-    ) -> Result<(Option<Affine>, PointVar)> {
+    ) -> errors::Result<(Option<Affine>, PointVar)> {
         let (res, res_var) = if let Some(bit) = bit {
             let res = if *bit { yes.unwrap() } else { no.unwrap() };
             let res_var = PointVar::allocate(cs, &Some(res.x), &Some(res.y))?;
@@ -249,7 +245,7 @@ impl ScalarMulProof {
         transcript: &'a mut Transcript,
         public_key: &SECP256K1G1,
         secret_key: &SECP256K1Scalar,
-    ) -> Result<(ScalarMulProof, Vec<SECQ256K1G1>, Vec<SECQ256K1Scalar>)> {
+    ) -> errors::Result<(ScalarMulProof, Vec<SECQ256K1G1>, Vec<SECQ256K1Scalar>)> {
         let pc_gens = PedersenCommitmentSecq256k1::default();
 
         let public_key = public_key.get_raw();
@@ -318,7 +314,7 @@ impl ScalarMulProof {
         bp_gens: &'b BulletproofGens<AffineBig>,
         transcript: &'a mut Transcript,
         commitments: &Vec<SECQ256K1G1>,
-    ) -> Result<()> {
+    ) -> errors::Result<()> {
         let pc_gens = PedersenCommitmentSecq256k1::default();
         let commitments = commitments
             .iter()
@@ -354,6 +350,7 @@ impl ScalarMulProof {
 #[test]
 fn scalar_mul_test() {
     use ark_secp256k1::Fr;
+    use noah_algebra::secp256k1::SECP256K1Scalar;
 
     let bp_gens = BulletproofGens::new(2048, 1);
 

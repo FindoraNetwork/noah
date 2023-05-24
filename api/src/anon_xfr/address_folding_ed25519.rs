@@ -10,7 +10,7 @@ use noah_algebra::ed25519::Ed25519Fq;
 use noah_algebra::prelude::*;
 use noah_algebra::zorro::{PedersenCommitmentZorro, ZorroBulletproofGens, ZorroG1, ZorroScalar};
 use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381};
-use noah_crypto::bulletproofs::scalar_mul_for_ed25519::ScalarMulProof;
+use noah_crypto::bulletproofs::scalar_mul::ed25519::ScalarMulProof;
 use noah_crypto::delegated_schnorr::{
     prove_delegated_schnorr, verify_delegated_schnorr, DelegatedSchnorrInspection,
     DelegatedSchnorrProof,

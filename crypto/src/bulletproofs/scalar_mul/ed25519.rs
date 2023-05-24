@@ -1,9 +1,7 @@
-//! Module for the Bulletproof scalar mul proof scheme
-//!
-use crate::errors::Result;
-use ark_bulletproofs::{
-    curve::zorro::G1Affine as G1AffineBig,
-    r1cs::{LinearCombination, Prover, RandomizableConstraintSystem, Variable, Verifier},
+use crate::errors;
+use ark_bulletproofs::curve::zorro::G1Affine as G1AffineBig;
+use ark_bulletproofs::r1cs::{
+    LinearCombination, Prover, RandomizableConstraintSystem, Variable, Verifier,
 };
 use ark_bulletproofs::{BulletproofGens, PedersenGens};
 use ark_ec::{AffineRepr, CurveGroup, Group as ArkGroup};
@@ -11,14 +9,10 @@ use ark_ed25519::{EdwardsAffine, EdwardsProjective, Fq, Fr};
 use ark_ff::{BigInteger, Field, PrimeField};
 use digest::Digest;
 use merlin::Transcript;
-use noah_algebra::zorro::{PedersenCommitmentZorro, ZorroProof, ZorroScalar};
-use noah_algebra::{
-    ed25519::{Ed25519Point, Ed25519Scalar, ED25519_D},
-    prelude::*,
-    zorro::ZorroG1,
-};
+use noah_algebra::ed25519::{Ed25519Point, Ed25519Scalar, ED25519_D};
+use noah_algebra::prelude::*;
+use noah_algebra::zorro::{PedersenCommitmentZorro, ZorroG1, ZorroProof, ZorroScalar};
 use rand_chacha::ChaChaRng;
-use rand_core::{CryptoRng, RngCore, SeedableRng};
 use sha3::Sha3_512;
 
 /// A scalar variable.
@@ -41,7 +35,7 @@ impl PointVar {
         cs: &mut CS,
         x: &Option<Fq>,
         y: &Option<Fq>,
-    ) -> Result<Self> {
+    ) -> errors::Result<Self> {
         let x_var = cs.allocate((*x).clone())?;
         let y_var = cs.allocate((*y).clone())?;
 
@@ -68,7 +62,7 @@ impl ScalarMulProof {
         secret_key_var: &ScalarVar,
         public_key: &Option<EdwardsAffine>,
         secret_key: &Option<Fr>,
-    ) -> Result<()> {
+    ) -> errors::Result<()> {
         assert_eq!(public_key.is_some(), secret_key.is_some());
 
         // 1. Initialize the point.
@@ -181,7 +175,7 @@ impl ScalarMulProof {
         left_var: &PointVar,
         left: &Option<EdwardsAffine>,
         right: &EdwardsAffine,
-    ) -> Result<(Option<EdwardsAffine>, PointVar)> {
+    ) -> errors::Result<(Option<EdwardsAffine>, PointVar)> {
         let (res_var, res) = if let Some(left) = left {
             let res = left.add(right).into_affine();
             let res_var = PointVar::allocate(cs, &Some(res.x), &Some(res.y))?;
@@ -219,7 +213,7 @@ impl ScalarMulProof {
         yes: &Option<EdwardsAffine>,
         no_var: &PointVar,
         no: &Option<EdwardsAffine>,
-    ) -> Result<(Option<EdwardsAffine>, PointVar)> {
+    ) -> errors::Result<(Option<EdwardsAffine>, PointVar)> {
         let (res, res_var) = if let Some(bit) = bit {
             let res = if *bit { yes.unwrap() } else { no.unwrap() };
             let res_var = PointVar::allocate(cs, &Some(res.x), &Some(res.y))?;
@@ -251,7 +245,7 @@ impl ScalarMulProof {
         transcript: &'a mut Transcript,
         public_key: &Ed25519Point,
         secret_key: &Ed25519Scalar,
-    ) -> Result<(ScalarMulProof, Vec<ZorroG1>, Vec<ZorroScalar>)> {
+    ) -> errors::Result<(ScalarMulProof, Vec<ZorroG1>, Vec<ZorroScalar>)> {
         let pc_gens = PedersenCommitmentZorro::default();
 
         let public_key = public_key.get_raw();
@@ -321,7 +315,7 @@ impl ScalarMulProof {
         bp_gens: &'b BulletproofGens<G1AffineBig>,
         transcript: &'a mut Transcript,
         commitments: &Vec<ZorroG1>,
-    ) -> Result<()> {
+    ) -> errors::Result<()> {
         let pc_gens = PedersenCommitmentZorro::default();
         let commitments = commitments
             .iter()
