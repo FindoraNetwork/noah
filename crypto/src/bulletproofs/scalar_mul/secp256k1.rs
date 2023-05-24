@@ -1,4 +1,4 @@
-use crate::errors;
+use crate::errors::Result;
 use ark_bulletproofs::r1cs::{
     LinearCombination, Prover, RandomizableConstraintSystem, Variable, Verifier,
 };
@@ -37,7 +37,7 @@ impl PointVar {
         cs: &mut CS,
         x: &Option<Fq>,
         y: &Option<Fq>,
-    ) -> errors::Result<Self> {
+    ) -> Result<Self> {
         let x_var = cs.allocate((*x).clone())?;
         let y_var = cs.allocate((*y).clone())?;
 
@@ -64,7 +64,7 @@ impl ScalarMulProof {
         secret_key_var: &ScalarVar,
         public_key: &Option<Affine>,
         secret_key: &Option<Fr>,
-    ) -> errors::Result<()> {
+    ) -> Result<()> {
         assert_eq!(public_key.is_some(), secret_key.is_some());
 
         // 1. Initialize the point.
@@ -177,7 +177,7 @@ impl ScalarMulProof {
         left_var: &PointVar,
         left: &Option<Affine>,
         right: &Affine,
-    ) -> errors::Result<(Option<Affine>, PointVar)> {
+    ) -> Result<(Option<Affine>, PointVar)> {
         let (s_var, res_var, res) = if let Some(left) = left {
             let s = (left.y - &right.y) * (left.x - &right.x).inverse().unwrap();
             let s_var = cs.allocate(Some(s))?;
@@ -213,7 +213,7 @@ impl ScalarMulProof {
         yes: &Option<Affine>,
         no_var: &PointVar,
         no: &Option<Affine>,
-    ) -> errors::Result<(Option<Affine>, PointVar)> {
+    ) -> Result<(Option<Affine>, PointVar)> {
         let (res, res_var) = if let Some(bit) = bit {
             let res = if *bit { yes.unwrap() } else { no.unwrap() };
             let res_var = PointVar::allocate(cs, &Some(res.x), &Some(res.y))?;
@@ -245,7 +245,7 @@ impl ScalarMulProof {
         transcript: &'a mut Transcript,
         public_key: &SECP256K1G1,
         secret_key: &SECP256K1Scalar,
-    ) -> errors::Result<(ScalarMulProof, Vec<SECQ256K1G1>, Vec<SECQ256K1Scalar>)> {
+    ) -> Result<(ScalarMulProof, Vec<SECQ256K1G1>, Vec<SECQ256K1Scalar>)> {
         let pc_gens = PedersenCommitmentSecq256k1::default();
 
         let public_key = public_key.get_raw();
@@ -314,7 +314,7 @@ impl ScalarMulProof {
         bp_gens: &'b BulletproofGens<AffineBig>,
         transcript: &'a mut Transcript,
         commitments: &Vec<SECQ256K1G1>,
-    ) -> errors::Result<()> {
+    ) -> Result<()> {
         let pc_gens = PedersenCommitmentSecq256k1::default();
         let commitments = commitments
             .iter()

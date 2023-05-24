@@ -1,4 +1,4 @@
-use crate::errors;
+use crate::errors::Result;
 use ark_bulletproofs::curve::zorro::G1Affine as G1AffineBig;
 use ark_bulletproofs::r1cs::{
     LinearCombination, Prover, RandomizableConstraintSystem, Variable, Verifier,
@@ -35,7 +35,7 @@ impl PointVar {
         cs: &mut CS,
         x: &Option<Fq>,
         y: &Option<Fq>,
-    ) -> errors::Result<Self> {
+    ) -> Result<Self> {
         let x_var = cs.allocate((*x).clone())?;
         let y_var = cs.allocate((*y).clone())?;
 
@@ -62,7 +62,7 @@ impl ScalarMulProof {
         secret_key_var: &ScalarVar,
         public_key: &Option<EdwardsAffine>,
         secret_key: &Option<Fr>,
-    ) -> errors::Result<()> {
+    ) -> Result<()> {
         assert_eq!(public_key.is_some(), secret_key.is_some());
 
         // 1. Initialize the point.
@@ -175,7 +175,7 @@ impl ScalarMulProof {
         left_var: &PointVar,
         left: &Option<EdwardsAffine>,
         right: &EdwardsAffine,
-    ) -> errors::Result<(Option<EdwardsAffine>, PointVar)> {
+    ) -> Result<(Option<EdwardsAffine>, PointVar)> {
         let (res_var, res) = if let Some(left) = left {
             let res = left.add(right).into_affine();
             let res_var = PointVar::allocate(cs, &Some(res.x), &Some(res.y))?;
@@ -213,7 +213,7 @@ impl ScalarMulProof {
         yes: &Option<EdwardsAffine>,
         no_var: &PointVar,
         no: &Option<EdwardsAffine>,
-    ) -> errors::Result<(Option<EdwardsAffine>, PointVar)> {
+    ) -> Result<(Option<EdwardsAffine>, PointVar)> {
         let (res, res_var) = if let Some(bit) = bit {
             let res = if *bit { yes.unwrap() } else { no.unwrap() };
             let res_var = PointVar::allocate(cs, &Some(res.x), &Some(res.y))?;
@@ -245,7 +245,7 @@ impl ScalarMulProof {
         transcript: &'a mut Transcript,
         public_key: &Ed25519Point,
         secret_key: &Ed25519Scalar,
-    ) -> errors::Result<(ScalarMulProof, Vec<ZorroG1>, Vec<ZorroScalar>)> {
+    ) -> Result<(ScalarMulProof, Vec<ZorroG1>, Vec<ZorroScalar>)> {
         let pc_gens = PedersenCommitmentZorro::default();
 
         let public_key = public_key.get_raw();
@@ -315,7 +315,7 @@ impl ScalarMulProof {
         bp_gens: &'b BulletproofGens<G1AffineBig>,
         transcript: &'a mut Transcript,
         commitments: &Vec<ZorroG1>,
-    ) -> errors::Result<()> {
+    ) -> Result<()> {
         let pc_gens = PedersenCommitmentZorro::default();
         let commitments = commitments
             .iter()
