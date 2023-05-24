@@ -23,7 +23,7 @@ pub struct Elligator<G: CurveGroup, P: ElligatorParameters<G>> {
 
 impl<G: CurveGroup, P: ElligatorParameters<G>> Elligator<G, P> {
     /// check whether candidate x lies on the curve
-    fn is_x_on_curve(x: &G::BaseType) -> bool {
+    pub(crate) fn is_x_on_curve(x: &G::BaseType) -> bool {
         let mut y_squared = *x * x * x;
         if !P::A.is_zero() {
             y_squared += &(*x * x * P::A);

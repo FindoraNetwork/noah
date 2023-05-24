@@ -13,6 +13,10 @@ impl SSWUParameters<Ed25519Point> for Ed25519SSWUParameters {
     const B: Ed25519Fq = new_ed25519_fq!(
         "35145622091990963912007590500565757691096108475092975709449221291113343398787"
     );
+    const A_ORG: Ed25519Fq = new_ed25519_fq!("6");
+    const B_ORG: Ed25519Fq = new_ed25519_fq!(
+        "35145622091990963912007590500565757691096108475092975709449221291113343398787"
+    );
     const QNR: Ed25519Fq = new_ed25519_fq!("2");
 
     const ISOGENY_DEGREE: u32 = 0;
@@ -89,6 +93,8 @@ mod tests {
 
             assert_eq!(final_x, final_x2);
             assert!(M::verify_trace(&t, &final_x, &trace));
+            assert!(M::is_x_on_isogeny_curve(&final_x));
+            assert!(M::is_x_on_original_curve(&final_x));
         }
     }
 }
