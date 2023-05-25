@@ -130,6 +130,25 @@ pub static ABAR_TO_AR_SECP256K1_VERIFIER_PARAMS: Option<&'static [u8]> = Some(in
 /// The verifier parameters for secp256k1 anonymous to transparent.
 pub static ABAR_TO_AR_SECP256K1_VERIFIER_PARAMS: Option<&'static [u8]> = None;
 
+#[cfg(not(feature = "no_vk"))]
+/// The verifier parameters for ed25519 anonymous to transparent.
+pub static OWNERSHIP_ED25519_VERIFIER_PARAMS: Option<&'static [u8]> =
+    Some(include_bytes!("../../parameters/ownership-vk-ed25519.bin"));
+
+#[cfg(feature = "no_vk")]
+/// The verifier parameters for ed25519 anonymous to transparent.
+pub static OWNERSHIP_ED25519_VERIFIER_PARAMS: Option<&'static [u8]> = None;
+
+#[cfg(not(feature = "no_vk"))]
+/// The verifier parameters for secp256k1 anonymous to transparent.
+pub static OWNERSHIP_SECP256K1_VERIFIER_PARAMS: Option<&'static [u8]> = Some(include_bytes!(
+    "../../parameters/ownership-vk-secp256k1.bin"
+));
+
+#[cfg(feature = "no_vk")]
+/// The verifier parameters for secp256k1 anonymous to transparent.
+pub static OWNERSHIP_SECP256K1_VERIFIER_PARAMS: Option<&'static [u8]> = None;
+
 #[cfg(feature = "no_srs")]
 lazy_static! {
     /// The Lagrange format of the SRS.

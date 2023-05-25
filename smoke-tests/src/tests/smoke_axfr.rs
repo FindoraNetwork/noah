@@ -2,6 +2,7 @@
 mod smoke_axfr {
     use digest::Digest;
     use mem_db::MemoryDB;
+    use noah::anon_xfr::ownership::verify_ownership_note;
     use noah::keys::SecretKey;
     use noah::parameters::params::{ProverParams, VerifierParams};
     use noah::parameters::AddressFormat::{ED25519, SECP256K1};
@@ -12,6 +13,7 @@ mod smoke_axfr {
             abar_to_bar::*,
             ar_to_abar::*,
             bar_to_abar::*,
+            ownership::*,
             structs::{
                 AnonAssetRecord, MTLeafInfo, MTNode, MTPath, OpenAnonAssetRecord,
                 OpenAnonAssetRecordBuilder,
@@ -336,6 +338,74 @@ mod smoke_axfr {
         let obar = open_blind_asset_record(&note.body.output, &note.body.memo, &receiver).unwrap();
         assert_eq!(*obar.get_amount(), AMOUNT);
         assert_eq!(*obar.get_asset_type(), ASSET);
+    }
+
+    #[test]
+    fn ownership_secp256k1() {
+        let mut prng = test_rng();
+        let sender = KeyPair::sample(&mut prng, SECP256K1);
+        let receiver = KeyPair::sample(&mut prng, SECP256K1);
+        ownership(sender, receiver);
+    }
+
+    #[test]
+    fn ownership_ed25519() {
+        let mut prng = test_rng();
+        let sender = KeyPair::sample(&mut prng, ED25519);
+        let receiver = KeyPair::sample(&mut prng, ED25519);
+        ownership(sender, receiver);
+    }
+
+    fn ownership(sender: KeyPair, receiver: KeyPair) {
+        let mut prng = test_rng();
+
+        let address_format = match sender.get_sk_ref() {
+            SecretKey::Ed25519(_) => ED25519,
+            SecretKey::Secp256k1(_) => SECP256K1,
+        };
+
+        let params = ProverParams::gen_ownership(address_format).unwrap();
+        let verify_params = VerifierParams::get_ownership(address_format).unwrap();
+
+        let fdb = MemoryDB::new();
+        let cs = Arc::new(RwLock::new(ChainState::new(fdb, "ownership".to_owned(), 0)));
+        let mut state = State::new(cs, false);
+        let store = PrefixedStore::new("my_store", &mut state);
+        let mut mt = PersistentMerkleTree::new(store).unwrap();
+
+        let mut oabar = build_oabar(&mut prng, AMOUNT, ASSET, &sender);
+        let abar = AnonAssetRecord::from_oabar(&oabar);
+        mt.add_commitment_hash(hash_abar(0, &abar)).unwrap();
+        mt.commit().unwrap();
+        let proof = mt.generate_proof(0).unwrap();
+        oabar.update_mt_leaf_info(build_mt_leaf_info_from_proof(proof.clone(), 0));
+
+        let pre_note = init_ownership_note(&mut prng, &oabar, &sender, &receiver.get_pk()).unwrap();
+        let hash = random_hasher(&mut prng);
+        let note = finish_ownership_note(&mut prng, &params, pre_note, hash.clone()).unwrap();
+        verify_ownership_note(&verify_params, &note, &proof.root, hash.clone()).unwrap();
+
+        let err_root = BLSScalar::random(&mut prng);
+        assert!(verify_ownership_note(&verify_params, &note, &err_root, hash.clone()).is_err());
+
+        let err_hash = random_hasher(&mut prng);
+        assert!(
+            verify_ownership_note(&verify_params, &note, &proof.root, err_hash.clone()).is_err()
+        );
+
+        let mut err_nullifier = note.clone();
+        err_nullifier.body.input = BLSScalar::random(&mut prng);
+        assert!(
+            verify_ownership_note(&verify_params, &err_nullifier, &proof.root, hash.clone())
+                .is_err()
+        );
+
+        let mut err_commitment = note.clone();
+        err_commitment.body.commitment = BLSScalar::random(&mut prng);
+        assert!(
+            verify_ownership_note(&verify_params, &err_commitment, &proof.root, hash.clone())
+                .is_err()
+        );
     }
 
     #[test]

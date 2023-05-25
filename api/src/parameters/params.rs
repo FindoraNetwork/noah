@@ -15,7 +15,7 @@ use crate::parameters::{
     ABAR_TO_ABAR_VERIFIER_SECP256K1_SPECIFIC_PARAMS, ABAR_TO_AR_ED25519_VERIFIER_PARAMS,
     ABAR_TO_AR_SECP256K1_VERIFIER_PARAMS, ABAR_TO_BAR_ED25519_VERIFIER_PARAMS,
     ABAR_TO_BAR_SECP256K1_VERIFIER_PARAMS, AR_TO_ABAR_VERIFIER_PARAMS, BAR_TO_ABAR_VERIFIER_PARAMS,
-    LAGRANGE_BASES, SRS,
+    LAGRANGE_BASES, OWNERSHIP_ED25519_VERIFIER_PARAMS, OWNERSHIP_SECP256K1_VERIFIER_PARAMS, SRS,
 };
 use ark_std::{collections::BTreeMap, format};
 use noah_algebra::bls12_381::{BLSScalar, BLSG1};
@@ -388,7 +388,33 @@ impl ProverParams {
             SECP256K1 => String::from("abar_to_ar_secp256k1"),
             ED25519 => String::from("abar_to_ar_ed25519"),
         };
+        let verifier_params = match VerifierParams::load_abar_to_ar(address_format).ok() {
+            Some(v) => Some(v.verifier_params),
+            None => None,
+        };
+        Self::gen_common_abar_to_ar(address_format, label, verifier_params, false)
+    }
 
+    /// Obtain the parameters for anonymous to transparent with ownership.
+    pub fn gen_ownership(address_format: AddressFormat) -> Result<ProverParams> {
+        let label = match address_format {
+            SECP256K1 => String::from("ownership_secp256k1"),
+            ED25519 => String::from("ownership_ed25519"),
+        };
+        let verifier_params = match VerifierParams::load_ownership(address_format).ok() {
+            Some(v) => Some(v.verifier_params),
+            None => None,
+        };
+        Self::gen_common_abar_to_ar(address_format, label, verifier_params, true)
+    }
+
+    /// Obtain the common parameters for anonymous to transparent.
+    pub fn gen_common_abar_to_ar(
+        address_format: AddressFormat,
+        label: String,
+        verifier_params: Option<PlonkVK<KZGCommitmentSchemeBLS>>,
+        open_commitment: bool,
+    ) -> Result<ProverParams> {
         let bls_zero = BLSScalar::zero();
 
         // It's okay to choose a fixed seed to build CS.
@@ -431,16 +457,12 @@ impl ProverParams {
             &nullifier_trace,
             &input_commitment_trace,
             &AXfrAddressFoldingWitness::default(address_format),
+            open_commitment,
         );
 
         let cs_size = cs.size();
         let pcs = load_srs_params(cs_size)?;
         let lagrange_pcs = load_lagrange_params(cs_size);
-
-        let verifier_params = match VerifierParams::load_abar_to_ar(address_format).ok() {
-            Some(v) => Some(v.verifier_params),
-            None => None,
-        };
 
         let prover_params =
             indexer_with_lagrange(&cs, &pcs, lagrange_pcs.as_ref(), verifier_params).unwrap();
@@ -650,6 +672,45 @@ impl VerifierParams {
                 let label = match address_format {
                     SECP256K1 => String::from("abar_to_ar_secp256k1"),
                     ED25519 => String::from("abar_to_ar_ed25519"),
+                };
+
+                if verifier_params.label != label {
+                    Err(NoahError::MissingVerifierParamsError)
+                } else {
+                    Ok(verifier_params)
+                }
+            } else {
+                Err(NoahError::DeserializationError)
+            }
+        } else {
+            Err(NoahError::MissingVerifierParamsError)
+        }
+    }
+
+    /// Obtain the parameters for anonymous to transparent with ownership.
+    pub fn get_ownership(address_format: AddressFormat) -> Result<VerifierParams> {
+        match Self::load_ownership(address_format) {
+            Ok(vk) => Ok(vk),
+            _ => {
+                let prover_params = ProverParams::gen_ownership(address_format)?;
+                Ok(VerifierParams::from(prover_params))
+            }
+        }
+    }
+
+    /// Obtain the parameters for anonymous to transparent with ownership from prepare.
+    pub fn load_ownership(address_format: AddressFormat) -> Result<VerifierParams> {
+        let bytes = match address_format {
+            SECP256K1 => OWNERSHIP_SECP256K1_VERIFIER_PARAMS,
+            ED25519 => OWNERSHIP_ED25519_VERIFIER_PARAMS,
+        };
+
+        if let Some(bytes) = bytes {
+            let verifier_params = bincode::deserialize::<VerifierParams>(bytes);
+            if let Ok(verifier_params) = verifier_params {
+                let label = match address_format {
+                    SECP256K1 => String::from("ownership_secp256k1"),
+                    ED25519 => String::from("ownership_ed25519"),
                 };
 
                 if verifier_params.label != label {

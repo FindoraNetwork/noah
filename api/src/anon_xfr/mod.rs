@@ -48,6 +48,8 @@ pub mod address_folding_secp256k1;
 pub mod ar_to_abar;
 /// Module for converting confidential assets to anonymous assets.
 pub mod bar_to_abar;
+/// Module for proof of ownership.
+pub mod ownership;
 /// Module for shared structures.
 pub mod structs;
 

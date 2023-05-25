@@ -348,6 +348,7 @@ fn prove_abar_to_ar<R: CryptoRng + RngCore>(
         nullifier_trace,
         input_commitment_trace,
         &folding_witness,
+        false,
     );
     let witness = cs.get_and_clear_witness();
 
@@ -368,6 +369,7 @@ pub fn build_abar_to_ar_cs(
     nullifier_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
     input_commitment_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
     folding_witness: &AXfrAddressFoldingWitness,
+    open_commitment: bool,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
 
@@ -477,6 +479,9 @@ pub fn build_abar_to_ar_cs(
     }
 
     // prepare public inputs variables
+    if open_commitment {
+        cs.prepare_pi_variable(com_abar_in_var);
+    }
     cs.prepare_pi_variable(nullifier_var);
     cs.prepare_pi_variable(root_var.unwrap()); // safe unwrap
 

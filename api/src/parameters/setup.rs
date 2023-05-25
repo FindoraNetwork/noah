@@ -54,6 +54,9 @@ enum Actions {
     /// Generates the verifying key for ABAR to AR transform
     ABAR_TO_AR { directory: PathBuf },
 
+    /// Generates the verifying key for Ownership transform
+    OWNERSHIP { directory: PathBuf },
+
     /// Generates the uniform reference string for Bulletproof (over the Curve25519 curve).
     BULLETPROOF_OVER_CURVE25519 { directory: PathBuf },
 
@@ -93,6 +96,10 @@ fn main() {
 
         ABAR_TO_AR { directory } => {
             gen_abar_to_ar_vk(directory);
+        }
+
+        OWNERSHIP { directory } => {
+            gen_ownership_vk(directory);
         }
 
         BULLETPROOF_OVER_CURVE25519 { directory } => gen_bulletproof_curve25519_urs(directory),
@@ -306,6 +313,43 @@ fn gen_abar_to_ar_vk(path: PathBuf) {
     println!("Deserialize time: {:.2?}", elapsed);
 }
 
+// cargo run --release --features="gen no_vk" --bin gen-params ownership "./parameters"
+fn gen_ownership_vk(path: PathBuf) {
+    println!("Generating the verifying key for Ownership for secp256k1 ...");
+    let mut new_path = path.clone();
+    let user_params = ProverParams::gen_ownership(SECP256K1).unwrap();
+    let node_params = VerifierParams::from(user_params);
+    println!(
+        "the size of the constraint system for Ownership for secp256k1: {}",
+        node_params.shrunk_cs.size
+    );
+    let bytes = bincode::serialize(&node_params).unwrap();
+    new_path.push("ownership-vk-secp256k1.bin");
+    save_to_file(&bytes, new_path);
+
+    let start = std::time::Instant::now();
+    let _n: VerifierParams = bincode::deserialize(&bytes).unwrap();
+    let elapsed = start.elapsed();
+    println!("Deserialize time: {:.2?}", elapsed);
+
+    println!("Generating the verifying key for Ownership for ed25519 ...");
+    let mut new_path = path.clone();
+    let user_params = ProverParams::gen_ownership(ED25519).unwrap();
+    let node_params = VerifierParams::from(user_params);
+    println!(
+        "the size of the constraint system for Ownership for ed25519: {}",
+        node_params.shrunk_cs.size
+    );
+    let bytes = bincode::serialize(&node_params).unwrap();
+    new_path.push("ownership-vk-ed25519.bin");
+    save_to_file(&bytes, new_path);
+
+    let start = std::time::Instant::now();
+    let _n: VerifierParams = bincode::deserialize(&bytes).unwrap();
+    let elapsed = start.elapsed();
+    println!("Deserialize time: {:.2?}", elapsed);
+}
+
 // cargo run --release --features="gen no_urs no_srs no_vk" --bin gen-params bulletproof-over-curve25519 "./parameters"
 fn gen_bulletproof_curve25519_urs(mut path: PathBuf) {
     println!("Generating Bulletproof(over the Curve25519 curve) uniform reference string ...");
@@ -396,6 +440,7 @@ fn gen_all(directory: PathBuf) {
     gen_bar_to_abar_vk(directory.clone());
     gen_ar_to_abar_vk(directory.clone());
     gen_abar_to_ar_vk(directory.clone());
+    gen_ownership_vk(directory.clone());
     gen_bulletproof_curve25519_urs(directory.clone());
     gen_bulletproof_secq256k1_urs(directory.clone());
     gen_bulletproof_zorro_urs(directory.clone());
