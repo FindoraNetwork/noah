@@ -172,6 +172,138 @@ impl<G: CurveGroup, P: SWParameters<G>> HashingToCurve<G> for SWMap<G, P> {
         return Ok((x3, trace));
     }
 
+    fn get_cofactor_uncleared_point(t: &G::BaseType) -> Result<(G::BaseType, G::BaseType)> {
+        let t_sq = t.square();
+        let a2 = t_sq.inv()?;
+        let c3t_sq_inv = P::C3.mul(a2);
+        let temp = G::BaseType::one().add(c3t_sq_inv);
+        let a3 = temp.inv()?;
+
+        let temp2 = P::C2.mul(a3);
+        let x1 = P::C1.sub(&temp2);
+
+        let mut y_squared_1 = x1 * x1 * x1 + P::C;
+        if !P::A.is_zero() {
+            y_squared_1 += &(x1 * x1 * P::A);
+        }
+        if !P::B.is_zero() {
+            y_squared_1 += &(x1 * P::B);
+        }
+
+        let b1 = y_squared_1.legendre() != LegendreSymbol::QuadraticNonResidue;
+        if b1 {
+            let y = y_squared_1.sqrt().unwrap();
+            return Ok((x1, y));
+        }
+
+        let x2 = P::C4.sub(&x1);
+        let mut y_squared_2 = x2 * x2 * x2 + P::C;
+        if !P::A.is_zero() {
+            y_squared_2 += &(x2 * x2 * P::A);
+        }
+        if !P::B.is_zero() {
+            y_squared_2 += &(x2 * P::B);
+        }
+
+        let b2 = y_squared_2.legendre() != LegendreSymbol::QuadraticNonResidue;
+        if b2 {
+            let y = y_squared_2.sqrt().unwrap();
+            return Ok((x2, y));
+        }
+
+        let temp3 = t_sq.mul(temp.square());
+        let x3 = P::C5.add(P::C6.mul(temp3));
+
+        let mut y_squared_3 = x3 * x3 * x3 + P::C;
+        if !P::A.is_zero() {
+            y_squared_3 += &(x3 * x3 * P::A);
+        }
+        if !P::B.is_zero() {
+            y_squared_3 += &(x3 * P::B);
+        }
+
+        let y = y_squared_3.sqrt().unwrap();
+        return Ok((x3, y));
+    }
+
+    fn get_cofactor_uncleared_point_and_trace(
+        t: &G::BaseType,
+    ) -> Result<(G::BaseType, G::BaseType, Self::Trace)> {
+        let t_sq = t.square();
+        let a2 = t_sq.inv()?;
+        let c3t_sq_inv = P::C3.mul(a2);
+        let temp = G::BaseType::one().add(c3t_sq_inv);
+        let a3 = temp.inv()?;
+
+        let temp2 = P::C2.mul(a3);
+        let x1 = P::C1.sub(&temp2);
+
+        let mut y_squared_1 = x1 * x1 * x1 + P::C;
+        if !P::A.is_zero() {
+            y_squared_1 += &(x1 * x1 * P::A);
+        }
+        if !P::B.is_zero() {
+            y_squared_1 += &(x1 * P::B);
+        }
+
+        let b1 = y_squared_1.legendre() != LegendreSymbol::QuadraticNonResidue;
+
+        let x2 = P::C4.sub(&x1);
+        let mut y_squared_2 = x2 * x2 * x2 + P::C;
+        if !P::A.is_zero() {
+            y_squared_2 += &(x2 * x2 * P::A);
+        }
+        if !P::B.is_zero() {
+            y_squared_2 += &(x2 * P::B);
+        }
+
+        let b2 = y_squared_2.legendre() != LegendreSymbol::QuadraticNonResidue;
+
+        let a4 = if b1 {
+            y_squared_1.sqrt().unwrap()
+        } else {
+            (y_squared_1 * P::QNR).sqrt().unwrap()
+        };
+
+        let a5 = if b2 {
+            y_squared_2.sqrt().unwrap()
+        } else {
+            (y_squared_2 * P::QNR).sqrt().unwrap()
+        };
+
+        let trace = SWTrace::<G> {
+            a2,
+            a3,
+            b1,
+            b2,
+            a4,
+            a5,
+        };
+
+        if b1 {
+            let y = y_squared_1.sqrt().unwrap();
+            return Ok((x1, y, trace));
+        }
+
+        if b2 {
+            let y = y_squared_2.sqrt().unwrap();
+            return Ok((x2, y, trace));
+        }
+
+        let temp3 = t_sq.mul(temp.square());
+        let x3 = P::C5.add(P::C6.mul(temp3));
+        let mut y_squared_3 = x3 * x3 * x3 + P::C;
+        if !P::A.is_zero() {
+            y_squared_3 += &(x3 * x3 * P::A);
+        }
+        if !P::B.is_zero() {
+            y_squared_3 += &(x3 * P::B);
+        }
+
+        let y = y_squared_3.sqrt().unwrap();
+        return Ok((x3, y, trace));
+    }
+
     fn verify_trace(t: &G::BaseType, final_x: &G::BaseType, trace: &Self::Trace) -> bool {
         let t_sq = t.square();
 

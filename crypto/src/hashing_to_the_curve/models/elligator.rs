@@ -82,6 +82,80 @@ impl<G: CurveGroup, P: ElligatorParameters<G>> HashingToCurve<G> for Elligator<G
         };
     }
 
+    fn get_cofactor_uncleared_point(t: &G::BaseType) -> Result<(G::BaseType, G::BaseType)> {
+        let t_sq = t.square();
+        let temp = t_sq.mul(P::QNR).add(G::BaseType::one()).inv()?;
+
+        let x1 = temp.mul(P::A).neg();
+
+        let mut y_squared: G::BaseType = x1 * x1 * x1;
+        if !P::A.is_zero() {
+            y_squared += &(x1 * x1 * P::A);
+        }
+        if !P::B.is_zero() {
+            y_squared += &(x1 * &P::B);
+        }
+
+        let b1 = y_squared.legendre() != LegendreSymbol::QuadraticNonResidue;
+
+        return if b1 {
+            let y = y_squared.sqrt().unwrap();
+            Ok((x1, y))
+        } else {
+            let x2 = P::A.add(x1).neg();
+
+            let mut y_squared: G::BaseType = x2 * x2 * x2;
+            if !P::A.is_zero() {
+                y_squared += &(x2 * x2 * P::A);
+            }
+            if !P::B.is_zero() {
+                y_squared += &(x2 * &P::B);
+            }
+
+            let y = y_squared.sqrt().unwrap();
+            Ok((x2, y))
+        };
+    }
+
+    fn get_cofactor_uncleared_point_and_trace(
+        t: &G::BaseType,
+    ) -> Result<(G::BaseType, G::BaseType, Self::Trace)> {
+        let t_sq = t.square();
+        let a2 = t_sq.mul(P::QNR).add(G::BaseType::one()).inv()?;
+        let x1 = a2.mul(P::A).neg();
+
+        let mut y_squared: G::BaseType = x1 * x1 * x1;
+        if !P::A.is_zero() {
+            y_squared += &(x1 * x1 * P::A);
+        }
+        if !P::B.is_zero() {
+            y_squared += &(x1 * &P::B);
+        }
+
+        let b1 = y_squared.legendre() != LegendreSymbol::QuadraticNonResidue;
+
+        return if b1 {
+            let a3 = y_squared.sqrt().unwrap();
+            let trace = Self::Trace { a2, b1, a3 };
+            Ok((x1, a3, trace))
+        } else {
+            let x2 = P::A.add(x1).neg();
+
+            let mut y_squared: G::BaseType = x2 * x2 * x2;
+            if !P::A.is_zero() {
+                y_squared += &(x2 * x2 * P::A);
+            }
+            if !P::B.is_zero() {
+                y_squared += &(x2 * &P::B);
+            }
+            let y = y_squared.sqrt().unwrap();
+
+            let a3 = (y_squared * P::QNR).sqrt().unwrap();
+            let trace = Self::Trace { a2, b1, a3 };
+            Ok((x2, y, trace))
+        };
+    }
+
     fn verify_trace(t: &G::BaseType, final_x: &G::BaseType, trace: &Self::Trace) -> bool {
         let t_sq = t.square();
         let a2_inv = t_sq.mul(P::QNR).add(G::BaseType::one());
