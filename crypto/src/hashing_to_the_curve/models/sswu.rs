@@ -142,6 +142,79 @@ impl<G: CurveGroup, P: SSWUParameters<G>> HashingToCurve<G> for SSWUMap<G, P> {
         };
     }
 
+    fn get_cofactor_uncleared_point(t: &G::BaseType) -> Result<(G::BaseType, G::BaseType)> {
+        let t2 = t.square().mul(P::QNR);
+        let t4 = t2.square();
+
+        let a3 = t4.add(&t2).inv()?;
+
+        let x1 = P::C1.mul(&a3.add(G::BaseType::one()));
+
+        let mut y_squared = (x1 * x1 * x1).add(P::B);
+        y_squared = y_squared.add(P::A.mul(x1));
+
+        let b1 = y_squared.legendre() != LegendreSymbol::QuadraticNonResidue;
+
+        return if b1 {
+            let x1_org = Self::isogeny_map_x(&x1)?;
+            let mut y_squared_org = (x1_org * x1_org * x1_org).add(P::B_ORG);
+            y_squared_org = y_squared_org.add(P::A_ORG.mul(x1_org));
+
+            let y_org = y_squared_org.sqrt().unwrap();
+            Ok((x1_org, y_org))
+        } else {
+            let x2 = x1.mul(t2);
+
+            let x2_org = Self::isogeny_map_x(&x2)?;
+            let mut y_squared_org = (x2_org * x2_org * x2_org).add(P::B_ORG);
+            y_squared_org = y_squared_org.add(P::A_ORG.mul(x2_org));
+
+            let y_org = y_squared_org.sqrt().unwrap();
+            Ok((x2_org, y_org))
+        };
+    }
+
+    fn get_cofactor_uncleared_point_and_trace(
+        t: &G::BaseType,
+    ) -> Result<(G::BaseType, G::BaseType, Self::Trace)> {
+        let t2 = t.square().mul(P::QNR);
+        let t4 = t2.square();
+
+        let a3 = t4.add(&t2).inv()?;
+
+        let x1 = P::C1.mul(&a3.add(G::BaseType::one()));
+
+        let mut y_squared = (x1 * x1 * x1).add(P::B);
+        y_squared = y_squared.add(P::A.mul(x1));
+
+        let b1 = y_squared.legendre() != LegendreSymbol::QuadraticNonResidue;
+
+        return if b1 {
+            let a4 = y_squared.sqrt().unwrap();
+            let trace = Self::Trace { a3, b1, a4 };
+
+            let x1_org = Self::isogeny_map_x(&x1)?;
+            let mut y_squared_org = (x1_org * x1_org * x1_org).add(P::B_ORG);
+            y_squared_org = y_squared_org.add(P::A_ORG.mul(x1_org));
+
+            let y_org = y_squared_org.sqrt().unwrap();
+
+            Ok((x1_org, y_org, trace))
+        } else {
+            let x2 = x1.mul(t2);
+            let a4 = (y_squared * P::QNR).sqrt().unwrap();
+            let trace = Self::Trace { a3, b1, a4 };
+
+            let x2_org = Self::isogeny_map_x(&x2)?;
+            let mut y_squared_org = (x2_org * x2_org * x2_org).add(P::B_ORG);
+            y_squared_org = y_squared_org.add(P::A_ORG.mul(x2_org));
+
+            let y_org = y_squared_org.sqrt().unwrap();
+
+            Ok((x2_org, y_org, trace))
+        };
+    }
+
     fn verify_trace(t: &G::BaseType, final_x: &G::BaseType, trace: &Self::Trace) -> bool {
         let t2 = t.square().mul(P::QNR);
         let t4 = t2.square();

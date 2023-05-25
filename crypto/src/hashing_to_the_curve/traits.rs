@@ -13,6 +13,14 @@ pub trait HashingToCurve<G: CurveGroup> {
     /// get the x coordinate as well as the trace.
     fn get_cofactor_uncleared_x_and_trace(t: &G::BaseType) -> Result<(G::BaseType, Self::Trace)>;
 
+    /// get (x, y) before cofactor clearing.
+    fn get_cofactor_uncleared_point(t: &G::BaseType) -> Result<(G::BaseType, G::BaseType)>;
+
+    /// get (x, y) before cofactor clearing.
+    fn get_cofactor_uncleared_point_and_trace(
+        t: &G::BaseType,
+    ) -> Result<(G::BaseType, G::BaseType, Self::Trace)>;
+
     /// verify the trace.
     fn verify_trace(t: &G::BaseType, final_x: &G::BaseType, trace: &Self::Trace) -> bool;
 }
