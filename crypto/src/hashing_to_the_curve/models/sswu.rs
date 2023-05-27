@@ -46,18 +46,18 @@ impl<G: CurveGroup, P: SSWUParameters<G>> SSWUMap<G, P> {
         }
 
         let mut numerator: G::BaseType = P::get_isogeny_numerator_term(0).clone();
-        let mut denumerator: G::BaseType = P::get_isogeny_denominator_term(0).clone();
+        let mut denominator: G::BaseType = P::get_isogeny_denominator_term(0).clone();
 
         let mut cur = *x;
         for i in 1u32..degree {
             numerator = numerator + cur * P::get_isogeny_numerator_term(i as usize);
-            denumerator = denumerator + cur * P::get_isogeny_denominator_term(i as usize);
+            denominator = denominator + cur * P::get_isogeny_denominator_term(i as usize);
 
             cur *= x;
         }
         numerator = numerator + cur * P::get_isogeny_numerator_term(degree as usize);
 
-        Ok(numerator.mul(denumerator.inv()?))
+        Ok(numerator.mul(denominator.inv()?))
     }
 
     /// first candidate for solution x
