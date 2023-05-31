@@ -26,6 +26,12 @@ pub trait SSWUParameters<G: CurveGroup> {
 
     /// Get a denominator term in the isogeny parameters.
     fn get_isogeny_denominator_term<'a>(i: usize) -> &'a G::BaseType;
+
+    /// Convert to the default group element.
+    fn convert_to_group(x: &G::BaseType, y: &G::BaseType) -> Result<G>;
+
+    /// Convert from the default group element.
+    fn convert_from_group(p: &G) -> Result<(G::BaseType, G::BaseType)>;
 }
 
 /// The simplified SWU map
@@ -258,6 +264,14 @@ impl<G: CurveGroup, P: SSWUParameters<G>> HashingToCurve<G> for SSWUMap<G, P> {
         }
 
         return true;
+    }
+
+    fn convert_to_group(x: &G::BaseType, y: &G::BaseType) -> Result<G> {
+        P::convert_to_group(x, y)
+    }
+
+    fn convert_from_group(p: &G) -> Result<(G::BaseType, G::BaseType)> {
+        P::convert_from_group(p)
     }
 }
 

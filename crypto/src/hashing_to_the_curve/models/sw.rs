@@ -27,6 +27,12 @@ pub trait SWParameters<G: CurveGroup> {
     const C: G::BaseType;
     /// A quadratic nonresidue.
     const QNR: G::BaseType;
+
+    /// Convert to the default group element.
+    fn convert_to_group(x: &G::BaseType, y: &G::BaseType) -> Result<G>;
+
+    /// Convert from the default group element.
+    fn convert_from_group(p: &G) -> Result<(G::BaseType, G::BaseType)>;
 }
 
 /// The Shallue-van de Woestijne map
@@ -390,6 +396,14 @@ impl<G: CurveGroup, P: SWParameters<G>> HashingToCurve<G> for SWMap<G, P> {
         }
 
         return true;
+    }
+
+    fn convert_to_group(x: &G::BaseType, y: &G::BaseType) -> Result<G> {
+        P::convert_to_group(x, y)
+    }
+
+    fn convert_from_group(p: &G) -> Result<(G::BaseType, G::BaseType)> {
+        P::convert_from_group(p)
     }
 }
 

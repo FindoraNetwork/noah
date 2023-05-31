@@ -28,6 +28,20 @@ impl SSWUParameters<Ed25519Point> for Ed25519SSWUParameters {
     fn get_isogeny_denominator_term<'a>(_: usize) -> &'a Ed25519Fq {
         unimplemented!()
     }
+
+    fn convert_to_group(x: &Ed25519Fq, y: &Ed25519Fq) -> crate::errors::Result<Ed25519Point> {
+        // from a special short Weierstrass curve: y^2 = x^3 + 6 x^2 + B
+        // to the twisted Edwards curve: -x^2 + y^2 = 1 - (121665/121666) * x^2 * y^2
+
+        // first, rescale x and y to the right short Weierstrass curve
+
+
+        todo!()
+    }
+
+    fn convert_from_group(p: &Ed25519Point) -> crate::errors::Result<(Ed25519Fq, Ed25519Fq)> {
+        todo!()
+    }
 }
 
 #[cfg(test)]
