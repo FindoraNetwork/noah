@@ -108,6 +108,11 @@ pub trait Scalar:
         }
         result
     }
+
+    /// Convert into BigUint, often for debug.
+    fn into_biguint(self) -> BigUint {
+        self.into()
+    }
 }
 
 /// The trait for domain.
@@ -233,6 +238,9 @@ pub trait CurveGroup: Group {
 
     /// Get the y-coordinate.
     fn get_y(&self) -> Self::BaseType;
+
+    /// Construct from x and y coordinates.
+    fn new(x: &Self::BaseType, y: &Self::BaseType) -> Self;
 
     /// Get the base point divided by the cofactor.
     fn get_point_div_by_cofactor() -> Self;

@@ -189,20 +189,24 @@ impl Neg for JubjubPoint {
 impl CurveGroup for JubjubPoint {
     type BaseType = BLSScalar;
 
-    /// Get the x-coordinate of the Jubjub affine point.
     #[inline]
     fn get_x(&self) -> Self::BaseType {
         let affine_point = AffinePoint::from(self.0);
         BLSScalar(affine_point.x)
     }
 
-    /// Get the y-coordinate of the Jubjub affine point.
     #[inline]
     fn get_y(&self) -> Self::BaseType {
         let affine_point = AffinePoint::from(self.0);
         BLSScalar(affine_point.y)
     }
 
+    #[inline]
+    fn new(x: &Self::BaseType, y: &Self::BaseType) -> Self {
+        Self(EdwardsProjective::from(AffinePoint::new(x.0, y.0)))
+    }
+
+    #[inline]
     fn get_point_div_by_cofactor() -> Self {
         // This is a point that is the base point divided by the cofactor,
         // but, however, still in the subgroup.
@@ -219,6 +223,7 @@ impl CurveGroup for JubjubPoint {
         Self(EdwardsProjective::from(AffinePoint::new(x.0, y.0)))
     }
 
+    #[inline]
     fn multiply_by_cofactor(&self) -> Self {
         self.double().double().double()
     }

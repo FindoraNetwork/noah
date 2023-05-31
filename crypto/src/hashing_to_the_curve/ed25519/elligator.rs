@@ -1,13 +1,14 @@
+use crate::errors::Result;
 use crate::hashing_to_the_curve::models::elligator::ElligatorParameters;
 use noah_algebra::ed25519::Ed25519Point;
 use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq};
-use crate::errors::Result;
 
 /// Elligator map for Ed25519
 pub struct Ed25519ElligatorParameters;
 
-const Y_SCALE_FACTOR: Ed25519Fq =
-    new_ed25519_fq!("51042569399160536130206135233146329284152202253034631822681833788666877215207");
+const Y_SCALE_FACTOR: Ed25519Fq = new_ed25519_fq!(
+    "51042569399160536130206135233146329284152202253034631822681833788666877215207"
+);
 
 impl ElligatorParameters<Ed25519Point> for Ed25519ElligatorParameters {
     const A: Ed25519Fq = new_ed25519_fq!("486662");

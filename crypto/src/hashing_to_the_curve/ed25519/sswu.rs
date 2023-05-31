@@ -35,7 +35,6 @@ impl SSWUParameters<Ed25519Point> for Ed25519SSWUParameters {
 
         // first, rescale x and y to the right short Weierstrass curve
 
-
         todo!()
     }
 

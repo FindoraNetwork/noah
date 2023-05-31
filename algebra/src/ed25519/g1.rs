@@ -216,6 +216,11 @@ impl CurveGroup for Ed25519Point {
     }
 
     #[inline]
+    fn new(x: &Self::BaseType, y: &Self::BaseType) -> Self {
+        Self(EdwardsProjective::from(EdwardsAffine::new(x.0, y.0)))
+    }
+
+    #[inline]
     fn get_point_div_by_cofactor() -> Self {
         let x: Ed25519Fq = new_ed25519_fq!(
             "35604061283131262236237912080593388040538131583714990752973521819155773715252"

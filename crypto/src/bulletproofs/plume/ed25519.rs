@@ -1,26 +1,24 @@
+use crate::bulletproofs::plume::Plume;
+use crate::errors::Result;
+use crate::hashing_to_the_curve::ed25519::elligator::Ed25519ElligatorParameters;
+use crate::hashing_to_the_curve::models::elligator::{Elligator, ElligatorParameters};
 use noah_algebra::ed25519::{Ed25519Fq, Ed25519Point, Ed25519Scalar};
 use noah_algebra::new_ed25519_fq;
 use noah_algebra::prelude::*;
 use noah_algebra::zorro::ZorroScalar;
-use crate::errors::Result;
-use crate::bulletproofs::plume::Plume;
-use crate::hashing_to_the_curve::ed25519::elligator::Ed25519ElligatorParameters;
-use crate::hashing_to_the_curve::models::elligator::{Elligator, ElligatorParameters};
 
 pub struct PlumeEd25519;
 
 impl Plume<Ed25519Point> for PlumeEd25519 {
-    const GENERATOR_G: (Ed25519Fq, Ed25519Fq) =
-        (
-            new_ed25519_fq!("9"),
-            new_ed25519_fq!("14781619447589544791020593568409986887264606134616475288964881837755586237401")
-        );
-    const GENERATOR_H: (Ed25519Fq, Ed25519Fq) =
-        (new_ed25519_fq!("1"), new_ed25519_fq!("1"));
+    const GENERATOR_G: (Ed25519Fq, Ed25519Fq) = (
+        new_ed25519_fq!("9"),
+        new_ed25519_fq!(
+            "14781619447589544791020593568409986887264606134616475288964881837755586237401"
+        ),
+    );
+    const GENERATOR_H: (Ed25519Fq, Ed25519Fq) = (new_ed25519_fq!("1"), new_ed25519_fq!("1"));
 
     fn convert_to_the_curve(p: &Ed25519Point) -> Result<(Ed25519Fq, Ed25519Fq)> {
-
-
         let edwards_x = p.get_x();
         let edwards_y = p.get_y();
 
@@ -44,18 +42,18 @@ impl Plume<Ed25519Point> for PlumeEd25519 {
 
 #[cfg(test)]
 mod test {
-    use digest::Digest;
-    use num_bigint::BigUint;
-    use rand_chacha::ChaChaRng;
-    use sha3::Sha3_512;
-    use noah_algebra::ed25519::{Ed25519Fq, Ed25519Point};
-    use noah_algebra::prelude::*;
     use crate::anemoi_jive::{AnemoiJive, AnemoiJive381};
     use crate::bulletproofs::plume::ed25519::PlumeEd25519;
     use crate::bulletproofs::plume::Plume;
     use crate::hashing_to_the_curve::ed25519::elligator::Ed25519ElligatorParameters;
     use crate::hashing_to_the_curve::models::elligator::Elligator;
     use crate::hashing_to_the_curve::traits::HashingToCurve;
+    use digest::Digest;
+    use noah_algebra::ed25519::{Ed25519Fq, Ed25519Point};
+    use noah_algebra::prelude::*;
+    use num_bigint::BigUint;
+    use rand_chacha::ChaChaRng;
+    use sha3::Sha3_512;
 
     #[test]
     fn generator_g_correctness() {
@@ -77,8 +75,9 @@ mod test {
         let hash_for_map = Ed25519Fq::rand(&mut prng);
 
         let p =
-            Elligator::<Ed25519Point, Ed25519ElligatorParameters>::get_cofactor_uncleared_point(&hash_for_map).unwrap();
-
-
+            Elligator::<Ed25519Point, Ed25519ElligatorParameters>::get_cofactor_uncleared_point(
+                &hash_for_map,
+            )
+            .unwrap();
     }
 }
