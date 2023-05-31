@@ -64,7 +64,7 @@ pub(crate) type TurboPlonkCS = TurboCS<BLSScalar>;
 use crate::parameters::params::AddressFormat;
 
 /// The Plonk proof type.
-pub(crate) type AXfrPlonkPf = PlonkPf<KZGCommitmentSchemeBLS>;
+pub type AXfrPlonkPf = PlonkPf<KZGCommitmentSchemeBLS>;
 
 /// The address folding instance.
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]

@@ -328,7 +328,7 @@ pub struct PayeeWitness {
 
 /// Information directed to secret key holder of a BlindAssetRecord
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct AxfrOwnerMemo(Vec<u8>);
+pub struct AxfrOwnerMemo(pub Vec<u8>);
 
 impl AxfrOwnerMemo {
     /// Crate an encrypted memo using the public key.
