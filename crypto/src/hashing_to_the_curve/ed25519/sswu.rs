@@ -34,6 +34,17 @@ impl SSWUParameters<Ed25519Point> for Ed25519SSWUParameters {
         // to the twisted Edwards curve: -x^2 + y^2 = 1 - (121665/121666) * x^2 * y^2
 
         // first, rescale x and y to the right short Weierstrass curve
+        const SW_X_RESCALE: Ed25519Fq = new_ed25519_fq!("3588469012313698530330944230071891185932753502600616350412800610627019690467");
+        const SW_Y_RESCALE: Ed25519Fq = new_ed25519_fq!("19664379987077386454535042711455997342735372489368666653119195093328899270820");
+
+        let x = SW_X_RESCALE * x;
+        let y = SW_Y_RESCALE * y;
+
+        // move it to the Montgomery curve
+
+        const SW_TO_MONT_X_ADJ: Ed25519Fq = new_ed25519_fq!("38597363079105398474523661669562635951089994888546854679819194669304376384412");
+
+
 
         todo!()
     }
