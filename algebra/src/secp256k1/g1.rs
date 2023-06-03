@@ -203,6 +203,11 @@ impl CurveGroup for SECP256K1G1 {
     }
 
     #[inline]
+    fn new(x: &Self::BaseType, y: &Self::BaseType) -> Self {
+        Self(Projective::from(Affine::new(x.0, y.0)))
+    }
+
+    #[inline]
     fn get_point_div_by_cofactor() -> Self {
         Self::get_base()
     }

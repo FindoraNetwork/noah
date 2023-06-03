@@ -1,4 +1,6 @@
+use crate::errors::Result;
 use crate::hashing_to_the_curve::models::sw::SWParameters;
+use noah_algebra::prelude::*;
 use noah_algebra::secp256k1::SECP256K1G1;
 use noah_algebra::{new_secp256k1_fq, secp256k1::SECP256K1Fq};
 
@@ -27,6 +29,14 @@ impl SWParameters<SECP256K1G1> for Secp256k1SWParameters {
     const B: SECP256K1Fq = new_secp256k1_fq!("0");
     const C: SECP256K1Fq = new_secp256k1_fq!("7");
     const QNR: SECP256K1Fq = new_secp256k1_fq!("-1");
+
+    fn convert_to_group(x: &SECP256K1Fq, y: &SECP256K1Fq) -> Result<SECP256K1G1> {
+        Ok(SECP256K1G1::new(x, y))
+    }
+
+    fn convert_from_group(p: &SECP256K1G1) -> Result<(SECP256K1Fq, SECP256K1Fq)> {
+        Ok((p.get_x(), p.get_y()))
+    }
 }
 
 #[cfg(test)]
@@ -35,7 +45,7 @@ mod tests {
     use crate::hashing_to_the_curve::secp256k1::sw::Secp256k1SWParameters;
     use crate::hashing_to_the_curve::traits::HashingToCurve;
     use noah_algebra::new_secp256k1_fq;
-    use noah_algebra::prelude::{test_rng, Scalar};
+    use noah_algebra::prelude::*;
     use noah_algebra::secp256k1::{SECP256K1Fq, SECP256K1G1};
 
     type M = SWMap<SECP256K1G1, Secp256k1SWParameters>;
@@ -107,6 +117,18 @@ mod tests {
             assert_eq!(final_x, final_x2);
             assert!(M::verify_trace(&t, &final_x, &trace));
             assert!(M::is_x_on_curve(&final_x));
+        }
+    }
+
+    #[test]
+    fn test_group_conversion() {
+        for _ in 0..100 {
+            let mut rng = test_rng();
+            let p = SECP256K1G1::random(&mut rng);
+
+            let p_conv = M::convert_from_group(&p).unwrap();
+            let p_rec = M::convert_to_group(&p_conv.0, &p_conv.1).unwrap();
+            assert_eq!(p, p_rec);
         }
     }
 }

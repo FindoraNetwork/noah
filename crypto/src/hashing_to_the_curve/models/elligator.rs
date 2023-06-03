@@ -13,6 +13,12 @@ pub trait ElligatorParameters<G: CurveGroup> {
 
     /// A quadratic nonresidue.
     const QNR: G::BaseType;
+
+    /// Convert to the default group element.
+    fn convert_to_group(x: &G::BaseType, y: &G::BaseType) -> Result<G>;
+
+    /// Convert from the default group element.
+    fn convert_from_group(p: &G) -> Result<(G::BaseType, G::BaseType)>;
 }
 
 /// The elligator.
@@ -202,6 +208,14 @@ impl<G: CurveGroup, P: ElligatorParameters<G>> HashingToCurve<G> for Elligator<G
         }
 
         return true;
+    }
+
+    fn convert_to_group(x: &G::BaseType, y: &G::BaseType) -> Result<G> {
+        P::convert_to_group(x, y)
+    }
+
+    fn convert_from_group(p: &G) -> Result<(G::BaseType, G::BaseType)> {
+        P::convert_from_group(p)
     }
 }
 

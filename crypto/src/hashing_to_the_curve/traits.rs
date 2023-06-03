@@ -23,4 +23,10 @@ pub trait HashingToCurve<G: CurveGroup> {
 
     /// verify the trace.
     fn verify_trace(t: &G::BaseType, final_x: &G::BaseType, trace: &Self::Trace) -> bool;
+
+    /// convert to the default group element.
+    fn convert_to_group(x: &G::BaseType, y: &G::BaseType) -> Result<G>;
+
+    /// convert from  the default group element.
+    fn convert_from_group(p: &G) -> Result<(G::BaseType, G::BaseType)>;
 }
