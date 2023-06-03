@@ -1,3 +1,6 @@
+use crate::errors::Result;
+use crate::hashing_to_the_curve::ed25519::elligator::Ed25519ElligatorParameters;
+use crate::hashing_to_the_curve::models::elligator::ElligatorParameters;
 use crate::hashing_to_the_curve::models::sw::SWParameters;
 use noah_algebra::ed25519::Ed25519Point;
 use noah_algebra::{ed25519::Ed25519Fq, new_ed25519_fq};
@@ -25,6 +28,14 @@ impl SWParameters<Ed25519Point> for Ed25519SWParameters {
     const B: Ed25519Fq = new_ed25519_fq!("1");
     const C: Ed25519Fq = new_ed25519_fq!("0");
     const QNR: Ed25519Fq = new_ed25519_fq!("2");
+
+    fn convert_to_group(x: &Ed25519Fq, y: &Ed25519Fq) -> Result<Ed25519Point> {
+        Ed25519ElligatorParameters::convert_to_group(x, y)
+    }
+
+    fn convert_from_group(p: &Ed25519Point) -> Result<(Ed25519Fq, Ed25519Fq)> {
+        Ed25519ElligatorParameters::convert_from_group(p)
+    }
 }
 
 #[cfg(test)]
@@ -34,7 +45,7 @@ mod tests {
     use crate::hashing_to_the_curve::traits::HashingToCurve;
     use noah_algebra::ed25519::{Ed25519Fq, Ed25519Point};
     use noah_algebra::new_ed25519_fq;
-    use noah_algebra::prelude::{test_rng, Scalar};
+    use noah_algebra::prelude::*;
 
     type M = SWMap<Ed25519Point, Ed25519SWParameters>;
 
@@ -105,6 +116,18 @@ mod tests {
             assert_eq!(final_x, final_x2);
             assert!(M::verify_trace(&t, &final_x, &trace));
             assert!(M::is_x_on_curve(&final_x));
+        }
+    }
+
+    #[test]
+    fn test_group_conversion() {
+        for _ in 0..100 {
+            let mut rng = test_rng();
+            let p = Ed25519Point::random(&mut rng);
+
+            let p_conv = M::convert_from_group(&p).unwrap();
+            let p_rec = M::convert_to_group(&p_conv.0, &p_conv.1).unwrap();
+            assert_eq!(p, p_rec);
         }
     }
 }

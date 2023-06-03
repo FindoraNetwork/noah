@@ -217,7 +217,7 @@ impl CurveGroup for Ed25519Point {
 
     #[inline]
     fn new(x: &Self::BaseType, y: &Self::BaseType) -> Self {
-        Self(EdwardsProjective::from(EdwardsAffine::new(x.0, y.0)))
+        Self(EdwardsProjective::from(EdwardsAffine::new_unchecked(x.0, y.0)))
     }
 
     #[inline]

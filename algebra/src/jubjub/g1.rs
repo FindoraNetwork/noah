@@ -203,7 +203,7 @@ impl CurveGroup for JubjubPoint {
 
     #[inline]
     fn new(x: &Self::BaseType, y: &Self::BaseType) -> Self {
-        Self(EdwardsProjective::from(AffinePoint::new(x.0, y.0)))
+        Self(EdwardsProjective::from(AffinePoint::new_unchecked(x.0, y.0)))
     }
 
     #[inline]
