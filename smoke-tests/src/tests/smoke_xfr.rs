@@ -1,7 +1,9 @@
 #[cfg(test)]
 mod smoke_xfr {
-    use noah::parameters::bulletproofs::BulletproofParams;
-    use noah::parameters::AddressFormat::SECP256K1;
+    use noah::parameters::{
+        bulletproofs::BulletproofParams,
+        AddressFormat::{ED25519, SECP256K1},
+    };
     use noah::{
         keys::{KeyPair, PublicKey},
         xfr::{
@@ -136,6 +138,105 @@ mod smoke_xfr {
         assert_eq!(recv_oar.asset_type, ASSET1_TYPE);
         assert_eq!(recv_oar.amount, AMOUNT);
         assert_eq!(recv_oar.blind_asset_record.public_key, receiver.get_pk());
+    }
+
+    #[test]
+    fn owner_memo_length_test() {
+        let mut prng = test_rng();
+
+        let amount_in1 = 100u64;
+        let amount_out1 = 20u64;
+        let amount_out2 = 20u64;
+        let amount_out3 = 20u64;
+        let amount_out4 = 13u64;
+        let amount_out5 = 13u64;
+        let amount_out6 = 14u64;
+
+        let sender1 = KeyPair::sample(&mut prng, SECP256K1);
+        let receiver1 = KeyPair::sample(&mut prng, SECP256K1);
+        let receiver2 = KeyPair::sample(&mut prng, SECP256K1);
+        let receiver3 = KeyPair::sample(&mut prng, SECP256K1);
+        let receiver4 = KeyPair::sample(&mut prng, ED25519);
+        let receiver5 = KeyPair::sample(&mut prng, ED25519);
+        let receiver6 = KeyPair::sample(&mut prng, ED25519);
+
+        // fake and build blind_asset_record
+        let (bar_in1, memo1) =
+            conf_blind_asset_record_from_ledger(&sender1.get_pk(), amount_in1, ASSET1_TYPE);
+
+        let oar_in1 = open_blind_asset_record(&bar_in1, &Some(memo1), &sender1).unwrap();
+
+        let ar_in1 = AssetRecord::from_open_asset_record_no_asset_tracing(oar_in1);
+
+        // prepare output AssetRecord
+        let temp1 = AssetRecordTemplate::with_no_asset_tracing(
+            amount_out1,
+            ASSET1_TYPE,
+            AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
+            receiver1.get_pk(),
+        );
+        let temp2 = AssetRecordTemplate::with_no_asset_tracing(
+            amount_out2,
+            ASSET1_TYPE,
+            AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
+            receiver2.get_pk(),
+        );
+        let temp3 = AssetRecordTemplate::with_no_asset_tracing(
+            amount_out3,
+            ASSET1_TYPE,
+            AssetRecordType::NonConfidentialAmount_ConfidentialAssetType,
+            receiver3.get_pk(),
+        );
+        let temp4 = AssetRecordTemplate::with_no_asset_tracing(
+            amount_out4,
+            ASSET1_TYPE,
+            AssetRecordType::ConfidentialAmount_ConfidentialAssetType,
+            receiver4.get_pk(),
+        );
+        let temp5 = AssetRecordTemplate::with_no_asset_tracing(
+            amount_out5,
+            ASSET1_TYPE,
+            AssetRecordType::ConfidentialAmount_NonConfidentialAssetType,
+            receiver5.get_pk(),
+        );
+        let temp6 = AssetRecordTemplate::with_no_asset_tracing(
+            amount_out6,
+            ASSET1_TYPE,
+            AssetRecordType::NonConfidentialAmount_ConfidentialAssetType,
+            receiver6.get_pk(),
+        );
+
+        let ar_out1 = AssetRecord::from_template_no_identity_tracing(&mut prng, &temp1).unwrap();
+        let ar_out2 = AssetRecord::from_template_no_identity_tracing(&mut prng, &temp2).unwrap();
+        let ar_out3 = AssetRecord::from_template_no_identity_tracing(&mut prng, &temp3).unwrap();
+        let ar_out4 = AssetRecord::from_template_no_identity_tracing(&mut prng, &temp4).unwrap();
+        let ar_out5 = AssetRecord::from_template_no_identity_tracing(&mut prng, &temp5).unwrap();
+        let ar_out6 = AssetRecord::from_template_no_identity_tracing(&mut prng, &temp6).unwrap();
+
+        // create xfr_note
+        let xfr_note = gen_xfr_note(
+            &mut prng,
+            &[ar_in1],
+            &[ar_out1, ar_out2, ar_out3, ar_out4, ar_out5, ar_out6],
+            &[&sender1],
+        )
+        .unwrap();
+
+        let om = xfr_note.body.owners_memos;
+
+        assert_eq!(om[0].as_ref().unwrap().blind_share_bytes.len(), 33);
+        assert_eq!(om[1].as_ref().unwrap().blind_share_bytes.len(), 33);
+        assert_eq!(om[2].as_ref().unwrap().blind_share_bytes.len(), 33);
+        assert_eq!(om[3].as_ref().unwrap().blind_share_bytes.len(), 32);
+        assert_eq!(om[4].as_ref().unwrap().blind_share_bytes.len(), 32);
+        assert_eq!(om[5].as_ref().unwrap().blind_share_bytes.len(), 32);
+
+        assert_eq!(om[0].as_ref().unwrap().lock_bytes.len(), 89);
+        assert_eq!(om[1].as_ref().unwrap().lock_bytes.len(), 57);
+        assert_eq!(om[2].as_ref().unwrap().lock_bytes.len(), 81);
+        assert_eq!(om[3].as_ref().unwrap().lock_bytes.len(), 72);
+        assert_eq!(om[4].as_ref().unwrap().lock_bytes.len(), 40);
+        assert_eq!(om[5].as_ref().unwrap().lock_bytes.len(), 64);
     }
 
     #[test]
