@@ -46,6 +46,30 @@ use self::{
 
 const POW_2_32: u64 = 0xFFFF_FFFFu64 + 1;
 
+/// The size of the owner memo's blind share point and lock bytes for SECP256K1,
+/// where the amount and the type are hidden.
+pub const OWNER_MEMO_SECP256K1_HIDE_AMOUNT_AND_TYPE: usize = 33 + 89;
+
+/// The size of the owner memo's blind share point and lock bytes for SECP256K1,
+/// where the amount is hidden.
+pub const OWNER_MEMO_SECP256K1_HIDE_AMOUNT: usize = 33 + 57;
+
+/// The size of the owner memo's blind share point and lock bytes for SECP256K1,
+/// where the type is hidden.
+pub const OWNER_MEMO_SECP256K1_HIDE_TYPE: usize = 33 + 81;
+
+/// The size of the owner memo's blind share point and lock bytes for ED25519,
+/// where the amount and the type are hidden.
+pub const OWNER_MEMO_ED25519_HIDE_AMOUNT_AND_TYPE: usize = 32 + 72;
+
+/// The size of the owner memo's blind share point and lock bytes for ED25519,
+/// where the amount is hidden.
+pub const OWNER_MEMO_ED25519_HIDE_AMOUNT: usize = 32 + 40;
+
+/// The size of the owner memo's blind share point and lock bytes for ED25519,
+/// where the type is hidden.
+pub const OWNER_MEMO_ED25519_HIDE_TYPE: usize = 32 + 64;
+
 #[derive(Clone, Copy, Debug)]
 #[allow(non_camel_case_types)]
 #[allow(clippy::enum_variant_names)]
@@ -322,7 +346,7 @@ pub fn gen_xfr_body<R: CryptoRng + RngCore>(
         .collect_vec();
     let owner_memos = outputs
         .iter()
-        .map(|record_input| record_input.owner_memo.clone())
+        .map(|record_output| record_output.owner_memo.clone())
         .collect_vec();
     Ok(XfrBody {
         inputs: xfr_inputs,
