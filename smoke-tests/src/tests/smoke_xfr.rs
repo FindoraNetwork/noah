@@ -4,6 +4,11 @@ mod smoke_xfr {
         bulletproofs::BulletproofParams,
         AddressFormat::{ED25519, SECP256K1},
     };
+    use noah::xfr::{
+        OWNER_MEMO_ED25519_HIDE_AMOUNT, OWNER_MEMO_ED25519_HIDE_AMOUNT_AND_TYPE,
+        OWNER_MEMO_ED25519_HIDE_TYPE, OWNER_MEMO_SECP256K1_HIDE_AMOUNT,
+        OWNER_MEMO_SECP256K1_HIDE_AMOUNT_AND_TYPE, OWNER_MEMO_SECP256K1_HIDE_TYPE,
+    };
     use noah::{
         keys::{KeyPair, PublicKey},
         xfr::{
@@ -224,19 +229,41 @@ mod smoke_xfr {
 
         let om = xfr_note.body.owners_memos;
 
-        assert_eq!(om[0].as_ref().unwrap().blind_share_bytes.len(), 33);
-        assert_eq!(om[1].as_ref().unwrap().blind_share_bytes.len(), 33);
-        assert_eq!(om[2].as_ref().unwrap().blind_share_bytes.len(), 33);
-        assert_eq!(om[3].as_ref().unwrap().blind_share_bytes.len(), 32);
-        assert_eq!(om[4].as_ref().unwrap().blind_share_bytes.len(), 32);
-        assert_eq!(om[5].as_ref().unwrap().blind_share_bytes.len(), 32);
+        let memo = om[0].as_ref().unwrap();
+        assert_eq!(
+            memo.blind_share_bytes.len() + memo.lock_bytes.len(),
+            OWNER_MEMO_SECP256K1_HIDE_AMOUNT_AND_TYPE
+        );
 
-        assert_eq!(om[0].as_ref().unwrap().lock_bytes.len(), 89);
-        assert_eq!(om[1].as_ref().unwrap().lock_bytes.len(), 57);
-        assert_eq!(om[2].as_ref().unwrap().lock_bytes.len(), 81);
-        assert_eq!(om[3].as_ref().unwrap().lock_bytes.len(), 72);
-        assert_eq!(om[4].as_ref().unwrap().lock_bytes.len(), 40);
-        assert_eq!(om[5].as_ref().unwrap().lock_bytes.len(), 64);
+        let memo = om[1].as_ref().unwrap();
+        assert_eq!(
+            memo.blind_share_bytes.len() + memo.lock_bytes.len(),
+            OWNER_MEMO_SECP256K1_HIDE_AMOUNT
+        );
+
+        let memo = om[2].as_ref().unwrap();
+        assert_eq!(
+            memo.blind_share_bytes.len() + memo.lock_bytes.len(),
+            OWNER_MEMO_SECP256K1_HIDE_TYPE
+        );
+
+        let memo = om[3].as_ref().unwrap();
+        assert_eq!(
+            memo.blind_share_bytes.len() + memo.lock_bytes.len(),
+            OWNER_MEMO_ED25519_HIDE_AMOUNT_AND_TYPE
+        );
+
+        let memo = om[4].as_ref().unwrap();
+        assert_eq!(
+            memo.blind_share_bytes.len() + memo.lock_bytes.len(),
+            OWNER_MEMO_ED25519_HIDE_AMOUNT
+        );
+
+        let memo = om[5].as_ref().unwrap();
+        assert_eq!(
+            memo.blind_share_bytes.len() + memo.lock_bytes.len(),
+            OWNER_MEMO_ED25519_HIDE_TYPE
+        );
     }
 
     #[test]
