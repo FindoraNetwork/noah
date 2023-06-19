@@ -7,15 +7,20 @@ use noah_algebra::marker::PhantomData;
 use noah_algebra::prelude::*;
 use rand_chacha::ChaChaRng;
 
+/// The standard implementation of GDH undeniable signature.
 pub struct StandardGDH<G: CurveGroup, H: HashingToCurve<G>> {
     g_phantom: PhantomData<G>,
     h_phantom: PhantomData<H>,
 }
 
+/// The struct for a proof in the standard implementation.
 #[derive(Default, Clone)]
 pub struct StandardGDHProof<G: CurveGroup> {
+    /// Point R1.
     pub point_r_1: G,
+    /// Point R2.
     pub point_r_2: G,
+    /// Response.
     pub response: G::ScalarType,
 }
 

@@ -8,9 +8,12 @@ pub mod hoisting;
 /// The implementation for the standard version of the GDH undeniable signature.
 pub mod standard;
 
+/// A trait for gap Diffie-Hellman undeniable signature.
 pub trait GapDHSignature<G: CurveGroup, H: HashingToCurve<G>> {
+    /// The struct of the proof.
     type Proof: Default + Clone;
 
+    /// Generate the keys.
     fn keygen<R: CryptoRng + RngCore>(prng: &mut R) -> (G::ScalarType, G) {
         let sk = G::ScalarType::random(prng);
         let pk = G::get_base().mul(&sk);
@@ -18,6 +21,7 @@ pub trait GapDHSignature<G: CurveGroup, H: HashingToCurve<G>> {
         (sk, pk)
     }
 
+    /// Map the message into a point.
     fn map(m: &G::BaseType) -> Result<G> {
         let (x, y) = H::get_cofactor_uncleared_point(m)?;
         let p = H::convert_to_group(&x, &y)?;
@@ -25,7 +29,10 @@ pub trait GapDHSignature<G: CurveGroup, H: HashingToCurve<G>> {
         Ok(p.multiply_by_cofactor())
     }
 
+    /// Create the undeniable signature.
     fn sign(sk: &G::ScalarType, m: &G) -> G;
+
+    /// Compute the proof that confirms the undeniable signature.
     fn confirm<R: CryptoRng + RngCore>(
         prng: &mut R,
         transcript: &mut Transcript,
@@ -33,6 +40,8 @@ pub trait GapDHSignature<G: CurveGroup, H: HashingToCurve<G>> {
         m: &G,
         sigma: &G,
     ) -> Self::Proof;
+
+    /// Verify a undeniable signature with the proof.
     fn verify(
         transcript: &mut Transcript,
         pk: &G,
