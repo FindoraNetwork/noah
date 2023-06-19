@@ -44,6 +44,8 @@ pub mod elgamal;
 pub mod errors;
 /// The module for field simulation.
 pub mod field_simulation;
+/// The module for the (modified) gap Diffie-Hellman undeniable signature.
+pub mod gapdh;
 /// The module for hashing to the curve.
 pub mod hashing_to_the_curve;
 /// The module for hybrid encryption.
