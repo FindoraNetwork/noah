@@ -146,7 +146,7 @@ tag = 'v1.1.5'
 
 [dev-dependencies.mem_db]
 git = 'https://github.com/FindoraNetwork/storage.git'
-tag = 'v1.1.5'
+tag = 'v1.1.6'
 
 [features]
 default = [
