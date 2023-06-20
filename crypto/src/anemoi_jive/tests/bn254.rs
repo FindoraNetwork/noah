@@ -1,7 +1,7 @@
+use crate::anemoi_jive::{AnemoiJive, AnemoiJive254, ApplicableMDSMatrix, MDSMatrix};
 use noah_algebra::bn254::BN254Scalar;
 use noah_algebra::new_bn254_fr;
 use noah_algebra::prelude::*;
-use crate::anemoi_jive::{AnemoiJive, AnemoiJive254, ApplicableMDSMatrix, MDSMatrix};
 
 #[test]
 fn test_jive() {
@@ -283,7 +283,6 @@ fn test_anemoi_variable_length_hash_flatten() {
 
     assert_eq!(trace.output, x[0]);
 }
-
 
 #[test]
 fn test_eval_stream_cipher() {
