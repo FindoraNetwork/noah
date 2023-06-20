@@ -2,6 +2,8 @@ use noah_algebra::prelude::*;
 
 /// The module for the AnemoiJive381 data structure.
 mod bls12_381;
+/// The module for the AnemoiJive254 data structure.
+mod bn254;
 /// The module for the MDS matrices.
 mod mds;
 /// The module for the salts used for Merkle tree.
@@ -13,6 +15,7 @@ mod tests;
 mod traces;
 
 pub use bls12_381::AnemoiJive381;
+pub use bn254::AnemoiJive254;
 pub use mds::{ApplicableMDSMatrix, MDSMatrix};
 pub use salts::ANEMOI_JIVE_381_SALTS;
 pub use traces::{AnemoiStreamCipherTrace, AnemoiVLHTrace, JiveTrace};

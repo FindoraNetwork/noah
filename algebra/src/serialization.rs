@@ -1,5 +1,6 @@
 use crate::{
     bls12_381::{BLSFq, BLSGt, BLSScalar, BLSG1, BLSG2},
+    bn254::{BN254Fq, BN254Gt, BN254Scalar, BN254G1, BN254G2},
     ed25519::{Ed25519Point, Ed25519Scalar},
     jubjub::{JubjubPoint, JubjubScalar},
     prelude::*,
@@ -31,6 +32,8 @@ macro_rules! to_from_bytes_scalar {
 
 to_from_bytes_scalar!(BLSScalar);
 to_from_bytes_scalar!(BLSFq);
+to_from_bytes_scalar!(BN254Scalar);
+to_from_bytes_scalar!(BN254Fq);
 to_from_bytes_scalar!(JubjubScalar);
 to_from_bytes_scalar!(SECQ256K1Scalar);
 to_from_bytes_scalar!(SECP256K1Scalar);
@@ -67,6 +70,8 @@ impl NoahFromToBytes for CompressedEdwardsY {
 
 serialize_deserialize!(BLSScalar);
 serialize_deserialize!(BLSFq);
+serialize_deserialize!(BN254Scalar);
+serialize_deserialize!(BN254Fq);
 serialize_deserialize!(JubjubScalar);
 serialize_deserialize!(SECQ256K1Scalar);
 serialize_deserialize!(SECP256K1Scalar);
@@ -94,6 +99,9 @@ macro_rules! to_from_bytes_group {
 to_from_bytes_group!(BLSG1);
 to_from_bytes_group!(BLSG2);
 to_from_bytes_group!(BLSGt);
+to_from_bytes_group!(BN254G1);
+to_from_bytes_group!(BN254G2);
+to_from_bytes_group!(BN254Gt);
 to_from_bytes_group!(JubjubPoint);
 to_from_bytes_group!(SECQ256K1G1);
 to_from_bytes_group!(SECP256K1G1);
@@ -104,6 +112,9 @@ to_from_bytes_group!(Ed25519Point);
 serialize_deserialize!(BLSG1);
 serialize_deserialize!(BLSG2);
 serialize_deserialize!(BLSGt);
+serialize_deserialize!(BN254G1);
+serialize_deserialize!(BN254G2);
+serialize_deserialize!(BN254Gt);
 serialize_deserialize!(JubjubPoint);
 serialize_deserialize!(SECQ256K1G1);
 serialize_deserialize!(SECP256K1G1);
@@ -298,6 +309,9 @@ mod test {
         check_compressed_len::<BLSG1>();
         check_compressed_len::<BLSG2>();
         check_compressed_len::<BLSGt>();
+        check_compressed_len::<BN254G1>();
+        check_compressed_len::<BN254G2>();
+        check_compressed_len::<BN254Gt>();
         check_compressed_len::<JubjubPoint>();
         check_compressed_len::<SECQ256K1G1>();
         check_compressed_len::<SECP256K1G1>();
