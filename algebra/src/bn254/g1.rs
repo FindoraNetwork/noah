@@ -163,12 +163,12 @@ impl Neg for BN254G1 {
 }
 
 impl BN254G1 {
-    /// Get the x-coordinate of the Jubjub affine point.
+    /// Get the x-coordinate of the BN254 affine point.
     #[inline]
     pub fn get_x(&self) -> BN254Fq {
         BN254Fq(self.0.x)
     }
-    /// Get the y-coordinate of the Jubjub affine point.
+    /// Get the y-coordinate of the BN254 affine point.
     #[inline]
     pub fn get_y(&self) -> BN254Fq {
         BN254Fq(self.0.y)
