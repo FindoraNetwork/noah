@@ -27,7 +27,9 @@ use crate::parameters::{
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
 use noah_algebra::{bls12_381::BLSScalar, prelude::*};
-use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS};
+use noah_crypto::anemoi_jive::{
+    AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS_OLD,
+};
 use noah_plonk::plonk::{
     constraint_system::{TurboCS, VarIndex},
     prover::prover_with_lagrange,
@@ -607,7 +609,7 @@ impl AXfrPubInputs {
             &[node.left, node.mid],
             &[
                 node.right,
-                ANEMOI_JIVE_381_SALTS[payer.path.nodes.len() - 1],
+                ANEMOI_JIVE_381_SALTS_OLD[payer.path.nodes.len() - 1],
             ],
         );
 
@@ -729,7 +731,7 @@ pub(crate) fn build_multi_xfr_cs(
         for (i, mt_node) in payer_witness.path.nodes.iter().enumerate() {
             let trace = AnemoiJive381::eval_jive_with_trace(
                 &[mt_node.left, mt_node.mid],
-                &[mt_node.right, ANEMOI_JIVE_381_SALTS[i]],
+                &[mt_node.right, ANEMOI_JIVE_381_SALTS_OLD[i]],
             );
             path_traces.push(trace);
         }
@@ -1109,7 +1111,7 @@ mod tests {
     use merlin::Transcript;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*};
     use noah_crypto::anemoi_jive::{
-        AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS,
+        AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS_OLD,
     };
     use noah_plonk::plonk::constraint_system::{TurboCS, VarIndex};
     use sha2::Sha512;
@@ -1996,7 +1998,7 @@ mod tests {
 
         let trace1 = AnemoiJive381::eval_jive_with_trace(
             &[path_node2.left, path_node2.mid],
-            &[leaf, ANEMOI_JIVE_381_SALTS[0]],
+            &[leaf, ANEMOI_JIVE_381_SALTS_OLD[0]],
         );
 
         let path_node1 = MTNode {
@@ -2010,7 +2012,7 @@ mod tests {
 
         let trace2 = AnemoiJive381::eval_jive_with_trace(
             &[path_node1.left, path_node1.mid],
-            &[path_node1.right, ANEMOI_JIVE_381_SALTS[1]],
+            &[path_node1.right, ANEMOI_JIVE_381_SALTS_OLD[1]],
         );
         let root = trace2.output;
 

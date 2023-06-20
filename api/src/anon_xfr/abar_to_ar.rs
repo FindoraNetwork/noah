@@ -25,7 +25,9 @@ use crate::xfr::{
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
 use noah_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::PedersenCommitmentRistretto};
-use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS};
+use noah_crypto::anemoi_jive::{
+    AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS_OLD,
+};
 use noah_plonk::plonk::{
     constraint_system::{TurboCS, VarIndex},
     prover::prover_with_lagrange,
@@ -457,7 +459,7 @@ pub fn build_abar_to_ar_cs(
     for (i, mt_node) in payer_witness.path.nodes.iter().enumerate() {
         let trace = AnemoiJive381::eval_jive_with_trace(
             &[mt_node.left, mt_node.mid],
-            &[mt_node.right, ANEMOI_JIVE_381_SALTS[i]],
+            &[mt_node.right, ANEMOI_JIVE_381_SALTS_OLD[i]],
         );
         path_traces.push(trace);
     }

@@ -596,11 +596,11 @@ impl TurboCS<BLSScalar> {
 mod test {
     use crate::plonk::constraint_system::TurboCS;
     use noah_algebra::bls12_381::BLSScalar;
-    use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS};
+    use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS_OLD};
 
     #[test]
     fn test_jive_constraint_system() {
-        let salt = ANEMOI_JIVE_381_SALTS[10];
+        let salt = ANEMOI_JIVE_381_SALTS_OLD[10];
 
         let trace = AnemoiJive381::eval_jive_with_trace(
             &[BLSScalar::from(1u64), BLSScalar::from(2u64)],
@@ -689,7 +689,7 @@ mod kzg_test {
     use crate::poly_commit::pcs::PolyComScheme;
     use merlin::Transcript;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*};
-    use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS};
+    use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS_OLD};
 
     #[test]
     fn test_turbo_plonk_kzg_anemoi_jive() {
@@ -736,7 +736,7 @@ mod kzg_test {
         pcs: &PCS,
         prng: &mut R,
     ) {
-        let salt = ANEMOI_JIVE_381_SALTS[10];
+        let salt = ANEMOI_JIVE_381_SALTS_OLD[10];
 
         let trace = AnemoiJive381::eval_jive_with_trace(
             &[BLSScalar::from(1u64), BLSScalar::from(2u64)],

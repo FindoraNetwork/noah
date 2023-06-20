@@ -29,7 +29,9 @@ use noah_algebra::{
     ristretto::{PedersenCommitmentRistretto, RistrettoPoint, RistrettoScalar},
     traits::PedersenCommitment,
 };
-use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS};
+use noah_crypto::anemoi_jive::{
+    AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS_OLD,
+};
 use noah_crypto::{
     delegated_schnorr::{
         prove_delegated_schnorr, verify_delegated_schnorr, DelegatedSchnorrInspection,
@@ -671,7 +673,7 @@ pub fn build_abar_to_bar_cs(
     for (i, mt_node) in payer_witness.path.nodes.iter().enumerate() {
         let trace = AnemoiJive381::eval_jive_with_trace(
             &[mt_node.left, mt_node.mid],
-            &[mt_node.right, ANEMOI_JIVE_381_SALTS[i]],
+            &[mt_node.right, ANEMOI_JIVE_381_SALTS_OLD[i]],
         );
         path_traces.push(trace);
     }

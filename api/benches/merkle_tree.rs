@@ -8,7 +8,7 @@ use noah_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
 use noah_algebra::bls12_381::BLSScalar;
 use noah_algebra::prelude::*;
 use noah_crypto::anemoi_jive::{
-    AnemoiJive, AnemoiJive381, AnemoiVLHTrace, JiveTrace, ANEMOI_JIVE_381_SALTS,
+    AnemoiJive, AnemoiJive381, AnemoiVLHTrace, JiveTrace, ANEMOI_JIVE_381_SALTS_OLD,
 };
 use noah_plonk::plonk::constraint_system::{TurboCS, VarIndex};
 use noah_plonk::plonk::indexer::indexer;
@@ -56,7 +56,7 @@ fn merkle_tree_proof_bench(c: &mut Criterion) {
     for (i, mt_node) in proof.nodes.iter().enumerate() {
         let trace = AnemoiJive381::eval_jive_with_trace(
             &[mt_node.left, mt_node.mid],
-            &[mt_node.right, ANEMOI_JIVE_381_SALTS[i]],
+            &[mt_node.right, ANEMOI_JIVE_381_SALTS_OLD[i]],
         );
         path_traces.push(trace);
     }
@@ -151,7 +151,7 @@ pub fn compute_merkle_root_variables_2_20(
             path_node.is_left_child,
             path_node.is_right_child,
         );
-        node_var = cs.jive_crh(trace, &input_var, ANEMOI_JIVE_381_SALTS[idx]);
+        node_var = cs.jive_crh(trace, &input_var, ANEMOI_JIVE_381_SALTS_OLD[idx]);
     }
     node_var
 }

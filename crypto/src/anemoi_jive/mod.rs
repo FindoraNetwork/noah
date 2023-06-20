@@ -17,7 +17,7 @@ mod traces;
 pub use bls12_381::AnemoiJive381;
 pub use bn254::AnemoiJive254;
 pub use mds::{ApplicableMDSMatrix, MDSMatrix};
-pub use salts::ANEMOI_JIVE_381_SALTS;
+pub use salts::*;
 pub use traces::{AnemoiStreamCipherTrace, AnemoiVLHTrace, JiveTrace};
 
 /// The trait for the Anemoi-Jive parameters.
