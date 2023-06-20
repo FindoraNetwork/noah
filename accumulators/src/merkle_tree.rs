@@ -5,7 +5,7 @@ use noah_algebra::{
     collections::{hash_map::Iter, HashMap},
     prelude::*,
 };
-use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS};
+use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS_OLD};
 use storage::db::MerkleDB;
 use storage::store::{ImmutablePrefixedStore, PrefixedStore, Stated, Store};
 
