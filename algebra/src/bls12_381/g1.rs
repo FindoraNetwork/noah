@@ -308,12 +308,12 @@ impl Neg for BLSG1 {
 }
 
 impl BLSG1 {
-    /// Get the x-coordinate of the Jubjub affine point.
+    /// Get the x-coordinate of the BLS12-381 affine point.
     #[inline]
     pub fn get_x(&self) -> BLSFq {
         BLSFq(self.0.x)
     }
-    /// Get the y-coordinate of the Jubjub affine point.
+    /// Get the y-coordinate of the BLS12-381 affine point.
     #[inline]
     pub fn get_y(&self) -> BLSFq {
         BLSFq(self.0.y)
