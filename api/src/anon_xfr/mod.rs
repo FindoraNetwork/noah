@@ -496,7 +496,7 @@ pub fn compute_merkle_root_variables(
         node_var = cs.jive_crh(
             trace,
             &[path_node.left, path_node.mid, path_node.right],
-            ANEMOI_JIVE_381_SALTS[idx],
+            ANEMOI_JIVE_381_SALTS_OLD[idx],
         );
     }
     node_var

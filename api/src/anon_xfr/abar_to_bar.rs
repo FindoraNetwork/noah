@@ -671,7 +671,7 @@ pub fn build_abar_to_bar_cs(
     for (i, mt_node) in payer_witness.path.nodes.iter().enumerate() {
         let trace = AnemoiJive381::eval_jive_with_trace(
             &[mt_node.left, mt_node.mid],
-            &[mt_node.right, ANEMOI_JIVE_381_SALTS[i]],
+            &[mt_node.right, ANEMOI_JIVE_381_SALTS_OLD[i]],
         );
         path_traces.push(trace);
     }

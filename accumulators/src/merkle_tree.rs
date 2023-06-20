@@ -128,7 +128,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
             };
 
             let hash =
-                AnemoiJive381::eval_jive(&[left, mid], &[right, ANEMOI_JIVE_381_SALTS[index]]);
+                AnemoiJive381::eval_jive(&[left, mid], &[right, ANEMOI_JIVE_381_SALTS_OLD[index]]);
             cache.set(keys[index + 1].0, BLSScalar::noah_to_bytes(&hash));
         }
 
@@ -503,7 +503,7 @@ impl EphemeralMerkleTree {
             };
 
             let hash =
-                AnemoiJive381::eval_jive(&[left, mid], &[right, ANEMOI_JIVE_381_SALTS[index]]);
+                AnemoiJive381::eval_jive(&[left, mid], &[right, ANEMOI_JIVE_381_SALTS_OLD[index]]);
             cache.set(keys[index + 1].0, BLSScalar::noah_to_bytes(&hash));
         }
 
@@ -658,7 +658,7 @@ pub fn verify(leaf: BLSScalar, proof: &Proof) -> bool {
     for (i, node) in proof.nodes.iter().enumerate() {
         let hash = AnemoiJive381::eval_jive(
             &[node.left, node.mid],
-            &[node.right, ANEMOI_JIVE_381_SALTS[i]],
+            &[node.right, ANEMOI_JIVE_381_SALTS_OLD[i]],
         );
         next = hash
     }

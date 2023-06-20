@@ -600,7 +600,7 @@ mod test {
 
     #[test]
     fn test_jive_constraint_system() {
-        let salt = ANEMOI_JIVE_381_SALTS[10];
+        let salt = ANEMOI_JIVE_381_SALTS_OLD[10];
 
         let trace = AnemoiJive381::eval_jive_with_trace(
             &[BLSScalar::from(1u64), BLSScalar::from(2u64)],
@@ -736,7 +736,7 @@ mod kzg_test {
         pcs: &PCS,
         prng: &mut R,
     ) {
-        let salt = ANEMOI_JIVE_381_SALTS[10];
+        let salt = ANEMOI_JIVE_381_SALTS_OLD[10];
 
         let trace = AnemoiJive381::eval_jive_with_trace(
             &[BLSScalar::from(1u64), BLSScalar::from(2u64)],
