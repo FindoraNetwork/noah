@@ -6,7 +6,7 @@ use noah::anon_xfr::{
 };
 use noah_accumulators::merkle_tree::{PersistentMerkleTree, TreePath};
 use noah_algebra::{bls12_381::BLSScalar, prelude::*};
-use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS};
+use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS_OLD};
 use noah_plonk::plonk::constraint_system::TurboCS;
 use parking_lot::RwLock;
 use std::env::temp_dir;
