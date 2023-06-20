@@ -3,7 +3,6 @@ use crate::gapdh::GapDHSignature;
 use crate::hashing_to_the_curve::traits::HashingToCurve;
 use crate::matrix_sigma::SigmaTranscript;
 use merlin::Transcript;
-use noah_algebra::marker::PhantomData;
 use noah_algebra::prelude::*;
 use rand_chacha::ChaChaRng;
 
@@ -56,7 +55,7 @@ impl<G: CurveGroup, H: HashingToCurve<G>> GapDHSignature<G, H> for HoistingGDH<G
         let r4 = G::ScalarType::random(prng);
 
         let h = {
-            let mut rng = ChaChaRng::from_seed([0u8; 32]);
+            let mut rng = ChaChaRng::from_seed([1u8; 32]);
             G::random(&mut rng)
         };
 
@@ -128,7 +127,7 @@ impl<G: CurveGroup, H: HashingToCurve<G>> GapDHSignature<G, H> for HoistingGDH<G
         };
 
         let h = {
-            let mut rng = ChaChaRng::from_seed([0u8; 32]);
+            let mut rng = ChaChaRng::from_seed([1u8; 32]);
             G::random(&mut rng)
         };
 

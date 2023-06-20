@@ -41,6 +41,7 @@ mod test {
         asset_tracer::RecordDataEncKey,
         structs::{BlindAssetRecord, OpenAssetRecord, XfrAmount, XfrAssetType},
     };
+    use core::convert::TryFrom;
     use noah_algebra::{prelude::*, ristretto::RistrettoPoint};
     use noah_crypto::{
         elgamal::elgamal_key_gen,
@@ -48,7 +49,6 @@ mod test {
     };
     use rmp_serde::{Deserializer, Serializer};
     use serde::{de::Deserialize, ser::Serialize};
-    use std::convert::TryFrom;
 
     #[test]
     fn xfr_amount_u64_to_string_serde() {

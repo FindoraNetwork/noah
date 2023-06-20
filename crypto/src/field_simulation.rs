@@ -1,4 +1,3 @@
-use ark_std::marker::PhantomData;
 use noah_algebra::bls12_381::BLSScalar;
 use noah_algebra::prelude::*;
 use noah_algebra::str::FromStr;

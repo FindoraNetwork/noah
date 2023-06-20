@@ -2,6 +2,7 @@ pub use crate::borrow::Borrow;
 pub use crate::errors::AlgebraError;
 pub use crate::fmt::Formatter;
 pub use crate::iter::Sum;
+pub use crate::marker::PhantomData;
 pub use crate::ops::*;
 pub use crate::rand::{CryptoRng, Rng, RngCore, SeedableRng};
 pub use crate::rand_helper::test_rng;

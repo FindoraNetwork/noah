@@ -1,6 +1,5 @@
 use crate::errors::Result;
 use crate::hashing_to_the_curve::traits::HashingToCurve;
-use noah_algebra::marker::PhantomData;
 use noah_algebra::prelude::*;
 
 /// Trait for the Elligator
