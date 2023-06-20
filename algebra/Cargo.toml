@@ -71,6 +71,15 @@ version = '0.4.0'
 default-features = false
 features = ['curve']
 
+[dependencies.ark-ed-on-bn254]
+version = '0.4.0'
+default-features = false
+
+[dependencies.ark-bn254]
+version = '0.4.0'
+default-features = false
+features = ['curve']
+
 [dependencies.ark-secp256k1]
 version = '0.4.0'
 default-features = false

@@ -24,44 +24,47 @@
 #[macro_use]
 extern crate serde_derive;
 
-/// Module for the BLS12-381 curve
+/// Module for the BLS12-381 curve.
 pub mod bls12_381;
 
-/// Module for the secq256k1 curve
+/// Module for the BN254 curve.
+pub mod bn254;
+
+/// Module for the secq256k1 curve.
 pub mod secq256k1;
 
-/// Module for the secp256k1 curve
+/// Module for the secp256k1 curve.
 pub mod secp256k1;
 
-/// Module for the Jubjub curve
+/// Module for the Jubjub curve.
 pub mod jubjub;
 
-/// Module for the Zorro curve
+/// Module for the Zorro curve.
 pub mod zorro;
 
-/// Module for the ed25519 curve used to work with the Zorro curve in address folding
+/// Module for the ed25519 curve used to work with the Zorro curve in address folding.
 pub mod ed25519;
 
-/// Module for the Ristretto group
+/// Module for the Ristretto group.
 pub mod ristretto;
 
-/// Module for error handling
+/// Module for error handling.
 pub mod errors;
 
-/// Module for traits
+/// Module for traits.
 pub mod traits;
 
-/// Module for serialization of scalars and group elements
+/// Module for serialization of scalars and group elements.
 pub mod serialization;
 
-/// Module for utils
+/// Module for utils.
 pub mod utils;
 
-/// Module for prelude
+/// Module for prelude.
 #[doc(hidden)]
 pub mod prelude;
 
-/// Module for test rng
+/// Module for test rng.
 pub mod rand_helper;
 
 #[doc(hidden)]
