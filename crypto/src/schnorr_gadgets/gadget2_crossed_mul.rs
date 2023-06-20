@@ -5,7 +5,7 @@ use merlin::Transcript;
 use noah_algebra::prelude::*;
 use rand_chacha::ChaChaRng;
 
-/// The struct for the proof of Gadget 3.
+/// The struct for the proof of Gadget 2.
 #[derive(Clone, Default)]
 pub struct Gadget2Proof<G: CurveGroup> {
     /// The randomizer R_P.
@@ -20,7 +20,7 @@ pub struct Gadget2Proof<G: CurveGroup> {
     pub response_3: G::ScalarType,
 }
 
-/// The struct for the instance of Gadget 1.
+/// The struct for the instance of Gadget 2.
 pub struct Gadget2Instance<G: CurveGroup> {
     /// The point Q with (a^2, c).
     pub point_q: G,
@@ -34,7 +34,7 @@ pub struct Gadget2Instance<G: CurveGroup> {
     pub g2: G,
 }
 
-/// The struct for the witness of Gadget 1.
+/// The struct for the witness of Gadget 2.
 pub struct Gadget2Witness<G: CurveGroup> {
     /// The scalar a, in point P.
     pub a: G::ScalarType,
