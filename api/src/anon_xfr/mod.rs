@@ -16,7 +16,7 @@ use noah_algebra::{
     prelude::*,
 };
 use noah_crypto::anemoi_jive::{
-    AnemoiJive, AnemoiJive381, AnemoiVLHTrace, JiveTrace, ANEMOI_JIVE_381_SALTS,
+    AnemoiJive, AnemoiJive381, AnemoiVLHTrace, JiveTrace, ANEMOI_JIVE_381_SALTS_OLD,
 };
 use noah_plonk::{
     plonk::{

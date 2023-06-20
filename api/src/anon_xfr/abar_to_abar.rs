@@ -1111,7 +1111,7 @@ mod tests {
     use merlin::Transcript;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*};
     use noah_crypto::anemoi_jive::{
-        AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS,
+        AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS_OLD,
     };
     use noah_plonk::plonk::constraint_system::{TurboCS, VarIndex};
     use sha2::Sha512;
