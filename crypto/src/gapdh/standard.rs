@@ -3,7 +3,6 @@ use crate::gapdh::GapDHSignature;
 use crate::hashing_to_the_curve::traits::HashingToCurve;
 use crate::matrix_sigma::SigmaTranscript;
 use merlin::Transcript;
-use noah_algebra::marker::PhantomData;
 use noah_algebra::prelude::*;
 use rand_chacha::ChaChaRng;
 
@@ -50,7 +49,7 @@ impl<G: CurveGroup, H: HashingToCurve<G>> GapDHSignature<G, H> for StandardGDH<G
         transcript.append_group_element(b"R1", &point_r_1);
         transcript.append_group_element(b"R2", &point_r_2);
 
-        let mut bytes = [0u8; 32];
+        let mut bytes = [1u8; 32];
         transcript.challenge_bytes(b"challenge", &mut bytes);
 
         let beta = {
@@ -82,7 +81,7 @@ impl<G: CurveGroup, H: HashingToCurve<G>> GapDHSignature<G, H> for StandardGDH<G
         transcript.append_group_element(b"R1", &proof.point_r_1);
         transcript.append_group_element(b"R2", &proof.point_r_2);
 
-        let mut bytes = [0u8; 32];
+        let mut bytes = [1u8; 32];
         transcript.challenge_bytes(b"challenge", &mut bytes);
 
         let beta = {

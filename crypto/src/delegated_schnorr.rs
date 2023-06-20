@@ -1,7 +1,6 @@
 use crate::anemoi_jive::{AnemoiJive, AnemoiJive381};
 use crate::errors::{CryptoError, Result};
 use crate::field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto};
-use ark_std::marker::PhantomData;
 use merlin::Transcript;
 use noah_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 use noah_algebra::traits::PedersenCommitment;

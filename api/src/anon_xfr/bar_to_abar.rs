@@ -659,8 +659,6 @@ mod test {
         field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto},
     };
     use num_bigint::BigUint;
-    use num_traits::One;
-    use std::ops::AddAssign;
 
     #[test]
     fn test_bar_to_abar() {
