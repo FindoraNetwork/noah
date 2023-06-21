@@ -538,14 +538,16 @@ impl OwnerMemo {
         keypair: &KeyPair,
     ) -> Result<(RistrettoScalar, RistrettoScalar)> {
         let (key_type, s) = keypair.sec_key.as_scalar_bytes()?;
-        let shared_point = OwnerMemo::derive_shared_point(&key_type, &s, &self.blind_share_bytes.0)?;
+        let shared_point =
+            OwnerMemo::derive_shared_point(&key_type, &s, &self.blind_share_bytes.0)?;
         Ok(OwnerMemo::calc_amount_blinds(&shared_point))
     }
 
     /// Return the asset type blind
     pub fn derive_asset_type_blind(&self, keypair: &KeyPair) -> Result<RistrettoScalar> {
         let (key_type, s) = keypair.sec_key.as_scalar_bytes()?;
-        let shared_point = OwnerMemo::derive_shared_point(&key_type, &s, &self.blind_share_bytes.0)?;
+        let shared_point =
+            OwnerMemo::derive_shared_point(&key_type, &s, &self.blind_share_bytes.0)?;
         Ok(OwnerMemo::calc_asset_type_blind(&shared_point))
     }
 }
