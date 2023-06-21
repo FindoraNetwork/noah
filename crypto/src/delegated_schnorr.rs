@@ -1,7 +1,8 @@
-use crate::anemoi_jive::{AnemoiJive, AnemoiJive381};
+use crate::anemoi_jive::AnemoiJive;
 use crate::errors::{CryptoError, Result};
-use crate::field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto};
+use crate::field_simulation::{SimFr, SimFrParams};
 use merlin::Transcript;
+use noah_algebra::bn254::BN254Scalar;
 use noah_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 use noah_algebra::traits::PedersenCommitment;
 use noah_algebra::{bls12_381::BLSScalar, prelude::*};
@@ -11,63 +12,61 @@ use serde::Deserialize;
 
 #[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone)]
 /// The non-interactive proof provided to the verifier.
-pub struct DelegatedSchnorrProof<S, G, P> {
+pub struct DSProof<F, S, G> {
     /// The commitment of the non-ZK verifier's state.
-    pub inspection_comm: BLSScalar,
+    pub inspection_comm: F,
     /// The randomizer points
     pub randomizers: Vec<G>,
     /// The response scalars (two per pair)
     pub response_scalars: Vec<(S, S)>,
-    /// PhantomData for the parameters.
-    pub params_phantom: PhantomData<P>,
 }
 
-/// The non-interactive proof provided to the verifier over Ristretto.
-pub type DelegatedSchnorrProofRistretto =
-    DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>;
+/// The non-interactive proof provided to the verifier over Ristretto in BLS12-381.
+pub type DSProofBLSRistretto = DSProof<BLSScalar, RistrettoScalar, RistrettoPoint>;
+
+/// The non-interactive proof provided to the verifier over Ristretto in BN254.
+pub type DSProofBN254Ristretto = DSProof<BN254Scalar, RistrettoScalar, RistrettoPoint>;
 
 #[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Clone)]
 /// The state of the inspector.
-pub struct DelegatedSchnorrInspection<S, G, P> {
+pub struct DSInspection<F, S, G> {
     /// The committed value and their corresponding randomizer
     pub committed_data_and_randomizer: Vec<(S, S)>,
     /// The randomizer used to make the hash function a commitment scheme.
-    pub r: BLSScalar,
-    /// PhantomData for the parameters.
-    pub params_phantom: PhantomData<P>,
+    pub r: F,
     /// PhantomData for the group.
     pub group_phantom: PhantomData<G>,
 }
 
-/// The state of the inspector over Ristretto.
-pub type DelegatedSchnorrInspectionRistretto =
-    DelegatedSchnorrInspection<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>;
+/// The state of the inspector over Ristretto in BLS12-381.
+pub type DSInspectionBLSRistretto = DSInspection<BLSScalar, RistrettoScalar, RistrettoPoint>;
 
-impl<S: Scalar, G: Group<ScalarType = S>, P: SimFrParams> DelegatedSchnorrInspection<S, G, P> {
+/// The state of the inspector over Ristretto in BLS12-381.
+pub type DSInspectionBN254Ristretto = DSInspection<BN254Scalar, RistrettoScalar, RistrettoPoint>;
+
+impl<F: Scalar, S: Scalar, G: Group<ScalarType = S>> DSInspection<F, S, G> {
     /// Create a dummy new one.
     pub fn new() -> Self {
         Self {
             committed_data_and_randomizer: vec![],
-            params_phantom: PhantomData,
-            r: BLSScalar::default(),
+            r: F::default(),
             group_phantom: PhantomData,
         }
     }
 }
 
-impl<S: Scalar, G: Group<ScalarType = S>, P: SimFrParams> DelegatedSchnorrProof<S, G, P> {
+impl<F: Scalar, S: Scalar, G: Group<ScalarType = S>> DSProof<F, S, G> {
     /// Create a dummy new one.
     pub fn new() -> Self {
         Self {
-            inspection_comm: BLSScalar::default(),
+            inspection_comm: F::default(),
             randomizers: vec![],
             response_scalars: vec![],
-            params_phantom: PhantomData,
         }
     }
 
     /// Represent the information needed by zk-SNARKs in its format.
-    pub fn to_verifier_input(&self) -> Vec<BLSScalar> {
+    pub fn to_verifier_input<P: SimFrParams<F>>(&self) -> Vec<F> {
         let response_scalars_sim_fr_limbs = self
             .response_scalars
             .iter()
@@ -75,14 +74,14 @@ impl<S: Scalar, G: Group<ScalarType = S>, P: SimFrParams> DelegatedSchnorrProof<
                 let first_biguint: BigUint = first.clone().into();
                 let second_biguint: BigUint = second.clone().into();
 
-                let first_sim_fr = SimFr::<P>::from(&first_biguint);
-                let second_sim_fr = SimFr::<P>::from(&second_biguint);
+                let first_sim_fr = SimFr::<F, P>::from(&first_biguint);
+                let second_sim_fr = SimFr::<F, P>::from(&second_biguint);
 
                 let mut v = first_sim_fr.limbs;
                 v.extend_from_slice(&second_sim_fr.limbs);
                 v
             })
-            .collect::<Vec<BLSScalar>>();
+            .collect::<Vec<F>>();
 
         let mut res = Vec::with_capacity(1 + P::NUM_OF_LIMBS * response_scalars_sim_fr_limbs.len());
         res.push(self.inspection_comm);
@@ -93,10 +92,12 @@ impl<S: Scalar, G: Group<ScalarType = S>, P: SimFrParams> DelegatedSchnorrProof<
 
 /// Generate a proof in the delegated Schnorr protocol.
 pub fn prove_delegated_schnorr<
+    F: Scalar,
+    H: AnemoiJive<F, 2usize, 12usize>,
     R: CryptoRng + RngCore,
     S: Scalar,
     G: Group<ScalarType = S>,
-    P: SimFrParams,
+    P: SimFrParams<F>,
     PC: PedersenCommitment<G>,
 >(
     rng: &mut R,
@@ -104,24 +105,19 @@ pub fn prove_delegated_schnorr<
     pc_gens: &PC,
     commitments: &Vec<G>,
     transcript: &mut Transcript,
-) -> Result<(
-    DelegatedSchnorrProof<S, G, P>,
-    DelegatedSchnorrInspection<S, G, P>,
-    S,
-    S,
-)> {
+) -> Result<(DSProof<F, S, G>, DSInspection<F, S, G>, S, S)> {
     assert_eq!(committed_data.len(), commitments.len());
     let len = committed_data.len();
 
-    let mut proof = DelegatedSchnorrProof::new();
-    let mut inspection = DelegatedSchnorrInspection::new();
+    let mut proof = DSProof::new();
+    let mut inspection = DSInspection::new();
 
     // 1. sample the scalars for the randomizers.
     let mut randomizer_scalars = Vec::<(S, S)>::with_capacity(len);
     for _ in 0..len {
         randomizer_scalars.push((S::random(rng), S::random(rng)));
     }
-    let r = BLSScalar::random(rng);
+    let r = F::random(rng);
 
     // 2. convert the first part of each entry in the committed data into biguint and sim_fr; these are in the inspector's state.
     let committed_data_biguint = committed_data
@@ -130,8 +126,8 @@ pub fn prove_delegated_schnorr<
         .collect::<Vec<BigUint>>();
     let committed_data_sim_fr = committed_data_biguint
         .iter()
-        .map(|v| SimFr::<P>::from(v))
-        .collect::<Vec<SimFr<P>>>();
+        .map(|v| SimFr::<F, P>::from(v))
+        .collect::<Vec<SimFr<F, P>>>();
 
     // 3. convert the first part of each pair of randomizer scalars; these are in the inspector's state.
     let randomizer_biguint = randomizer_scalars
@@ -140,8 +136,8 @@ pub fn prove_delegated_schnorr<
         .collect::<Vec<BigUint>>();
     let randomizer_sim_fr = randomizer_biguint
         .iter()
-        .map(|v| SimFr::<P>::from(v))
-        .collect::<Vec<SimFr<P>>>();
+        .map(|v| SimFr::<F, P>::from(v))
+        .collect::<Vec<SimFr<F, P>>>();
 
     // 3. merge limbs of the committed data as well as the randomizer scalars
     let mut all_limbs = Vec::with_capacity(2 * len * P::NUM_OF_LIMBS);
@@ -153,17 +149,17 @@ pub fn prove_delegated_schnorr<
         .for_each(|v| all_limbs.extend_from_slice(&v.limbs));
 
     // 4. compress these limbs for public input.
-    let num_limbs_compressed = BLSScalar::capacity() / P::BIT_PER_LIMB;
+    let num_limbs_compressed = F::capacity() / P::BIT_PER_LIMB;
     let mut compressed_limbs = Vec::new();
     for limbs in all_limbs.chunks(num_limbs_compressed) {
         let mut sum = BigUint::zero();
         for (i, limb) in limbs.iter().enumerate() {
             sum.add_assign(
-                <BLSScalar as Into<BigUint>>::into(limb.clone())
+                <F as Into<BigUint>>::into(limb.clone())
                     .mul(&BigUint::from(1u32).shl(P::BIT_PER_LIMB * i)),
             );
         }
-        compressed_limbs.push(BLSScalar::from(&sum));
+        compressed_limbs.push(F::from(&sum));
     }
 
     // 5. compute comm, which is the commitment of the non-ZK verifier's state
@@ -171,7 +167,7 @@ pub fn prove_delegated_schnorr<
         let mut input = compressed_limbs.clone();
         input.push(r);
 
-        AnemoiJive381::eval_variable_length_hash(&input)
+        H::eval_variable_length_hash(&input)
     };
     proof.inspection_comm = comm;
 
@@ -246,14 +242,14 @@ pub fn prove_delegated_schnorr<
 
 /// Verify a proof in the delegated Schnorr protocol.
 pub fn verify_delegated_schnorr<
+    F: Scalar,
     S: Scalar,
     G: Group<ScalarType = S>,
-    P: SimFrParams,
     PC: PedersenCommitment<G>,
 >(
     pc_gens: &PC,
     commitments: &Vec<G>,
-    proof: &DelegatedSchnorrProof<S, G, P>,
+    proof: &DSProof<F, S, G>,
     transcript: &mut Transcript,
 ) -> Result<(S, S)> {
     assert_eq!(commitments.len(), proof.randomizers.len());
@@ -320,10 +316,12 @@ pub fn verify_delegated_schnorr<
 }
 
 #[cfg(test)]
-mod test_ristretto {
+mod test_ristretto_bls12_381 {
+    use crate::anemoi_jive::AnemoiJive381;
     use crate::delegated_schnorr::{prove_delegated_schnorr, verify_delegated_schnorr};
-    use crate::field_simulation::SimFrParamsRistretto;
+    use crate::field_simulation::SimFrParamsBLSRistretto;
     use merlin::Transcript;
+    use noah_algebra::bls12_381::BLSScalar;
     use noah_algebra::traits::PedersenCommitment;
     use noah_algebra::{
         prelude::*,
@@ -347,7 +345,15 @@ mod test_ristretto {
 
             let mut transcript = Transcript::new(b"Test");
 
-            let (proof, _, _, _) = prove_delegated_schnorr::<_, _, _, SimFrParamsRistretto, _>(
+            let (proof, _, _, _) = prove_delegated_schnorr::<
+                BLSScalar,
+                AnemoiJive381,
+                _,
+                _,
+                _,
+                SimFrParamsBLSRistretto,
+                _,
+            >(
                 &mut prng,
                 &vec![(x, gamma), (y, delta)],
                 &pc_gens,
@@ -370,10 +376,12 @@ mod test_ristretto {
 }
 
 #[cfg(test)]
-mod test_secq256k1 {
+mod test_secq256k1_bls12_381 {
+    use crate::anemoi_jive::AnemoiJive381;
     use crate::delegated_schnorr::{prove_delegated_schnorr, verify_delegated_schnorr};
-    use crate::field_simulation::SimFrParamsSecq256k1;
+    use crate::field_simulation::SimFrParamsBLSSecq256k1;
     use merlin::Transcript;
+    use noah_algebra::bls12_381::BLSScalar;
     use noah_algebra::traits::PedersenCommitment;
     use noah_algebra::{
         prelude::*,
@@ -397,7 +405,15 @@ mod test_secq256k1 {
 
             let mut transcript = Transcript::new(b"Test");
 
-            let (proof, _, _, _) = prove_delegated_schnorr::<_, _, _, SimFrParamsSecq256k1, _>(
+            let (proof, _, _, _) = prove_delegated_schnorr::<
+                BLSScalar,
+                AnemoiJive381,
+                _,
+                _,
+                _,
+                SimFrParamsBLSSecq256k1,
+                _,
+            >(
                 &mut prng,
                 &vec![(x, gamma), (y, delta)],
                 &pc_gens,

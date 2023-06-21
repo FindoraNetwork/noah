@@ -21,9 +21,7 @@ use ark_std::{collections::BTreeMap, format};
 use noah_algebra::bls12_381::{BLSScalar, BLSG1};
 use noah_algebra::prelude::*;
 use noah_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
-use noah_crypto::delegated_schnorr::{
-    DelegatedSchnorrInspectionRistretto, DelegatedSchnorrProofRistretto,
-};
+use noah_crypto::delegated_schnorr::{DSInspectionBLSRistretto, DSProofBLSRistretto};
 use noah_plonk::plonk::constraint_system::ConstraintSystem;
 use noah_plonk::plonk::indexer::{indexer_with_lagrange, PlonkPK, PlonkVK};
 use noah_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS;
@@ -171,14 +169,13 @@ impl ProverParams {
         let label = String::from("bar_to_abar");
         let zero = BLSScalar::zero();
 
-        let proof = DelegatedSchnorrProofRistretto {
+        let proof = DSProofBLSRistretto {
             inspection_comm: Default::default(),
             randomizers: vec![RistrettoPoint::default(); 3],
             response_scalars: vec![(RistrettoScalar::default(), RistrettoScalar::default()); 3],
-            params_phantom: Default::default(),
         };
 
-        let non_zk_state = DelegatedSchnorrInspectionRistretto {
+        let non_zk_state = DSInspectionBLSRistretto {
             committed_data_and_randomizer: vec![
                 (
                     RistrettoScalar::default(),
@@ -187,7 +184,6 @@ impl ProverParams {
                 3
             ],
             r: BLSScalar::default(),
-            params_phantom: Default::default(),
             group_phantom: Default::default(),
         };
 
@@ -244,14 +240,13 @@ impl ProverParams {
 
         let bls_zero = BLSScalar::zero();
 
-        let proof = DelegatedSchnorrProofRistretto {
+        let proof = DSProofBLSRistretto {
             inspection_comm: Default::default(),
             randomizers: vec![RistrettoPoint::default(); 3],
             response_scalars: vec![(RistrettoScalar::default(), RistrettoScalar::default()); 3],
-            params_phantom: Default::default(),
         };
 
-        let non_zk_state = DelegatedSchnorrInspectionRistretto {
+        let non_zk_state = DSInspectionBLSRistretto {
             committed_data_and_randomizer: vec![
                 (
                     RistrettoScalar::default(),
@@ -260,7 +255,6 @@ impl ProverParams {
                 3
             ],
             r: BLSScalar::default(),
-            params_phantom: Default::default(),
             group_phantom: Default::default(),
         };
 

@@ -1,12 +1,13 @@
 use crate::field_simulation::SimFrParams;
+use core::str::FromStr;
 use noah_algebra::bls12_381::BLSScalar;
 use num_bigint::BigUint;
 
 /// The parameters for field simulation for Ristretto.
 #[derive(Clone, Default, Eq, PartialEq, Debug)]
-pub struct SimFrParamsRistretto;
+pub struct SimFrParamsBLSRistretto;
 
-impl SimFrParams<BLSScalar> for SimFrParamsRistretto {
+impl SimFrParams<BLSScalar> for SimFrParamsBLSRistretto {
     const NUM_OF_LIMBS: usize = 6;
     const BIT_PER_LIMB: usize = 43;
     const BIT_IN_TOP_LIMB: usize = 38;
@@ -53,9 +54,9 @@ impl SimFrParams<BLSScalar> for SimFrParamsRistretto {
 
 /// The parameters for field simulation for the secq256k1 scalar field.
 #[derive(Clone, Default, Eq, PartialEq, Debug)]
-pub struct SimFrParamsSecq256k1;
+pub struct SimFrParamsBLSSecq256k1;
 
-impl SimFrParams<BLSScalar> for SimFrParamsSecq256k1 {
+impl SimFrParams<BLSScalar> for SimFrParamsBLSSecq256k1 {
     const NUM_OF_LIMBS: usize = 6;
     const BIT_PER_LIMB: usize = 44;
     const BIT_IN_TOP_LIMB: usize = 36;
@@ -102,9 +103,9 @@ impl SimFrParams<BLSScalar> for SimFrParamsSecq256k1 {
 
 /// The parameters for field simulation for the zorro scalar field.
 #[derive(Clone, Default, Eq, PartialEq, Debug)]
-pub struct SimFrParamsZorro;
+pub struct SimFrParamsBLSZorro;
 
-impl SimFrParams<BLSScalar> for SimFrParamsZorro {
+impl SimFrParams<BLSScalar> for SimFrParamsBLSZorro {
     const NUM_OF_LIMBS: usize = 6;
     const BIT_PER_LIMB: usize = 44;
     const BIT_IN_TOP_LIMB: usize = 36;
@@ -151,18 +152,18 @@ impl SimFrParams<BLSScalar> for SimFrParamsZorro {
 
 #[cfg(test)]
 mod test_ristretto {
-    use crate::field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto};
+    use crate::field_simulation::{SimFr, SimFrParams, SimFrParamsBLSRistretto};
     use noah_algebra::bls12_381::BLSScalar;
     use noah_algebra::prelude::*;
     use num_bigint::{BigUint, RandBigInt};
     use num_integer::Integer;
 
-    type SimFrTest = SimFr<BLSScalar, SimFrParamsRistretto>;
+    type SimFrTest = SimFr<BLSScalar, SimFrParamsBLSRistretto>;
 
     #[test]
     fn test_sim_fr_biguint_conversion() {
         let mut prng = test_rng();
-        let r_biguint = SimFrParamsRistretto::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsBLSRistretto::scalar_field_in_biguint();
 
         for _ in 0..100 {
             let a = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
@@ -176,7 +177,7 @@ mod test_ristretto {
     #[test]
     fn test_sub() {
         let mut prng = test_rng();
-        let r_biguint = SimFrParamsRistretto::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsBLSRistretto::scalar_field_in_biguint();
 
         for _ in 0..100 {
             let a = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
@@ -197,7 +198,7 @@ mod test_ristretto {
     #[test]
     fn test_mul() {
         let mut prng = test_rng();
-        let r_biguint = SimFrParamsRistretto::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsBLSRistretto::scalar_field_in_biguint();
 
         for _ in 0..100 {
             let a = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
@@ -226,7 +227,7 @@ mod test_ristretto {
     #[test]
     fn test_enforce_zero() {
         let mut prng = test_rng();
-        let r_biguint = SimFrParamsRistretto::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsBLSRistretto::scalar_field_in_biguint();
 
         for _ in 0..1000 {
             let a = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
@@ -253,7 +254,7 @@ mod test_ristretto {
     #[should_panic]
     fn test_enforce_zero_panic() {
         let mut prng = test_rng();
-        let r_biguint = SimFrParamsRistretto::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsBLSRistretto::scalar_field_in_biguint();
 
         let a = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
         let b = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
@@ -275,18 +276,18 @@ mod test_ristretto {
 
 #[cfg(test)]
 mod test_secq256k1 {
-    use crate::field_simulation::{SimFr, SimFrParams, SimFrParamsSecq256k1};
+    use crate::field_simulation::{SimFr, SimFrParams, SimFrParamsBLSSecq256k1};
     use noah_algebra::bls12_381::BLSScalar;
     use noah_algebra::prelude::*;
     use num_bigint::{BigUint, RandBigInt};
     use num_integer::Integer;
 
-    type SimFrTest = SimFr<BLSScalar, SimFrParamsSecq256k1>;
+    type SimFrTest = SimFr<BLSScalar, SimFrParamsBLSSecq256k1>;
 
     #[test]
     fn test_sim_fr_biguint_conversion() {
         let mut prng = test_rng();
-        let r_biguint = SimFrParamsSecq256k1::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsBLSSecq256k1::scalar_field_in_biguint();
 
         for _ in 0..100 {
             let a = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
@@ -300,7 +301,7 @@ mod test_secq256k1 {
     #[test]
     fn test_sub() {
         let mut prng = test_rng();
-        let r_biguint = SimFrParamsSecq256k1::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsBLSSecq256k1::scalar_field_in_biguint();
 
         for _ in 0..100 {
             let a = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
@@ -321,7 +322,7 @@ mod test_secq256k1 {
     #[test]
     fn test_mul() {
         let mut prng = test_rng();
-        let r_biguint = SimFrParamsSecq256k1::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsBLSSecq256k1::scalar_field_in_biguint();
 
         for _ in 0..100 {
             let a = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
@@ -350,7 +351,7 @@ mod test_secq256k1 {
     #[test]
     fn test_enforce_zero() {
         let mut prng = test_rng();
-        let r_biguint = SimFrParamsSecq256k1::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsBLSSecq256k1::scalar_field_in_biguint();
 
         for _ in 0..1000 {
             let a = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
@@ -377,7 +378,7 @@ mod test_secq256k1 {
     #[should_panic]
     fn test_enforce_zero_panic() {
         let mut prng = test_rng();
-        let r_biguint = SimFrParamsSecq256k1::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsBLSSecq256k1::scalar_field_in_biguint();
 
         let a = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
         let b = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
@@ -399,18 +400,18 @@ mod test_secq256k1 {
 
 #[cfg(test)]
 mod test_zorro {
-    use crate::field_simulation::{SimFr, SimFrParams, SimFrParamsZorro};
+    use crate::field_simulation::{SimFr, SimFrParams, SimFrParamsBLSZorro};
     use noah_algebra::bls12_381::BLSScalar;
     use noah_algebra::prelude::*;
     use num_bigint::{BigUint, RandBigInt};
     use num_integer::Integer;
 
-    type SimFrTest = SimFr<BLSScalar, SimFrParamsZorro>;
+    type SimFrTest = SimFr<BLSScalar, SimFrParamsBLSZorro>;
 
     #[test]
     fn test_sim_fr_biguint_conversion() {
         let mut prng = test_rng();
-        let r_biguint = SimFrParamsZorro::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsBLSZorro::scalar_field_in_biguint();
 
         for _ in 0..100 {
             let a = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
@@ -424,7 +425,7 @@ mod test_zorro {
     #[test]
     fn test_sub() {
         let mut prng = test_rng();
-        let r_biguint = SimFrParamsZorro::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsBLSZorro::scalar_field_in_biguint();
 
         for _ in 0..100 {
             let a = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
@@ -445,7 +446,7 @@ mod test_zorro {
     #[test]
     fn test_mul() {
         let mut prng = test_rng();
-        let r_biguint = SimFrParamsZorro::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsBLSZorro::scalar_field_in_biguint();
 
         for _ in 0..100 {
             let a = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
@@ -474,7 +475,7 @@ mod test_zorro {
     #[test]
     fn test_enforce_zero() {
         let mut prng = test_rng();
-        let r_biguint = SimFrParamsZorro::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsBLSZorro::scalar_field_in_biguint();
 
         for _ in 0..1000 {
             let a = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
@@ -501,7 +502,7 @@ mod test_zorro {
     #[should_panic]
     fn test_enforce_zero_panic() {
         let mut prng = test_rng();
-        let r_biguint = SimFrParamsZorro::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsBLSZorro::scalar_field_in_biguint();
 
         let a = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
         let b = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
