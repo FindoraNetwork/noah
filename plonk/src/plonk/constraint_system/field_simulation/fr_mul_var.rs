@@ -466,3 +466,163 @@ mod test_secq256k1_bls12_381 {
         zero_supposed_manipulated.enforce_zero(&mut cs);
     }
 }
+
+#[cfg(test)]
+mod test_ristretto_bn254 {
+    use crate::plonk::constraint_system::{field_simulation::SimFrVar, turbo::TurboCS};
+    use noah_algebra::{bn254::BN254Scalar, prelude::*};
+    use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsBN254Ristretto};
+    use num_bigint::{BigUint, RandBigInt};
+
+    type SimFrTest = SimFr<BN254Scalar, SimFrParamsBN254Ristretto>;
+    type SimFrVarTest = SimFrVar<BN254Scalar, SimFrParamsBN254Ristretto>;
+
+    #[test]
+    fn test_enforce_zero_trivial() {
+        let mut cs = TurboCS::<BN254Scalar>::new();
+
+        let zero_fr = SimFrTest::from(&BigUint::zero());
+        let (zero_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &zero_fr);
+        let zero_fr_mul_val = zero_fr_val.mul(&mut cs, &zero_fr_val);
+
+        zero_fr_mul_val.enforce_zero(&mut cs);
+    }
+
+    #[test]
+    fn test_enforce_zero() {
+        let mut prng = test_rng();
+        let r_biguint = SimFrParamsBN254Ristretto::scalar_field_in_biguint();
+
+        for _ in 0..1000 {
+            let mut cs = TurboCS::<BN254Scalar>::new();
+
+            let a = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+            let b = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+
+            let a_fr = SimFrTest::from(&a);
+            let b_fr = SimFrTest::from(&b);
+
+            let (a_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &a_fr);
+            let (b_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &b_fr);
+
+            let ab_fr_mul_val = a_fr_val.mul(&mut cs, &b_fr_val);
+
+            let ab_fr = &a * &b;
+            let ab_fr_reduced = &ab_fr % &r_biguint;
+            let ab_reduced = SimFrTest::from(&ab_fr_reduced);
+            let (ab_reduced_val, _) = SimFrVarTest::alloc_witness(&mut cs, &ab_reduced);
+
+            let zero_supposed = ab_fr_mul_val.sub(&mut cs, &ab_reduced_val);
+            zero_supposed.enforce_zero(&mut cs);
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_enforce_zero_panic() {
+        let mut prng = test_rng();
+        let r_biguint = SimFrParamsBN254Ristretto::scalar_field_in_biguint();
+
+        let mut cs = TurboCS::<BN254Scalar>::new();
+
+        let a = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+        let b = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+
+        let a_fr = SimFrTest::from(&a);
+        let b_fr = SimFrTest::from(&b);
+
+        let (a_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &a_fr);
+        let (b_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &b_fr);
+
+        let ab_fr_mul_val = a_fr_val.mul(&mut cs, &b_fr_val);
+
+        let ab_fr = &a * &b;
+        let ab_fr_reduced_manipulated = &ab_fr % &r_biguint + &BigUint::from(10u64);
+        let ab_reduced_manipulated = SimFrTest::from(&ab_fr_reduced_manipulated);
+        let (ab_reduced_manipulated_val, _) =
+            SimFrVarTest::alloc_witness(&mut cs, &ab_reduced_manipulated);
+
+        let zero_supposed_manipulated = ab_fr_mul_val.sub(&mut cs, &ab_reduced_manipulated_val);
+        zero_supposed_manipulated.enforce_zero(&mut cs);
+    }
+}
+
+#[cfg(test)]
+mod test_secq256k1_bn254 {
+    use crate::plonk::constraint_system::{field_simulation::SimFrVar, turbo::TurboCS};
+    use noah_algebra::{bn254::BN254Scalar, prelude::*};
+    use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsBN254Secq256k1};
+    use num_bigint::{BigUint, RandBigInt};
+
+    type SimFrTest = SimFr<BN254Scalar, SimFrParamsBN254Secq256k1>;
+    type SimFrVarTest = SimFrVar<BN254Scalar, SimFrParamsBN254Secq256k1>;
+
+    #[test]
+    fn test_enforce_zero_trivial() {
+        let mut cs = TurboCS::<BN254Scalar>::new();
+
+        let zero_fr = SimFrTest::from(&BigUint::zero());
+        let (zero_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &zero_fr);
+        let zero_fr_mul_val = zero_fr_val.mul(&mut cs, &zero_fr_val);
+
+        zero_fr_mul_val.enforce_zero(&mut cs);
+    }
+
+    #[test]
+    fn test_enforce_zero() {
+        let mut prng = test_rng();
+        let r_biguint = SimFrParamsBN254Secq256k1::scalar_field_in_biguint();
+
+        for _ in 0..1000 {
+            let mut cs = TurboCS::<BN254Scalar>::new();
+
+            let a = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+            let b = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+
+            let a_fr = SimFrTest::from(&a);
+            let b_fr = SimFrTest::from(&b);
+
+            let (a_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &a_fr);
+            let (b_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &b_fr);
+
+            let ab_fr_mul_val = a_fr_val.mul(&mut cs, &b_fr_val);
+
+            let ab_fr = &a * &b;
+            let ab_fr_reduced = &ab_fr % &r_biguint;
+            let ab_reduced = SimFrTest::from(&ab_fr_reduced);
+            let (ab_reduced_val, _) = SimFrVarTest::alloc_witness(&mut cs, &ab_reduced);
+
+            let zero_supposed = ab_fr_mul_val.sub(&mut cs, &ab_reduced_val);
+            zero_supposed.enforce_zero(&mut cs);
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_enforce_zero_panic() {
+        let mut prng = test_rng();
+        let r_biguint = SimFrParamsBN254Secq256k1::scalar_field_in_biguint();
+
+        let mut cs = TurboCS::<BN254Scalar>::new();
+
+        let a = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+        let b = prng.gen_biguint_range(&BigUint::zero(), &r_biguint);
+
+        let a_fr = SimFrTest::from(&a);
+        let b_fr = SimFrTest::from(&b);
+
+        let (a_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &a_fr);
+        let (b_fr_val, _) = SimFrVarTest::alloc_witness(&mut cs, &b_fr);
+
+        let ab_fr_mul_val = a_fr_val.mul(&mut cs, &b_fr_val);
+
+        let ab_fr = &a * &b;
+        let ab_fr_reduced_manipulated = &ab_fr % &r_biguint + &BigUint::from(10u64);
+        let ab_reduced_manipulated = SimFrTest::from(&ab_fr_reduced_manipulated);
+        let (ab_reduced_manipulated_val, _) =
+            SimFrVarTest::alloc_witness(&mut cs, &ab_reduced_manipulated);
+
+        let zero_supposed_manipulated = ab_fr_mul_val.sub(&mut cs, &ab_reduced_manipulated_val);
+        zero_supposed_manipulated.enforce_zero(&mut cs);
+    }
+}
