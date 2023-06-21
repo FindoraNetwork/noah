@@ -14,3 +14,7 @@ pub use ark_std::{string::String, vec, vec::Vec};
 pub use itertools::Itertools;
 
 pub(crate) type Result<T> = core::result::Result<T, AlgebraError>;
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+/// The ciphertext from the symmetric encryption.
+pub struct CompactByteArray(pub Vec<u8>);

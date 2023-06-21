@@ -33,11 +33,8 @@ use noah_crypto::anemoi_jive::{
     AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS_OLD,
 };
 use noah_crypto::{
-    delegated_schnorr::{
-        prove_delegated_schnorr, verify_delegated_schnorr, DelegatedSchnorrInspection,
-        DelegatedSchnorrProof,
-    },
-    field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto},
+    delegated_schnorr::{prove_delegated_schnorr, verify_delegated_schnorr, DSInspection, DSProof},
+    field_simulation::{SimFr, SimFrParams, SimFrParamsBLSRistretto},
 };
 use noah_plonk::plonk::{
     constraint_system::{field_simulation::SimFrVar, TurboCS, VarIndex},
@@ -78,8 +75,7 @@ pub struct AbarToBarPreNote {
     /// Input key pair.
     pub input_keypair: KeyPair,
     /// Inspection data in the delegated Schnorr proof on Ristretto.
-    pub inspection:
-        DelegatedSchnorrInspection<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
+    pub inspection: DSInspection<BLSScalar, RistrettoScalar, RistrettoPoint>,
     /// Beta on Ristretto.
     pub beta: RistrettoScalar,
     /// Lambda on Ristretto.
@@ -94,8 +90,7 @@ pub struct AbarToBarBody {
     /// The new BAR to be created.
     pub output: BlindAssetRecord,
     /// The inspector's proof on Ristretto.
-    pub delegated_schnorr_proof:
-        DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
+    pub delegated_schnorr_proof: DSProof<BLSScalar, RistrettoScalar, RistrettoPoint>,
     /// The Merkle root hash.
     pub merkle_root: BLSScalar,
     /// The Merkle root version.
@@ -169,7 +164,8 @@ pub fn init_abar_to_bar_note<R: CryptoRng + RngCore>(
     let (delegated_schnorr_proof, delegated_schnorr_inspection, beta, lambda) = {
         let mut transcript = Transcript::new(ABAR_TO_BAR_PLONK_PROOF_TRANSCRIPT);
         transcript.append_message(b"nullifier", &this_nullifier.to_bytes());
-        prove_delegated_schnorr(
+
+        prove_delegated_schnorr::<BLSScalar, AnemoiJive381, _, _, _, SimFrParamsBLSRistretto, _>(
             prng,
             &vec![(x, gamma), (y, delta)],
             &pc_gens,
@@ -355,14 +351,18 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     let s1_plus_lambda_s2 = delegated_schnorr_proof.response_scalars[0].0
         + delegated_schnorr_proof.response_scalars[1].0 * &lambda;
 
-    let beta_sim_fr =
-        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&beta.to_bytes()));
-    let lambda_sim_fr =
-        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&lambda.to_bytes()));
-    let beta_lambda_sim_fr =
-        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&beta_lambda.to_bytes()));
-    let s1_plus_lambda_s2_sim_fr =
-        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&s1_plus_lambda_s2.to_bytes()));
+    let beta_sim_fr = SimFr::<BLSScalar, SimFrParamsBLSRistretto>::from(&BigUint::from_bytes_le(
+        &beta.to_bytes(),
+    ));
+    let lambda_sim_fr = SimFr::<BLSScalar, SimFrParamsBLSRistretto>::from(&BigUint::from_bytes_le(
+        &lambda.to_bytes(),
+    ));
+    let beta_lambda_sim_fr = SimFr::<BLSScalar, SimFrParamsBLSRistretto>::from(
+        &BigUint::from_bytes_le(&beta_lambda.to_bytes()),
+    );
+    let s1_plus_lambda_s2_sim_fr = SimFr::<BLSScalar, SimFrParamsBLSRistretto>::from(
+        &BigUint::from_bytes_le(&s1_plus_lambda_s2.to_bytes()),
+    );
 
     let mut transcript = Transcript::new(ABAR_TO_BAR_PLONK_PROOF_TRANSCRIPT);
     let mut online_inputs = vec![];
@@ -489,14 +489,16 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
             let s1_plus_lambda_s2 = delegated_schnorr_proof.response_scalars[0].0
                 + delegated_schnorr_proof.response_scalars[1].0 * &lambda;
 
-            let beta_sim_fr =
-                SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&beta.to_bytes()));
-            let lambda_sim_fr =
-                SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&lambda.to_bytes()));
-            let beta_lambda_sim_fr = SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(
-                &beta_lambda.to_bytes(),
-            ));
-            let s1_plus_lambda_s2_sim_fr = SimFr::<SimFrParamsRistretto>::from(
+            let beta_sim_fr = SimFr::<BLSScalar, SimFrParamsBLSRistretto>::from(
+                &BigUint::from_bytes_le(&beta.to_bytes()),
+            );
+            let lambda_sim_fr = SimFr::<BLSScalar, SimFrParamsBLSRistretto>::from(
+                &BigUint::from_bytes_le(&lambda.to_bytes()),
+            );
+            let beta_lambda_sim_fr = SimFr::<BLSScalar, SimFrParamsBLSRistretto>::from(
+                &BigUint::from_bytes_le(&beta_lambda.to_bytes()),
+            );
+            let s1_plus_lambda_s2_sim_fr = SimFr::<BLSScalar, SimFrParamsBLSRistretto>::from(
                 &BigUint::from_bytes_le(&s1_plus_lambda_s2.to_bytes()),
             );
 
@@ -536,8 +538,8 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
     payers_witness: &PayerWitness,
     nullifier_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
     input_commitment_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
-    proof: &DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
-    inspection: &DelegatedSchnorrInspection<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
+    proof: &DSProof<BLSScalar, RistrettoScalar, RistrettoPoint>,
+    inspection: &DSInspection<BLSScalar, RistrettoScalar, RistrettoPoint>,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
     folding_witness: &AXfrAddressFoldingWitness,
@@ -572,8 +574,8 @@ pub fn build_abar_to_bar_cs(
     payer_witness: &PayerWitness,
     nullifier_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
     input_commitment_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
-    proof: &DelegatedSchnorrProof<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
-    inspection: &DelegatedSchnorrInspection<RistrettoScalar, RistrettoPoint, SimFrParamsRistretto>,
+    proof: &DSProof<BLSScalar, RistrettoScalar, RistrettoPoint>,
+    inspection: &DSInspection<BLSScalar, RistrettoScalar, RistrettoPoint>,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
     folding_witness: &AXfrAddressFoldingWitness,
@@ -605,11 +607,11 @@ pub fn build_abar_to_bar_cs(
     let zero_var = cs.zero_var();
     let mut root_var: Option<VarIndex> = None;
 
-    let step_1 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB));
-    let step_2 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 2));
-    let step_3 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 3));
-    let step_4 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 4));
-    let step_5 = BLSScalar::from(&BigUint::one().shl(SimFrParamsRistretto::BIT_PER_LIMB * 5));
+    let step_1 = BLSScalar::from(&BigUint::one().shl(SimFrParamsBLSRistretto::BIT_PER_LIMB));
+    let step_2 = BLSScalar::from(&BigUint::one().shl(SimFrParamsBLSRistretto::BIT_PER_LIMB * 2));
+    let step_3 = BLSScalar::from(&BigUint::one().shl(SimFrParamsBLSRistretto::BIT_PER_LIMB * 3));
+    let step_4 = BLSScalar::from(&BigUint::one().shl(SimFrParamsBLSRistretto::BIT_PER_LIMB * 4));
+    let step_5 = BLSScalar::from(&BigUint::one().shl(SimFrParamsBLSRistretto::BIT_PER_LIMB * 5));
 
     let secret_key_type = match keypair.get_sk_ref() {
         SecretKey::Ed25519(_) => BLSScalar::one(),
@@ -693,32 +695,36 @@ pub fn build_abar_to_bar_cs(
     }
 
     // 2. Input witness x, y, a, b, r, public input comm, beta, s1, s2.
-    let x_sim_fr = SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(
+    let x_sim_fr = SimFr::<BLSScalar, SimFrParamsBLSRistretto>::from(&BigUint::from_bytes_le(
         &inspection.committed_data_and_randomizer[0].0.to_bytes(),
     ));
-    let y_sim_fr = SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(
+    let y_sim_fr = SimFr::<BLSScalar, SimFrParamsBLSRistretto>::from(&BigUint::from_bytes_le(
         &inspection.committed_data_and_randomizer[1].0.to_bytes(),
     ));
-    let a_sim_fr = SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(
+    let a_sim_fr = SimFr::<BLSScalar, SimFrParamsBLSRistretto>::from(&BigUint::from_bytes_le(
         &inspection.committed_data_and_randomizer[0].1.to_bytes(),
     ));
-    let b_sim_fr = SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(
+    let b_sim_fr = SimFr::<BLSScalar, SimFrParamsBLSRistretto>::from(&BigUint::from_bytes_le(
         &inspection.committed_data_and_randomizer[1].1.to_bytes(),
     ));
     let comm = proof.inspection_comm;
     let r = inspection.r;
-    let beta_sim_fr =
-        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&beta.to_bytes()));
-    let lambda_sim_fr =
-        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&lambda.to_bytes()));
+    let beta_sim_fr = SimFr::<BLSScalar, SimFrParamsBLSRistretto>::from(&BigUint::from_bytes_le(
+        &beta.to_bytes(),
+    ));
+    let lambda_sim_fr = SimFr::<BLSScalar, SimFrParamsBLSRistretto>::from(&BigUint::from_bytes_le(
+        &lambda.to_bytes(),
+    ));
 
     let beta_lambda = *beta * lambda;
-    let beta_lambda_sim_fr =
-        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&beta_lambda.to_bytes()));
+    let beta_lambda_sim_fr = SimFr::<BLSScalar, SimFrParamsBLSRistretto>::from(
+        &BigUint::from_bytes_le(&beta_lambda.to_bytes()),
+    );
 
     let s1_plus_lambda_s2 = proof.response_scalars[0].0 + proof.response_scalars[1].0 * lambda;
-    let s1_plus_lambda_s2_sim_fr =
-        SimFr::<SimFrParamsRistretto>::from(&BigUint::from_bytes_le(&s1_plus_lambda_s2.to_bytes()));
+    let s1_plus_lambda_s2_sim_fr = SimFr::<BLSScalar, SimFrParamsBLSRistretto>::from(
+        &BigUint::from_bytes_le(&s1_plus_lambda_s2.to_bytes()),
+    );
 
     let (x_sim_fr_var, _) = SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &x_sim_fr, 64);
     let (y_sim_fr_var, _) = SimFrVar::alloc_witness_bounded_total_bits(&mut cs, &y_sim_fr, 240);
@@ -732,13 +738,13 @@ pub fn build_abar_to_bar_cs(
     let s1_plus_lambda_s2_sim_fr_var = SimFrVar::alloc_input(&mut cs, &s1_plus_lambda_s2_sim_fr);
 
     // 3. Merge the limbs for x, y, a, b.
-    let mut all_limbs = Vec::with_capacity(4 * SimFrParamsRistretto::NUM_OF_LIMBS);
+    let mut all_limbs = Vec::with_capacity(4 * SimFrParamsBLSRistretto::NUM_OF_LIMBS);
     all_limbs.extend_from_slice(&x_sim_fr.limbs);
     all_limbs.extend_from_slice(&y_sim_fr.limbs);
     all_limbs.extend_from_slice(&a_sim_fr.limbs);
     all_limbs.extend_from_slice(&b_sim_fr.limbs);
 
-    let mut all_limbs_var = Vec::with_capacity(4 * SimFrParamsRistretto::NUM_OF_LIMBS);
+    let mut all_limbs_var = Vec::with_capacity(4 * SimFrParamsBLSRistretto::NUM_OF_LIMBS);
     all_limbs_var.extend_from_slice(&x_sim_fr_var.var);
     all_limbs_var.extend_from_slice(&y_sim_fr_var.var);
     all_limbs_var.extend_from_slice(&a_sim_fr_var.var);
@@ -751,7 +757,7 @@ pub fn build_abar_to_bar_cs(
         for (i, limb) in limbs.iter().enumerate() {
             sum.add_assign(
                 <BLSScalar as Into<BigUint>>::into(*limb)
-                    .shl(SimFrParamsRistretto::BIT_PER_LIMB * i),
+                    .shl(SimFrParamsBLSRistretto::BIT_PER_LIMB * i),
             );
         }
         compressed_limbs.push(BLSScalar::from(&sum));
@@ -888,16 +894,16 @@ pub fn build_abar_to_bar_cs(
 
     cs.prepare_pi_variable(comm_var);
 
-    for i in 0..SimFrParamsRistretto::NUM_OF_LIMBS {
+    for i in 0..SimFrParamsBLSRistretto::NUM_OF_LIMBS {
         cs.prepare_pi_variable(beta_sim_fr_var.var[i]);
     }
-    for i in 0..SimFrParamsRistretto::NUM_OF_LIMBS {
+    for i in 0..SimFrParamsBLSRistretto::NUM_OF_LIMBS {
         cs.prepare_pi_variable(lambda_sim_fr_var.var[i]);
     }
-    for i in 0..SimFrParamsRistretto::NUM_OF_LIMBS {
+    for i in 0..SimFrParamsBLSRistretto::NUM_OF_LIMBS {
         cs.prepare_pi_variable(beta_lambda_sim_fr_var.var[i]);
     }
-    for i in 0..SimFrParamsRistretto::NUM_OF_LIMBS {
+    for i in 0..SimFrParamsBLSRistretto::NUM_OF_LIMBS {
         cs.prepare_pi_variable(s1_plus_lambda_s2_sim_fr_var.var[i]);
     }
 

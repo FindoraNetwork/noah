@@ -101,24 +101,10 @@ impl PartialEq for XSecretKey {
 
 impl Eq for XSecretKey {}
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-/// The ciphertext from the symmetric encryption.
-pub struct Ctext(pub Vec<u8>);
-impl NoahFromToBytes for Ctext {
-    fn noah_to_bytes(&self) -> Vec<u8> {
-        self.0.clone()
-    }
-
-    fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
-        Ok(Ctext(bytes.to_vec()))
-    }
-}
-serialize_deserialize!(Ctext);
-
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq, Clone)]
 /// A ciphertext of hybrid encryption.
 pub struct NoahHybridCiphertext {
-    pub(crate) ciphertext: Ctext,
+    pub(crate) ciphertext: CompactByteArray,
     pub(crate) ephemeral_public_key: XPublicKey,
 }
 
@@ -135,7 +121,7 @@ impl NoahFromToBytes for NoahHybridCiphertext {
             Err(AlgebraError::DeserializationError)
         } else {
             let ephemeral_public_key = XPublicKey::noah_from_bytes(&bytes[0..32])?;
-            let ciphertext = Ctext::noah_from_bytes(&bytes[32..])?;
+            let ciphertext = CompactByteArray::noah_from_bytes(&bytes[32..])?;
             Ok(Self {
                 ciphertext,
                 ephemeral_public_key,
@@ -260,16 +246,16 @@ fn symmetric_key_from_ed25519_secret_key(
     symmetric_key_from_x25519_secret_key(&x_secret, ephemeral_public_key)
 }
 
-fn symmetric_encrypt(key: &[u8; 32], plaintext: &[u8]) -> Ctext {
+fn symmetric_encrypt(key: &[u8; 32], plaintext: &[u8]) -> CompactByteArray {
     let kkey = GenericArray::from_slice(key);
     let ctr = GenericArray::from_slice(&[0u8; 16]); // counter can be zero because key is fresh
     let mut ctext_vec = plaintext.to_vec();
     let mut cipher = Aes256Ctr::new(kkey, ctr);
     cipher.apply_keystream(ctext_vec.as_mut_slice());
-    Ctext(ctext_vec)
+    CompactByteArray(ctext_vec)
 }
 
-fn symmetric_decrypt(key: &[u8; 32], ciphertext: &Ctext) -> Vec<u8> {
+fn symmetric_decrypt(key: &[u8; 32], ciphertext: &CompactByteArray) -> Vec<u8> {
     let kkey = GenericArray::from_slice(key);
     let ctr = GenericArray::from_slice(&[0u8; 16]);
     let mut plaintext_vec = ciphertext.0.clone();

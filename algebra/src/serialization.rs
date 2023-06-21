@@ -217,6 +217,18 @@ impl NoahFromToBytes for x25519_dalek::StaticSecret {
     }
 }
 
+impl NoahFromToBytes for CompactByteArray {
+    fn noah_to_bytes(&self) -> Vec<u8> {
+        self.0.clone()
+    }
+
+    fn noah_from_bytes(bytes: &[u8]) -> Result<Self> {
+        Ok(CompactByteArray(bytes.to_vec()))
+    }
+}
+
+serialize_deserialize!(CompactByteArray);
+
 /// Module for serialization for Noah objects
 pub mod noah_obj_serde {
     use crate::serialization::NoahFromToBytes;

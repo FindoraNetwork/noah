@@ -3,38 +3,38 @@ use core::{
     cmp::{max, min},
     ops::{Shl, Shr},
 };
-use noah_algebra::{bls12_381::BLSScalar, prelude::*};
+use noah_algebra::prelude::*;
 use noah_crypto::field_simulation::{SimFr, SimFrMul, SimFrParams};
 use num_bigint::BigUint;
 use num_integer::Integer;
 
 /// `SimFrMulVar` is the variable for `SimFrMul` in
-/// `TurboConstraintSystem<BLSScalar>`
+/// `TurboConstraintSystem<F>`
 #[derive(Clone)]
-pub struct SimFrMulVar<P: SimFrParams> {
+pub struct SimFrMulVar<F: Scalar, P: SimFrParams<F>> {
     /// the `SimFrMul` value.
-    pub val: SimFrMul<P>,
+    pub val: SimFrMul<F, P>,
     /// the `SimFrMul` variables.
     pub var: Vec<VarIndex>,
 }
 
-impl<P: SimFrParams> SimFrMulVar<P> {
+impl<F: Scalar, P: SimFrParams<F>> SimFrMulVar<F, P> {
     /// Create a zero `SimFrMul`.
-    pub fn new(cs: &mut TurboCS<BLSScalar>) -> Self {
+    pub fn new(cs: &mut TurboCS<F>) -> Self {
         Self {
-            val: SimFrMul::<P>::default(),
+            val: SimFrMul::<F, P>::default(),
             var: vec![cs.zero_var(); P::NUM_OF_LIMBS_MUL],
         }
     }
 
     /// the Add operation.
-    pub fn add(&self, cs: &mut TurboCS<BLSScalar>, other: &SimFrMulVar<P>) -> SimFrMulVar<P> {
+    pub fn add(&self, cs: &mut TurboCS<F>, other: &SimFrMulVar<F, P>) -> SimFrMulVar<F, P> {
         let mut res = (*self).clone();
         res.val = &self.val + &other.val;
 
         let zero_var = cs.zero_var();
-        let zero = BLSScalar::zero();
-        let one = BLSScalar::one();
+        let zero = F::zero();
+        let one = F::one();
 
         for i in 0..P::NUM_OF_LIMBS_MUL {
             res.var[i] = cs.new_variable(res.val.limbs[i]);
@@ -60,14 +60,14 @@ impl<P: SimFrParams> SimFrMulVar<P> {
     }
 
     /// the Sub operation.
-    pub fn sub(&self, cs: &mut TurboCS<BLSScalar>, other: &SimFrVar<P>) -> SimFrMulVar<P> {
+    pub fn sub(&self, cs: &mut TurboCS<F>, other: &SimFrVar<F, P>) -> SimFrMulVar<F, P> {
         let mut res = (*self).clone();
         res.val = &self.val - &other.val;
 
         let zero_var = cs.zero_var();
 
-        let zero = BLSScalar::zero();
-        let one = BLSScalar::one();
+        let zero = F::zero();
+        let one = F::one();
         let minus_one = one.neg();
 
         let r_limbs = P::scalar_field_sub_pad_in_limbs();
@@ -100,7 +100,7 @@ impl<P: SimFrParams> SimFrMulVar<P> {
     }
 
     /// Enforce a zero constraint.
-    pub fn enforce_zero(&self, cs: &mut TurboCS<BLSScalar>) {
+    pub fn enforce_zero(&self, cs: &mut TurboCS<F>) {
         assert!(self.val.prod_of_num_of_additions.bits() as usize <= 5);
         let surfeit = 5;
 
@@ -108,8 +108,8 @@ impl<P: SimFrParams> SimFrMulVar<P> {
 
         let r_biguint = P::scalar_field_in_biguint();
 
-        let zero = BLSScalar::zero();
-        let one = BLSScalar::one();
+        let zero = F::zero();
+        let one = F::one();
         let minus_one = one.neg();
 
         let zero_var = cs.zero_var();
@@ -121,7 +121,7 @@ impl<P: SimFrParams> SimFrMulVar<P> {
         debug_assert!(k.lt(&r_biguint.shl(5u32)));
 
         let r_limbs = P::scalar_field_in_limbs().to_vec();
-        let k_limbs = SimFr::<P>::from(&k).limbs.to_vec();
+        let k_limbs = SimFr::<F, P>::from(&k).limbs.to_vec();
         let mut k_limbs_var = Vec::with_capacity(k_limbs.len());
         for i in 0..P::NUM_OF_LIMBS {
             let new_var = cs.new_variable(k_limbs[i]);
@@ -133,7 +133,7 @@ impl<P: SimFrParams> SimFrMulVar<P> {
             k_limbs_var.push(new_var);
         }
 
-        let mut rk_limbs = vec![BLSScalar::zero(); P::NUM_OF_LIMBS_MUL];
+        let mut rk_limbs = vec![F::zero(); P::NUM_OF_LIMBS_MUL];
 
         for i in 0..P::NUM_OF_LIMBS {
             for j in 0..P::NUM_OF_LIMBS {
@@ -156,13 +156,13 @@ impl<P: SimFrParams> SimFrMulVar<P> {
                 let (second_index, second_multiple) = if left_chuck.len() > 1 {
                     (k_limbs_var[i - left_chuck[1]], r_limbs[left_chuck[1]])
                 } else {
-                    (zero_var, BLSScalar::zero())
+                    (zero_var, F::zero())
                 };
 
                 let (third_index, third_multiple) = if left_chuck.len() > 2 {
                     (k_limbs_var[i - left_chuck[2]], r_limbs[left_chuck[2]])
                 } else {
-                    (zero_var, BLSScalar::zero())
+                    (zero_var, F::zero())
                 };
 
                 res = cs.linear_combine(
@@ -184,7 +184,7 @@ impl<P: SimFrParams> SimFrMulVar<P> {
         let mut right_var_group = Vec::with_capacity(P::NUM_OF_GROUPS);
         let mut num_limbs_in_group = Vec::with_capacity(P::NUM_OF_GROUPS);
 
-        let step = BLSScalar::from(&BigUint::from(1u32).shl(P::BIT_PER_LIMB));
+        let step = F::from(&BigUint::from(1u32).shl(P::BIT_PER_LIMB));
 
         for i in 0..P::NUM_OF_GROUPS {
             if i * 2 + 1 < P::NUM_OF_LIMBS_MUL {
@@ -233,7 +233,7 @@ impl<P: SimFrParams> SimFrMulVar<P> {
         //      left_group_limb + pad_limb + carry_in - right_group_limb
         //   =  carry shift by (BIT_PER_LIMB * num_limb_in_group) + remainder
 
-        let mut carry_in = BLSScalar::zero();
+        let mut carry_in = F::zero();
         let mut carry_in_var = cs.zero_var();
         let mut accumulated_extra = BigUint::zero();
         for (
@@ -253,8 +253,8 @@ impl<P: SimFrParams> SimFrMulVar<P> {
             let pad = BigUint::from(1u32).shl(
                 (num_limbs_in_this_group + 1) * P::BIT_PER_LIMB + num_limbs_in_this_group + surfeit,
             );
-            let pad_limb = BLSScalar::from(&pad);
-            assert!(pad > <BLSScalar as Into<BigUint>>::into(right_group_limb.clone()));
+            let pad_limb = F::from(&pad);
+            assert!(pad > <F as Into<BigUint>>::into(right_group_limb.clone()));
 
             // Compute the carry number for the next cycle
             let mut carry = left_group_limb
@@ -263,7 +263,7 @@ impl<P: SimFrParams> SimFrMulVar<P> {
                 .sub(&right_group_limb);
 
             let carry_biguint: BigUint = carry.clone().into();
-            carry = BLSScalar::from(&carry_biguint.shr(num_limbs_in_this_group * P::BIT_PER_LIMB));
+            carry = F::from(&carry_biguint.shr(num_limbs_in_this_group * P::BIT_PER_LIMB));
 
             accumulated_extra += BigUint::from_bytes_le(&pad_limb.to_bytes());
 
@@ -272,7 +272,7 @@ impl<P: SimFrParams> SimFrMulVar<P> {
             let (new_accumulated_extra, remainder_biguint) = accumulated_extra
                 .div_rem(&BigUint::from(1u64).shl(P::BIT_PER_LIMB * num_limbs_in_this_group));
 
-            let remainder = BLSScalar::from(&remainder_biguint);
+            let remainder = F::from(&remainder_biguint);
 
             let carry_shift =
                 (&BigUint::from(1u32).shl(P::BIT_PER_LIMB * num_limbs_in_this_group)).into();
@@ -308,14 +308,14 @@ impl<P: SimFrParams> SimFrMulVar<P> {
 }
 
 #[cfg(test)]
-mod test_ristretto {
+mod test_ristretto_bls12_381 {
     use crate::plonk::constraint_system::{field_simulation::SimFrVar, turbo::TurboCS};
     use noah_algebra::{bls12_381::BLSScalar, prelude::*};
-    use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto};
+    use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsBLSRistretto};
     use num_bigint::{BigUint, RandBigInt};
 
-    type SimFrTest = SimFr<SimFrParamsRistretto>;
-    type SimFrVarTest = SimFrVar<SimFrParamsRistretto>;
+    type SimFrTest = SimFr<BLSScalar, SimFrParamsBLSRistretto>;
+    type SimFrVarTest = SimFrVar<BLSScalar, SimFrParamsBLSRistretto>;
 
     #[test]
     fn test_enforce_zero_trivial() {
@@ -331,7 +331,7 @@ mod test_ristretto {
     #[test]
     fn test_enforce_zero() {
         let mut prng = test_rng();
-        let r_biguint = SimFrParamsRistretto::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsBLSRistretto::scalar_field_in_biguint();
 
         for _ in 0..1000 {
             let mut cs = TurboCS::<BLSScalar>::new();
@@ -361,7 +361,7 @@ mod test_ristretto {
     #[should_panic]
     fn test_enforce_zero_panic() {
         let mut prng = test_rng();
-        let r_biguint = SimFrParamsRistretto::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsBLSRistretto::scalar_field_in_biguint();
 
         let mut cs = TurboCS::<BLSScalar>::new();
 
@@ -388,14 +388,14 @@ mod test_ristretto {
 }
 
 #[cfg(test)]
-mod test_secq256k1 {
+mod test_secq256k1_bls12_381 {
     use crate::plonk::constraint_system::{field_simulation::SimFrVar, turbo::TurboCS};
     use noah_algebra::{bls12_381::BLSScalar, prelude::*};
-    use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsSecq256k1};
+    use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsBLSSecq256k1};
     use num_bigint::{BigUint, RandBigInt};
 
-    type SimFrTest = SimFr<SimFrParamsSecq256k1>;
-    type SimFrVarTest = SimFrVar<SimFrParamsSecq256k1>;
+    type SimFrTest = SimFr<BLSScalar, SimFrParamsBLSSecq256k1>;
+    type SimFrVarTest = SimFrVar<BLSScalar, SimFrParamsBLSSecq256k1>;
 
     #[test]
     fn test_enforce_zero_trivial() {
@@ -411,7 +411,7 @@ mod test_secq256k1 {
     #[test]
     fn test_enforce_zero() {
         let mut prng = test_rng();
-        let r_biguint = SimFrParamsSecq256k1::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsBLSSecq256k1::scalar_field_in_biguint();
 
         for _ in 0..1000 {
             let mut cs = TurboCS::<BLSScalar>::new();
@@ -441,7 +441,7 @@ mod test_secq256k1 {
     #[should_panic]
     fn test_enforce_zero_panic() {
         let mut prng = test_rng();
-        let r_biguint = SimFrParamsSecq256k1::scalar_field_in_biguint();
+        let r_biguint = SimFrParamsBLSSecq256k1::scalar_field_in_biguint();
 
         let mut cs = TurboCS::<BLSScalar>::new();
 

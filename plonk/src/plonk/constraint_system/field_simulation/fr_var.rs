@@ -1,6 +1,5 @@
 use crate::plonk::constraint_system::{field_simulation::SimFrMulVar, TurboCS, VarIndex};
 use noah_algebra::{
-    bls12_381::BLSScalar,
     cmp::{max, min},
     prelude::*,
 };
@@ -9,29 +8,29 @@ use noah_crypto::field_simulation::{SimFr, SimFrParams, SimReducibility};
 /// `SimFrVar` is the variable for `SimFr` in
 /// `TurboConstraintSystem<BLSScalar>`
 #[derive(Clone)]
-pub struct SimFrVar<P: SimFrParams> {
+pub struct SimFrVar<F: Scalar, P: SimFrParams<F>> {
     /// the `SimFr` value.
-    pub val: SimFr<P>,
+    pub val: SimFr<F, P>,
     /// the `SimFr` variables.
     pub var: Vec<VarIndex>,
 }
 
-impl<P: SimFrParams> SimFrVar<P> {
+impl<F: Scalar, P: SimFrParams<F>> SimFrVar<F, P> {
     /// Create a zero `SimFr`.
-    pub fn new(cs: &mut TurboCS<BLSScalar>) -> Self {
+    pub fn new(cs: &mut TurboCS<F>) -> Self {
         Self {
-            val: SimFr::<P>::default(),
+            val: SimFr::<F, P>::default(),
             var: vec![cs.zero_var(); P::NUM_OF_LIMBS],
         }
     }
 
     /// the Sub operation.
-    pub fn sub(&self, cs: &mut TurboCS<BLSScalar>, other: &SimFrVar<P>) -> SimFrVar<P> {
-        let mut res = SimFrVar::<P>::new(cs);
+    pub fn sub(&self, cs: &mut TurboCS<F>, other: &SimFrVar<F, P>) -> SimFrVar<F, P> {
+        let mut res = SimFrVar::<F, P>::new(cs);
         res.val = &self.val - &other.val;
 
-        let zero = BLSScalar::zero();
-        let one = BLSScalar::one();
+        let zero = F::zero();
+        let one = F::one();
         let minus_one = one.neg();
 
         let zero_var = cs.zero_var();
@@ -61,12 +60,12 @@ impl<P: SimFrParams> SimFrVar<P> {
     }
 
     /// the Mul operation.
-    pub fn mul(&self, cs: &mut TurboCS<BLSScalar>, other: &SimFrVar<P>) -> SimFrMulVar<P> {
-        let mut res = SimFrMulVar::<P>::new(cs);
+    pub fn mul(&self, cs: &mut TurboCS<F>, other: &SimFrVar<F, P>) -> SimFrMulVar<F, P> {
+        let mut res = SimFrMulVar::<F, P>::new(cs);
         res.val = &self.val * &other.val;
 
-        let zero = BLSScalar::zero();
-        let one = BLSScalar::one();
+        let zero = F::zero();
+        let one = F::one();
 
         let zero_var = cs.zero_var();
 
@@ -76,7 +75,7 @@ impl<P: SimFrParams> SimFrVar<P> {
 
             let left_array = (smallest_left..=largest_left).collect::<Vec<_>>();
 
-            let mut prior_res_val = BLSScalar::zero();
+            let mut prior_res_val = F::zero();
             let mut prior_res = cs.zero_var();
             for left in left_array {
                 let res_val =
@@ -109,7 +108,7 @@ impl<P: SimFrParams> SimFrVar<P> {
     }
 
     /// Alloc a constant gate.
-    pub fn alloc_constant(cs: &mut TurboCS<BLSScalar>, val: &SimFr<P>) -> Self {
+    pub fn alloc_constant(cs: &mut TurboCS<F>, val: &SimFr<F, P>) -> Self {
         let mut res = Self::new(cs);
         res.val = (*val).clone();
         for i in 0..P::NUM_OF_LIMBS {
@@ -120,7 +119,7 @@ impl<P: SimFrParams> SimFrVar<P> {
     }
 
     /// Alloc an input variable.
-    pub fn alloc_input(cs: &mut TurboCS<BLSScalar>, val: &SimFr<P>) -> Self {
+    pub fn alloc_input(cs: &mut TurboCS<F>, val: &SimFr<F, P>) -> Self {
         let mut res = Self::new(cs);
         res.val = (*val).clone();
         for i in 0..P::NUM_OF_LIMBS {
@@ -130,7 +129,7 @@ impl<P: SimFrParams> SimFrVar<P> {
     }
 
     /// Alloc a witness variable and range check gate.
-    pub fn alloc_witness(cs: &mut TurboCS<BLSScalar>, val: &SimFr<P>) -> (Self, Vec<VarIndex>) {
+    pub fn alloc_witness(cs: &mut TurboCS<F>, val: &SimFr<F, P>) -> (Self, Vec<VarIndex>) {
         assert!(val.num_of_additions_over_normal_form == SimReducibility::StrictlyNotReducible);
 
         let mut res = Self::new(cs);
@@ -153,8 +152,8 @@ impl<P: SimFrParams> SimFrVar<P> {
 
     /// Alloc a witness variable and range check gate with bounded.
     pub fn alloc_witness_bounded_total_bits(
-        cs: &mut TurboCS<BLSScalar>,
-        val: &SimFr<P>,
+        cs: &mut TurboCS<F>,
+        val: &SimFr<F, P>,
         total_bits: usize,
     ) -> (Self, Vec<VarIndex>) {
         assert!(val.num_of_additions_over_normal_form == SimReducibility::StrictlyNotReducible);
@@ -184,22 +183,22 @@ impl<P: SimFrParams> SimFrVar<P> {
 }
 
 #[cfg(test)]
-mod test_ristretto {
+mod test_ristretto_bls12_381 {
     use crate::plonk::constraint_system::{
         field_simulation::{SimFrMulVar, SimFrVar},
         TurboCS,
     };
     use noah_algebra::{bls12_381::BLSScalar, ops::Shl, prelude::*};
-    use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsRistretto};
+    use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsBLSRistretto};
     use num_bigint::{BigUint, RandBigInt};
 
-    type SimFrTest = SimFr<SimFrParamsRistretto>;
-    type SimFrVarTest = SimFrVar<SimFrParamsRistretto>;
-    type SimFrMulVarTest = SimFrMulVar<SimFrParamsRistretto>;
+    type SimFrTest = SimFr<BLSScalar, SimFrParamsBLSRistretto>;
+    type SimFrVarTest = SimFrVar<BLSScalar, SimFrParamsBLSRistretto>;
+    type SimFrMulVarTest = SimFrMulVar<BLSScalar, SimFrParamsBLSRistretto>;
 
     fn test_sim_fr_equality(cs: TurboCS<BLSScalar>, val: &SimFrVarTest) {
         let mut cs = cs;
-        for i in 0..SimFrParamsRistretto::NUM_OF_LIMBS {
+        for i in 0..SimFrParamsBLSRistretto::NUM_OF_LIMBS {
             cs.insert_constant_gate(val.var[i], val.val.limbs[i]);
         }
 
@@ -209,7 +208,7 @@ mod test_ristretto {
 
     fn test_sim_fr_mul_equality(cs: TurboCS<BLSScalar>, val: &SimFrMulVarTest) {
         let mut cs = cs;
-        for i in 0..SimFrParamsRistretto::NUM_OF_LIMBS_MUL {
+        for i in 0..SimFrParamsBLSRistretto::NUM_OF_LIMBS_MUL {
             cs.insert_constant_gate(val.var[i], val.val.limbs[i]);
         }
 
@@ -220,7 +219,7 @@ mod test_ristretto {
     #[test]
     fn test_alloc_constant() {
         let mut prng = test_rng();
-        let p_biguint = SimFrParamsRistretto::scalar_field_in_biguint();
+        let p_biguint = SimFrParamsBLSRistretto::scalar_field_in_biguint();
 
         for _ in 0..100 {
             let a = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
@@ -237,7 +236,7 @@ mod test_ristretto {
     #[test]
     fn test_alloc_witness() {
         let mut prng = test_rng();
-        let p_biguint = SimFrParamsRistretto::scalar_field_in_biguint();
+        let p_biguint = SimFrParamsBLSRistretto::scalar_field_in_biguint();
 
         for _ in 0..100 {
             let a = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
@@ -254,7 +253,7 @@ mod test_ristretto {
     #[test]
     fn test_sub() {
         let mut prng = test_rng();
-        let p_biguint = SimFrParamsRistretto::scalar_field_in_biguint();
+        let p_biguint = SimFrParamsBLSRistretto::scalar_field_in_biguint();
 
         for _ in 0..100 {
             let a = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
@@ -278,7 +277,7 @@ mod test_ristretto {
     #[test]
     fn test_mul() {
         let mut prng = test_rng();
-        let p_biguint = SimFrParamsRistretto::scalar_field_in_biguint();
+        let p_biguint = SimFrParamsBLSRistretto::scalar_field_in_biguint();
 
         for _ in 0..100 {
             let a = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
@@ -335,22 +334,22 @@ mod test_ristretto {
 }
 
 #[cfg(test)]
-mod test_secq256k1 {
+mod test_secq256k1_bls12_381 {
     use crate::plonk::constraint_system::{
         field_simulation::{SimFrMulVar, SimFrVar},
         TurboCS,
     };
     use noah_algebra::{bls12_381::BLSScalar, ops::Shl, prelude::*};
-    use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsSecq256k1};
+    use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsBLSSecq256k1};
     use num_bigint::{BigUint, RandBigInt};
 
-    type SimFrTest = SimFr<SimFrParamsSecq256k1>;
-    type SimFrVarTest = SimFrVar<SimFrParamsSecq256k1>;
-    type SimFrMulVarTest = SimFrMulVar<SimFrParamsSecq256k1>;
+    type SimFrTest = SimFr<BLSScalar, SimFrParamsBLSSecq256k1>;
+    type SimFrVarTest = SimFrVar<BLSScalar, SimFrParamsBLSSecq256k1>;
+    type SimFrMulVarTest = SimFrMulVar<BLSScalar, SimFrParamsBLSSecq256k1>;
 
     fn test_sim_fr_equality(cs: TurboCS<BLSScalar>, val: &SimFrVarTest) {
         let mut cs = cs;
-        for i in 0..SimFrParamsSecq256k1::NUM_OF_LIMBS {
+        for i in 0..SimFrParamsBLSSecq256k1::NUM_OF_LIMBS {
             cs.insert_constant_gate(val.var[i], val.val.limbs[i]);
         }
 
@@ -360,7 +359,7 @@ mod test_secq256k1 {
 
     fn test_sim_fr_mul_equality(cs: TurboCS<BLSScalar>, val: &SimFrMulVarTest) {
         let mut cs = cs;
-        for i in 0..SimFrParamsSecq256k1::NUM_OF_LIMBS_MUL {
+        for i in 0..SimFrParamsBLSSecq256k1::NUM_OF_LIMBS_MUL {
             cs.insert_constant_gate(val.var[i], val.val.limbs[i]);
         }
 
@@ -371,7 +370,7 @@ mod test_secq256k1 {
     #[test]
     fn test_alloc_constant() {
         let mut prng = test_rng();
-        let p_biguint = SimFrParamsSecq256k1::scalar_field_in_biguint();
+        let p_biguint = SimFrParamsBLSSecq256k1::scalar_field_in_biguint();
 
         for _ in 0..100 {
             let a = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
@@ -388,7 +387,7 @@ mod test_secq256k1 {
     #[test]
     fn test_alloc_witness() {
         let mut prng = test_rng();
-        let p_biguint = SimFrParamsSecq256k1::scalar_field_in_biguint();
+        let p_biguint = SimFrParamsBLSSecq256k1::scalar_field_in_biguint();
 
         for _ in 0..100 {
             let a = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
@@ -405,7 +404,7 @@ mod test_secq256k1 {
     #[test]
     fn test_sub() {
         let mut prng = test_rng();
-        let p_biguint = SimFrParamsSecq256k1::scalar_field_in_biguint();
+        let p_biguint = SimFrParamsBLSSecq256k1::scalar_field_in_biguint();
 
         for _ in 0..100 {
             let a = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
@@ -429,7 +428,7 @@ mod test_secq256k1 {
     #[test]
     fn test_mul() {
         let mut prng = test_rng();
-        let p_biguint = SimFrParamsSecq256k1::scalar_field_in_biguint();
+        let p_biguint = SimFrParamsBLSSecq256k1::scalar_field_in_biguint();
 
         for _ in 0..100 {
             let a = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);

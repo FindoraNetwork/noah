@@ -231,37 +231,37 @@ mod smoke_xfr {
 
         let memo = om[0].as_ref().unwrap();
         assert_eq!(
-            memo.blind_share_bytes.len() + memo.lock_bytes.len(),
+            memo.blind_share_bytes.0.len() + memo.lock_bytes.0.len(),
             OWNER_MEMO_SECP256K1_HIDE_AMOUNT_AND_TYPE
         );
 
         let memo = om[1].as_ref().unwrap();
         assert_eq!(
-            memo.blind_share_bytes.len() + memo.lock_bytes.len(),
+            memo.blind_share_bytes.0.len() + memo.lock_bytes.0.len(),
             OWNER_MEMO_SECP256K1_HIDE_AMOUNT
         );
 
         let memo = om[2].as_ref().unwrap();
         assert_eq!(
-            memo.blind_share_bytes.len() + memo.lock_bytes.len(),
+            memo.blind_share_bytes.0.len() + memo.lock_bytes.0.len(),
             OWNER_MEMO_SECP256K1_HIDE_TYPE
         );
 
         let memo = om[3].as_ref().unwrap();
         assert_eq!(
-            memo.blind_share_bytes.len() + memo.lock_bytes.len(),
+            memo.blind_share_bytes.0.len() + memo.lock_bytes.0.len(),
             OWNER_MEMO_ED25519_HIDE_AMOUNT_AND_TYPE
         );
 
         let memo = om[4].as_ref().unwrap();
         assert_eq!(
-            memo.blind_share_bytes.len() + memo.lock_bytes.len(),
+            memo.blind_share_bytes.0.len() + memo.lock_bytes.0.len(),
             OWNER_MEMO_ED25519_HIDE_AMOUNT
         );
 
         let memo = om[5].as_ref().unwrap();
         assert_eq!(
-            memo.blind_share_bytes.len() + memo.lock_bytes.len(),
+            memo.blind_share_bytes.0.len() + memo.lock_bytes.0.len(),
             OWNER_MEMO_ED25519_HIDE_TYPE
         );
     }
