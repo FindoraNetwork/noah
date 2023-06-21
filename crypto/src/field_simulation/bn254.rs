@@ -17,7 +17,7 @@ impl SimFrParams<BN254Scalar> for SimFrParamsBN254Ristretto {
         BigUint::from_str(
             "7237005577332262213973186563042994240857116359379907606001950938285454250989",
         )
-            .unwrap()
+        .unwrap()
     }
 
     fn scalar_field_in_limbs() -> Vec<BN254Scalar> {
@@ -29,7 +29,7 @@ impl SimFrParams<BN254Scalar> for SimFrParamsBN254Ristretto {
             BN254Scalar::from_str("0").unwrap(),
             BN254Scalar::from_str("137438953472").unwrap(),
         ]
-            .to_vec()
+        .to_vec()
     }
 
     fn scalar_field_sub_pad_in_limbs() -> Vec<BN254Scalar> {
@@ -41,14 +41,14 @@ impl SimFrParams<BN254Scalar> for SimFrParamsBN254Ristretto {
             BN254Scalar::from_str("17592186044414").unwrap(),
             BN254Scalar::from_str("412316860414").unwrap(),
         ]
-            .to_vec()
+        .to_vec()
     }
 
     fn scalar_field_sub_pad_in_biguint() -> BigUint {
         BigUint::from_str(
             "21711016731996786641919559689128982722571349078139722818005852814856362752967",
         )
-            .unwrap()
+        .unwrap()
     }
 }
 
@@ -66,7 +66,7 @@ impl SimFrParams<BN254Scalar> for SimFrParamsBN254Secq256k1 {
         BigUint::from_str(
             "115792089237316195423570985008687907853269984665640564039457584007908834671663",
         )
-            .unwrap()
+        .unwrap()
     }
 
     fn scalar_field_in_limbs() -> Vec<BN254Scalar> {
@@ -78,7 +78,7 @@ impl SimFrParams<BN254Scalar> for SimFrParamsBN254Secq256k1 {
             BN254Scalar::from_str("17592186044415").unwrap(),
             BN254Scalar::from_str("68719476735").unwrap(),
         ]
-            .to_vec()
+        .to_vec()
     }
 
     fn scalar_field_sub_pad_in_limbs() -> Vec<BN254Scalar> {
@@ -90,14 +90,14 @@ impl SimFrParams<BN254Scalar> for SimFrParamsBN254Secq256k1 {
             BN254Scalar::from_str("35184372088830").unwrap(),
             BN254Scalar::from_str("137438953470").unwrap(),
         ]
-            .to_vec()
+        .to_vec()
     }
 
     fn scalar_field_sub_pad_in_biguint() -> BigUint {
         BigUint::from_str(
             "231584178474632390847141970017375815706539969331281128078915168015817669343326",
         )
-            .unwrap()
+        .unwrap()
     }
 }
 
@@ -115,7 +115,7 @@ impl SimFrParams<BN254Scalar> for SimFrParamsBN254Zorro {
         BigUint::from_str(
             "57896044618658097711785492504343953926634992332820282019728792003956564819949",
         )
-            .unwrap()
+        .unwrap()
     }
 
     fn scalar_field_in_limbs() -> Vec<BN254Scalar> {
@@ -127,7 +127,7 @@ impl SimFrParams<BN254Scalar> for SimFrParamsBN254Zorro {
             BN254Scalar::from_str("17592186044415").unwrap(),
             BN254Scalar::from_str("34359738367").unwrap(),
         ]
-            .to_vec()
+        .to_vec()
     }
 
     fn scalar_field_sub_pad_in_limbs() -> Vec<BN254Scalar> {
@@ -139,14 +139,14 @@ impl SimFrParams<BN254Scalar> for SimFrParamsBN254Zorro {
             BN254Scalar::from_str("35184372088830").unwrap(),
             BN254Scalar::from_str("68719476734").unwrap(),
         ]
-            .to_vec()
+        .to_vec()
     }
 
     fn scalar_field_sub_pad_in_biguint() -> BigUint {
         BigUint::from_str(
             "115792089237316195423570985008687907853269984665640564039457584007913129639898",
         )
-            .unwrap()
+        .unwrap()
     }
 }
 

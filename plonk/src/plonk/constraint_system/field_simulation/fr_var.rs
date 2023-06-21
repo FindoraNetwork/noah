@@ -484,7 +484,6 @@ mod test_secq256k1_bls12_381 {
     }
 }
 
-
 #[cfg(test)]
 mod test_ristretto_bn254 {
     use crate::plonk::constraint_system::{
