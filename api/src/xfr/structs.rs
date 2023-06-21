@@ -411,9 +411,9 @@ pub struct OwnerMemo {
     /// The signature used curve type.
     pub key_type: KeyType,
     /// The random point used to compute the shared point.
-    pub blind_share_bytes: Vec<u8>,
+    pub blind_share_bytes: CompactByteArray,
     /// The ciphertext of the memo information.
-    pub lock_bytes: Vec<u8>,
+    pub lock_bytes: CompactByteArray,
 }
 
 impl OwnerMemo {
@@ -432,8 +432,8 @@ impl OwnerMemo {
         Ok((
             OwnerMemo {
                 key_type,
-                blind_share_bytes,
-                lock_bytes,
+                blind_share_bytes: CompactByteArray(blind_share_bytes),
+                lock_bytes: CompactByteArray(lock_bytes),
             },
             amount_blinds,
         ))
@@ -454,8 +454,8 @@ impl OwnerMemo {
         Ok((
             OwnerMemo {
                 key_type,
-                blind_share_bytes,
-                lock_bytes,
+                blind_share_bytes: CompactByteArray(blind_share_bytes),
+                lock_bytes: CompactByteArray(lock_bytes),
             },
             asset_type_blind,
         ))
@@ -481,8 +481,8 @@ impl OwnerMemo {
         Ok((
             OwnerMemo {
                 key_type,
-                blind_share_bytes,
-                lock_bytes,
+                blind_share_bytes: CompactByteArray(blind_share_bytes),
+                lock_bytes: CompactByteArray(lock_bytes),
             },
             amount_blinds,
             asset_type_blind,
@@ -538,14 +538,14 @@ impl OwnerMemo {
         keypair: &KeyPair,
     ) -> Result<(RistrettoScalar, RistrettoScalar)> {
         let (key_type, s) = keypair.sec_key.as_scalar_bytes()?;
-        let shared_point = OwnerMemo::derive_shared_point(&key_type, &s, &self.blind_share_bytes)?;
+        let shared_point = OwnerMemo::derive_shared_point(&key_type, &s, &self.blind_share_bytes.0)?;
         Ok(OwnerMemo::calc_amount_blinds(&shared_point))
     }
 
     /// Return the asset type blind
     pub fn derive_asset_type_blind(&self, keypair: &KeyPair) -> Result<RistrettoScalar> {
         let (key_type, s) = keypair.sec_key.as_scalar_bytes()?;
-        let shared_point = OwnerMemo::derive_shared_point(&key_type, &s, &self.blind_share_bytes)?;
+        let shared_point = OwnerMemo::derive_shared_point(&key_type, &s, &self.blind_share_bytes.0)?;
         Ok(OwnerMemo::calc_asset_type_blind(&shared_point))
     }
 }
@@ -553,7 +553,7 @@ impl OwnerMemo {
 impl OwnerMemo {
     // Decrypt the lock.
     fn decrypt(&self, keypair: &KeyPair) -> Result<Vec<u8>> {
-        xfr_hybrid_decrypt(&keypair.sec_key, &self.lock_bytes)
+        xfr_hybrid_decrypt(&keypair.sec_key, &self.lock_bytes.0)
     }
 
     // Given a shared point, calculate the amount blinds.
@@ -610,16 +610,16 @@ pub fn check_memo_size(output: &BlindAssetRecord, memo: &Option<OwnerMemo>) -> R
 
     match (&memo.key_type, output.public_key.inner()) {
         (KeyType::Ed25519, PublicKeyInner::Ed25519(_)) => {
-            if memo.blind_share_bytes.len() != Ed25519Point::COMPRESSED_LEN
+            if memo.blind_share_bytes.0.len() != Ed25519Point::COMPRESSED_LEN
                 || (output.amount.is_confidential()
                     && output.asset_type.is_confidential()
-                    && memo.lock_bytes.len() > MAX_LOCK_BYTES_CON_CON_ED25519)
+                    && memo.lock_bytes.0.len() > MAX_LOCK_BYTES_CON_CON_ED25519)
                 || (!output.amount.is_confidential()
                     && output.asset_type.is_confidential()
-                    && memo.lock_bytes.len() > MAX_LOCK_BYTES_NON_CON_ED25519)
+                    && memo.lock_bytes.0.len() > MAX_LOCK_BYTES_NON_CON_ED25519)
                 || (output.amount.is_confidential()
                     && !output.asset_type.is_confidential()
-                    && memo.lock_bytes.len() > MAX_LOCK_BYTES_CON_NON_ED25519)
+                    && memo.lock_bytes.0.len() > MAX_LOCK_BYTES_CON_NON_ED25519)
             {
                 return Err(NoahError::AXfrVerifierParamsError);
             }
@@ -627,16 +627,16 @@ pub fn check_memo_size(output: &BlindAssetRecord, memo: &Option<OwnerMemo>) -> R
             Ok(())
         }
         (KeyType::Secp256k1, PublicKeyInner::Secp256k1(_)) => {
-            if memo.blind_share_bytes.len() != SECP256K1G1::COMPRESSED_LEN
+            if memo.blind_share_bytes.0.len() != SECP256K1G1::COMPRESSED_LEN
                 || (output.amount.is_confidential()
                     && output.asset_type.is_confidential()
-                    && memo.lock_bytes.len() > MAX_LOCK_BYTES_CON_CON_SECP256K1)
+                    && memo.lock_bytes.0.len() > MAX_LOCK_BYTES_CON_CON_SECP256K1)
                 || (!output.amount.is_confidential()
                     && output.asset_type.is_confidential()
-                    && memo.lock_bytes.len() > MAX_LOCK_BYTES_NON_CON_SECP256K1)
+                    && memo.lock_bytes.0.len() > MAX_LOCK_BYTES_NON_CON_SECP256K1)
                 || (output.amount.is_confidential()
                     && !output.asset_type.is_confidential()
-                    && memo.lock_bytes.len() > MAX_LOCK_BYTES_CON_NON_SECP256K1)
+                    && memo.lock_bytes.0.len() > MAX_LOCK_BYTES_CON_NON_SECP256K1)
             {
                 return Err(NoahError::AXfrVerificationError);
             }
@@ -877,8 +877,8 @@ impl<'de> Deserialize<'de> for OwnerMemo {
                 };
                 Ok(OwnerMemo {
                     key_type,
-                    blind_share_bytes,
-                    lock_bytes,
+                    blind_share_bytes: CompactByteArray(blind_share_bytes),
+                    lock_bytes: CompactByteArray(lock_bytes),
                 })
             }
 
@@ -931,8 +931,8 @@ impl<'de> Deserialize<'de> for OwnerMemo {
                 let lock_bytes = lock_bytes.ok_or_else(|| de::Error::missing_field("lock"))?;
                 Ok(OwnerMemo {
                     key_type,
-                    blind_share_bytes,
-                    lock_bytes,
+                    blind_share_bytes: CompactByteArray(blind_share_bytes),
+                    lock_bytes: CompactByteArray(lock_bytes),
                 })
             }
         }
