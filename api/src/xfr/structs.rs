@@ -406,7 +406,7 @@ pub struct TracerMemo {
 }
 
 /// Information directed to the recipient.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Serialize)]
 pub struct OwnerMemo {
     /// The signature used curve type.
     pub key_type: KeyType,
