@@ -483,3 +483,305 @@ mod test_secq256k1_bls12_381 {
         }
     }
 }
+
+#[cfg(test)]
+mod test_ristretto_bn254 {
+    use crate::plonk::constraint_system::{
+        field_simulation::{SimFrMulVar, SimFrVar},
+        TurboCS,
+    };
+    use noah_algebra::{bn254::BN254Scalar, ops::Shl, prelude::*};
+    use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsBN254Ristretto};
+    use num_bigint::{BigUint, RandBigInt};
+
+    type SimFrTest = SimFr<BN254Scalar, SimFrParamsBN254Ristretto>;
+    type SimFrVarTest = SimFrVar<BN254Scalar, SimFrParamsBN254Ristretto>;
+    type SimFrMulVarTest = SimFrMulVar<BN254Scalar, SimFrParamsBN254Ristretto>;
+
+    fn test_sim_fr_equality(cs: TurboCS<BN254Scalar>, val: &SimFrVarTest) {
+        let mut cs = cs;
+        for i in 0..SimFrParamsBN254Ristretto::NUM_OF_LIMBS {
+            cs.insert_constant_gate(val.var[i], val.val.limbs[i]);
+        }
+
+        let witness = cs.get_and_clear_witness();
+        assert!(cs.verify_witness(&witness[..], &[]).is_ok());
+    }
+
+    fn test_sim_fr_mul_equality(cs: TurboCS<BN254Scalar>, val: &SimFrMulVarTest) {
+        let mut cs = cs;
+        for i in 0..SimFrParamsBN254Ristretto::NUM_OF_LIMBS_MUL {
+            cs.insert_constant_gate(val.var[i], val.val.limbs[i]);
+        }
+
+        let witness = cs.get_and_clear_witness();
+        assert!(cs.verify_witness(&witness[..], &[]).is_ok());
+    }
+
+    #[test]
+    fn test_alloc_constant() {
+        let mut prng = test_rng();
+        let p_biguint = SimFrParamsBN254Ristretto::scalar_field_in_biguint();
+
+        for _ in 0..100 {
+            let a = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+            let a_sim_fr = SimFrTest::from(&a);
+
+            {
+                let mut cs = TurboCS::<BN254Scalar>::new();
+                let a_sim_fr_var = SimFrVarTest::alloc_constant(&mut cs, &a_sim_fr);
+                test_sim_fr_equality(cs, &a_sim_fr_var);
+            }
+        }
+    }
+
+    #[test]
+    fn test_alloc_witness() {
+        let mut prng = test_rng();
+        let p_biguint = SimFrParamsBN254Ristretto::scalar_field_in_biguint();
+
+        for _ in 0..100 {
+            let a = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+            let a_sim_fr = SimFrTest::from(&a);
+
+            {
+                let mut cs = TurboCS::<BN254Scalar>::new();
+                let (a_sim_fr_var, _) = SimFrVarTest::alloc_witness(&mut cs, &a_sim_fr);
+                test_sim_fr_equality(cs, &a_sim_fr_var);
+            }
+        }
+    }
+
+    #[test]
+    fn test_sub() {
+        let mut prng = test_rng();
+        let p_biguint = SimFrParamsBN254Ristretto::scalar_field_in_biguint();
+
+        for _ in 0..100 {
+            let a = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+            let b = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+
+            let a_sim_fr = SimFrTest::from(&a);
+            let b_sim_fr = SimFrTest::from(&b);
+
+            {
+                let mut cs = TurboCS::<BN254Scalar>::new();
+
+                let (a_sim_fr_var, _) = SimFrVarTest::alloc_witness(&mut cs, &a_sim_fr);
+                let (b_sim_fr_var, _) = SimFrVarTest::alloc_witness(&mut cs, &b_sim_fr);
+
+                let c_sim_fr_var = a_sim_fr_var.sub(&mut cs, &b_sim_fr_var);
+                test_sim_fr_equality(cs, &c_sim_fr_var);
+            }
+        }
+    }
+
+    #[test]
+    fn test_mul() {
+        let mut prng = test_rng();
+        let p_biguint = SimFrParamsBN254Ristretto::scalar_field_in_biguint();
+
+        for _ in 0..100 {
+            let a = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+            let b = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+
+            let a_sim_fr = SimFrTest::from(&a);
+            let b_sim_fr = SimFrTest::from(&b);
+
+            {
+                let mut cs = TurboCS::<BN254Scalar>::new();
+
+                let (a_sim_fr_var, _) = SimFrVarTest::alloc_witness(&mut cs, &a_sim_fr);
+                let (b_sim_fr_var, _) = SimFrVarTest::alloc_witness(&mut cs, &b_sim_fr);
+
+                let c_sim_fr_mul_var = a_sim_fr_var.mul(&mut cs, &b_sim_fr_var);
+                test_sim_fr_mul_equality(cs, &c_sim_fr_mul_var);
+            }
+        }
+    }
+
+    #[test]
+    fn test_bounded_allocated_witness() {
+        let mut prng = test_rng();
+
+        for _ in 0..100 {
+            let a = prng.gen_biguint(240);
+            let a_sim_fr = SimFrTest::from(&a);
+
+            {
+                let mut cs = TurboCS::<BN254Scalar>::new();
+
+                let (a_sim_fr_var, _) =
+                    SimFrVarTest::alloc_witness_bounded_total_bits(&mut cs, &a_sim_fr, 240);
+                test_sim_fr_equality(cs, &a_sim_fr_var);
+            }
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_bounded_allocated_witness_bad() {
+        let a = BigUint::from(1u32).shl(240);
+        let a_sim_fr = SimFrTest::from(&a);
+
+        {
+            let mut cs = TurboCS::<BN254Scalar>::new();
+
+            let (a_sim_fr_var, _) =
+                SimFrVarTest::alloc_witness_bounded_total_bits(&mut cs, &a_sim_fr, 240);
+
+            test_sim_fr_equality(cs, &a_sim_fr_var);
+        }
+    }
+}
+
+#[cfg(test)]
+mod test_secq256k1_bn254 {
+    use crate::plonk::constraint_system::{
+        field_simulation::{SimFrMulVar, SimFrVar},
+        TurboCS,
+    };
+    use noah_algebra::{bn254::BN254Scalar, ops::Shl, prelude::*};
+    use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsBN254Secq256k1};
+    use num_bigint::{BigUint, RandBigInt};
+
+    type SimFrTest = SimFr<BN254Scalar, SimFrParamsBN254Secq256k1>;
+    type SimFrVarTest = SimFrVar<BN254Scalar, SimFrParamsBN254Secq256k1>;
+    type SimFrMulVarTest = SimFrMulVar<BN254Scalar, SimFrParamsBN254Secq256k1>;
+
+    fn test_sim_fr_equality(cs: TurboCS<BN254Scalar>, val: &SimFrVarTest) {
+        let mut cs = cs;
+        for i in 0..SimFrParamsBN254Secq256k1::NUM_OF_LIMBS {
+            cs.insert_constant_gate(val.var[i], val.val.limbs[i]);
+        }
+
+        let witness = cs.get_and_clear_witness();
+        assert!(cs.verify_witness(&witness[..], &[]).is_ok());
+    }
+
+    fn test_sim_fr_mul_equality(cs: TurboCS<BN254Scalar>, val: &SimFrMulVarTest) {
+        let mut cs = cs;
+        for i in 0..SimFrParamsBN254Secq256k1::NUM_OF_LIMBS_MUL {
+            cs.insert_constant_gate(val.var[i], val.val.limbs[i]);
+        }
+
+        let witness = cs.get_and_clear_witness();
+        assert!(cs.verify_witness(&witness[..], &[]).is_ok());
+    }
+
+    #[test]
+    fn test_alloc_constant() {
+        let mut prng = test_rng();
+        let p_biguint = SimFrParamsBN254Secq256k1::scalar_field_in_biguint();
+
+        for _ in 0..100 {
+            let a = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+            let a_sim_fr = SimFrTest::from(&a);
+
+            {
+                let mut cs = TurboCS::<BN254Scalar>::new();
+                let a_sim_fr_var = SimFrVarTest::alloc_constant(&mut cs, &a_sim_fr);
+                test_sim_fr_equality(cs, &a_sim_fr_var);
+            }
+        }
+    }
+
+    #[test]
+    fn test_alloc_witness() {
+        let mut prng = test_rng();
+        let p_biguint = SimFrParamsBN254Secq256k1::scalar_field_in_biguint();
+
+        for _ in 0..100 {
+            let a = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+            let a_sim_fr = SimFrTest::from(&a);
+
+            {
+                let mut cs = TurboCS::<BN254Scalar>::new();
+                let (a_sim_fr_var, _) = SimFrVarTest::alloc_witness(&mut cs, &a_sim_fr);
+                test_sim_fr_equality(cs, &a_sim_fr_var);
+            }
+        }
+    }
+
+    #[test]
+    fn test_sub() {
+        let mut prng = test_rng();
+        let p_biguint = SimFrParamsBN254Secq256k1::scalar_field_in_biguint();
+
+        for _ in 0..100 {
+            let a = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+            let b = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+
+            let a_sim_fr = SimFrTest::from(&a);
+            let b_sim_fr = SimFrTest::from(&b);
+
+            {
+                let mut cs = TurboCS::<BN254Scalar>::new();
+
+                let (a_sim_fr_var, _) = SimFrVarTest::alloc_witness(&mut cs, &a_sim_fr);
+                let (b_sim_fr_var, _) = SimFrVarTest::alloc_witness(&mut cs, &b_sim_fr);
+
+                let c_sim_fr_var = a_sim_fr_var.sub(&mut cs, &b_sim_fr_var);
+                test_sim_fr_equality(cs, &c_sim_fr_var);
+            }
+        }
+    }
+
+    #[test]
+    fn test_mul() {
+        let mut prng = test_rng();
+        let p_biguint = SimFrParamsBN254Secq256k1::scalar_field_in_biguint();
+
+        for _ in 0..100 {
+            let a = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+            let b = prng.gen_biguint_range(&BigUint::zero(), &p_biguint);
+
+            let a_sim_fr = SimFrTest::from(&a);
+            let b_sim_fr = SimFrTest::from(&b);
+
+            {
+                let mut cs = TurboCS::<BN254Scalar>::new();
+
+                let (a_sim_fr_var, _) = SimFrVarTest::alloc_witness(&mut cs, &a_sim_fr);
+                let (b_sim_fr_var, _) = SimFrVarTest::alloc_witness(&mut cs, &b_sim_fr);
+
+                let c_sim_fr_mul_var = a_sim_fr_var.mul(&mut cs, &b_sim_fr_var);
+                test_sim_fr_mul_equality(cs, &c_sim_fr_mul_var);
+            }
+        }
+    }
+
+    #[test]
+    fn test_bounded_allocated_witness() {
+        let mut prng = test_rng();
+
+        for _ in 0..100 {
+            let a = prng.gen_biguint(240);
+            let a_sim_fr = SimFrTest::from(&a);
+
+            {
+                let mut cs = TurboCS::<BN254Scalar>::new();
+
+                let (a_sim_fr_var, _) =
+                    SimFrVarTest::alloc_witness_bounded_total_bits(&mut cs, &a_sim_fr, 240);
+                test_sim_fr_equality(cs, &a_sim_fr_var);
+            }
+        }
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_bounded_allocated_witness_bad() {
+        let a = BigUint::from(1u32).shl(240);
+        let a_sim_fr = SimFrTest::from(&a);
+
+        {
+            let mut cs = TurboCS::<BN254Scalar>::new();
+
+            let (a_sim_fr_var, _) =
+                SimFrVarTest::alloc_witness_bounded_total_bits(&mut cs, &a_sim_fr, 240);
+
+            test_sim_fr_equality(cs, &a_sim_fr_var);
+        }
+    }
+}

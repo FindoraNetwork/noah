@@ -5,6 +5,9 @@ use num_integer::Integer;
 mod bls12_381;
 pub use bls12_381::*;
 
+mod bn254;
+pub use bn254::*;
+
 /// The trait for parameters for field simulation.
 pub trait SimFrParams<F: Scalar>: Clone + Default {
     /// The number of limbs in the simulated field element representation.
