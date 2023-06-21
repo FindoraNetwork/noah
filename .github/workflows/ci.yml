@@ -212,7 +212,7 @@ jobs:
       fail-fast: true
     steps:
       - uses: actions/checkout@v3
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: dtolnay/rust-toolchain@stable
       - uses: taiki-e/install-action@nextest
       - uses: actions/cache@v3
         with:
