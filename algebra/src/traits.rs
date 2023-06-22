@@ -249,6 +249,9 @@ pub trait CurveGroup: Group {
     fn multiply_by_cofactor(&self) -> Self;
 }
 
+/// A trait that labels a curve to be based on twisted Edwards, which is requested by the constraint system.
+pub trait TECurve: CurveGroup {}
+
 /// Convert the scalar into a vector of small chunks, each of size `w`
 pub fn scalar_to_radix_2_power_w<S: Scalar>(scalar: &S, w: usize) -> Vec<i8> {
     assert!(w <= 7);

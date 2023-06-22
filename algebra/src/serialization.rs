@@ -1,4 +1,5 @@
 use crate::{
+    baby_jubjub::{BabyJubjubPoint, BabyJubjubScalar},
     bls12_381::{BLSFq, BLSGt, BLSScalar, BLSG1, BLSG2},
     bn254::{BN254Fq, BN254Gt, BN254Scalar, BN254G1, BN254G2},
     ed25519::{Ed25519Point, Ed25519Scalar},
@@ -41,6 +42,7 @@ to_from_bytes_scalar!(ZorroScalar);
 to_from_bytes_scalar!(ZorroFq);
 to_from_bytes_scalar!(RistrettoScalar);
 to_from_bytes_scalar!(Ed25519Scalar);
+to_from_bytes_scalar!(BabyJubjubScalar);
 
 impl NoahFromToBytes for CompressedRistretto {
     #[inline]
@@ -81,6 +83,7 @@ serialize_deserialize!(RistrettoScalar);
 serialize_deserialize!(Ed25519Scalar);
 serialize_deserialize!(CompressedRistretto);
 serialize_deserialize!(CompressedEdwardsY);
+serialize_deserialize!(BabyJubjubScalar);
 
 macro_rules! to_from_bytes_group {
     ($g:ident) => {
@@ -108,6 +111,7 @@ to_from_bytes_group!(SECP256K1G1);
 to_from_bytes_group!(ZorroG1);
 to_from_bytes_group!(RistrettoPoint);
 to_from_bytes_group!(Ed25519Point);
+to_from_bytes_group!(BabyJubjubPoint);
 
 serialize_deserialize!(BLSG1);
 serialize_deserialize!(BLSG2);
@@ -121,6 +125,7 @@ serialize_deserialize!(SECP256K1G1);
 serialize_deserialize!(ZorroG1);
 serialize_deserialize!(RistrettoPoint);
 serialize_deserialize!(Ed25519Point);
+serialize_deserialize!(BabyJubjubPoint);
 
 /// Helper trait to serialize Noah's and foreign objects that implement from/to bytes/bits
 pub trait NoahFromToBytes: Sized {
@@ -330,5 +335,6 @@ mod test {
         check_compressed_len::<ZorroG1>();
         check_compressed_len::<RistrettoPoint>();
         check_compressed_len::<Ed25519Point>();
+        check_compressed_len::<BabyJubjubPoint>();
     }
 }

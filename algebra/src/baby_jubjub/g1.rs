@@ -1,38 +1,38 @@
-use crate::bls12_381::BLSScalar;
-use crate::jubjub::JubjubScalar;
+use crate::baby_jubjub::BabyJubjubScalar;
+use crate::bn254::BN254Scalar;
 use crate::prelude::*;
 use crate::traits::TECurve;
 use crate::{
     cmp::Ordering,
     hash::{Hash, Hasher},
-    new_bls12_381_fr,
+    new_bn254_fr,
 };
 use ark_ec::{AffineRepr, CurveGroup as ArkCurveGroup, Group as ArkGroup};
-use ark_ed_on_bls12_381::{EdwardsAffine as AffinePoint, EdwardsProjective};
+use ark_ed_on_bn254::{EdwardsAffine as AffinePoint, EdwardsProjective};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use ark_std::{string::ToString, vec::Vec};
 use digest::consts::U64;
 use digest::Digest;
 
-/// The wrapped struct for `ark_ed_on_bls12_381::EdwardsProjective`
+/// The wrapped struct for `ark_ed_on_bn254::EdwardsProjective`
 #[derive(Clone, PartialEq, Debug, Copy)]
-pub struct JubjubPoint(pub EdwardsProjective);
+pub struct BabyJubjubPoint(pub EdwardsProjective);
 
-impl Hash for JubjubPoint {
+impl Hash for BabyJubjubPoint {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.to_string().as_bytes().hash(state)
     }
 }
 
-impl Default for JubjubPoint {
+impl Default for BabyJubjubPoint {
     #[inline]
     fn default() -> Self {
         Self(EdwardsProjective::default())
     }
 }
 
-impl Ord for JubjubPoint {
+impl Ord for BabyJubjubPoint {
     #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
         self.0
@@ -42,16 +42,16 @@ impl Ord for JubjubPoint {
     }
 }
 
-impl PartialOrd for JubjubPoint {
+impl PartialOrd for BabyJubjubPoint {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Eq for JubjubPoint {}
+impl Eq for BabyJubjubPoint {}
 
-impl JubjubPoint {
+impl BabyJubjubPoint {
     /// Multiply the point by the cofactor
     #[inline]
     pub fn mul_by_cofactor(&self) -> Self {
@@ -59,8 +59,8 @@ impl JubjubPoint {
     }
 }
 
-impl Group for JubjubPoint {
-    type ScalarType = JubjubScalar;
+impl Group for BabyJubjubPoint {
+    type ScalarType = BabyJubjubScalar;
     const COMPRESSED_LEN: usize = 32;
     const UNCOMPRESSED_LEN: usize = 64;
 
@@ -138,8 +138,8 @@ impl Group for JubjubPoint {
     }
 }
 
-impl<'a> Add<&'a JubjubPoint> for JubjubPoint {
-    type Output = JubjubPoint;
+impl<'a> Add<&'a BabyJubjubPoint> for BabyJubjubPoint {
+    type Output = BabyJubjubPoint;
 
     #[inline]
     fn add(self, rhs: &Self) -> Self::Output {
@@ -147,8 +147,8 @@ impl<'a> Add<&'a JubjubPoint> for JubjubPoint {
     }
 }
 
-impl<'a> Sub<&'a JubjubPoint> for JubjubPoint {
-    type Output = JubjubPoint;
+impl<'a> Sub<&'a BabyJubjubPoint> for BabyJubjubPoint {
+    type Output = BabyJubjubPoint;
 
     #[inline]
     fn sub(self, rhs: &Self) -> Self::Output {
@@ -156,30 +156,30 @@ impl<'a> Sub<&'a JubjubPoint> for JubjubPoint {
     }
 }
 
-impl<'a> Mul<&'a JubjubScalar> for JubjubPoint {
-    type Output = JubjubPoint;
+impl<'a> Mul<&'a BabyJubjubScalar> for BabyJubjubPoint {
+    type Output = BabyJubjubPoint;
 
     #[inline]
-    fn mul(self, rhs: &JubjubScalar) -> Self::Output {
+    fn mul(self, rhs: &BabyJubjubScalar) -> Self::Output {
         Self(self.0.mul(&rhs.0))
     }
 }
 
-impl<'a> AddAssign<&'a JubjubPoint> for JubjubPoint {
+impl<'a> AddAssign<&'a BabyJubjubPoint> for BabyJubjubPoint {
     #[inline]
-    fn add_assign(&mut self, rhs: &JubjubPoint) {
+    fn add_assign(&mut self, rhs: &BabyJubjubPoint) {
         self.0.add_assign(&rhs.0)
     }
 }
 
-impl<'a> SubAssign<&'a JubjubPoint> for JubjubPoint {
+impl<'a> SubAssign<&'a BabyJubjubPoint> for BabyJubjubPoint {
     #[inline]
-    fn sub_assign(&mut self, rhs: &'a JubjubPoint) {
+    fn sub_assign(&mut self, rhs: &'a BabyJubjubPoint) {
         self.0.sub_assign(&rhs.0)
     }
 }
 
-impl Neg for JubjubPoint {
+impl Neg for BabyJubjubPoint {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
@@ -187,19 +187,19 @@ impl Neg for JubjubPoint {
     }
 }
 
-impl CurveGroup for JubjubPoint {
-    type BaseType = BLSScalar;
+impl CurveGroup for BabyJubjubPoint {
+    type BaseType = BN254Scalar;
 
     #[inline]
     fn get_x(&self) -> Self::BaseType {
         let affine_point = AffinePoint::from(self.0);
-        BLSScalar(affine_point.x)
+        BN254Scalar(affine_point.x)
     }
 
     #[inline]
     fn get_y(&self) -> Self::BaseType {
         let affine_point = AffinePoint::from(self.0);
-        BLSScalar(affine_point.y)
+        BN254Scalar(affine_point.y)
     }
 
     #[inline]
@@ -216,11 +216,11 @@ impl CurveGroup for JubjubPoint {
         //
         // This is because among all the 8 points for P such as 8P = G,
         // one of them is in the subgroup spanned by G.
-        let x = new_bls12_381_fr!(
-            "37283441954580174170554388175493150130054720173248049475226975321836017924287"
+        let x = new_bn254_fr!(
+            "21203262999653643426297788520157772073732315680991985809818023872395048906927"
         );
-        let y = new_bls12_381_fr!(
-            "38161757907713225632814750034917660204320126559701604632199511537313216752811"
+        let y = new_bn254_fr!(
+            "9527268222859104004218785105844981434522971679550559578340699358791462330091"
         );
 
         Self(EdwardsProjective::from(AffinePoint::new(x.0, y.0)))
@@ -232,7 +232,7 @@ impl CurveGroup for JubjubPoint {
     }
 }
 
-impl TECurve for JubjubPoint {}
+impl TECurve for BabyJubjubPoint {}
 
 #[cfg(test)]
 mod test {
@@ -241,8 +241,8 @@ mod test {
     #[test]
     fn correctness_div_by_cofactor() {
         assert_eq!(
-            super::JubjubPoint::get_point_div_by_cofactor().multiply_by_cofactor(),
-            super::JubjubPoint::get_base()
+            super::BabyJubjubPoint::get_point_div_by_cofactor().multiply_by_cofactor(),
+            super::BabyJubjubPoint::get_base()
         );
     }
 }

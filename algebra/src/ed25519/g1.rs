@@ -1,5 +1,6 @@
 use crate::ed25519::{Ed25519Fq, Ed25519Scalar};
 use crate::prelude::*;
+use crate::traits::TECurve;
 use crate::zorro::ZorroScalar;
 use crate::{
     cmp::Ordering,
@@ -238,6 +239,8 @@ impl CurveGroup for Ed25519Point {
         Self(self.0.into_affine().mul_by_cofactor_to_group())
     }
 }
+
+impl TECurve for Ed25519Point {}
 
 #[cfg(test)]
 mod test {

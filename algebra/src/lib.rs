@@ -39,6 +39,9 @@ pub mod secp256k1;
 /// Module for the Jubjub curve.
 pub mod jubjub;
 
+/// Module for the BabyJubjub curve.
+pub mod baby_jubjub;
+
 /// Module for the Zorro curve.
 pub mod zorro;
 
