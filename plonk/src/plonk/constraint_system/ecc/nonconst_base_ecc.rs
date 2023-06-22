@@ -1,26 +1,22 @@
 use crate::plonk::constraint_system::ecc::{ExtendedPointVar, PointVar};
 use crate::plonk::constraint_system::{TurboCS, VarIndex};
-use noah_algebra::bls12_381::BLSScalar;
-use noah_algebra::jubjub::JubjubPoint;
 use noah_algebra::prelude::*;
+use noah_algebra::traits::TECurve;
 
-impl TurboCS<BLSScalar> {
-    /// Returns an identity Jubjub point and its corresponding point variable
-    fn get_identity(&mut self) -> ExtendedPointVar {
-        ExtendedPointVar(
-            PointVar(self.zero_var(), self.one_var()),
-            JubjubPoint::get_identity(),
-        )
+impl<S: Scalar> TurboCS<S> {
+    /// Returns an identity twisted Edwards point and its corresponding point variable
+    fn get_identity<T: TECurve<BaseType = S>>(&mut self) -> ExtendedPointVar<T> {
+        ExtendedPointVar(PointVar(self.zero_var(), self.one_var()), T::get_identity())
     }
 
     /// Given two (extended) point variables `point0`, `point1`, and a Boolean variable `bit`,
     /// returns `point_bit`.
-    fn select_nonconstant_points(
+    fn select_nonconstant_points<T: TECurve<BaseType = S>>(
         &mut self,
-        point0: &ExtendedPointVar,
-        point1: &ExtendedPointVar,
+        point0: &ExtendedPointVar<T>,
+        point1: &ExtendedPointVar<T>,
         bit: VarIndex,
-    ) -> ExtendedPointVar {
+    ) -> ExtendedPointVar<T> {
         let point0_var = &point0.0;
         let point1_var = &point1.0;
         let x = self.select(point0_var.0, point1_var.0, bit);
@@ -36,10 +32,10 @@ impl TurboCS<BLSScalar> {
     ///  Non-constant-base scalar multiplication:
     ///  Given a base point `[G]` and an `n_bits`-bit secret scalar `s`, returns `s * [G]`.
     /// `n_bits` should be a positive even number.
-    pub fn nonconst_base_scalar_mul(
+    pub fn nonconst_base_scalar_mul<T: TECurve<BaseType = S>>(
         &mut self,
         base_var: PointVar,
-        base: JubjubPoint,
+        base: T,
         scalar_var: VarIndex,
         n_bits: usize,
     ) -> PointVar {
@@ -66,13 +62,16 @@ impl TurboCS<BLSScalar> {
 mod test {
     use crate::plonk::constraint_system::TurboCS;
     use noah_algebra::{
-        bls12_381::BLSScalar,
-        jubjub::{JubjubPoint, JubjubScalar},
-        prelude::*,
+        baby_jubjub::BabyJubjubPoint, jubjub::JubjubPoint, prelude::*, traits::TECurve,
     };
 
     #[test]
     fn test_scalar_mul() {
+        scalar_mul::<JubjubPoint>();
+        scalar_mul::<BabyJubjubPoint>();
+    }
+
+    fn scalar_mul<T: TECurve>() {
         let mut cs = TurboCS::new();
 
         // compute secret scalar
@@ -80,9 +79,9 @@ mod test {
             17, 144, 47, 113, 34, 14, 11, 207, 13, 116, 200, 201, 17, 33, 101, 116, 0, 59, 51, 1,
             2, 39, 13, 56, 69, 175, 41, 111, 134, 180, 0, 0,
         ];
-        let scalar = BLSScalar::from_bytes(&scalar_bytes).unwrap();
-        let jubjub_scalar = JubjubScalar::from_bytes(&scalar_bytes).unwrap(); // safe unwrap
-        let base_ext = JubjubPoint::get_base();
+        let scalar = T::BaseType::from_bytes(&scalar_bytes).unwrap();
+        let jubjub_scalar = T::ScalarType::from_bytes(&scalar_bytes).unwrap(); // safe unwrap
+        let base_ext = T::get_base();
         let p_out_ext = base_ext.mul(&jubjub_scalar);
         let p_out_plus_ext = p_out_ext.add(&base_ext);
 
@@ -93,7 +92,7 @@ mod test {
         let mut witness = cs.get_and_clear_witness();
         cs.verify_witness(&witness[..], &[]).unwrap();
 
-        // wrong witness: point = GENERATOR * (jubjub_scalar + 1)
+        // wrong witness: point = GENERATOR * (scalar + 1)
         witness[p_out_var.0] = p_out_plus_ext.get_x();
         witness[p_out_var.1] = p_out_plus_ext.get_y();
         assert!(cs.verify_witness(&witness[..], &[]).is_err());
@@ -101,17 +100,22 @@ mod test {
 
     #[test]
     fn test_scalar_mul_with_zero_scalar() {
+        scalar_mul_with_zero_scalar::<JubjubPoint>();
+        scalar_mul_with_zero_scalar::<BabyJubjubPoint>();
+    }
+
+    fn scalar_mul_with_zero_scalar<T: TECurve>() {
         let mut cs = TurboCS::new();
-        let base_ext = JubjubPoint::get_base();
+        let base_ext = T::get_base();
 
         let base_var = cs.new_point_variable(base_ext);
-        let scalar_var = cs.new_variable(BLSScalar::zero());
+        let scalar_var = cs.new_variable(T::BaseType::zero());
         let p_out_var = cs.nonconst_base_scalar_mul(base_var, base_ext, scalar_var, 64);
         let mut witness = cs.get_and_clear_witness();
 
         // check p_out is an identity point
-        assert_eq!(witness[p_out_var.0], BLSScalar::zero());
-        assert_eq!(witness[p_out_var.1], BLSScalar::one());
+        assert_eq!(witness[p_out_var.0], T::BaseType::zero());
+        assert_eq!(witness[p_out_var.1], T::BaseType::one());
         cs.verify_witness(&witness[..], &[]).unwrap();
 
         // wrong witness: p_out = GENERATOR
