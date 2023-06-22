@@ -1,40 +1,38 @@
-use crate::ed25519::{Ed25519Fq, Ed25519Scalar};
+use crate::baby_jubjub::BabyJubjubScalar;
+use crate::bn254::BN254Scalar;
 use crate::prelude::*;
 use crate::traits::TECurve;
-use crate::zorro::ZorroScalar;
 use crate::{
     cmp::Ordering,
     hash::{Hash, Hasher},
-    new_ed25519_fq,
+    new_bn254_fr,
 };
 use ark_ec::{AffineRepr, CurveGroup as ArkCurveGroup, Group as ArkGroup};
-use ark_ed25519::{EdwardsAffine, EdwardsProjective};
+use ark_ed_on_bn254::{EdwardsAffine as AffinePoint, EdwardsProjective};
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use ark_std::{string::ToString, vec::Vec};
 use digest::consts::U64;
 use digest::Digest;
-use wasm_bindgen::prelude::*;
 
-/// The wrapped struct for `ark_ed25519::EdwardsProjective`
-#[wasm_bindgen]
+/// The wrapped struct for `ark_ed_on_bn254::EdwardsProjective`
 #[derive(Clone, PartialEq, Debug, Copy)]
-pub struct Ed25519Point(pub(crate) EdwardsProjective);
+pub struct BabyJubjubPoint(pub EdwardsProjective);
 
-impl Hash for Ed25519Point {
+impl Hash for BabyJubjubPoint {
     #[inline]
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.to_string().as_bytes().hash(state)
     }
 }
 
-impl Default for Ed25519Point {
+impl Default for BabyJubjubPoint {
     #[inline]
     fn default() -> Self {
         Self(EdwardsProjective::default())
     }
 }
 
-impl Ord for Ed25519Point {
+impl Ord for BabyJubjubPoint {
     #[inline]
     fn cmp(&self, other: &Self) -> Ordering {
         self.0
@@ -44,17 +42,25 @@ impl Ord for Ed25519Point {
     }
 }
 
-impl PartialOrd for Ed25519Point {
+impl PartialOrd for BabyJubjubPoint {
     #[inline]
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Eq for Ed25519Point {}
+impl Eq for BabyJubjubPoint {}
 
-impl Group for Ed25519Point {
-    type ScalarType = Ed25519Scalar;
+impl BabyJubjubPoint {
+    /// Multiply the point by the cofactor
+    #[inline]
+    pub fn mul_by_cofactor(&self) -> Self {
+        Self(self.0.into_affine().mul_by_cofactor_to_group())
+    }
+}
+
+impl Group for BabyJubjubPoint {
+    type ScalarType = BabyJubjubScalar;
     const COMPRESSED_LEN: usize = 32;
     const UNCOMPRESSED_LEN: usize = 64;
 
@@ -96,7 +102,7 @@ impl Group for Ed25519Point {
 
     #[inline]
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
-        let affine = EdwardsAffine::deserialize_with_mode(bytes, Compress::Yes, Validate::Yes);
+        let affine = AffinePoint::deserialize_with_mode(bytes, Compress::Yes, Validate::Yes);
 
         if let Ok(affine) = affine {
             Ok(Self(EdwardsProjective::from(affine))) // safe unwrap
@@ -107,7 +113,7 @@ impl Group for Ed25519Point {
 
     #[inline]
     fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
-        let affine = EdwardsAffine::deserialize_with_mode(bytes, Compress::No, Validate::No);
+        let affine = AffinePoint::deserialize_with_mode(bytes, Compress::No, Validate::No);
 
         if let Ok(affine) = affine {
             Ok(Self(EdwardsProjective::from(affine))) // safe unwrap
@@ -118,7 +124,7 @@ impl Group for Ed25519Point {
 
     #[inline]
     fn unchecked_size() -> usize {
-        EdwardsAffine::default().serialized_size(Compress::No)
+        AffinePoint::default().serialized_size(Compress::No)
     }
 
     #[inline]
@@ -132,8 +138,8 @@ impl Group for Ed25519Point {
     }
 }
 
-impl<'a> Add<&'a Ed25519Point> for Ed25519Point {
-    type Output = Ed25519Point;
+impl<'a> Add<&'a BabyJubjubPoint> for BabyJubjubPoint {
+    type Output = BabyJubjubPoint;
 
     #[inline]
     fn add(self, rhs: &Self) -> Self::Output {
@@ -141,8 +147,8 @@ impl<'a> Add<&'a Ed25519Point> for Ed25519Point {
     }
 }
 
-impl<'a> Sub<&'a Ed25519Point> for Ed25519Point {
-    type Output = Ed25519Point;
+impl<'a> Sub<&'a BabyJubjubPoint> for BabyJubjubPoint {
+    type Output = BabyJubjubPoint;
 
     #[inline]
     fn sub(self, rhs: &Self) -> Self::Output {
@@ -150,30 +156,30 @@ impl<'a> Sub<&'a Ed25519Point> for Ed25519Point {
     }
 }
 
-impl<'a> Mul<&'a Ed25519Scalar> for Ed25519Point {
-    type Output = Ed25519Point;
+impl<'a> Mul<&'a BabyJubjubScalar> for BabyJubjubPoint {
+    type Output = BabyJubjubPoint;
 
     #[inline]
-    fn mul(self, rhs: &Ed25519Scalar) -> Self::Output {
+    fn mul(self, rhs: &BabyJubjubScalar) -> Self::Output {
         Self(self.0.mul(&rhs.0))
     }
 }
 
-impl<'a> AddAssign<&'a Ed25519Point> for Ed25519Point {
+impl<'a> AddAssign<&'a BabyJubjubPoint> for BabyJubjubPoint {
     #[inline]
-    fn add_assign(&mut self, rhs: &Ed25519Point) {
+    fn add_assign(&mut self, rhs: &BabyJubjubPoint) {
         self.0.add_assign(&rhs.0)
     }
 }
 
-impl<'a> SubAssign<&'a Ed25519Point> for Ed25519Point {
+impl<'a> SubAssign<&'a BabyJubjubPoint> for BabyJubjubPoint {
     #[inline]
-    fn sub_assign(&mut self, rhs: &'a Ed25519Point) {
+    fn sub_assign(&mut self, rhs: &'a BabyJubjubPoint) {
         self.0.sub_assign(&rhs.0)
     }
 }
 
-impl Neg for Ed25519Point {
+impl Neg for BabyJubjubPoint {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
@@ -181,71 +187,57 @@ impl Neg for Ed25519Point {
     }
 }
 
-impl Ed25519Point {
-    /// Obtain a point using the y coordinate (which would be ZorroScalar).
-    pub fn get_point_from_y(y: &ZorroScalar) -> Result<Self> {
-        let point = EdwardsAffine::get_point_from_y_unchecked(y.0.clone(), false)
-            .ok_or(AlgebraError::DeserializationError)?
-            .into_group();
-        Ok(Self(point))
-    }
-
-    /// Get the raw data.
-    pub fn get_raw(&self) -> EdwardsAffine {
-        self.0.into_affine()
-    }
-
-    /// From the raw data.
-    pub fn from_raw(raw: EdwardsAffine) -> Self {
-        Self(raw.into_group())
-    }
-}
-
-impl CurveGroup for Ed25519Point {
-    type BaseType = ZorroScalar;
+impl CurveGroup for BabyJubjubPoint {
+    type BaseType = BN254Scalar;
 
     #[inline]
-    fn get_x(&self) -> ZorroScalar {
-        let affine_point = EdwardsAffine::from(self.0);
-        ZorroScalar(affine_point.x)
+    fn get_x(&self) -> Self::BaseType {
+        let affine_point = AffinePoint::from(self.0);
+        BN254Scalar(affine_point.x)
     }
 
     #[inline]
-    fn get_y(&self) -> ZorroScalar {
-        let affine_point = EdwardsAffine::from(self.0);
-        ZorroScalar(affine_point.y)
+    fn get_y(&self) -> Self::BaseType {
+        let affine_point = AffinePoint::from(self.0);
+        BN254Scalar(affine_point.y)
     }
 
     #[inline]
     fn new(x: &Self::BaseType, y: &Self::BaseType) -> Self {
-        Self(EdwardsProjective::from(EdwardsAffine::new_unchecked(
+        Self(EdwardsProjective::from(AffinePoint::new_unchecked(
             x.0, y.0,
         )))
     }
 
     #[inline]
     fn get_point_div_by_cofactor() -> Self {
-        let x: Ed25519Fq = new_ed25519_fq!(
-            "35604061283131262236237912080593388040538131583714990752973521819155773715252"
+        // This is a point that is the base point divided by the cofactor,
+        // but, however, still in the subgroup.
+        //
+        // This is because among all the 8 points for P such as 8P = G,
+        // one of them is in the subgroup spanned by G.
+        let x = new_bn254_fr!(
+            "21203262999653643426297788520157772073732315680991985809818023872395048906927"
         );
-        let y: Ed25519Fq = new_ed25519_fq!(
-            "27851808521341356751558414065160235650345903714080310552172372736657214748571"
+        let y = new_bn254_fr!(
+            "9527268222859104004218785105844981434522971679550559578340699358791462330091"
         );
-        Self(EdwardsAffine::new(x.0, y.0).into_group())
+
+        Self(EdwardsProjective::from(AffinePoint::new(x.0, y.0)))
     }
 
     #[inline]
     fn multiply_by_cofactor(&self) -> Self {
-        Self(self.0.into_affine().mul_by_cofactor_to_group())
+        self.double().double().double()
     }
 }
 
-impl TECurve for Ed25519Point {
+impl TECurve for BabyJubjubPoint {
     #[inline]
     fn get_edwards_d() -> Vec<u8> {
         return [
-            163, 120, 89, 19, 202, 77, 235, 117, 171, 216, 65, 65, 77, 10, 112, 0, 152, 232, 121,
-            119, 121, 64, 199, 140, 115, 254, 111, 43, 238, 108, 3, 82,
+            115, 20, 40, 251, 6, 43, 108, 115, 41, 168, 1, 142, 238, 190, 152, 36, 97, 70, 132,
+            231, 222, 210, 95, 122, 192, 22, 16, 130, 129, 189, 117, 21,
         ]
         .to_vec();
     }
@@ -253,8 +245,8 @@ impl TECurve for Ed25519Point {
     #[inline]
     fn get_edwards_a() -> Vec<u8> {
         return [
-            236, 211, 245, 92, 26, 99, 18, 88, 214, 156, 247, 162, 222, 249, 222, 20, 0, 0, 0, 0,
-            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 16,
+            1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0,
         ]
         .to_vec();
     }
@@ -267,8 +259,8 @@ mod test {
     #[test]
     fn correctness_div_by_cofactor() {
         assert_eq!(
-            super::Ed25519Point::get_point_div_by_cofactor().multiply_by_cofactor(),
-            super::Ed25519Point::get_base()
+            super::BabyJubjubPoint::get_point_div_by_cofactor().multiply_by_cofactor(),
+            super::BabyJubjubPoint::get_base()
         );
     }
 }

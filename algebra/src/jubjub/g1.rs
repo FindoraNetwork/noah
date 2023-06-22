@@ -1,6 +1,7 @@
 use crate::bls12_381::BLSScalar;
 use crate::jubjub::JubjubScalar;
 use crate::prelude::*;
+use crate::traits::TECurve;
 use crate::{
     cmp::Ordering,
     hash::{Hash, Hasher},
@@ -228,6 +229,26 @@ impl CurveGroup for JubjubPoint {
     #[inline]
     fn multiply_by_cofactor(&self) -> Self {
         self.double().double().double()
+    }
+}
+
+impl TECurve for JubjubPoint {
+    #[inline]
+    fn get_edwards_d() -> Vec<u8> {
+        return [
+            177, 62, 52, 214, 214, 95, 6, 1, 38, 157, 87, 55, 109, 127, 45, 41, 212, 127, 189, 230,
+            7, 146, 253, 245, 72, 43, 250, 75, 231, 24, 147, 42,
+        ]
+        .to_vec();
+    }
+
+    #[inline]
+    fn get_edwards_a() -> Vec<u8> {
+        return [
+            0, 0, 0, 0, 255, 255, 255, 255, 254, 91, 254, 255, 2, 164, 189, 83, 5, 216, 161, 9, 8,
+            216, 57, 51, 72, 125, 157, 41, 83, 167, 237, 115,
+        ]
+        .to_vec();
     }
 }
 
