@@ -10,7 +10,7 @@ name = 'noah_accumulators'
 crate-type = ['rlib']
 
 [dependencies]
-itertools = '0.10.5'
+itertools = '0.11.0'
 ruc = '1.0'
 parking_lot = '0.12'
 
