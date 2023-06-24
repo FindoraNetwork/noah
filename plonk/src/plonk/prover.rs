@@ -39,9 +39,10 @@ use {noah_algebra::bls12_381::init_fast_msm_wasm, wasm_bindgen::prelude::*};
 /// use merlin::Transcript;
 /// use rand_chacha::ChaChaRng;
 /// use noah_algebra::{prelude::*, bls12_381::BLSScalar};
+/// use noah_algebra::bls12_381::BLSPairingEngine;
 ///
 /// let mut prng = ChaChaRng::from_seed([0u8; 32]);
-/// let pcs = KZGCommitmentScheme::new(20, &mut prng);
+/// let pcs = KZGCommitmentScheme::<BLSPairingEngine>::new(20, &mut prng);
 /// let mut cs = TurboCS::new();
 ///
 /// // circuit (x_0 + x_1);

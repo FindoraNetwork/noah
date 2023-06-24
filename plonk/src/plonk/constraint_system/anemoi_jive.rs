@@ -1,22 +1,19 @@
 use crate::plonk::constraint_system::{TurboCS, VarIndex};
-use noah_algebra::bls12_381::BLSScalar;
 use noah_algebra::prelude::*;
-use noah_crypto::anemoi_jive::{
-    AnemoiJive, AnemoiJive381, AnemoiStreamCipherTrace, AnemoiVLHTrace, JiveTrace,
-};
+use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiStreamCipherTrace, AnemoiVLHTrace, JiveTrace};
 
-impl TurboCS<BLSScalar> {
+impl<F: Scalar> TurboCS<F> {
     /// Create constraints for the Anemoi permutation.
-    fn anemoi_permutation_round(
+    fn anemoi_permutation_round<P: AnemoiJive<F, 2usize, 12usize>>(
         &mut self,
         input_var: &([VarIndex; 2], [VarIndex; 2]),
         output_var: &([Option<VarIndex>; 2], [Option<VarIndex>; 2]),
-        intermediate_val: &([[BLSScalar; 2]; 12], [[BLSScalar; 2]; 12]),
-        checksum: Option<BLSScalar>,
-        salt: Option<BLSScalar>,
+        intermediate_val: &([[F; 2]; 12], [[F; 2]; 12]),
+        checksum: Option<F>,
+        salt: Option<F>,
     ) -> Option<VarIndex> {
-        let zero = BLSScalar::zero();
-        let one = BLSScalar::one();
+        let zero = F::zero();
+        let one = F::one();
         let zero_var = self.zero_var();
 
         // Allocate the intermediate values
@@ -73,12 +70,7 @@ impl TurboCS<BLSScalar> {
         if output_var.0[0].is_some() {
             let var = output_var.0[0].unwrap();
 
-            self.push_add_selectors(
-                AnemoiJive381::MDS_MATRIX[0][0],
-                AnemoiJive381::MDS_MATRIX[0][1],
-                zero,
-                zero,
-            );
+            self.push_add_selectors(P::MDS_MATRIX[0][0], P::MDS_MATRIX[0][1], zero, zero);
             self.push_mul_selectors(zero, zero);
             self.push_constant_selector(zero);
             self.push_ecc_selector(zero);
@@ -96,12 +88,7 @@ impl TurboCS<BLSScalar> {
         if output_var.0[1].is_some() {
             let var = output_var.0[1].unwrap();
 
-            self.push_add_selectors(
-                AnemoiJive381::MDS_MATRIX[1][0],
-                AnemoiJive381::MDS_MATRIX[1][1],
-                zero,
-                zero,
-            );
+            self.push_add_selectors(P::MDS_MATRIX[1][0], P::MDS_MATRIX[1][1], zero, zero);
             self.push_mul_selectors(zero, zero);
             self.push_constant_selector(zero);
             self.push_ecc_selector(zero);
@@ -119,12 +106,7 @@ impl TurboCS<BLSScalar> {
         if output_var.1[0].is_some() {
             let var = output_var.1[0].unwrap();
 
-            self.push_add_selectors(
-                zero,
-                zero,
-                AnemoiJive381::MDS_MATRIX[0][1],
-                AnemoiJive381::MDS_MATRIX[0][0],
-            );
+            self.push_add_selectors(zero, zero, P::MDS_MATRIX[0][1], P::MDS_MATRIX[0][0]);
             self.push_mul_selectors(zero, zero);
             self.push_constant_selector(zero);
             self.push_ecc_selector(zero);
@@ -142,12 +124,7 @@ impl TurboCS<BLSScalar> {
         if output_var.1[1].is_some() {
             let var = output_var.1[1].unwrap();
 
-            self.push_add_selectors(
-                zero,
-                zero,
-                AnemoiJive381::MDS_MATRIX[1][1],
-                AnemoiJive381::MDS_MATRIX[1][0],
-            );
+            self.push_add_selectors(zero, zero, P::MDS_MATRIX[1][1], P::MDS_MATRIX[1][0]);
             self.push_mul_selectors(zero, zero);
             self.push_constant_selector(zero);
             self.push_ecc_selector(zero);
@@ -166,10 +143,10 @@ impl TurboCS<BLSScalar> {
             let var = self.new_variable(checksum.unwrap());
 
             self.push_add_selectors(
-                AnemoiJive381::MDS_MATRIX[0][0] + AnemoiJive381::MDS_MATRIX[1][0],
-                AnemoiJive381::MDS_MATRIX[0][1] + AnemoiJive381::MDS_MATRIX[1][1],
-                AnemoiJive381::MDS_MATRIX[0][1] + AnemoiJive381::MDS_MATRIX[1][1],
-                AnemoiJive381::MDS_MATRIX[0][0] + AnemoiJive381::MDS_MATRIX[1][0],
+                P::MDS_MATRIX[0][0] + P::MDS_MATRIX[1][0],
+                P::MDS_MATRIX[0][1] + P::MDS_MATRIX[1][1],
+                P::MDS_MATRIX[0][1] + P::MDS_MATRIX[1][1],
+                P::MDS_MATRIX[0][0] + P::MDS_MATRIX[1][0],
             );
             self.push_mul_selectors(zero, zero);
             self.push_constant_selector(zero);
@@ -191,9 +168,9 @@ impl TurboCS<BLSScalar> {
     }
 
     /// Create constraints for the Anemoi variable length hash function.
-    pub fn anemoi_variable_length_hash(
+    pub fn anemoi_variable_length_hash<P: AnemoiJive<F, 2usize, 12usize>>(
         &mut self,
-        trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
+        trace: &AnemoiVLHTrace<F, 2, 12>,
         input_var: &[VarIndex],
         output_var: VarIndex,
     ) {
@@ -228,7 +205,7 @@ impl TurboCS<BLSScalar> {
         let mut y_var = [chunks[0][2], zero_var];
 
         if num_chunks == 1 {
-            self.anemoi_permutation_round(
+            self.anemoi_permutation_round::<P>(
                 &(x_var, y_var),
                 &([Some(output_var), None], [None, None]),
                 &trace.intermediate_values_before_constant_additions[0],
@@ -246,7 +223,7 @@ impl TurboCS<BLSScalar> {
                 self.new_variable(trace.after_permutation[0].1[1]),
             ];
 
-            self.anemoi_permutation_round(
+            self.anemoi_permutation_round::<P>(
                 &(x_var, y_var),
                 &(
                     [Some(new_x_var[0]), Some(new_x_var[1])],
@@ -275,7 +252,7 @@ impl TurboCS<BLSScalar> {
                     self.new_variable(trace.after_permutation[rr].1[1]),
                 ];
 
-                self.anemoi_permutation_round(
+                self.anemoi_permutation_round::<P>(
                     &(x_var, y_var),
                     &(
                         [Some(new_x_var[0]), Some(new_x_var[1])],
@@ -296,7 +273,7 @@ impl TurboCS<BLSScalar> {
                 x_var[1] = self.add(x_var[1], chunks[num_chunks - 1][1]);
                 y_var[0] = self.add(y_var[0], chunks[num_chunks - 1][2]);
 
-                self.anemoi_permutation_round(
+                self.anemoi_permutation_round::<P>(
                     &(x_var, y_var),
                     &([Some(output_var), None], [None, None]),
                     &trace.intermediate_values_before_constant_additions[num_chunks - 1],
@@ -308,14 +285,14 @@ impl TurboCS<BLSScalar> {
     }
 
     /// Create constraints for the Jive CRH.
-    pub fn jive_crh(
+    pub fn jive_crh<P: AnemoiJive<F, 2usize, 12usize>>(
         &mut self,
-        trace: &JiveTrace<BLSScalar, 2, 12>,
+        trace: &JiveTrace<F, 2, 12>,
         input_var: &[VarIndex; 3],
-        salt: BLSScalar,
+        salt: F,
     ) -> VarIndex {
-        let one = BLSScalar::one();
-        let zero = BLSScalar::zero();
+        let one = F::one();
+        let zero = F::zero();
 
         let x_var = [input_var[0], input_var[1]];
         let y_var = [input_var[2], self.new_variable(salt)];
@@ -324,7 +301,7 @@ impl TurboCS<BLSScalar> {
             trace.final_x[0] + trace.final_x[1] + trace.final_y[0] + trace.final_y[1];
 
         let sum_output_var = self
-            .anemoi_permutation_round(
+            .anemoi_permutation_round::<P>(
                 &(x_var, y_var),
                 &([None, None], [None, None]),
                 &(
@@ -361,9 +338,9 @@ impl TurboCS<BLSScalar> {
     }
 
     /// Create constraints for the Anemoi stream cipher
-    pub fn anemoi_stream_cipher(
+    pub fn anemoi_stream_cipher<P: AnemoiJive<F, 2usize, 12usize>>(
         &mut self,
-        trace: &AnemoiStreamCipherTrace<BLSScalar, 2, 12>,
+        trace: &AnemoiStreamCipherTrace<F, 2, 12>,
         input_var: &[VarIndex],
         output_var: &[VarIndex],
     ) {
@@ -413,7 +390,7 @@ impl TurboCS<BLSScalar> {
         let mut y_var = [input_chunks[0][2], zero_var];
 
         if num_input_chunks == 1 && num_output_chunks == 1 {
-            self.anemoi_permutation_round(
+            self.anemoi_permutation_round::<P>(
                 &(x_var, y_var),
                 &(
                     [output_chunks[0][0], output_chunks[0][1]],
@@ -424,7 +401,7 @@ impl TurboCS<BLSScalar> {
                 None,
             );
         } else if num_input_chunks == 1 && num_output_chunks > 1 {
-            self.anemoi_permutation_round(
+            self.anemoi_permutation_round::<P>(
                 &(x_var, y_var),
                 &(
                     [output_chunks[0][0], output_chunks[0][1]],
@@ -463,7 +440,7 @@ impl TurboCS<BLSScalar> {
                     ];
                 }
 
-                self.anemoi_permutation_round(
+                self.anemoi_permutation_round::<P>(
                     &(x_var, y_var),
                     &(
                         [output_chunks[rr][0], output_chunks[rr][1]],
@@ -485,7 +462,7 @@ impl TurboCS<BLSScalar> {
                 self.new_variable(trace.after_permutation[0].1[1]),
             ];
 
-            self.anemoi_permutation_round(
+            self.anemoi_permutation_round::<P>(
                 &(x_var, y_var),
                 &(
                     [Some(new_x_var[0]), Some(new_x_var[1])],
@@ -514,7 +491,7 @@ impl TurboCS<BLSScalar> {
                     self.new_variable(trace.after_permutation[rr].1[1]),
                 ];
 
-                self.anemoi_permutation_round(
+                self.anemoi_permutation_round::<P>(
                     &(x_var, y_var),
                     &(
                         [Some(new_x_var[0]), Some(new_x_var[1])],
@@ -548,7 +525,7 @@ impl TurboCS<BLSScalar> {
                     new_y_var[1] = self.add(new_y_var[1], sigma_var);
                 }
 
-                self.anemoi_permutation_round(
+                self.anemoi_permutation_round::<P>(
                     &(x_var, y_var),
                     &(
                         [output_chunks[0][0], output_chunks[0][1]],
@@ -577,7 +554,7 @@ impl TurboCS<BLSScalar> {
                     ];
                 }
 
-                self.anemoi_permutation_round(
+                self.anemoi_permutation_round::<P>(
                     &(x_var, y_var),
                     &(
                         [output_chunks[rr][0], output_chunks[rr][1]],
@@ -593,7 +570,7 @@ impl TurboCS<BLSScalar> {
 }
 
 #[cfg(test)]
-mod test {
+mod test_bls12_381 {
     use crate::plonk::constraint_system::TurboCS;
     use noah_algebra::bls12_381::BLSScalar;
     use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS_OLD};
@@ -607,14 +584,14 @@ mod test {
             &[BLSScalar::from(3u64), salt],
         );
 
-        let mut cs = TurboCS::new();
+        let mut cs = TurboCS::<BLSScalar>::new();
         cs.load_anemoi_jive_parameters::<AnemoiJive381>();
 
         let one = cs.new_variable(BLSScalar::from(1u64));
         let two = cs.new_variable(BLSScalar::from(2u64));
         let three = cs.new_variable(BLSScalar::from(3u64));
 
-        let _ = cs.jive_crh(&trace, &[one, two, three], salt);
+        let _ = cs.jive_crh::<AnemoiJive381>(&trace, &[one, two, three], salt);
 
         let witness = cs.get_and_clear_witness();
         cs.verify_witness(&witness, &[]).unwrap();
@@ -639,7 +616,11 @@ mod test {
 
         let output_var = cs.new_variable(trace.output);
 
-        let _ = cs.anemoi_variable_length_hash(&trace, &[one, two, three, four], output_var);
+        let _ = cs.anemoi_variable_length_hash::<AnemoiJive381>(
+            &trace,
+            &[one, two, three, four],
+            output_var,
+        );
 
         let witness = cs.get_and_clear_witness();
         cs.verify_witness(&witness, &[]).unwrap();
@@ -671,7 +652,7 @@ mod test {
                     output_var.push(cs.new_variable(o.clone()))
                 }
 
-                let _ = cs.anemoi_stream_cipher(&trace, &input_var, &output_var);
+                let _ = cs.anemoi_stream_cipher::<AnemoiJive381>(&trace, &input_var, &output_var);
                 let witness = cs.get_and_clear_witness();
                 cs.verify_witness(&witness, &[]).unwrap();
             }
@@ -680,7 +661,7 @@ mod test {
 }
 
 #[cfg(test)]
-mod kzg_test {
+mod kzg_test_bls12_381 {
     use crate::plonk::constraint_system::{ConstraintSystem, TurboCS};
     use crate::plonk::indexer::indexer;
     use crate::plonk::prover::prover;
@@ -688,13 +669,14 @@ mod kzg_test {
     use crate::poly_commit::kzg_poly_com::KZGCommitmentScheme;
     use crate::poly_commit::pcs::PolyComScheme;
     use merlin::Transcript;
+    use noah_algebra::bls12_381::BLSPairingEngine;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*};
     use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS_OLD};
 
     #[test]
     fn test_turbo_plonk_kzg_anemoi_jive() {
         let mut prng = test_rng();
-        let pcs = KZGCommitmentScheme::new(260, &mut prng);
+        let pcs = KZGCommitmentScheme::<BLSPairingEngine>::new(260, &mut prng);
         test_turbo_plonk_anemoi_variable_length_hash(&pcs, &mut prng);
         test_turbo_plonk_jive_crh(&pcs, &mut prng);
         test_turbo_plonk_anemoi_stream_cipher(&pcs, &mut prng);
@@ -724,7 +706,11 @@ mod kzg_test {
 
         let output_var = cs.new_variable(trace.output);
 
-        let _ = cs.anemoi_variable_length_hash(&trace, &[one, two, three, four], output_var);
+        let _ = cs.anemoi_variable_length_hash::<AnemoiJive381>(
+            &trace,
+            &[one, two, three, four],
+            output_var,
+        );
         cs.pad();
 
         let witness = cs.get_and_clear_witness();
@@ -750,7 +736,7 @@ mod kzg_test {
         let two = cs.new_variable(BLSScalar::from(2u64));
         let three = cs.new_variable(BLSScalar::from(3u64));
 
-        let _ = cs.jive_crh(&trace, &[one, two, three], salt);
+        let _ = cs.jive_crh::<AnemoiJive381>(&trace, &[one, two, three], salt);
         cs.pad();
 
         let witness = cs.get_and_clear_witness();
@@ -789,7 +775,276 @@ mod kzg_test {
             output_var.push(cs.new_variable(output.clone()))
         }
 
-        let _ = cs.anemoi_stream_cipher(&trace, &[one, two, three, four], &output_var);
+        let _ =
+            cs.anemoi_stream_cipher::<AnemoiJive381>(&trace, &[one, two, three, four], &output_var);
+        cs.pad();
+
+        let witness = cs.get_and_clear_witness();
+        cs.verify_witness(&witness, &[]).unwrap();
+        check_turbo_plonk_proof(pcs, prng, &cs, &witness[..], &[]);
+    }
+
+    fn check_turbo_plonk_proof<PCS: PolyComScheme, R: CryptoRng + RngCore>(
+        pcs: &PCS,
+        prng: &mut R,
+        cs: &TurboCS<PCS::Field>,
+        witness: &[PCS::Field],
+        online_vars: &[PCS::Field],
+    ) {
+        let prover_params = indexer(cs, pcs).unwrap();
+        let verifier_params_ref = &prover_params.verifier_params;
+
+        let mut transcript = Transcript::new(b"TestTurboPlonk");
+        let proof = prover(prng, &mut transcript, pcs, cs, &prover_params, witness).unwrap();
+
+        let mut transcript = Transcript::new(b"TestTurboPlonk");
+        assert!(verifier(
+            &mut transcript,
+            pcs,
+            cs,
+            verifier_params_ref,
+            online_vars,
+            &proof
+        )
+        .is_ok());
+
+        let prover_cs = cs.shrink_to_verifier_only();
+
+        let mut transcript = Transcript::new(b"TestTurboPlonk");
+        assert!(prover(
+            prng,
+            &mut transcript,
+            pcs,
+            &prover_cs,
+            &prover_params,
+            witness
+        )
+        .is_err());
+
+        let mut transcript = Transcript::new(b"TestTurboPlonk");
+        assert!(verifier(
+            &mut transcript,
+            pcs,
+            &prover_cs,
+            verifier_params_ref,
+            online_vars,
+            &proof
+        )
+        .is_ok());
+    }
+}
+
+#[cfg(test)]
+mod test_bn254 {
+    use crate::plonk::constraint_system::TurboCS;
+    use noah_algebra::bn254::BN254Scalar;
+    use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive254, ANEMOI_JIVE_BN254_SALTS};
+
+    #[test]
+    fn test_jive_constraint_system() {
+        let salt = ANEMOI_JIVE_BN254_SALTS[10];
+
+        let trace = AnemoiJive254::eval_jive_with_trace(
+            &[BN254Scalar::from(1u64), BN254Scalar::from(2u64)],
+            &[BN254Scalar::from(3u64), salt],
+        );
+
+        let mut cs = TurboCS::<BN254Scalar>::new();
+        cs.load_anemoi_jive_parameters::<AnemoiJive254>();
+
+        let one = cs.new_variable(BN254Scalar::from(1u64));
+        let two = cs.new_variable(BN254Scalar::from(2u64));
+        let three = cs.new_variable(BN254Scalar::from(3u64));
+
+        let _ = cs.jive_crh::<AnemoiJive254>(&trace, &[one, two, three], salt);
+
+        let witness = cs.get_and_clear_witness();
+        cs.verify_witness(&witness, &[]).unwrap();
+    }
+
+    #[test]
+    fn test_anemoi_variable_length_hash_constraint_system() {
+        let trace = AnemoiJive254::eval_variable_length_hash_with_trace(&[
+            BN254Scalar::from(1u64),
+            BN254Scalar::from(2u64),
+            BN254Scalar::from(3u64),
+            BN254Scalar::from(4u64),
+        ]);
+
+        let mut cs = TurboCS::new();
+        cs.load_anemoi_jive_parameters::<AnemoiJive254>();
+
+        let one = cs.new_variable(BN254Scalar::from(1u64));
+        let two = cs.new_variable(BN254Scalar::from(2u64));
+        let three = cs.new_variable(BN254Scalar::from(3u64));
+        let four = cs.new_variable(BN254Scalar::from(4u64));
+
+        let output_var = cs.new_variable(trace.output);
+
+        let _ = cs.anemoi_variable_length_hash::<AnemoiJive254>(
+            &trace,
+            &[one, two, three, four],
+            output_var,
+        );
+
+        let witness = cs.get_and_clear_witness();
+        cs.verify_witness(&witness, &[]).unwrap();
+    }
+
+    #[test]
+    fn test_anemoi_stream_cipher() {
+        for output_len in 1..=7 {
+            // There are two main test cases for input:
+            // The first one is when the input length is 3 and sigma is equal to 1,
+            // The second one is when the input length is 4 and sigma is equal to 0.
+            for input_len in [3, 4u64] {
+                let mut input = vec![];
+                for i in 0..input_len {
+                    input.push(BN254Scalar::from(i + 1));
+                }
+                let trace = AnemoiJive254::eval_stream_cipher_with_trace(&input, output_len);
+
+                let mut cs = TurboCS::new();
+                cs.load_anemoi_jive_parameters::<AnemoiJive254>();
+
+                let mut input_var = vec![];
+                for i in input {
+                    input_var.push(cs.new_variable(i))
+                }
+
+                let mut output_var = vec![];
+                for o in &trace.output {
+                    output_var.push(cs.new_variable(o.clone()))
+                }
+
+                let _ = cs.anemoi_stream_cipher::<AnemoiJive254>(&trace, &input_var, &output_var);
+                let witness = cs.get_and_clear_witness();
+                cs.verify_witness(&witness, &[]).unwrap();
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod kzg_test_bn254 {
+    use crate::plonk::constraint_system::{ConstraintSystem, TurboCS};
+    use crate::plonk::indexer::indexer;
+    use crate::plonk::prover::prover;
+    use crate::plonk::verifier::verifier;
+    use crate::poly_commit::kzg_poly_com::KZGCommitmentScheme;
+    use crate::poly_commit::pcs::PolyComScheme;
+    use merlin::Transcript;
+    use noah_algebra::bn254::BN254PairingEngine;
+    use noah_algebra::{bn254::BN254Scalar, prelude::*};
+    use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive254, ANEMOI_JIVE_BN254_SALTS};
+
+    #[test]
+    fn test_turbo_plonk_kzg_anemoi_jive() {
+        let mut prng = test_rng();
+        let pcs = KZGCommitmentScheme::<BN254PairingEngine>::new(260, &mut prng);
+        test_turbo_plonk_anemoi_variable_length_hash(&pcs, &mut prng);
+        test_turbo_plonk_jive_crh(&pcs, &mut prng);
+        test_turbo_plonk_anemoi_stream_cipher(&pcs, &mut prng);
+    }
+
+    fn test_turbo_plonk_anemoi_variable_length_hash<
+        PCS: PolyComScheme<Field = BN254Scalar>,
+        R: CryptoRng + RngCore,
+    >(
+        pcs: &PCS,
+        prng: &mut R,
+    ) {
+        let trace = AnemoiJive254::eval_variable_length_hash_with_trace(&[
+            BN254Scalar::from(1u64),
+            BN254Scalar::from(2u64),
+            BN254Scalar::from(3u64),
+            BN254Scalar::from(4u64),
+        ]);
+
+        let mut cs = TurboCS::new();
+        cs.load_anemoi_jive_parameters::<AnemoiJive254>();
+
+        let one = cs.new_variable(BN254Scalar::from(1u64));
+        let two = cs.new_variable(BN254Scalar::from(2u64));
+        let three = cs.new_variable(BN254Scalar::from(3u64));
+        let four = cs.new_variable(BN254Scalar::from(4u64));
+
+        let output_var = cs.new_variable(trace.output);
+
+        let _ = cs.anemoi_variable_length_hash::<AnemoiJive254>(
+            &trace,
+            &[one, two, three, four],
+            output_var,
+        );
+        cs.pad();
+
+        let witness = cs.get_and_clear_witness();
+        cs.verify_witness(&witness, &[]).unwrap();
+        check_turbo_plonk_proof(pcs, prng, &cs, &witness[..], &[]);
+    }
+
+    fn test_turbo_plonk_jive_crh<
+        PCS: PolyComScheme<Field = BN254Scalar>,
+        R: CryptoRng + RngCore,
+    >(
+        pcs: &PCS,
+        prng: &mut R,
+    ) {
+        let salt = ANEMOI_JIVE_BN254_SALTS[10];
+
+        let trace = AnemoiJive254::eval_jive_with_trace(
+            &[BN254Scalar::from(1u64), BN254Scalar::from(2u64)],
+            &[BN254Scalar::from(3u64), salt],
+        );
+
+        let mut cs = TurboCS::new();
+        cs.load_anemoi_jive_parameters::<AnemoiJive254>();
+
+        let one = cs.new_variable(BN254Scalar::from(1u64));
+        let two = cs.new_variable(BN254Scalar::from(2u64));
+        let three = cs.new_variable(BN254Scalar::from(3u64));
+
+        let _ = cs.jive_crh::<AnemoiJive254>(&trace, &[one, two, three], salt);
+        cs.pad();
+
+        let witness = cs.get_and_clear_witness();
+        cs.verify_witness(&witness, &[]).unwrap();
+        check_turbo_plonk_proof(pcs, prng, &cs, &witness[..], &[]);
+    }
+
+    fn test_turbo_plonk_anemoi_stream_cipher<
+        PCS: PolyComScheme<Field = BN254Scalar>,
+        R: CryptoRng + RngCore,
+    >(
+        pcs: &PCS,
+        prng: &mut R,
+    ) {
+        let output_len = 7;
+        let trace = AnemoiJive254::eval_stream_cipher_with_trace(
+            &[
+                BN254Scalar::from(1u64),
+                BN254Scalar::from(2u64),
+                BN254Scalar::from(3u64),
+                BN254Scalar::from(4u64),
+            ],
+            output_len,
+        );
+
+        let mut cs = TurboCS::new();
+        cs.load_anemoi_jive_parameters::<AnemoiJive254>();
+
+        let one = cs.new_variable(BN254Scalar::from(1u64));
+        let two = cs.new_variable(BN254Scalar::from(2u64));
+        let three = cs.new_variable(BN254Scalar::from(3u64));
+        let four = cs.new_variable(BN254Scalar::from(4u64));
+
+        let mut output_var = vec![];
+        for output in trace.output.iter() {
+            output_var.push(cs.new_variable(output.clone()))
+        }
+
+        let _ =
+            cs.anemoi_stream_cipher::<AnemoiJive254>(&trace, &[one, two, three, four], &output_var);
         cs.pad();
 
         let witness = cs.get_and_clear_witness();

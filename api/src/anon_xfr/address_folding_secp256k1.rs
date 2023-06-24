@@ -546,7 +546,7 @@ pub fn prove_address_folding_in_cs_secp256k1(
         input.push(r);
 
         let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&input);
-        cs.anemoi_variable_length_hash(&trace, &input_vars, comm_var);
+        cs.anemoi_variable_length_hash::<AnemoiJive381>(&trace, &input_vars, comm_var);
     }
     cs.prepare_pi_variable(comm_var);
 

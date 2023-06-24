@@ -173,6 +173,13 @@ impl<'a> SubAssign<&'a Ed25519Point> for Ed25519Point {
     }
 }
 
+impl<'a> MulAssign<&'a Ed25519Scalar> for Ed25519Point {
+    #[inline]
+    fn mul_assign(&mut self, rhs: &'a Ed25519Scalar) {
+        self.0.mul_assign(rhs.0.clone())
+    }
+}
+
 impl Neg for Ed25519Point {
     type Output = Self;
 

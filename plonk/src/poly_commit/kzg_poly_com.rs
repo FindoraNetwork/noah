@@ -4,9 +4,9 @@ use crate::poly_commit::{
     pcs::{HomomorphicPolyComElem, PolyComScheme, ToBytes},
 };
 use merlin::Transcript;
-use noah_algebra::bls12_381::{BLSGt, BLSPairingEngine};
+use noah_algebra::bls12_381::BLSPairingEngine;
+use noah_algebra::bn254::BN254PairingEngine;
 use noah_algebra::{
-    bls12_381::{BLSScalar, BLSG1},
     prelude::*,
     traits::{Domain, Pairing},
 };
@@ -24,14 +24,13 @@ where
     }
 }
 
-impl HomomorphicPolyComElem for KZGCommitment<BLSG1> {
-    type Scalar = BLSScalar;
+impl<G: Group> HomomorphicPolyComElem<G::ScalarType> for KZGCommitment<G> {
     fn get_base() -> Self {
-        KZGCommitment(BLSG1::get_base())
+        KZGCommitment(G::get_base())
     }
 
     fn get_identity() -> Self {
-        KZGCommitment(BLSG1::get_identity())
+        KZGCommitment(G::get_identity())
     }
 
     fn add(&self, other: &Self) -> Self {
@@ -50,11 +49,11 @@ impl HomomorphicPolyComElem for KZGCommitment<BLSG1> {
         self.0.sub_assign(&other.0)
     }
 
-    fn mul(&self, exp: &BLSScalar) -> Self {
+    fn mul(&self, exp: &G::ScalarType) -> Self {
         KZGCommitment(self.0.mul(exp))
     }
 
-    fn mul_assign(&mut self, exp: &BLSScalar) {
+    fn mul_assign(&mut self, exp: &G::ScalarType) {
         self.0.mul_assign(&exp)
     }
 }
@@ -65,9 +64,7 @@ impl<F: Scalar> ToBytes for FpPolynomial<F> {
     }
 }
 
-impl<F: Domain> HomomorphicPolyComElem for FpPolynomial<F> {
-    type Scalar = F;
-
+impl<F: Domain> HomomorphicPolyComElem<F> for FpPolynomial<F> {
     fn get_base() -> Self {
         unimplemented!()
     }
@@ -202,18 +199,15 @@ impl<P: Pairing> KZGCommitmentScheme<P> {
     }
 }
 
-/// KZG commitment scheme over the BLS12-381 curve
-pub type KZGCommitmentSchemeBLS = KZGCommitmentScheme<BLSPairingEngine>;
-
-impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
-    type Field = BLSScalar;
-    type Commitment = KZGCommitment<BLSG1>;
+impl<P: Pairing> PolyComScheme for KZGCommitmentScheme<P> {
+    type Field = P::ScalarField;
+    type Commitment = KZGCommitment<P::G1>;
 
     fn max_degree(&self) -> usize {
         self.public_parameter_group_1.len() - 1
     }
 
-    fn commit(&self, polynomial: &FpPolynomial<BLSScalar>) -> Result<Self::Commitment> {
+    fn commit(&self, polynomial: &FpPolynomial<Self::Field>) -> Result<Self::Commitment> {
         let coefs = polynomial.get_coefs_ref();
 
         let degree = polynomial.degree();
@@ -222,21 +216,78 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
             return Err(PlonkError::DegreeError);
         }
 
-        let coefs_poly_bls_scalar_ref: Vec<&BLSScalar> = coefs.iter().collect();
-        let pub_param_group_1_as_ref: Vec<&BLSG1> = self.public_parameter_group_1[0..degree + 1]
+        let coefs_poly_scalar_ref: Vec<&Self::Field> = coefs.iter().collect();
+        let pub_param_group_1_as_ref: Vec<&P::G1> = self.public_parameter_group_1[0..degree + 1]
             .iter()
             .collect();
 
-        let commitment_value = BLSG1::multi_exp(
-            &coefs_poly_bls_scalar_ref[..],
-            &pub_param_group_1_as_ref[..],
-        );
+        let commitment_value =
+            P::G1::multi_exp(&coefs_poly_scalar_ref[..], &pub_param_group_1_as_ref[..]);
 
-        Ok(KZGCommitment(commitment_value))
+        Ok(KZGCommitment::<P::G1>(commitment_value))
     }
 
-    fn eval(&self, poly: &FpPolynomial<Self::Field>, point: &Self::Field) -> Self::Field {
-        poly.eval(point)
+    fn eval(&self, polynomial: &FpPolynomial<Self::Field>, point: &Self::Field) -> Self::Field {
+        polynomial.eval(point)
+    }
+
+    fn prove(
+        &self,
+        polynomial: &FpPolynomial<Self::Field>,
+        point: &Self::Field,
+        max_degree: usize,
+    ) -> Result<Self::Commitment> {
+        let eval = polynomial.eval(point);
+
+        if polynomial.degree() > max_degree {
+            return Err(PlonkError::DegreeError);
+        }
+
+        let nominator = polynomial.sub(&FpPolynomial::from_coefs(vec![eval]));
+        // f(X) - f(x)
+
+        // Negation must happen in Fq
+        let point_neg = point.neg();
+
+        // X - x
+        let vanishing_poly = FpPolynomial::from_coefs(vec![point_neg, Self::Field::one()]);
+        let (q_poly, r_poly) = nominator.div_rem(&vanishing_poly); // P(X)-P(x) / (X-x)
+
+        if !r_poly.is_zero() {
+            return Err(PlonkError::PCSProveEvalError);
+        }
+
+        let proof = self.commit(&q_poly).unwrap();
+        Ok(proof)
+    }
+
+    fn verify(
+        &self,
+        commitment: &Self::Commitment,
+        _degree: usize,
+        point: &Self::Field,
+        value: &Self::Field,
+        proof: &Self::Commitment,
+    ) -> Result<()> {
+        let g1_0 = self.public_parameter_group_1[0].clone();
+        let g2_0 = self.public_parameter_group_2[0].clone();
+        let g2_1 = self.public_parameter_group_2[1].clone();
+
+        let x_minus_point_group_element_group_2 = &g2_1.sub(&g2_0.mul(point));
+
+        let left_pairing_eval = if value.is_zero() {
+            P::pairing(&commitment.0, &g2_0)
+        } else {
+            P::pairing(&commitment.0.sub(&g1_0.mul(value)), &g2_0)
+        };
+
+        let right_pairing_eval = P::pairing(&proof.0, &x_minus_point_group_element_group_2);
+
+        if left_pairing_eval == right_pairing_eval {
+            Ok(())
+        } else {
+            Err(PlonkError::PCSProveEvalError)
+        }
     }
 
     fn apply_blind_factors(
@@ -253,66 +304,6 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
             commitment = commitment + &(self.public_parameter_group_1[zeroing_degree + i] * &blind);
         }
         KZGCommitment(commitment)
-    }
-
-    fn prove(
-        &self,
-        poly: &FpPolynomial<Self::Field>,
-        x: &Self::Field,
-        max_degree: usize,
-    ) -> Result<Self::Commitment> {
-        let eval = poly.eval(x);
-
-        if poly.degree() > max_degree {
-            return Err(PlonkError::DegreeError);
-        }
-
-        let nominator = poly.sub(&FpPolynomial::from_coefs(vec![eval]));
-        // f(X) - f(x)
-
-        // Negation must happen in Fq
-        let point_neg = x.neg();
-
-        // X - x
-        let vanishing_poly = FpPolynomial::from_coefs(vec![point_neg, Self::Field::one()]);
-        let (q_poly, r_poly) = nominator.div_rem(&vanishing_poly); // P(X)-P(x) / (X-x)
-
-        if !r_poly.is_zero() {
-            return Err(PlonkError::PCSProveEvalError);
-        }
-
-        let proof = self.commit(&q_poly).unwrap();
-        Ok(proof)
-    }
-
-    fn verify(
-        &self,
-        cm: &Self::Commitment,
-        _degree: usize,
-        point: &Self::Field,
-        eval: &Self::Field,
-        proof: &Self::Commitment,
-    ) -> Result<()> {
-        let g1_0 = self.public_parameter_group_1[0].clone();
-        let g2_0 = self.public_parameter_group_2[0].clone();
-        let g2_1 = self.public_parameter_group_2[1].clone();
-
-        let x_minus_point_group_element_group_2 = &g2_1.sub(&g2_0.mul(point));
-
-        let left_pairing_eval = if eval.is_zero() {
-            BLSPairingEngine::pairing(&cm.0, &g2_0)
-        } else {
-            BLSPairingEngine::pairing(&cm.0.sub(&g1_0.mul(eval)), &g2_0)
-        };
-
-        let right_pairing_eval =
-            BLSPairingEngine::pairing(&proof.0, &x_minus_point_group_element_group_2);
-
-        if left_pairing_eval == right_pairing_eval {
-            Ok(())
-        } else {
-            Err(PlonkError::PCSProveEvalError)
-        }
     }
 
     fn batch_verify_diff_points(
@@ -356,12 +347,12 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         right_first.sub_assign(&g1_0.mul(&right_first_val));
         right_first.add_assign(&right_first_comm);
 
-        let pairing_eval = BLSPairingEngine::product_of_pairings(
+        let pairing_eval = P::product_of_pairings(
             &[left_first, right_first.neg()],
             &[left_second, right_second],
         );
 
-        if pairing_eval == BLSGt::get_identity() {
+        if pairing_eval == P::Gt::get_identity() {
             Ok(())
         } else {
             Err(PlonkError::PCSProveEvalError)
@@ -378,6 +369,12 @@ impl<'b> PolyComScheme for KZGCommitmentSchemeBLS {
         }
     }
 }
+
+/// KZG commitment scheme over the BLS12-381 curve
+pub type KZGCommitmentSchemeBLS = KZGCommitmentScheme<BLSPairingEngine>;
+
+/// KZG commitment scheme over the BLS12-381 curve
+pub type KZGCommitmentSchemeBN254 = KZGCommitmentScheme<BN254PairingEngine>;
 
 #[cfg(test)]
 mod tests_kzg_impl {

@@ -984,6 +984,7 @@ mod test {
     };
     use crate::poly_commit::{kzg_poly_com::KZGCommitmentScheme, pcs::PolyComScheme};
     use merlin::Transcript;
+    use noah_algebra::bls12_381::BLSPairingEngine;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 
     type F = BLSScalar;
@@ -1342,7 +1343,7 @@ mod test {
     #[test]
     fn test_turbo_plonk_kzg() {
         let mut prng = test_rng();
-        let pcs = KZGCommitmentScheme::new(20, &mut prng);
+        let pcs = KZGCommitmentScheme::<BLSPairingEngine>::new(20, &mut prng);
         test_turbo_plonk_with_constant_and_online_values(&pcs, &mut prng);
         test_turbo_plonk_arithmetic_gates(&pcs, &mut prng);
     }

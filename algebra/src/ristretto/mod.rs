@@ -481,6 +481,13 @@ impl<'a> SubAssign<&'a RistrettoPoint> for RistrettoPoint {
     }
 }
 
+impl<'a> MulAssign<&'a RistrettoScalar> for RistrettoPoint {
+    #[inline]
+    fn mul_assign(&mut self, rhs: &'a RistrettoScalar) {
+        self.0.mul_assign(rhs.0.clone())
+    }
+}
+
 #[allow(non_snake_case)]
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 /// The Pedersen commitment implementation for the Ristretto group.

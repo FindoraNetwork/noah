@@ -94,6 +94,13 @@ impl<'a> SubAssign<&'a BLSGt> for BLSGt {
     }
 }
 
+impl<'a> MulAssign<&'a BLSScalar> for BLSGt {
+    #[inline]
+    fn mul_assign(&mut self, rhs: &'a BLSScalar) {
+        *self = self.mul(rhs);
+    }
+}
+
 impl Group for BLSGt {
     type ScalarType = BLSScalar;
 

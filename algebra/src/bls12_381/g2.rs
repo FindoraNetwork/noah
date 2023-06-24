@@ -148,3 +148,10 @@ impl<'a> SubAssign<&'a BLSG2> for BLSG2 {
         self.0.sub_assign(&rhs.0)
     }
 }
+
+impl<'a> MulAssign<&'a BLSScalar> for BLSG2 {
+    #[inline]
+    fn mul_assign(&mut self, rhs: &'a BLSScalar) {
+        self.0.mul_assign(rhs.0.clone())
+    }
+}

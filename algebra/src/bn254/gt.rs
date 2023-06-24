@@ -46,6 +46,13 @@ impl<'a> Sub<&'a BN254Gt> for BN254Gt {
     }
 }
 
+impl<'a> MulAssign<&'a BN254Scalar> for BN254Gt {
+    #[inline]
+    fn mul_assign(&mut self, rhs: &'a BN254Scalar) {
+        *self = self.mul(rhs)
+    }
+}
+
 impl<'a> Mul<&'a BN254Scalar> for BN254Gt {
     type Output = BN254Gt;
 
