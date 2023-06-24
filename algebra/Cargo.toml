@@ -75,7 +75,6 @@ features = ['curve']
 package = "ark-ed-on-bn254-mixed-radix"
 git = "https://github.com/FindoraNetwork/ark-ed-on-bn254-mixed-radix"
 tag = "v0.4.0"
-version = '0.4.0'
 default-features = false
 
 [dependencies.ark-bn254]
