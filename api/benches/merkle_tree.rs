@@ -151,7 +151,7 @@ pub fn compute_merkle_root_variables_2_20(
             path_node.is_left_child,
             path_node.is_right_child,
         );
-        node_var = cs.jive_crh(trace, &input_var, ANEMOI_JIVE_381_SALTS_OLD[idx]);
+        node_var = cs.jive_crh::<AnemoiJive381>(trace, &input_var, ANEMOI_JIVE_381_SALTS_OLD[idx]);
     }
     node_var
 }
