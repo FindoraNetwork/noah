@@ -135,7 +135,7 @@ pub fn compute_merkle_root_variables_2_20(
     let (uid, commitment) = (elem.uid, elem.commitment);
 
     let mut node_var = cs.new_variable(leaf_trace.output);
-    cs.anemoi_variable_length_hash(leaf_trace, &[uid, commitment], node_var);
+    cs.anemoi_variable_length_hash::<AnemoiJive381>(leaf_trace, &[uid, commitment], node_var);
     for (idx, (path_node, trace)) in path_vars
         .nodes
         .iter()
