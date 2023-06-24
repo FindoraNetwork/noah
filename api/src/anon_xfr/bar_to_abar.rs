@@ -507,7 +507,7 @@ pub(crate) fn build_bar_to_abar_cs(
             r,
         ]);
 
-        cs.anemoi_variable_length_hash(
+        cs.anemoi_variable_length_hash::<AnemoiJive381>(
             &trace,
             &[
                 compressed_limbs_var[0],

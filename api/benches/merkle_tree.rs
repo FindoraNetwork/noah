@@ -5,7 +5,7 @@ use merlin::Transcript;
 use noah::anon_xfr::add_merkle_path_variables;
 use noah::anon_xfr::structs::{AccElemVars, MTLeafInfo, MTNode, MTPath, MerklePathVars};
 use noah_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
-use noah_algebra::bls12_381::BLSScalar;
+use noah_algebra::bls12_381::{BLSPairingEngine, BLSScalar};
 use noah_algebra::prelude::*;
 use noah_crypto::anemoi_jive::{
     AnemoiJive, AnemoiJive381, AnemoiVLHTrace, JiveTrace, ANEMOI_JIVE_381_SALTS_OLD,
@@ -79,7 +79,7 @@ fn merkle_tree_proof_bench(c: &mut Criterion) {
     let witness = cs.get_and_clear_witness();
 
     let mut prng = test_rng();
-    let pcs = KZGCommitmentScheme::new(16400, &mut prng);
+    let pcs = KZGCommitmentScheme::<BLSPairingEngine>::new(16400, &mut prng);
 
     let prover_params = indexer(&cs, &pcs).unwrap();
 
@@ -135,7 +135,7 @@ pub fn compute_merkle_root_variables_2_20(
     let (uid, commitment) = (elem.uid, elem.commitment);
 
     let mut node_var = cs.new_variable(leaf_trace.output);
-    cs.anemoi_variable_length_hash(leaf_trace, &[uid, commitment], node_var);
+    cs.anemoi_variable_length_hash::<AnemoiJive381>(leaf_trace, &[uid, commitment], node_var);
     for (idx, (path_node, trace)) in path_vars
         .nodes
         .iter()
@@ -151,7 +151,7 @@ pub fn compute_merkle_root_variables_2_20(
             path_node.is_left_child,
             path_node.is_right_child,
         );
-        node_var = cs.jive_crh(trace, &input_var, ANEMOI_JIVE_381_SALTS_OLD[idx]);
+        node_var = cs.jive_crh::<AnemoiJive381>(trace, &input_var, ANEMOI_JIVE_381_SALTS_OLD[idx]);
     }
     node_var
 }

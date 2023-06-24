@@ -289,7 +289,7 @@ pub fn commit_in_cs(
     let output_var = cs.new_variable(trace.output);
     let zero_var = cs.zero_var();
 
-    cs.anemoi_variable_length_hash(
+    cs.anemoi_variable_length_hash::<AnemoiJive381>(
         trace,
         &[
             zero_var,
@@ -356,7 +356,7 @@ pub(crate) fn nullify_in_cs(
     let output_var = cs.new_variable(trace.output);
     let zero_var = cs.zero_var();
 
-    cs.anemoi_variable_length_hash(
+    cs.anemoi_variable_length_hash::<AnemoiJive381>(
         trace,
         &[
             zero_var,
@@ -481,7 +481,7 @@ pub fn compute_merkle_root_variables(
     let (uid, commitment) = (elem.uid, elem.commitment);
 
     let mut node_var = cs.new_variable(leaf_trace.output);
-    cs.anemoi_variable_length_hash(leaf_trace, &[uid, commitment], node_var);
+    cs.anemoi_variable_length_hash::<AnemoiJive381>(leaf_trace, &[uid, commitment], node_var);
     for (idx, (path_node, trace)) in path_vars.nodes.iter().zip(traces.iter()).enumerate() {
         check_merkle_tree_validity(
             cs,
@@ -493,7 +493,7 @@ pub fn compute_merkle_root_variables(
             path_node.is_mid_child,
             path_node.is_right_child,
         );
-        node_var = cs.jive_crh(
+        node_var = cs.jive_crh::<AnemoiJive381>(
             trace,
             &[path_node.left, path_node.mid, path_node.right],
             ANEMOI_JIVE_381_SALTS_OLD[idx],

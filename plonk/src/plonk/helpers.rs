@@ -431,7 +431,7 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
 
 /// Compute r polynomial or commitment.
 #[cfg(not(feature = "parallel"))]
-fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
+fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<F>>(
     w: &[F],
     q_polys_or_comms: &[PCSType],
     qb_poly_or_comm: &PCSType,
@@ -507,7 +507,7 @@ fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
 
 /// Compute r polynomial or commitment.
 #[cfg(feature = "parallel")]
-fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<Scalar = F>>(
+fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<F>>(
     w: &[F],
     q_polys_or_comms: &[PCSType],
     qb_poly_or_comm: &PCSType,
@@ -977,6 +977,7 @@ mod test {
         indexer::indexer,
     };
     use crate::poly_commit::kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS};
+    use noah_algebra::bls12_381::BLSPairingEngine;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 
     type F = BLSScalar;
@@ -1004,7 +1005,7 @@ mod test {
         cs.pad();
 
         let mut prng = test_rng();
-        let pcs = KZGCommitmentScheme::new(20, &mut prng);
+        let pcs = KZGCommitmentScheme::<BLSPairingEngine>::new(20, &mut prng);
         let params = indexer(&cs, &pcs).unwrap();
 
         let mut challenges = PlonkChallenges::<F>::new();

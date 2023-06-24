@@ -141,9 +141,12 @@ pub trait Group:
     + for<'a> Sub<&'a Self, Output = Self>
     + for<'a> AddAssign<&'a Self>
     + for<'a> SubAssign<&'a Self>
+    + for<'a> MulAssign<&'a Self::ScalarType>
     + Serialize
-    + Neg
+    + Neg<Output = Self>
     + for<'de> Deserialize<'de>
+    + Send
+    + Sync
 {
     /// The scalar type
     type ScalarType: Scalar;
@@ -210,7 +213,7 @@ pub trait PedersenCommitment<G: Group>: Default {
 /// The trait for a pair of groups for pairing
 pub trait Pairing {
     /// The scalar type
-    type ScalarField: Scalar;
+    type ScalarField: Scalar + Domain;
 
     /// The first group
     type G1: Group<ScalarType = Self::ScalarField>;

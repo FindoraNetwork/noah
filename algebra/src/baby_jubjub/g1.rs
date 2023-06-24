@@ -179,6 +179,13 @@ impl<'a> SubAssign<&'a BabyJubjubPoint> for BabyJubjubPoint {
     }
 }
 
+impl<'a> MulAssign<&'a BabyJubjubScalar> for BabyJubjubPoint {
+    #[inline]
+    fn mul_assign(&mut self, rhs: &'a BabyJubjubScalar) {
+        self.0.mul_assign(rhs.0.clone())
+    }
+}
+
 impl Neg for BabyJubjubPoint {
     type Output = Self;
 

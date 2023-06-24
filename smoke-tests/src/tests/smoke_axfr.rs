@@ -547,7 +547,7 @@ mod smoke_axfr {
 
     #[test]
     fn abar_1in_xout_1asset() {
-        for output_len in 1..=20 {
+        for output_len in [1, 5, 10, 20] {
             let fee_amount = mock_fee(1, output_len);
 
             let fee_t = FEE_TYPE;

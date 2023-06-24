@@ -12,10 +12,7 @@ pub trait ToBytes {
 }
 
 /// The trait for homomorphic polynomial commitment or polynomial.
-pub trait HomomorphicPolyComElem: ToBytes + Clone + Sync + Send + Default {
-    /// This is the scalar field of the polynomial.
-    type Scalar;
-
+pub trait HomomorphicPolyComElem<F: Scalar>: ToBytes + Clone + Sync + Send + Default {
     /// Get base (generator) of the group.
     fn get_base() -> Self;
 
@@ -36,10 +33,10 @@ pub trait HomomorphicPolyComElem: ToBytes + Clone + Sync + Send + Default {
 
     /// Multiply underlying polynomial by scalar `scalar` represented
     /// in least significant byte first.
-    fn mul(&self, scalar: &Self::Scalar) -> Self;
+    fn mul(&self, scalar: &F) -> Self;
 
     /// Multiply underlying polynomial by scalar `scalar`.
-    fn mul_assign(&mut self, scalar: &Self::Scalar);
+    fn mul_assign(&mut self, scalar: &F);
 }
 
 /// Trait for polynomial commitment scheme.
@@ -48,7 +45,7 @@ pub trait PolyComScheme: Sized {
     type Field: Domain + Debug + Sync + Send;
 
     /// Type of commitment produces, need to implement `HomomorphicPolyComElem`.
-    type Commitment: HomomorphicPolyComElem<Scalar = Self::Field>
+    type Commitment: HomomorphicPolyComElem<Self::Field>
         + Debug
         + Default
         + PartialEq
@@ -243,6 +240,7 @@ mod test {
         field_polynomial::FpPolynomial, kzg_poly_com::KZGCommitmentScheme, pcs::PolyComScheme,
     };
     use merlin::Transcript;
+    use noah_algebra::bls12_381::BLSPairingEngine;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 
     #[test]
@@ -254,7 +252,7 @@ mod test {
 
         let poly = FpPolynomial::from_zeroes(&[zero, one, two]);
         let degree = poly.degree();
-        let pcs = KZGCommitmentScheme::new(degree, &mut prng);
+        let pcs = KZGCommitmentScheme::<BLSPairingEngine>::new(degree, &mut prng);
         let com = pcs.commit(&poly).unwrap();
         let point = BLSScalar::random(&mut prng);
         let proof = pcs.prove(&poly, &point, degree).unwrap();
@@ -274,7 +272,7 @@ mod test {
         let poly2 = FpPolynomial::from_coefs(vec![one, zero, three]);
         let poly3 = FpPolynomial::from_coefs(vec![two, two, two, two]);
         let degree = poly3.degree();
-        let pcs = KZGCommitmentScheme::new(degree + 1, &mut prng);
+        let pcs = KZGCommitmentScheme::<BLSPairingEngine>::new(degree + 1, &mut prng);
         let com1 = pcs.commit(&poly1).unwrap();
         let com2 = pcs.commit(&poly2).unwrap();
         let com3 = pcs.commit(&poly3).unwrap();
