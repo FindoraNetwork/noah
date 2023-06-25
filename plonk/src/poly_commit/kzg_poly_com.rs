@@ -373,7 +373,7 @@ impl<P: Pairing> PolyComScheme for KZGCommitmentScheme<P> {
 /// KZG commitment scheme over the BLS12-381 curve
 pub type KZGCommitmentSchemeBLS = KZGCommitmentScheme<BLSPairingEngine>;
 
-/// KZG commitment scheme over the BLS12-381 curve
+/// KZG commitment scheme over the BN254 curve
 pub type KZGCommitmentSchemeBN254 = KZGCommitmentScheme<BN254PairingEngine>;
 
 #[cfg(test)]
