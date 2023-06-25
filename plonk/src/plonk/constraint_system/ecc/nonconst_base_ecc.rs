@@ -62,13 +62,15 @@ impl<S: Scalar> TurboCS<S> {
 mod test {
     use crate::plonk::constraint_system::TurboCS;
     use noah_algebra::{
-        baby_jubjub::BabyJubjubPoint, jubjub::JubjubPoint, prelude::*, traits::TECurve,
+        baby_jubjub::BabyJubjubPoint, ed25519::Ed25519Point, jubjub::JubjubPoint, prelude::*,
+        traits::TECurve,
     };
 
     #[test]
     fn test_scalar_mul() {
         scalar_mul::<JubjubPoint>();
         scalar_mul::<BabyJubjubPoint>();
+        scalar_mul::<Ed25519Point>();
     }
 
     fn scalar_mul<T: TECurve>() {
@@ -102,6 +104,7 @@ mod test {
     fn test_scalar_mul_with_zero_scalar() {
         scalar_mul_with_zero_scalar::<JubjubPoint>();
         scalar_mul_with_zero_scalar::<BabyJubjubPoint>();
+        scalar_mul_with_zero_scalar::<Ed25519Point>();
     }
 
     fn scalar_mul_with_zero_scalar<T: TECurve>() {
