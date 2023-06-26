@@ -129,7 +129,7 @@ impl<G: CurveGroup> SchnorrVerifyingKey<G> {
 #[cfg(test)]
 mod tests {
     use noah_algebra::{
-        bn254::BN254Scalar, baby_jubjub::BabyJubjubPoint, rand_helper::test_rng, traits::Scalar,
+        baby_jubjub::BabyJubjubPoint, bn254::BN254Scalar, rand_helper::test_rng, traits::Scalar,
     };
 
     use crate::anemoi_jive::AnemoiJive254;

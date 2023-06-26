@@ -391,8 +391,8 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
             let term9 = alpha_pow_7.mul(&q_prk3_eval_point).mul(
                 (tmp - &wo_eval_point).pow(five) + &(g * tmp.square())
                     - &(g * &w0_eval_point
-                    + g_square_plus_one * w1_eval_point
-                    + &q_prk2_eval_point),
+                        + g_square_plus_one * w1_eval_point
+                        + &q_prk2_eval_point),
             );
 
             // - alpha^9 * q_{prk3} *
@@ -851,7 +851,7 @@ pub(super) fn r_eval_zeta<PCS: PolyComScheme>(
     let term4 = alpha_pow_7.mul(&proof.prk_3_poly_eval_zeta).mul(
         (tmp - &proof.w_polys_eval_zeta[4]).pow(five) + anemoi_generator * &tmp.square()
             - &(anemoi_generator * &proof.w_polys_eval_zeta[0]
-            + &(anemoi_generator_square_plus_one * &proof.w_polys_eval_zeta[1])),
+                + &(anemoi_generator_square_plus_one * &proof.w_polys_eval_zeta[1])),
     );
     let term6 = alpha_pow_9.mul(&proof.prk_3_poly_eval_zeta).mul(
         (tmp - &proof.w_polys_eval_zeta[4]).pow(five)

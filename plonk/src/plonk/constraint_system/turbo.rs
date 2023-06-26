@@ -455,7 +455,7 @@ impl<F: Scalar> TurboCS<F> {
             wiring_3_var,
             wiring_4_var,
         ]
-            .iter()
+        .iter()
         {
             self.witness_backtrace.remove(var);
         }
@@ -687,7 +687,7 @@ impl<F: Scalar> TurboCS<F> {
         // Therefore, here we save the backtrace information,  so that `finish_new_gate` does not
         // delete such information, and then put it back to the list of witness backtrace.
         #[cfg(feature = "debug")]
-            let backtrace = { self.witness_backtrace.remove(&var) };
+        let backtrace = { self.witness_backtrace.remove(&var) };
 
         self.finish_new_gate();
 

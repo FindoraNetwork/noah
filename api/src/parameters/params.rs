@@ -18,6 +18,7 @@ use crate::parameters::{
     LAGRANGE_BASES, SRS,
 };
 use ark_std::{collections::BTreeMap, format};
+use noah_algebra::bn254::{BN254Scalar, BN254G1};
 use noah_algebra::prelude::*;
 use noah_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 use noah_crypto::delegated_schnorr::{DSInspectionBN254Ristretto, DSProofBN254Ristretto};
@@ -28,7 +29,6 @@ use noah_plonk::poly_commit::pcs::PolyComScheme;
 use num_traits::Zero;
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
-use noah_algebra::bn254::{BN254G1, BN254Scalar};
 
 /// The range in the Bulletproofs range check.
 pub const BULLET_PROOF_RANGE: usize = 32;

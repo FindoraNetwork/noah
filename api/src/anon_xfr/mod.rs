@@ -15,7 +15,9 @@ use noah_algebra::{
     collections::HashMap,
     prelude::*,
 };
-use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiVLHTrace, JiveTrace, AnemoiJive254, ANEMOI_JIVE_BN254_SALTS};
+use noah_crypto::anemoi_jive::{
+    AnemoiJive, AnemoiJive254, AnemoiVLHTrace, JiveTrace, ANEMOI_JIVE_BN254_SALTS,
+};
 use noah_plonk::{
     plonk::{
         constraint_system::{TurboCS, VarIndex},
@@ -324,7 +326,7 @@ pub fn commit(
         }
     };
 
-    let zero =  BN254Scalar::zero();
+    let zero = BN254Scalar::zero();
     let public_key_scalars = public_key.to_bn_scalars()?;
 
     let trace = AnemoiJive254::eval_variable_length_hash_with_trace(&[

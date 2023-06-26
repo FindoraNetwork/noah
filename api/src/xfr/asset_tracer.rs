@@ -223,8 +223,8 @@ impl TracerMemo {
 mod tests {
     use crate::errors::NoahError;
     use crate::xfr::structs::{AssetTracerKeyPair, AssetType, TracerMemo};
-    use noah_algebra::{prelude::*, ristretto::RistrettoScalar};
     use noah_algebra::bn254::BN254Scalar;
+    use noah_algebra::{prelude::*, ristretto::RistrettoScalar};
     use noah_crypto::elgamal::elgamal_encrypt;
 
     #[test]

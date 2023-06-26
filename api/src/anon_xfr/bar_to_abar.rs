@@ -196,14 +196,21 @@ pub(crate) fn prove_bar_to_abar<R: CryptoRng + RngCore>(
     transcript.append_message(b"commitment", &comm.to_bytes());
 
     // 3. Compute the delegated Schnorr proof.
-    let (delegated_schnorr_proof, inspection, beta, lambda) =
-        prove_delegated_schnorr::<BN254Scalar, AnemoiJive254, _, _, _, SimFrParamsBN254Ristretto, _>(
-            prng,
-            &vec![(x, gamma), (y, delta)],
-            &pc_gens,
-            &vec![point_p, point_q],
-            &mut transcript,
-        )?;
+    let (delegated_schnorr_proof, inspection, beta, lambda) = prove_delegated_schnorr::<
+        BN254Scalar,
+        AnemoiJive254,
+        _,
+        _,
+        _,
+        SimFrParamsBN254Ristretto,
+        _,
+    >(
+        prng,
+        &vec![(x, gamma), (y, delta)],
+        &pc_gens,
+        &vec![point_p, point_q],
+        &mut transcript,
+    )?;
 
     // 4. Compute the inspector's proof.
     let inspector_proof = prove_bar_to_abar_cs(
@@ -335,12 +342,12 @@ pub(crate) fn verify_inspection(
     let mut online_inputs = Vec::with_capacity(2 + 3 * SimFrParamsBN254Ristretto::NUM_OF_LIMBS);
     online_inputs.push(hash_comm);
     online_inputs.push(proof_zk_part.inspection_comm);
-    let beta_sim_fr = SimFr::<BN254Scalar, SimFrParamsBN254Ristretto>::from(&BigUint::from_bytes_le(
-        &beta.to_bytes(),
-    ));
-    let lambda_sim_fr = SimFr::<BN254Scalar, SimFrParamsBN254Ristretto>::from(&BigUint::from_bytes_le(
-        &lambda.to_bytes(),
-    ));
+    let beta_sim_fr = SimFr::<BN254Scalar, SimFrParamsBN254Ristretto>::from(
+        &BigUint::from_bytes_le(&beta.to_bytes()),
+    );
+    let lambda_sim_fr = SimFr::<BN254Scalar, SimFrParamsBN254Ristretto>::from(
+        &BigUint::from_bytes_le(&lambda.to_bytes()),
+    );
 
     let beta_lambda = *beta * lambda;
     let beta_lambda_sim_fr = SimFr::<BN254Scalar, SimFrParamsBN254Ristretto>::from(
@@ -388,10 +395,14 @@ pub(crate) fn build_bar_to_abar_cs(
     let zero = BN254Scalar::zero();
     let one = BN254Scalar::one();
     let step_1 = BN254Scalar::from(&BigUint::one().shl(SimFrParamsBN254Ristretto::BIT_PER_LIMB));
-    let step_2 = BN254Scalar::from(&BigUint::one().shl(SimFrParamsBN254Ristretto::BIT_PER_LIMB * 2));
-    let step_3 = BN254Scalar::from(&BigUint::one().shl(SimFrParamsBN254Ristretto::BIT_PER_LIMB * 3));
-    let step_4 = BN254Scalar::from(&BigUint::one().shl(SimFrParamsBN254Ristretto::BIT_PER_LIMB * 4));
-    let step_5 = BN254Scalar::from(&BigUint::one().shl(SimFrParamsBN254Ristretto::BIT_PER_LIMB * 5));
+    let step_2 =
+        BN254Scalar::from(&BigUint::one().shl(SimFrParamsBN254Ristretto::BIT_PER_LIMB * 2));
+    let step_3 =
+        BN254Scalar::from(&BigUint::one().shl(SimFrParamsBN254Ristretto::BIT_PER_LIMB * 3));
+    let step_4 =
+        BN254Scalar::from(&BigUint::one().shl(SimFrParamsBN254Ristretto::BIT_PER_LIMB * 4));
+    let step_5 =
+        BN254Scalar::from(&BigUint::one().shl(SimFrParamsBN254Ristretto::BIT_PER_LIMB * 5));
 
     // 1. Input commitment witnesses.
     let amount_var = cs.new_variable(amount);

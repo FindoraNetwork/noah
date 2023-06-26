@@ -16,6 +16,7 @@ use libsecp256k1::{
     PublicKey as Secp256k1PublicKey, RecoveryId, SecretKey as Secp256k1SecretKey,
     Signature as Secp256k1Signature,
 };
+use noah_algebra::bn254::BN254Scalar;
 use noah_algebra::{
     cmp::Ordering,
     ed25519::{Ed25519Point, Ed25519Scalar},
@@ -26,7 +27,6 @@ use noah_algebra::{
 use serde::Serialize;
 use sha3::Keccak256;
 use wasm_bindgen::prelude::*;
-use noah_algebra::bn254::BN254Scalar;
 
 /// The length of the secret key.
 pub const SECRET_KEY_LENGTH: usize = 33; // KeyType + 32 bytes

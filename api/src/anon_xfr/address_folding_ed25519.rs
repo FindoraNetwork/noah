@@ -374,9 +374,9 @@ pub fn prove_address_folding_in_cs_ed25519(
     let mut lambda_series_vars_skip_first = vec![];
     for lambda_series_val in lambda_series.iter().skip(1) {
         let sim_fr =
-            SimFr::<BN254Scalar, SimFrParamsBN254Zorro>::from(&<ZorroScalar as Into<BigUint>>::into(
-                *lambda_series_val,
-            ));
+            SimFr::<BN254Scalar, SimFrParamsBN254Zorro>::from(
+                &<ZorroScalar as Into<BigUint>>::into(*lambda_series_val),
+            );
         lambda_series_vars_skip_first.push(
             SimFrVar::<BN254Scalar, SimFrParamsBN254Zorro>::alloc_input(cs, &sim_fr),
         );
@@ -386,9 +386,9 @@ pub fn prove_address_folding_in_cs_ed25519(
     let mut beta_lambda_series_vars = vec![];
     for beta_lambda_series_var in beta_lambda_series.iter() {
         let sim_fr =
-            SimFr::<BN254Scalar, SimFrParamsBN254Zorro>::from(&<ZorroScalar as Into<BigUint>>::into(
-                *beta_lambda_series_var,
-            ));
+            SimFr::<BN254Scalar, SimFrParamsBN254Zorro>::from(
+                &<ZorroScalar as Into<BigUint>>::into(*beta_lambda_series_var),
+            );
         beta_lambda_series_vars.push(SimFrVar::<BN254Scalar, SimFrParamsBN254Zorro>::alloc_input(
             cs, &sim_fr,
         ));
@@ -404,9 +404,11 @@ pub fn prove_address_folding_in_cs_ed25519(
         )
         .map(|(v_var, (_, blinding_factor))| {
             let sim_fr =
-                SimFr::<BN254Scalar, SimFrParamsBN254Zorro>::from(
-                    &<ZorroScalar as Into<BigUint>>::into(*blinding_factor),
-                );
+                SimFr::<BN254Scalar, SimFrParamsBN254Zorro>::from(&<ZorroScalar as Into<
+                    BigUint,
+                >>::into(
+                    *blinding_factor
+                ));
             let (blinding_factor_var, _) =
                 SimFrVar::<BN254Scalar, SimFrParamsBN254Zorro>::alloc_witness(cs, &sim_fr);
 
@@ -577,17 +579,17 @@ pub fn prepare_verifier_input_ed25519(
 
     for lambda_series_val in lambda_series.iter().skip(1) {
         let sim_fr =
-            SimFr::<BN254Scalar, SimFrParamsBN254Zorro>::from(&<ZorroScalar as Into<BigUint>>::into(
-                *lambda_series_val,
-            ));
+            SimFr::<BN254Scalar, SimFrParamsBN254Zorro>::from(
+                &<ZorroScalar as Into<BigUint>>::into(*lambda_series_val),
+            );
         v.extend_from_slice(&sim_fr.limbs);
     }
 
     for beta_lambda_series_val in beta_lambda_series.iter() {
         let sim_fr =
-            SimFr::<BN254Scalar, SimFrParamsBN254Zorro>::from(&<ZorroScalar as Into<BigUint>>::into(
-                *beta_lambda_series_val,
-            ));
+            SimFr::<BN254Scalar, SimFrParamsBN254Zorro>::from(
+                &<ZorroScalar as Into<BigUint>>::into(*beta_lambda_series_val),
+            );
         v.extend_from_slice(&sim_fr.limbs);
     }
 

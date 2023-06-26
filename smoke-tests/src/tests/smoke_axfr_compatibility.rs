@@ -34,9 +34,7 @@ mod smoke_axfr_compatibility {
         },
     };
     use noah_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
-    use noah_algebra::{
-        bn254::BN254Scalar, rand_helper::test_rng, serialization::NoahFromToBytes,
-    };
+    use noah_algebra::{bn254::BN254Scalar, rand_helper::test_rng, serialization::NoahFromToBytes};
     use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive254};
     use parking_lot::RwLock;
     use rand::Rng;

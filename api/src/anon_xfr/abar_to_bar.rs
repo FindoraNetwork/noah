@@ -351,12 +351,12 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     let s1_plus_lambda_s2 = delegated_schnorr_proof.response_scalars[0].0
         + delegated_schnorr_proof.response_scalars[1].0 * &lambda;
 
-    let beta_sim_fr = SimFr::<BN254Scalar, SimFrParamsBN254Ristretto>::from(&BigUint::from_bytes_le(
-        &beta.to_bytes(),
-    ));
-    let lambda_sim_fr = SimFr::<BN254Scalar, SimFrParamsBN254Ristretto>::from(&BigUint::from_bytes_le(
-        &lambda.to_bytes(),
-    ));
+    let beta_sim_fr = SimFr::<BN254Scalar, SimFrParamsBN254Ristretto>::from(
+        &BigUint::from_bytes_le(&beta.to_bytes()),
+    );
+    let lambda_sim_fr = SimFr::<BN254Scalar, SimFrParamsBN254Ristretto>::from(
+        &BigUint::from_bytes_le(&lambda.to_bytes()),
+    );
     let beta_lambda_sim_fr = SimFr::<BN254Scalar, SimFrParamsBN254Ristretto>::from(
         &BigUint::from_bytes_le(&beta_lambda.to_bytes()),
     );
@@ -608,10 +608,14 @@ pub fn build_abar_to_bar_cs(
     let mut root_var: Option<VarIndex> = None;
 
     let step_1 = BN254Scalar::from(&BigUint::one().shl(SimFrParamsBN254Ristretto::BIT_PER_LIMB));
-    let step_2 = BN254Scalar::from(&BigUint::one().shl(SimFrParamsBN254Ristretto::BIT_PER_LIMB * 2));
-    let step_3 = BN254Scalar::from(&BigUint::one().shl(SimFrParamsBN254Ristretto::BIT_PER_LIMB * 3));
-    let step_4 = BN254Scalar::from(&BigUint::one().shl(SimFrParamsBN254Ristretto::BIT_PER_LIMB * 4));
-    let step_5 = BN254Scalar::from(&BigUint::one().shl(SimFrParamsBN254Ristretto::BIT_PER_LIMB * 5));
+    let step_2 =
+        BN254Scalar::from(&BigUint::one().shl(SimFrParamsBN254Ristretto::BIT_PER_LIMB * 2));
+    let step_3 =
+        BN254Scalar::from(&BigUint::one().shl(SimFrParamsBN254Ristretto::BIT_PER_LIMB * 3));
+    let step_4 =
+        BN254Scalar::from(&BigUint::one().shl(SimFrParamsBN254Ristretto::BIT_PER_LIMB * 4));
+    let step_5 =
+        BN254Scalar::from(&BigUint::one().shl(SimFrParamsBN254Ristretto::BIT_PER_LIMB * 5));
 
     let secret_key_type = match keypair.get_sk_ref() {
         SecretKey::Ed25519(_) => BN254Scalar::one(),
@@ -709,12 +713,12 @@ pub fn build_abar_to_bar_cs(
     ));
     let comm = proof.inspection_comm;
     let r = inspection.r;
-    let beta_sim_fr = SimFr::<BN254Scalar, SimFrParamsBN254Ristretto>::from(&BigUint::from_bytes_le(
-        &beta.to_bytes(),
-    ));
-    let lambda_sim_fr = SimFr::<BN254Scalar, SimFrParamsBN254Ristretto>::from(&BigUint::from_bytes_le(
-        &lambda.to_bytes(),
-    ));
+    let beta_sim_fr = SimFr::<BN254Scalar, SimFrParamsBN254Ristretto>::from(
+        &BigUint::from_bytes_le(&beta.to_bytes()),
+    );
+    let lambda_sim_fr = SimFr::<BN254Scalar, SimFrParamsBN254Ristretto>::from(
+        &BigUint::from_bytes_le(&lambda.to_bytes()),
+    );
 
     let beta_lambda = *beta * lambda;
     let beta_lambda_sim_fr = SimFr::<BN254Scalar, SimFrParamsBN254Ristretto>::from(

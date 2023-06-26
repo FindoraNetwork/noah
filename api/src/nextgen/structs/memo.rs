@@ -1,5 +1,5 @@
-use noah_algebra::bn254::{BN254Scalar, BN254_SCALAR_LEN};
 use noah_algebra::baby_jubjub::BabyJubjubPoint;
+use noah_algebra::bn254::{BN254Scalar, BN254_SCALAR_LEN};
 use noah_algebra::prelude::*;
 use serde::de::Error as SerdeError;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};

@@ -26,8 +26,11 @@ use crate::parameters::{
 };
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
+use noah_algebra::bn254::BN254Scalar;
 use noah_algebra::prelude::*;
-use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiVLHTrace, AnemoiJive254, ANEMOI_JIVE_BN254_SALTS};
+use noah_crypto::anemoi_jive::{
+    AnemoiJive, AnemoiJive254, AnemoiVLHTrace, ANEMOI_JIVE_BN254_SALTS,
+};
 use noah_plonk::plonk::{
     constraint_system::{TurboCS, VarIndex},
     prover::prover_with_lagrange,
@@ -35,7 +38,6 @@ use noah_plonk::plonk::{
 };
 #[cfg(feature = "parallel")]
 use rayon::prelude::{IndexedParallelIterator, IntoParallelRefIterator, ParallelIterator};
-use noah_algebra::bn254::BN254Scalar;
 
 /// The domain separator for anonymous transfer, for the Plonk proof.
 const ANON_XFR_PLONK_PROOF_TRANSCRIPT: &[u8] = b"Anon Xfr Plonk Proof";

@@ -237,7 +237,11 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
     }
 
     /// get tree root by depth and version.
-    pub fn get_root_with_depth_and_version(&self, depth: usize, version: u64) -> Result<BN254Scalar> {
+    pub fn get_root_with_depth_and_version(
+        &self,
+        depth: usize,
+        version: u64,
+    ) -> Result<BN254Scalar> {
         if version == 0 {
             return Ok(BN254Scalar::zero());
         }
@@ -399,7 +403,11 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
     }
 
     /// get tree root by depth and version.
-    pub fn get_root_with_depth_and_version(&self, depth: usize, version: u64) -> Result<BN254Scalar> {
+    pub fn get_root_with_depth_and_version(
+        &self,
+        depth: usize,
+        version: u64,
+    ) -> Result<BN254Scalar> {
         if version == 0 {
             return Ok(BN254Scalar::zero());
         }
