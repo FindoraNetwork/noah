@@ -588,117 +588,131 @@ impl<F: Domain> FpPolynomial<F> {
     }
 }
 
+macro_rules! _test_polynomial {
+    ($scalar: ty) => {
+        #[test]
+        fn from_zeroes() {
+            let n = 10;
+            let mut zeroes = vec![];
+            let mut prng = test_rng();
+            for _ in 0..n {
+                zeroes.push(<$scalar>::random(&mut prng));
+            }
+            let poly = FpPolynomial::from_zeroes(&zeroes[..]);
+            for root in zeroes.iter() {
+                assert_eq!(<$scalar>::zero(), poly.eval(root));
+            }
+
+            let zeroes_ref: Vec<&$scalar> = zeroes.iter().collect();
+            let poly = FpPolynomial::from_zeroes_ref(&zeroes_ref);
+            for root in zeroes.iter() {
+                assert_eq!(<$scalar>::zero(), poly.eval(root));
+            }
+        }
+
+        fn check_fft<F: Domain>(poly: &FpPolynomial<F>, root: &F::Field, fft: &[F]) -> bool {
+            assert!(
+                fft.len().is_power_of_two()
+                    || ((fft.len() % 3 == 0) && (fft.len() / 3).is_power_of_two())
+            );
+
+            let mut omega = F::one().get_field();
+            for fft_elem in fft {
+                if *fft_elem != poly.eval(&F::from_field(omega)) {
+                    return false;
+                }
+                omega.mul_assign(root)
+            }
+            true
+        }
+
+        #[test]
+        fn test_fft() {
+            let mut prng = test_rng();
+            let zero = <$scalar>::zero();
+            let one = <$scalar>::one();
+
+            let polynomial = FpPolynomial::from_coefs(vec![one]);
+            let fft = polynomial.fft(1).unwrap();
+            let domain = FpPolynomial::<$scalar>::evaluation_domain(1).unwrap();
+            assert!(check_fft(&polynomial, &domain.group_gen, &fft));
+
+            let polynomial = FpPolynomial::from_coefs(vec![one, one]);
+            let fft = polynomial.fft(2).unwrap();
+            let domain = FpPolynomial::<$scalar>::evaluation_domain(2).unwrap();
+            assert!(check_fft(&polynomial, &domain.group_gen, &fft));
+
+            let polynomial = FpPolynomial::from_coefs(vec![one, zero]);
+            let fft = polynomial.fft(2).unwrap();
+            assert!(check_fft(&polynomial, &domain.group_gen, &fft));
+
+            let polynomial = FpPolynomial::from_coefs(vec![zero, one]);
+            let fft = polynomial.fft(2).unwrap();
+            assert!(check_fft(&polynomial, &domain.group_gen, &fft));
+
+            let polynomial = FpPolynomial::from_coefs(vec![zero, one, one]);
+            let fft = polynomial.fft(3).unwrap();
+            let domain = FpPolynomial::<$scalar>::quotient_evaluation_domain(3).unwrap();
+            assert!(check_fft(&polynomial, &domain.group_gen, &fft));
+
+            let ffti_polynomial = FpPolynomial::ifft_with_domain(&domain, &fft);
+            assert_eq!(ffti_polynomial, polynomial);
+
+            let mut coefs = vec![];
+            for _ in 0..16 {
+                coefs.push(<$scalar>::random(&mut prng));
+            }
+            let polynomial = FpPolynomial::from_coefs(coefs);
+            let fft = polynomial.fft(16).unwrap();
+            let domain = FpPolynomial::<$scalar>::evaluation_domain(16).unwrap();
+            let ffti_polynomial = FpPolynomial::ifft_with_domain(&domain, &fft);
+            assert_eq!(ffti_polynomial, polynomial);
+
+            let mut coefs = vec![];
+            for _ in 0..32 {
+                coefs.push(<$scalar>::random(&mut prng));
+            }
+            let polynomial = FpPolynomial::from_coefs(coefs);
+            let domain = FpPolynomial::<$scalar>::evaluation_domain(32).unwrap();
+            let fft = polynomial.fft_with_domain(&domain);
+            let ffti_polynomial = FpPolynomial::ifft_with_domain(&domain, &fft);
+            assert_eq!(ffti_polynomial, polynomial);
+
+            let mut coefs = vec![];
+            for _ in 0..3 {
+                coefs.push(<$scalar>::random(&mut prng));
+            }
+            let polynomial = FpPolynomial::from_coefs(coefs);
+            let domain = FpPolynomial::<$scalar>::quotient_evaluation_domain(3).unwrap();
+            let fft = polynomial.fft_with_domain(&domain);
+            let ffti_polynomial = FpPolynomial::ifft_with_domain(&domain, &fft);
+            assert_eq!(ffti_polynomial, polynomial);
+
+            let mut coefs = vec![];
+            for _ in 0..48 {
+                coefs.push(<$scalar>::random(&mut prng));
+            }
+            let polynomial = FpPolynomial::from_coefs(coefs);
+            let domain = FpPolynomial::<$scalar>::quotient_evaluation_domain(48).unwrap();
+            let fft = polynomial.fft_with_domain(&domain);
+            let ffti_polynomial = FpPolynomial::ifft_with_domain(&domain, &fft);
+            assert_eq!(ffti_polynomial, polynomial);
+        }
+    };
+}
+
 #[cfg(test)]
-mod test {
+mod test_polynomial_bls {
     use crate::poly_commit::field_polynomial::FpPolynomial;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*, traits::Domain};
 
-    #[test]
-    fn from_zeroes() {
-        let n = 10;
-        let mut zeroes = vec![];
-        let mut prng = test_rng();
-        for _ in 0..n {
-            zeroes.push(BLSScalar::random(&mut prng));
-        }
-        let poly = FpPolynomial::from_zeroes(&zeroes[..]);
-        for root in zeroes.iter() {
-            assert_eq!(BLSScalar::zero(), poly.eval(root));
-        }
+    _test_polynomial!(BLSScalar);
+}
 
-        let zeroes_ref: Vec<&BLSScalar> = zeroes.iter().collect();
-        let poly = FpPolynomial::from_zeroes_ref(&zeroes_ref);
-        for root in zeroes.iter() {
-            assert_eq!(BLSScalar::zero(), poly.eval(root));
-        }
-    }
+#[cfg(test)]
+mod test_polynomial_bn254 {
+    use crate::poly_commit::field_polynomial::FpPolynomial;
+    use noah_algebra::{bn254::BN254Scalar, prelude::*, traits::Domain};
 
-    fn check_fft<F: Domain>(poly: &FpPolynomial<F>, root: &F::Field, fft: &[F]) -> bool {
-        assert!(
-            fft.len().is_power_of_two()
-                || ((fft.len() % 3 == 0) && (fft.len() / 3).is_power_of_two())
-        );
-
-        let mut omega = F::one().get_field();
-        for fft_elem in fft {
-            if *fft_elem != poly.eval(&F::from_field(omega)) {
-                return false;
-            }
-            omega.mul_assign(root)
-        }
-        true
-    }
-
-    #[test]
-    fn test_fft() {
-        let mut prng = test_rng();
-        let zero = BLSScalar::zero();
-        let one = BLSScalar::one();
-
-        let polynomial = FpPolynomial::from_coefs(vec![one]);
-        let fft = polynomial.fft(1).unwrap();
-        let domain = FpPolynomial::<BLSScalar>::evaluation_domain(1).unwrap();
-        assert!(check_fft(&polynomial, &domain.group_gen, &fft));
-
-        let polynomial = FpPolynomial::from_coefs(vec![one, one]);
-        let fft = polynomial.fft(2).unwrap();
-        let domain = FpPolynomial::<BLSScalar>::evaluation_domain(2).unwrap();
-        assert!(check_fft(&polynomial, &domain.group_gen, &fft));
-
-        let polynomial = FpPolynomial::from_coefs(vec![one, zero]);
-        let fft = polynomial.fft(2).unwrap();
-        assert!(check_fft(&polynomial, &domain.group_gen, &fft));
-
-        let polynomial = FpPolynomial::from_coefs(vec![zero, one]);
-        let fft = polynomial.fft(2).unwrap();
-        assert!(check_fft(&polynomial, &domain.group_gen, &fft));
-
-        let polynomial = FpPolynomial::from_coefs(vec![zero, one, one]);
-        let fft = polynomial.fft(3).unwrap();
-        let domain = FpPolynomial::<BLSScalar>::quotient_evaluation_domain(3).unwrap();
-        assert!(check_fft(&polynomial, &domain.group_gen, &fft));
-
-        let ffti_polynomial = FpPolynomial::ifft_with_domain(&domain, &fft);
-        assert_eq!(ffti_polynomial, polynomial);
-
-        let mut coefs = vec![];
-        for _ in 0..16 {
-            coefs.push(BLSScalar::random(&mut prng));
-        }
-        let polynomial = FpPolynomial::from_coefs(coefs);
-        let fft = polynomial.fft(16).unwrap();
-        let domain = FpPolynomial::<BLSScalar>::evaluation_domain(16).unwrap();
-        let ffti_polynomial = FpPolynomial::ifft_with_domain(&domain, &fft);
-        assert_eq!(ffti_polynomial, polynomial);
-
-        let mut coefs = vec![];
-        for _ in 0..32 {
-            coefs.push(BLSScalar::random(&mut prng));
-        }
-        let polynomial = FpPolynomial::from_coefs(coefs);
-        let domain = FpPolynomial::<BLSScalar>::evaluation_domain(32).unwrap();
-        let fft = polynomial.fft_with_domain(&domain);
-        let ffti_polynomial = FpPolynomial::ifft_with_domain(&domain, &fft);
-        assert_eq!(ffti_polynomial, polynomial);
-
-        let mut coefs = vec![];
-        for _ in 0..3 {
-            coefs.push(BLSScalar::random(&mut prng));
-        }
-        let polynomial = FpPolynomial::from_coefs(coefs);
-        let domain = FpPolynomial::<BLSScalar>::quotient_evaluation_domain(3).unwrap();
-        let fft = polynomial.fft_with_domain(&domain);
-        let ffti_polynomial = FpPolynomial::ifft_with_domain(&domain, &fft);
-        assert_eq!(ffti_polynomial, polynomial);
-
-        let mut coefs = vec![];
-        for _ in 0..48 {
-            coefs.push(BLSScalar::random(&mut prng));
-        }
-        let polynomial = FpPolynomial::from_coefs(coefs);
-        let domain = FpPolynomial::<BLSScalar>::quotient_evaluation_domain(48).unwrap();
-        let fft = polynomial.fft_with_domain(&domain);
-        let ffti_polynomial = FpPolynomial::ifft_with_domain(&domain, &fft);
-        assert_eq!(ffti_polynomial, polynomial);
-    }
+    _test_polynomial!(BN254Scalar);
 }

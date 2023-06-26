@@ -391,8 +391,8 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
             let term9 = alpha_pow_7.mul(&q_prk3_eval_point).mul(
                 (tmp - &wo_eval_point).pow(five) + &(g * tmp.square())
                     - &(g * &w0_eval_point
-                        + g_square_plus_one * w1_eval_point
-                        + &q_prk2_eval_point),
+                    + g_square_plus_one * w1_eval_point
+                    + &q_prk2_eval_point),
             );
 
             // - alpha^9 * q_{prk3} *
@@ -851,7 +851,7 @@ pub(super) fn r_eval_zeta<PCS: PolyComScheme>(
     let term4 = alpha_pow_7.mul(&proof.prk_3_poly_eval_zeta).mul(
         (tmp - &proof.w_polys_eval_zeta[4]).pow(five) + anemoi_generator * &tmp.square()
             - &(anemoi_generator * &proof.w_polys_eval_zeta[0]
-                + &(anemoi_generator_square_plus_one * &proof.w_polys_eval_zeta[1])),
+            + &(anemoi_generator_square_plus_one * &proof.w_polys_eval_zeta[1])),
     );
     let term6 = alpha_pow_9.mul(&proof.prk_3_poly_eval_zeta).mul(
         (tmp - &proof.w_polys_eval_zeta[4]).pow(five)
@@ -969,21 +969,27 @@ pub(super) fn first_lagrange_poly<PCS: PolyComScheme>(
     let l1_eval_zeta = z_h_eval_zeta.mul(zeta_minus_one.inv().unwrap());
     (z_h_eval_zeta, l1_eval_zeta)
 }
+
 #[cfg(test)]
 mod test {
-    use crate::plonk::{
-        constraint_system::TurboCS,
-        helpers::{z_poly, PlonkChallenges},
-        indexer::indexer,
-    };
     use crate::poly_commit::kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS};
-    use noah_algebra::bls12_381::BLSPairingEngine;
+    use crate::{
+        plonk::{
+            constraint_system::TurboCS,
+            helpers::{z_poly, PlonkChallenges},
+            indexer::indexer,
+        },
+        poly_commit::kzg_poly_com::KZGCommitmentSchemeBN254,
+    };
+    use noah_algebra::{
+        bls12_381::BLSPairingEngine,
+        bn254::{BN254PairingEngine, BN254Scalar},
+    };
     use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 
-    type F = BLSScalar;
-
     #[test]
-    fn test_z_polynomial() {
+    fn test_z_polynomial_over_bls() {
+        type F = BLSScalar;
         let mut cs = TurboCS::new();
 
         let zero = F::zero();
@@ -1011,6 +1017,41 @@ mod test {
         let mut challenges = PlonkChallenges::<F>::new();
         challenges.insert_beta_gamma(one, zero).unwrap();
         let q = z_poly::<KZGCommitmentSchemeBLS, TurboCS<F>>(&params, &witness[..], &challenges);
+
+        let q0 = q.coefs[0];
+        assert_eq!(q0, one);
+    }
+
+    #[test]
+    fn test_z_polynomial_over_bn254() {
+        type F = BN254Scalar;
+        let mut cs = TurboCS::new();
+
+        let zero = F::zero();
+        let one = F::one();
+        let two = one.add(&one);
+        let three = two.add(&one);
+        let four = three.add(&one);
+        let five = four.add(&one);
+        let six = five.add(&one);
+        let seven = six.add(&one);
+
+        let witness = [one, three, five, four, two, two, seven, six];
+        cs.add_variables(&witness);
+
+        cs.insert_add_gate(0 + 2, 4 + 2, 1 + 2);
+        cs.insert_add_gate(1 + 2, 4 + 2, 2 + 2);
+        cs.insert_add_gate(2 + 2, 4 + 2, 6 + 2);
+        cs.insert_add_gate(3 + 2, 5 + 2, 7 + 2);
+        cs.pad();
+
+        let mut prng = test_rng();
+        let pcs = KZGCommitmentScheme::<BN254PairingEngine>::new(20, &mut prng);
+        let params = indexer(&cs, &pcs).unwrap();
+
+        let mut challenges = PlonkChallenges::<F>::new();
+        challenges.insert_beta_gamma(one, zero).unwrap();
+        let q = z_poly::<KZGCommitmentSchemeBN254, TurboCS<F>>(&params, &witness[..], &challenges);
 
         let q0 = q.coefs[0];
         assert_eq!(q0, one);

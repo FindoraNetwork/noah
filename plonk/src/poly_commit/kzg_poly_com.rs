@@ -16,8 +16,8 @@ use noah_algebra::{
 pub struct KZGCommitment<G>(pub G);
 
 impl<'a, G> ToBytes for KZGCommitment<G>
-where
-    G: Group,
+    where
+        G: Group,
 {
     fn to_bytes(&self) -> Vec<u8> {
         self.0.to_compressed_bytes()
@@ -376,162 +376,167 @@ pub type KZGCommitmentSchemeBLS = KZGCommitmentScheme<BLSPairingEngine>;
 /// KZG commitment scheme over the BN254 curve
 pub type KZGCommitmentSchemeBN254 = KZGCommitmentScheme<BN254PairingEngine>;
 
+macro_rules! _test_kzg_commitment {
+    ($scalar:ty, $scheme: ty, $pairing:ty) => {
+        #[test]
+        fn test_homomorphic_poly_com_elem() {
+            let mut prng = test_rng();
+            let pcs = <$scheme>::new(20, &mut prng);
+            let one = <$scalar>::one();
+            let two = one.add(&one);
+            let three = two.add(&one);
+            let four = three.add(&one);
+            let six = three.add(&three);
+            let eight = six.add(&two);
+            let poly1 = FpPolynomial::from_coefs(vec![two, three, six]);
+
+            let commitment1 = pcs.commit(&poly1).unwrap();
+
+            let poly2 = FpPolynomial::from_coefs(vec![one, eight, four]);
+
+            let commitment2 = pcs.commit(&poly2).unwrap();
+
+            // Add two polynomials
+            let poly_sum = poly1.add(&poly2);
+            let commitment_sum = pcs.commit(&poly_sum).unwrap();
+            let commitment_sum_computed = commitment1.add(&commitment2);
+            assert_eq!(commitment_sum, commitment_sum_computed);
+
+            // Multiplying all the coefficients of a polynomial by some value
+            let exponent = four.add(&one);
+            let poly1_mult_5 = poly1.mul_scalar(&exponent);
+            let commitment_poly1_mult_5 = pcs.commit(&poly1_mult_5).unwrap();
+            let commitment_poly1_mult_5_hom = commitment1.mul(&exponent);
+            assert_eq!(commitment_poly1_mult_5, commitment_poly1_mult_5_hom);
+        }
+
+        #[test]
+        fn test_public_parameters() {
+            let param_size = 5;
+            let mut prng = test_rng();
+            let kzg_scheme = KZGCommitmentScheme::<$pairing>::new(param_size, &mut prng);
+            let g1_power1 = kzg_scheme.public_parameter_group_1[1].clone();
+            let g2_power1 = kzg_scheme.public_parameter_group_2[1].clone();
+
+            // Check parameters for G1
+            for i in 0..param_size - 1 {
+                let elem_first_group_1 = kzg_scheme.public_parameter_group_1[i].clone();
+                let elem_next_group_1 = kzg_scheme.public_parameter_group_1[i + 1].clone();
+                let elem_next_group_1_target =
+                    <$pairing>::pairing(&elem_next_group_1, &<$pairing as Pairing>::G2::get_base());
+                let elem_next_group_1_target_recomputed =
+                    <$pairing>::pairing(&elem_first_group_1, &g2_power1);
+                assert_eq!(
+                    elem_next_group_1_target_recomputed,
+                    elem_next_group_1_target
+                );
+            }
+
+            // Check parameters for G2
+            let elem_first_group_2 = kzg_scheme.public_parameter_group_2[0].clone();
+            let elem_second_group_2 = kzg_scheme.public_parameter_group_2[1].clone();
+            let elem_next_group_2_target =
+                <$pairing>::pairing(&<$pairing as Pairing>::G1::get_base(), &elem_second_group_2);
+            let elem_next_group_2_target_recomputed =
+                <$pairing>::pairing(&g1_power1, &elem_first_group_2);
+
+            assert_eq!(
+                elem_next_group_2_target_recomputed,
+                elem_next_group_2_target
+            );
+        }
+
+        #[test]
+        fn test_generation_of_crs() {
+            let n = 1 << 5;
+            let mut prng = test_rng();
+            let kzg_scheme = KZGCommitmentScheme::<$pairing>::new(n, &mut prng);
+            assert_eq!(kzg_scheme.public_parameter_group_1.len(), n + 1);
+            assert_eq!(kzg_scheme.public_parameter_group_2.len(), 2);
+        }
+
+        #[test]
+        fn test_commit() {
+            let mut prng = test_rng();
+            let pcs = <$scheme>::new(10, &mut prng);
+            let one = <$scalar>::one();
+            let two = one.add(&one);
+            let three = two.add(&one);
+            let six = three.add(&three);
+
+            let fq_poly = FpPolynomial::from_coefs(vec![two, three, six]);
+            let commitment = pcs.commit(&fq_poly).unwrap();
+
+            let coefs_poly_blsscalar = fq_poly.get_coefs_ref().iter().collect_vec();
+            let mut expected_committed_value = <$pairing as Pairing>::G1::get_identity();
+
+            // Doing the multiexp by hand
+            for (i, coef) in coefs_poly_blsscalar.iter().enumerate() {
+                let g_i = pcs.public_parameter_group_1[i].clone();
+                expected_committed_value = expected_committed_value.add(&g_i.mul(&coef));
+            }
+            assert_eq!(expected_committed_value, commitment.0);
+        }
+
+        #[test]
+        fn test_eval() {
+            let mut prng = test_rng();
+            let pcs = <$scheme>::new(10, &mut prng);
+            let one = <$scalar>::one();
+            let two = one.add(&one);
+            let three = two.add(&one);
+            let four = three.add(&one);
+            let six = three.add(&three);
+            let seven = six.add(&one);
+            let fq_poly = FpPolynomial::from_coefs(vec![one, two, four]);
+            let point = one;
+            let max_degree = fq_poly.degree();
+
+            let degree = fq_poly.degree();
+            let commitment_value = pcs.commit(&fq_poly).unwrap();
+
+            // Check that an error is returned if the degree of the polynomial exceeds the maximum degree.
+            let wrong_max_degree = 1;
+            let res = pcs.prove(&fq_poly, &point, wrong_max_degree);
+            assert!(res.is_err());
+
+            let proof = pcs.prove(&fq_poly, &point, max_degree).unwrap();
+
+            pcs.verify(&commitment_value, degree, &point, &seven, &proof)
+                .unwrap();
+
+            let new_pcs = pcs.shrink_to_verifier_only();
+            new_pcs
+                .verify(&commitment_value, degree, &point, &seven, &proof)
+                .unwrap();
+
+            let wrong_eval = one;
+            let res = pcs.verify(&commitment_value, degree, &point, &wrong_eval, &proof);
+            assert!(res.is_err());
+        }
+    };
+}
 #[cfg(test)]
-mod tests_kzg_impl {
+mod tests_kzg_bls {
     use crate::poly_commit::{
         field_polynomial::FpPolynomial,
         kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBLS},
         pcs::{HomomorphicPolyComElem, PolyComScheme},
     };
     use noah_algebra::bls12_381::BLSPairingEngine;
-    use noah_algebra::{
-        bls12_381::{BLSScalar, BLSG1},
-        prelude::*,
-        traits::Pairing,
+    use noah_algebra::{bls12_381::BLSScalar, prelude::*, traits::Pairing};
+
+    _test_kzg_commitment!(BLSScalar, KZGCommitmentSchemeBLS, BLSPairingEngine);
+}
+#[cfg(test)]
+mod tests_kzg_bn254 {
+    use crate::poly_commit::{
+        field_polynomial::FpPolynomial,
+        kzg_poly_com::{KZGCommitmentScheme, KZGCommitmentSchemeBN254},
+        pcs::{HomomorphicPolyComElem, PolyComScheme},
     };
+    use noah_algebra::bn254::{BN254PairingEngine, BN254Scalar};
+    use noah_algebra::{prelude::*, traits::Pairing};
 
-    fn check_public_parameters_generation<P: Pairing>() {
-        let param_size = 5;
-        let mut prng = test_rng();
-        let kzg_scheme = KZGCommitmentScheme::<P>::new(param_size, &mut prng);
-        let g1_power1 = kzg_scheme.public_parameter_group_1[1].clone();
-        let g2_power1 = kzg_scheme.public_parameter_group_2[1].clone();
-
-        // Check parameters for G1
-        for i in 0..param_size - 1 {
-            let elem_first_group_1 = kzg_scheme.public_parameter_group_1[i].clone();
-            let elem_next_group_1 = kzg_scheme.public_parameter_group_1[i + 1].clone();
-            let elem_next_group_1_target = P::pairing(&elem_next_group_1, &P::G2::get_base());
-            let elem_next_group_1_target_recomputed = P::pairing(&elem_first_group_1, &g2_power1);
-            assert_eq!(
-                elem_next_group_1_target_recomputed,
-                elem_next_group_1_target
-            );
-        }
-
-        // Check parameters for G2
-        let elem_first_group_2 = kzg_scheme.public_parameter_group_2[0].clone();
-        let elem_second_group_2 = kzg_scheme.public_parameter_group_2[1].clone();
-        let elem_next_group_2_target = P::pairing(&P::G1::get_base(), &elem_second_group_2);
-        let elem_next_group_2_target_recomputed = P::pairing(&g1_power1, &elem_first_group_2);
-
-        assert_eq!(
-            elem_next_group_2_target_recomputed,
-            elem_next_group_2_target
-        );
-    }
-
-    // Check the size of the KZG being generated.
-    fn generation_of_crs<P: Pairing>() {
-        let n = 1 << 5;
-        let mut prng = test_rng();
-        let kzg_scheme = KZGCommitmentScheme::<P>::new(n, &mut prng);
-        assert_eq!(kzg_scheme.public_parameter_group_1.len(), n + 1);
-        assert_eq!(kzg_scheme.public_parameter_group_2.len(), 2);
-    }
-
-    #[test]
-    fn test_homomorphic_poly_com_elem() {
-        let mut prng = test_rng();
-        let pcs = KZGCommitmentSchemeBLS::new(20, &mut prng);
-        type Field = BLSScalar;
-        let one = Field::one();
-        let two = one.add(&one);
-        let three = two.add(&one);
-        let four = three.add(&one);
-        let six = three.add(&three);
-        let eight = six.add(&two);
-        let poly1 = FpPolynomial::from_coefs(vec![two, three, six]);
-
-        let commitment1 = pcs.commit(&poly1).unwrap();
-
-        let poly2 = FpPolynomial::from_coefs(vec![one, eight, four]);
-
-        let commitment2 = pcs.commit(&poly2).unwrap();
-
-        // Add two polynomials
-        let poly_sum = poly1.add(&poly2);
-        let commitment_sum = pcs.commit(&poly_sum).unwrap();
-        let commitment_sum_computed = commitment1.add(&commitment2);
-        assert_eq!(commitment_sum, commitment_sum_computed);
-
-        // Multiplying all the coefficients of a polynomial by some value
-        let exponent = four.add(&one);
-        let poly1_mult_5 = poly1.mul_scalar(&exponent);
-        let commitment_poly1_mult_5 = pcs.commit(&poly1_mult_5).unwrap();
-        let commitment_poly1_mult_5_hom = commitment1.mul(&exponent);
-        assert_eq!(commitment_poly1_mult_5, commitment_poly1_mult_5_hom);
-    }
-
-    #[test]
-    fn test_public_parameters() {
-        check_public_parameters_generation::<BLSPairingEngine>();
-    }
-
-    #[test]
-    fn test_generation_of_crs() {
-        generation_of_crs::<BLSPairingEngine>();
-    }
-
-    #[test]
-    fn test_commit() {
-        let mut prng = test_rng();
-        let pcs = KZGCommitmentSchemeBLS::new(10, &mut prng);
-        type Field = BLSScalar;
-        let one = Field::one();
-        let two = one.add(&one);
-        let three = two.add(&one);
-        let six = three.add(&three);
-
-        let fq_poly = FpPolynomial::from_coefs(vec![two, three, six]);
-        let commitment = pcs.commit(&fq_poly).unwrap();
-
-        let coefs_poly_blsscalar = fq_poly.get_coefs_ref().iter().collect_vec();
-        let mut expected_committed_value = BLSG1::get_identity();
-
-        // Doing the multiexp by hand
-        for (i, coef) in coefs_poly_blsscalar.iter().enumerate() {
-            let g_i = pcs.public_parameter_group_1[i].clone();
-            expected_committed_value = expected_committed_value.add(&g_i.mul(&coef));
-        }
-        assert_eq!(expected_committed_value, commitment.0);
-    }
-
-    #[test]
-    fn test_eval() {
-        let mut prng = test_rng();
-        let pcs = KZGCommitmentSchemeBLS::new(10, &mut prng);
-        type Field = BLSScalar;
-        let one = Field::one();
-        let two = one.add(&one);
-        let three = two.add(&one);
-        let four = three.add(&one);
-        let six = three.add(&three);
-        let seven = six.add(&one);
-        let fq_poly = FpPolynomial::from_coefs(vec![one, two, four]);
-        let point = one;
-        let max_degree = fq_poly.degree();
-
-        let degree = fq_poly.degree();
-        let commitment_value = pcs.commit(&fq_poly).unwrap();
-
-        // Check that an error is returned if the degree of the polynomial exceeds the maximum degree.
-        let wrong_max_degree = 1;
-        let res = pcs.prove(&fq_poly, &point, wrong_max_degree);
-        assert!(res.is_err());
-
-        let proof = pcs.prove(&fq_poly, &point, max_degree).unwrap();
-
-        pcs.verify(&commitment_value, degree, &point, &seven, &proof)
-            .unwrap();
-
-        let new_pcs = pcs.shrink_to_verifier_only();
-        new_pcs
-            .verify(&commitment_value, degree, &point, &seven, &proof)
-            .unwrap();
-
-        let wrong_eval = one;
-        let res = pcs.verify(&commitment_value, degree, &point, &wrong_eval, &proof);
-        assert!(res.is_err());
-    }
+    _test_kzg_commitment!(BN254Scalar, KZGCommitmentSchemeBN254, BN254PairingEngine);
 }

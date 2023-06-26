@@ -126,31 +126,31 @@ impl<G: CurveGroup> ECIESEncryptionKey<G> {
 #[cfg(test)]
 mod tests {
     use noah_algebra::{
-        bls12_381::BLSScalar, jubjub::JubjubPoint, rand_helper::test_rng, traits::Scalar,
+        bn254::BN254Scalar, baby_jubjub::BabyJubjubPoint, rand_helper::test_rng, traits::Scalar,
     };
 
-    use crate::anemoi_jive::AnemoiJive381;
+    use crate::anemoi_jive::AnemoiJive254;
     use crate::doubly_snark_friendly::ecies_encryption::{ECIESKeyPair, ECIESPlaintext};
 
     #[test]
     fn test_ecies_encryption() {
         let mut rng = test_rng();
 
-        let key_pair = ECIESKeyPair::<JubjubPoint>::sample(&mut rng);
+        let key_pair = ECIESKeyPair::<BabyJubjubPoint>::sample(&mut rng);
 
         let encryption_key = key_pair.get_encryption_key();
         let decryption_key = key_pair.get_decryption_key();
 
         let msg = vec![
-            BLSScalar::random(&mut rng),
-            BLSScalar::random(&mut rng),
-            BLSScalar::random(&mut rng),
-            BLSScalar::random(&mut rng),
-            BLSScalar::random(&mut rng),
+            BN254Scalar::random(&mut rng),
+            BN254Scalar::random(&mut rng),
+            BN254Scalar::random(&mut rng),
+            BN254Scalar::random(&mut rng),
+            BN254Scalar::random(&mut rng),
         ];
 
-        let c = encryption_key.encrypt::<AnemoiJive381, _>(&mut rng, &ECIESPlaintext(msg.clone()));
-        let p = decryption_key.decrypt::<AnemoiJive381>(&c);
+        let c = encryption_key.encrypt::<AnemoiJive254, _>(&mut rng, &ECIESPlaintext(msg.clone()));
+        let p = decryption_key.decrypt::<AnemoiJive254>(&c);
 
         assert_eq!(msg, p.0);
     }

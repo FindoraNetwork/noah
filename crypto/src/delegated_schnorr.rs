@@ -5,7 +5,7 @@ use merlin::Transcript;
 use noah_algebra::bn254::BN254Scalar;
 use noah_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 use noah_algebra::traits::PedersenCommitment;
-use noah_algebra::{bls12_381::BLSScalar, prelude::*};
+use noah_algebra::prelude::*;
 use num_bigint::BigUint;
 use rand_chacha::ChaChaRng;
 use serde::Deserialize;
@@ -21,9 +21,6 @@ pub struct DSProof<F, S, G> {
     pub response_scalars: Vec<(S, S)>,
 }
 
-/// The non-interactive proof provided to the verifier over Ristretto in BLS12-381.
-pub type DSProofBLSRistretto = DSProof<BLSScalar, RistrettoScalar, RistrettoPoint>;
-
 /// The non-interactive proof provided to the verifier over Ristretto in BN254.
 pub type DSProofBN254Ristretto = DSProof<BN254Scalar, RistrettoScalar, RistrettoPoint>;
 
@@ -37,9 +34,6 @@ pub struct DSInspection<F, S, G> {
     /// PhantomData for the group.
     pub group_phantom: PhantomData<G>,
 }
-
-/// The state of the inspector over Ristretto in BLS12-381.
-pub type DSInspectionBLSRistretto = DSInspection<BLSScalar, RistrettoScalar, RistrettoPoint>;
 
 /// The state of the inspector over Ristretto in BLS12-381.
 pub type DSInspectionBN254Ristretto = DSInspection<BN254Scalar, RistrettoScalar, RistrettoPoint>;
@@ -316,12 +310,12 @@ pub fn verify_delegated_schnorr<
 }
 
 #[cfg(test)]
-mod test_ristretto_bls12_381 {
-    use crate::anemoi_jive::AnemoiJive381;
+mod test_ristretto_bn254 {
+    use crate::anemoi_jive::AnemoiJive254;
     use crate::delegated_schnorr::{prove_delegated_schnorr, verify_delegated_schnorr};
-    use crate::field_simulation::SimFrParamsBLSRistretto;
+    use crate::field_simulation::SimFrParamsBN254Ristretto;
     use merlin::Transcript;
-    use noah_algebra::bls12_381::BLSScalar;
+    use noah_algebra::bn254::BN254Scalar;
     use noah_algebra::traits::PedersenCommitment;
     use noah_algebra::{
         prelude::*,
@@ -346,12 +340,12 @@ mod test_ristretto_bls12_381 {
             let mut transcript = Transcript::new(b"Test");
 
             let (proof, _, _, _) = prove_delegated_schnorr::<
-                BLSScalar,
-                AnemoiJive381,
+                BN254Scalar,
+                AnemoiJive254,
                 _,
                 _,
                 _,
-                SimFrParamsBLSRistretto,
+                SimFrParamsBN254Ristretto,
                 _,
             >(
                 &mut prng,
@@ -376,12 +370,12 @@ mod test_ristretto_bls12_381 {
 }
 
 #[cfg(test)]
-mod test_secq256k1_bls12_381 {
-    use crate::anemoi_jive::AnemoiJive381;
+mod test_secq256k1_bn254 {
+    use crate::anemoi_jive::AnemoiJive254;
     use crate::delegated_schnorr::{prove_delegated_schnorr, verify_delegated_schnorr};
-    use crate::field_simulation::SimFrParamsBLSSecq256k1;
+    use crate::field_simulation::SimFrParamsBN254Secq256k1;
     use merlin::Transcript;
-    use noah_algebra::bls12_381::BLSScalar;
+    use noah_algebra::bn254::BN254Scalar;
     use noah_algebra::traits::PedersenCommitment;
     use noah_algebra::{
         prelude::*,
@@ -406,12 +400,12 @@ mod test_secq256k1_bls12_381 {
             let mut transcript = Transcript::new(b"Test");
 
             let (proof, _, _, _) = prove_delegated_schnorr::<
-                BLSScalar,
-                AnemoiJive381,
+                BN254Scalar,
+                AnemoiJive254,
                 _,
                 _,
                 _,
-                SimFrParamsBLSSecq256k1,
+                SimFrParamsBN254Secq256k1,
                 _,
             >(
                 &mut prng,

@@ -9,10 +9,10 @@ use ark_bulletproofs::BulletproofGens as BulletproofGensOverSecq256k1;
 use ark_serialize::{CanonicalDeserialize, CanonicalSerialize, Compress, Validate};
 use bulletproofs::BulletproofGens;
 use noah::parameters::{AddressFormat, SRS};
-use noah_algebra::bls12_381::BLSG1;
+use noah_algebra::bn254::BN254G1;
 use noah_algebra::secq256k1::{PedersenCommitmentSecq256k1, Secq256k1BulletproofGens};
 use noah_algebra::utils::save_to_file;
-use noah_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS;
+use noah_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBN254;
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
 use std::collections::BTreeMap;
@@ -363,22 +363,22 @@ fn gen_bulletproof_zorro_urs(mut path: PathBuf) {
 // cargo run --release --features="gen no_vk" --bin gen-params cut-srs "./parameters"
 fn cut_srs(mut path: PathBuf) {
     let srs = SRS.unwrap();
-    let KZGCommitmentSchemeBLS {
+    let KZGCommitmentSchemeBN254 {
         public_parameter_group_1,
         public_parameter_group_2,
-    } = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs).unwrap();
+    } = KZGCommitmentSchemeBN254::from_unchecked_bytes(&srs).unwrap();
 
     if public_parameter_group_1.len() == 2057 {
         println!("Already complete");
         return;
     }
 
-    let mut new_group_1 = vec![BLSG1::default(); 2057];
+    let mut new_group_1 = vec![BN254G1::default(); 2057];
     new_group_1[0..2051].copy_from_slice(&public_parameter_group_1[0..2051]);
     new_group_1[2051..2054].copy_from_slice(&public_parameter_group_1[4096..4099]);
     new_group_1[2054..2057].copy_from_slice(&public_parameter_group_1[8192..8195]);
 
-    let new_srs = KZGCommitmentSchemeBLS {
+    let new_srs = KZGCommitmentSchemeBN254 {
         public_parameter_group_2,
         public_parameter_group_1: new_group_1,
     };

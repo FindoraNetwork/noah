@@ -129,10 +129,10 @@ impl<G: CurveGroup> SchnorrVerifyingKey<G> {
 #[cfg(test)]
 mod tests {
     use noah_algebra::{
-        bls12_381::BLSScalar, jubjub::JubjubPoint, rand_helper::test_rng, traits::Scalar,
+        bn254::BN254Scalar, baby_jubjub::BabyJubjubPoint, rand_helper::test_rng, traits::Scalar,
     };
 
-    use crate::anemoi_jive::AnemoiJive381;
+    use crate::anemoi_jive::AnemoiJive254;
 
     use super::SchnorrKeyPair;
 
@@ -140,28 +140,28 @@ mod tests {
     fn test_schnorr_signature() {
         let mut rng = test_rng();
 
-        let key_pair = SchnorrKeyPair::<JubjubPoint>::sample(&mut rng);
+        let key_pair = SchnorrKeyPair::<BabyJubjubPoint>::sample(&mut rng);
 
         let verifying_key = key_pair.get_verifying_key();
         let signing_key = key_pair.get_signing_key();
 
         let msg = vec![
-            BLSScalar::random(&mut rng),
-            BLSScalar::random(&mut rng),
-            BLSScalar::random(&mut rng),
-            BLSScalar::random(&mut rng),
-            BLSScalar::random(&mut rng),
+            BN254Scalar::random(&mut rng),
+            BN254Scalar::random(&mut rng),
+            BN254Scalar::random(&mut rng),
+            BN254Scalar::random(&mut rng),
+            BN254Scalar::random(&mut rng),
         ];
 
-        let aux = BLSScalar::random(&mut rng);
+        let aux = BN254Scalar::random(&mut rng);
 
-        let sign = signing_key.sign::<AnemoiJive381, _>(&mut rng, aux, &msg);
+        let sign = signing_key.sign::<AnemoiJive254, _>(&mut rng, aux, &msg);
 
         assert!(verifying_key
-            .verify::<AnemoiJive381>(&sign, aux, &msg)
+            .verify::<AnemoiJive254>(&sign, aux, &msg)
             .is_ok());
         assert!(verifying_key
-            .verify::<AnemoiJive381>(&sign, aux, &msg[..4])
+            .verify::<AnemoiJive254>(&sign, aux, &msg[..4])
             .is_err());
     }
 }

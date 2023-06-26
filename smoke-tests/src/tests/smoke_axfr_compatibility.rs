@@ -35,9 +35,9 @@ mod smoke_axfr_compatibility {
     };
     use noah_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
     use noah_algebra::{
-        bls12_381::BLSScalar, rand_helper::test_rng, serialization::NoahFromToBytes,
+        bn254::BN254Scalar, rand_helper::test_rng, serialization::NoahFromToBytes,
     };
-    use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381};
+    use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive254};
     use parking_lot::RwLock;
     use rand::Rng;
     use rand_core::{CryptoRng, RngCore};
@@ -717,8 +717,8 @@ mod smoke_axfr_compatibility {
         verify_anon_xfr_note(&verifier_params, &note, &root, hash.clone()).unwrap();
     }
 
-    fn hash_abar(uid: u64, abar: &AnonAssetRecord) -> BLSScalar {
-        AnemoiJive381::eval_variable_length_hash(&[BLSScalar::from(uid), abar.commitment])
+    fn hash_abar(uid: u64, abar: &AnonAssetRecord) -> BN254Scalar {
+        AnemoiJive254::eval_variable_length_hash(&[BN254Scalar::from(uid), abar.commitment])
     }
 
     fn build_mt_leaf_info_from_proof(proof: Proof, uid: u64) -> MTLeafInfo {

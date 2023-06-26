@@ -18,17 +18,17 @@ use crate::parameters::{
     LAGRANGE_BASES, SRS,
 };
 use ark_std::{collections::BTreeMap, format};
-use noah_algebra::bls12_381::{BLSScalar, BLSG1};
 use noah_algebra::prelude::*;
 use noah_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
-use noah_crypto::delegated_schnorr::{DSInspectionBLSRistretto, DSProofBLSRistretto};
+use noah_crypto::delegated_schnorr::{DSInspectionBN254Ristretto, DSProofBN254Ristretto};
 use noah_plonk::plonk::constraint_system::ConstraintSystem;
 use noah_plonk::plonk::indexer::{indexer_with_lagrange, PlonkPK, PlonkVK};
-use noah_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS;
+use noah_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBN254;
 use noah_plonk::poly_commit::pcs::PolyComScheme;
 use num_traits::Zero;
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
+use noah_algebra::bn254::{BN254G1, BN254Scalar};
 
 /// The range in the Bulletproofs range check.
 pub const BULLET_PROOF_RANGE: usize = 32;
@@ -53,18 +53,18 @@ pub struct VerifierParams {
     /// A label that describes the prover parameters.
     pub label: String,
     /// The shrunk version of the polynomial commitment scheme.
-    pub shrunk_vk: KZGCommitmentSchemeBLS,
+    pub shrunk_vk: KZGCommitmentSchemeBN254,
     /// The shrunk version of the constraint system.
     pub shrunk_cs: TurboPlonkCS,
     /// The TurboPlonk verifying key.
-    pub verifier_params: PlonkVK<KZGCommitmentSchemeBLS>,
+    pub verifier_params: PlonkVK<KZGCommitmentSchemeBN254>,
 }
 
 #[derive(Serialize, Deserialize)]
 /// The common part of the verifier parameters.
 pub struct VerifierParamsSplitCommon {
     /// The shrunk version of the polynomial commitment scheme.
-    pub shrunk_pcs: KZGCommitmentSchemeBLS,
+    pub shrunk_pcs: KZGCommitmentSchemeBN254,
 }
 
 #[derive(Serialize, Deserialize)]
@@ -75,7 +75,7 @@ pub struct VerifierParamsSplitSpecific {
     /// The shrunk version of the constraint system.
     pub shrunk_cs: TurboPlonkCS,
     /// The verifier parameters.
-    pub verifier_params: PlonkVK<KZGCommitmentSchemeBLS>,
+    pub verifier_params: PlonkVK<KZGCommitmentSchemeBN254>,
 }
 
 /// The address format.
@@ -167,15 +167,15 @@ impl ProverParams {
     /// Obtain the parameters for confidential to anonymous.
     pub fn gen_bar_to_abar() -> Result<ProverParams> {
         let label = String::from("bar_to_abar");
-        let zero = BLSScalar::zero();
+        let zero = BN254Scalar::zero();
 
-        let proof = DSProofBLSRistretto {
+        let proof = DSProofBN254Ristretto {
             inspection_comm: Default::default(),
             randomizers: vec![RistrettoPoint::default(); 3],
             response_scalars: vec![(RistrettoScalar::default(), RistrettoScalar::default()); 3],
         };
 
-        let non_zk_state = DSInspectionBLSRistretto {
+        let non_zk_state = DSInspectionBN254Ristretto {
             committed_data_and_randomizer: vec![
                 (
                     RistrettoScalar::default(),
@@ -183,7 +183,7 @@ impl ProverParams {
                 );
                 3
             ],
-            r: BLSScalar::default(),
+            r: BN254Scalar::default(),
             group_phantom: Default::default(),
         };
 
@@ -238,15 +238,15 @@ impl ProverParams {
             ED25519 => String::from("abar_to_bar_ed25519"),
         };
 
-        let bls_zero = BLSScalar::zero();
+        let elem_zero = BN254Scalar::zero();
 
-        let proof = DSProofBLSRistretto {
+        let proof = DSProofBN254Ristretto {
             inspection_comm: Default::default(),
             randomizers: vec![RistrettoPoint::default(); 3],
             response_scalars: vec![(RistrettoScalar::default(), RistrettoScalar::default()); 3],
         };
 
-        let non_zk_state = DSInspectionBLSRistretto {
+        let non_zk_state = DSInspectionBN254Ristretto {
             committed_data_and_randomizer: vec![
                 (
                     RistrettoScalar::default(),
@@ -254,7 +254,7 @@ impl ProverParams {
                 );
                 3
             ],
-            r: BLSScalar::default(),
+            r: BN254Scalar::default(),
             group_phantom: Default::default(),
         };
 
@@ -265,9 +265,9 @@ impl ProverParams {
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
 
         let node = MTNode {
-            left: bls_zero,
-            mid: bls_zero,
-            right: bls_zero,
+            left: elem_zero,
+            mid: elem_zero,
+            right: elem_zero,
             is_left_child: 0,
             is_mid_child: 0,
             is_right_child: 0,
@@ -278,9 +278,9 @@ impl ProverParams {
             secret_key: keypair.get_sk(),
             uid: 0,
             amount: 0,
-            asset_type: bls_zero,
+            asset_type: elem_zero,
             path: MTPath::new(vec![node.clone(); TREE_DEPTH]),
-            blind: bls_zero,
+            blind: elem_zero,
         };
 
         let (_, nullifier_trace) = nullify(
@@ -333,7 +333,7 @@ impl ProverParams {
     pub fn gen_ar_to_abar() -> Result<ProverParams> {
         let label = String::from("ar_to_abar");
 
-        let bls_zero = BLSScalar::zero();
+        let elem_zero = BN254Scalar::zero();
 
         // It's okay to choose a fixed seed to build CS.
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
@@ -343,8 +343,8 @@ impl ProverParams {
 
         let dummy_payee = PayeeWitness {
             amount: 0,
-            blind: bls_zero,
-            asset_type: bls_zero,
+            blind: elem_zero,
+            asset_type: elem_zero,
             public_key: keypair.get_pk(),
         };
         let (_, input_commitment_trace) = commit(
@@ -383,15 +383,15 @@ impl ProverParams {
             ED25519 => String::from("abar_to_ar_ed25519"),
         };
 
-        let bls_zero = BLSScalar::zero();
+        let elem_zero = BN254Scalar::zero();
 
         // It's okay to choose a fixed seed to build CS.
         let mut prng = ChaChaRng::from_seed([0u8; 32]);
 
         let node = MTNode {
-            left: bls_zero,
-            mid: bls_zero,
-            right: bls_zero,
+            left: elem_zero,
+            mid: elem_zero,
+            right: elem_zero,
             is_left_child: 0,
             is_mid_child: 0,
             is_right_child: 0,
@@ -402,9 +402,9 @@ impl ProverParams {
             secret_key: keypair.get_sk(),
             uid: 0,
             amount: 0,
-            asset_type: bls_zero,
+            asset_type: elem_zero,
             path: MTPath::new(vec![node.clone(); TREE_DEPTH]),
-            blind: bls_zero,
+            blind: elem_zero,
         };
         let (_, nullifier_trace) = nullify(
             &payer_secret.secret_key.clone().into_keypair(),
@@ -691,31 +691,31 @@ pub struct ProverParams {
     /// A label that describes the prover parameters.
     pub label: String,
     /// The full SRS for the polynomial commitment scheme.
-    pub pcs: KZGCommitmentSchemeBLS,
+    pub pcs: KZGCommitmentSchemeBN254,
     /// The Lagrange basis format of SRS.
-    pub lagrange_pcs: Option<KZGCommitmentSchemeBLS>,
+    pub lagrange_pcs: Option<KZGCommitmentSchemeBN254>,
     /// The constraint system.
     pub cs: TurboPlonkCS,
     /// The TurboPlonk proving key.
-    pub prover_params: PlonkPK<KZGCommitmentSchemeBLS>,
+    pub prover_params: PlonkPK<KZGCommitmentSchemeBN254>,
 }
 
-fn load_lagrange_params(size: usize) -> Option<KZGCommitmentSchemeBLS> {
+fn load_lagrange_params(size: usize) -> Option<KZGCommitmentSchemeBN254> {
     match LAGRANGE_BASES.get(&size) {
         None => None,
-        Some(bytes) => KZGCommitmentSchemeBLS::from_unchecked_bytes(&bytes).ok(),
+        Some(bytes) => KZGCommitmentSchemeBN254::from_unchecked_bytes(&bytes).ok(),
     }
 }
 
-fn load_srs_params(size: usize) -> Result<KZGCommitmentSchemeBLS> {
+fn load_srs_params(size: usize) -> Result<KZGCommitmentSchemeBN254> {
     let srs = SRS.ok_or(NoahError::MissingSRSError)?;
 
-    let KZGCommitmentSchemeBLS {
+    let KZGCommitmentSchemeBN254 {
         public_parameter_group_1,
         public_parameter_group_2,
-    } = KZGCommitmentSchemeBLS::from_unchecked_bytes(&srs)?;
+    } = KZGCommitmentSchemeBN254::from_unchecked_bytes(&srs)?;
 
-    let mut new_group_1 = vec![BLSG1::default(); core::cmp::max(size + 3, 2051)];
+    let mut new_group_1 = vec![BN254G1::default(); core::cmp::max(size + 3, 2051)];
     new_group_1[0..2051].copy_from_slice(&public_parameter_group_1[0..2051]);
 
     if size == 4096 {
@@ -730,7 +730,7 @@ fn load_srs_params(size: usize) -> Result<KZGCommitmentSchemeBLS> {
         return Err(NoahError::ParameterError);
     }
 
-    Ok(KZGCommitmentSchemeBLS {
+    Ok(KZGCommitmentSchemeBN254 {
         public_parameter_group_2,
         public_parameter_group_1: new_group_1,
     })
@@ -743,7 +743,7 @@ mod test {
     use crate::parameters::params::ProverParams;
     use crate::parameters::params::VerifierParams;
     use noah_algebra::{
-        bls12_381::{BLSScalar, BLSG1},
+        bn254::{BN254Scalar, BN254G1},
         prelude::*,
     };
     use noah_plonk::poly_commit::{field_polynomial::FpPolynomial, pcs::PolyComScheme};
@@ -784,7 +784,7 @@ mod test {
     fn test_crs_commit() {
         let pcs = load_srs_params(16).unwrap();
 
-        let one = BLSScalar::one();
+        let one = BN254Scalar::one();
         let two = one.add(&one);
         let three = two.add(&one);
         let six = three.add(&three);
@@ -793,7 +793,7 @@ mod test {
         let commitment = pcs.commit(&fq_poly).unwrap();
 
         let coefs_poly_blsscalar = fq_poly.get_coefs_ref().iter().collect_vec();
-        let mut expected_committed_value = BLSG1::get_identity();
+        let mut expected_committed_value = BN254G1::get_identity();
 
         // Doing the multiexp by hand
         for (i, coef) in coefs_poly_blsscalar.iter().enumerate() {

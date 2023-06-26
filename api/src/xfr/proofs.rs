@@ -780,8 +780,7 @@ mod tests {
         .unwrap();
 
         // fake sig commitment
-        let sig_commitment = crate::anon_creds::ACCommitment::default(); // { 0: ACSignature { sigma1: BLSG1::get_identity(),
-                                                                         //sigma2: BLSG1::get_identity() } };
+        let sig_commitment = crate::anon_creds::ACCommitment::default();
 
         // 2. sig commitments length doesn't match memos length
         let sig_commitments = vec![Some(&sig_commitment)];

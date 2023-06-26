@@ -17,7 +17,6 @@ use libsecp256k1::{
     Signature as Secp256k1Signature,
 };
 use noah_algebra::{
-    bls12_381::BLSScalar,
     cmp::Ordering,
     ed25519::{Ed25519Point, Ed25519Scalar},
     hash::{Hash, Hasher},
@@ -27,6 +26,7 @@ use noah_algebra::{
 use serde::Serialize;
 use sha3::Keccak256;
 use wasm_bindgen::prelude::*;
+use noah_algebra::bn254::BN254Scalar;
 
 /// The length of the secret key.
 pub const SECRET_KEY_LENGTH: usize = 33; // KeyType + 32 bytes
@@ -209,8 +209,8 @@ impl PublicKey {
         }
     }
 
-    /// Return the BLS12-381 scalar representation of the public key.
-    pub fn to_bls_scalars(&self) -> Result<[BLSScalar; 3]> {
+    /// Return the BN254 scalar representation of the public key.
+    pub fn to_bn_scalars(&self) -> Result<[BN254Scalar; 3]> {
         let bytes = match self.inner() {
             PublicKeyInner::Secp256k1(_) => {
                 let pk = self.to_secp256k1()?;
@@ -233,9 +233,9 @@ impl PublicKey {
             _ => return Err(NoahError::ParameterError),
         };
 
-        let first = BLSScalar::from_bytes(&bytes[0..31])?;
-        let second = BLSScalar::from_bytes(&bytes[31..62])?;
-        let third = BLSScalar::from_bytes(&bytes[62..])?;
+        let first = BN254Scalar::from_bytes(&bytes[0..31])?;
+        let second = BN254Scalar::from_bytes(&bytes[31..62])?;
+        let third = BN254Scalar::from_bytes(&bytes[62..])?;
 
         Ok([first, second, third])
     }
@@ -432,7 +432,7 @@ impl SecretKey {
     }
 
     /// Return the BLS12-381 scalar representation of the secret key.
-    pub fn to_bls_scalars(&self) -> Result<[BLSScalar; 2]> {
+    pub fn to_bn_scalars(&self) -> Result<[BN254Scalar; 2]> {
         let bytes = match self {
             SecretKey::Secp256k1(_) => {
                 let sk = self.to_secp256k1()?;
@@ -444,8 +444,8 @@ impl SecretKey {
             }
         };
 
-        let first = BLSScalar::from_bytes(&bytes[0..31])?;
-        let second = BLSScalar::from_bytes(&bytes[31..])?;
+        let first = BN254Scalar::from_bytes(&bytes[0..31])?;
+        let second = BN254Scalar::from_bytes(&bytes[31..])?;
 
         Ok([first, second])
     }
