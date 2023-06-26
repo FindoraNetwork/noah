@@ -19,16 +19,19 @@ use crate::parameters::{
 };
 use ark_std::{collections::BTreeMap, format};
 use noah_algebra::bls12_381::{BLSScalar, BLSG1};
+use noah_algebra::bn254::BN254G1;
 use noah_algebra::prelude::*;
 use noah_algebra::ristretto::{RistrettoPoint, RistrettoScalar};
 use noah_crypto::delegated_schnorr::{DSInspectionBLSRistretto, DSProofBLSRistretto};
 use noah_plonk::plonk::constraint_system::ConstraintSystem;
 use noah_plonk::plonk::indexer::{indexer_with_lagrange, PlonkPK, PlonkVK};
-use noah_plonk::poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS;
+use noah_plonk::poly_commit::kzg_poly_com::{KZGCommitmentSchemeBLS, KZGCommitmentSchemeBN254};
 use noah_plonk::poly_commit::pcs::PolyComScheme;
 use num_traits::Zero;
 use rand_chacha::ChaChaRng;
 use rand_core::SeedableRng;
+
+use super::{BN254_LAGRANGE_BASES, BN254_SRS};
 
 /// The range in the Bulletproofs range check.
 pub const BULLET_PROOF_RANGE: usize = 32;
@@ -707,6 +710,13 @@ fn load_lagrange_params(size: usize) -> Option<KZGCommitmentSchemeBLS> {
     }
 }
 
+fn load_lagrange_params_bn254(size: usize) -> Option<KZGCommitmentSchemeBN254> {
+    match BN254_LAGRANGE_BASES.get(&size) {
+        None => None,
+        Some(bytes) => KZGCommitmentSchemeBN254::from_unchecked_bytes(&bytes).ok(),
+    }
+}
+
 fn load_srs_params(size: usize) -> Result<KZGCommitmentSchemeBLS> {
     let srs = SRS.ok_or(NoahError::MissingSRSError)?;
 
@@ -731,6 +741,35 @@ fn load_srs_params(size: usize) -> Result<KZGCommitmentSchemeBLS> {
     }
 
     Ok(KZGCommitmentSchemeBLS {
+        public_parameter_group_2,
+        public_parameter_group_1: new_group_1,
+    })
+}
+
+fn load_srs_params_bn254(size: usize) -> Result<KZGCommitmentSchemeBN254> {
+    let srs = BN254_SRS.ok_or(NoahError::MissingSRSError)?;
+
+    let KZGCommitmentSchemeBN254 {
+        public_parameter_group_1,
+        public_parameter_group_2,
+    } = KZGCommitmentSchemeBN254::from_unchecked_bytes(&srs)?;
+
+    let mut new_group_1 = vec![BN254G1::default(); core::cmp::max(size + 3, 2051)];
+    new_group_1[0..2051].copy_from_slice(&public_parameter_group_1[0..2051]);
+
+    if size == 4096 {
+        new_group_1[4096..4099].copy_from_slice(&public_parameter_group_1[2051..2054]);
+    }
+
+    if size == 8192 {
+        new_group_1[8192..8195].copy_from_slice(&public_parameter_group_1[2054..2057]);
+    }
+
+    if size > 8192 {
+        return Err(NoahError::ParameterError);
+    }
+
+    Ok(KZGCommitmentSchemeBN254 {
         public_parameter_group_2,
         public_parameter_group_1: new_group_1,
     })

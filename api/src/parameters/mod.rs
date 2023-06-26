@@ -44,6 +44,15 @@ pub static SRS: Option<&'static [u8]> = Some(include_bytes!("../../parameters/sr
 /// The SRS.
 pub static SRS: Option<&'static [u8]> = None;
 
+#[cfg(not(feature = "no_srs"))]
+/// The SRS.
+pub static BN254_SRS: Option<&'static [u8]> =
+    Some(include_bytes!("../../parameters/bn254/srs-padding.bin"));
+
+#[cfg(feature = "no_srs")]
+/// The SRS.
+pub static BN254_SRS: Option<&'static [u8]> = None;
+
 #[cfg(not(feature = "no_vk"))]
 /// The common part of the verifier parameters for anonymous transfer.
 pub static ABAR_TO_ABAR_VERIFIER_COMMON_PARAMS: Option<&'static [u8]> =
@@ -52,6 +61,16 @@ pub static ABAR_TO_ABAR_VERIFIER_COMMON_PARAMS: Option<&'static [u8]> =
 #[cfg(feature = "no_vk")]
 /// The common part of the verifier parameters for anonymous transfer.
 pub static ABAR_TO_ABAR_VERIFIER_COMMON_PARAMS: Option<&'static [u8]> = None;
+
+#[cfg(not(feature = "no_vk"))]
+/// The common part of the verifier parameters for anonymous transfer.
+pub static BN254_ABAR_TO_ABAR_VERIFIER_COMMON_PARAMS: Option<&'static [u8]> = Some(include_bytes!(
+    "../../parameters/bn254/transfer-vk-common.bin"
+));
+
+#[cfg(feature = "no_vk")]
+/// The common part of the verifier parameters for anonymous transfer.
+pub static BN254_ABAR_TO_ABAR_VERIFIER_COMMON_PARAMS: Option<&'static [u8]> = None;
 
 #[cfg(not(feature = "no_vk"))]
 /// The specific part of the verifier parameters for ed25519 anonymous transfer.
@@ -65,6 +84,18 @@ pub static ABAR_TO_ABAR_VERIFIER_SECP256K1_SPECIFIC_PARAMS: Option<&'static [u8]
     include_bytes!("../../parameters/transfer-vk-secp256k1-specific.bin"),
 );
 
+// #[cfg(not(feature = "no_vk"))]
+// /// The specific part of the verifier parameters for ed25519 anonymous transfer.
+// pub static BN254_ABAR_TO_ABAR_VERIFIER_ED25519_SPECIFIC_PARAMS: Option<&'static [u8]> = Some(
+//     include_bytes!("../../parameters/bn254/transfer-vk-ed25519-specific.bin"),
+// );
+
+#[cfg(not(feature = "no_vk"))]
+/// The specific part of the verifier parameters for secp256k1 anonymous transfer.
+pub static BN254_ABAR_TO_ABAR_VERIFIER_SECP256K1_SPECIFIC_PARAMS: Option<&'static [u8]> = Some(
+    include_bytes!("../../parameters/bn254/transfer-vk-secp256k1-specific.bin"),
+);
+
 #[cfg(feature = "no_vk")]
 /// The specific part of the verifier parameters for ed25519 anonymous transfer.
 pub static ABAR_TO_ABAR_VERIFIER_ED25519_SPECIFIC_PARAMS: Option<&'static [u8]> = None;
@@ -72,6 +103,14 @@ pub static ABAR_TO_ABAR_VERIFIER_ED25519_SPECIFIC_PARAMS: Option<&'static [u8]> 
 #[cfg(feature = "no_vk")]
 /// The specific part of the verifier parameters for secp256k1 anonymous transfer.
 pub static ABAR_TO_ABAR_VERIFIER_SECP256K1_SPECIFIC_PARAMS: Option<&'static [u8]> = None;
+
+#[cfg(feature = "no_vk")]
+/// The specific part of the verifier parameters for ed25519 anonymous transfer.
+pub static BN254_ABAR_TO_ABAR_VERIFIER_ED25519_SPECIFIC_PARAMS: Option<&'static [u8]> = None;
+
+#[cfg(feature = "no_vk")]
+/// The specific part of the verifier parameters for secp256k1 anonymous transfer.
+pub static BN254_ABAR_TO_ABAR_VERIFIER_SECP256K1_SPECIFIC_PARAMS: Option<&'static [u8]> = None;
 
 #[cfg(not(feature = "no_vk"))]
 /// The verifier parameters for ed25519 anonymous to confidential.
@@ -134,12 +173,22 @@ pub static ABAR_TO_AR_SECP256K1_VERIFIER_PARAMS: Option<&'static [u8]> = None;
 lazy_static! {
     /// The Lagrange format of the SRS.
     pub static ref LAGRANGE_BASES: BTreeMap<usize, &'static [u8]> = BTreeMap::default();
+
+    /// The Lagrange format of the BN254 SRS.
+    pub static ref BN254_LAGRANGE_BASES: BTreeMap<usize, &'static [u8]> = BTreeMap::default();
 }
 
 #[cfg(not(feature = "no_srs"))]
 static LAGRANGE_BASE_4096: &'static [u8] = include_bytes!("../../parameters/lagrange-srs-4096.bin");
 #[cfg(all(not(feature = "no_srs"), not(feature = "lightweight")))]
 static LAGRANGE_BASE_8192: &'static [u8] = include_bytes!("../../parameters/lagrange-srs-8192.bin");
+
+#[cfg(not(feature = "no_srs"))]
+static BN254_LAGRANGE_BASE_4096: &'static [u8] =
+    include_bytes!("../../parameters/bn254/lagrange-srs-4096.bin");
+#[cfg(all(not(feature = "no_srs"), not(feature = "lightweight")))]
+static BN254_LAGRANGE_BASE_8192: &'static [u8] =
+    include_bytes!("../../parameters/bn254/lagrange-srs-8192.bin");
 
 #[cfg(not(feature = "no_srs"))]
 lazy_static! {
@@ -150,6 +199,17 @@ lazy_static! {
         #[cfg(not(feature = "lightweight"))]
         {
             m.insert(8192, LAGRANGE_BASE_8192);
+        }
+        m
+    };
+
+    /// The Lagrange format of the BN254 SRS.
+    pub static ref BN254_LAGRANGE_BASES: BTreeMap<usize, &'static [u8]> = {
+        let mut m = BTreeMap::new();
+        m.insert(4096, BN254_LAGRANGE_BASE_4096);
+        #[cfg(not(feature = "lightweight"))]
+        {
+            m.insert(8192, BN254_LAGRANGE_BASE_8192);
         }
         m
     };

@@ -16,6 +16,7 @@ use libsecp256k1::{
     PublicKey as Secp256k1PublicKey, RecoveryId, SecretKey as Secp256k1SecretKey,
     Signature as Secp256k1Signature,
 };
+use noah_algebra::bn254::BN254Scalar;
 use noah_algebra::{
     bls12_381::BLSScalar,
     cmp::Ordering,
@@ -240,6 +241,37 @@ impl PublicKey {
         Ok([first, second, third])
     }
 
+    /// Return the BN254 scalar representation of the public key.
+    pub fn to_bn_scalars(&self) -> Result<[BN254Scalar; 3]> {
+        let bytes = match self.inner() {
+            PublicKeyInner::Secp256k1(_) => {
+                let pk = self.to_secp256k1()?;
+                let affine = pk.get_raw();
+                let mut bytes = Vec::new();
+                bytes.extend(affine.x.into_bigint().to_bytes_le());
+                bytes.extend(affine.y.into_bigint().to_bytes_le());
+
+                bytes
+            }
+            PublicKeyInner::Ed25519(_) => {
+                let pk = self.to_ed25519()?;
+                let affine = pk.get_raw();
+                let mut bytes = Vec::new();
+                bytes.extend(affine.x.into_bigint().to_bytes_le());
+                bytes.extend(affine.y.into_bigint().to_bytes_le());
+
+                bytes
+            }
+            _ => return Err(NoahError::ParameterError),
+        };
+
+        let first = BN254Scalar::from_bytes(&bytes[0..31])?;
+        let second = BN254Scalar::from_bytes(&bytes[31..62])?;
+        let third = BN254Scalar::from_bytes(&bytes[62..])?;
+
+        Ok([first, second, third])
+    }
+
     /// random a scalar and the compressed point.
     pub fn random_scalar_with_compressed_point<R: CryptoRng + RngCore>(
         &self,
@@ -446,6 +478,25 @@ impl SecretKey {
 
         let first = BLSScalar::from_bytes(&bytes[0..31])?;
         let second = BLSScalar::from_bytes(&bytes[31..])?;
+
+        Ok([first, second])
+    }
+
+    /// Return the BN254 scalar representation of the secret key.
+    pub fn to_bn_scalars(&self) -> Result<[BN254Scalar; 2]> {
+        let bytes = match self {
+            SecretKey::Secp256k1(_) => {
+                let sk = self.to_secp256k1()?;
+                sk.to_bytes()
+            }
+            SecretKey::Ed25519(_) => {
+                let sk = self.to_ed25519()?;
+                sk.to_bytes()
+            }
+        };
+
+        let first = BN254Scalar::from_bytes(&bytes[0..31])?;
+        let second = BN254Scalar::from_bytes(&bytes[31..])?;
 
         Ok([first, second])
     }
