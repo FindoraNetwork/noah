@@ -1,3 +1,4 @@
+use noah_algebra::error;
 use noah_algebra::prelude::AlgebraError;
 
 pub(crate) type Result<T> = core::result::Result<T, AccumulatorError>;
@@ -30,5 +31,12 @@ impl From<AlgebraError> for AccumulatorError {
 impl From<Box<dyn ruc::err::RucError>> for AccumulatorError {
     fn from(e: Box<dyn ruc::err::RucError>) -> AccumulatorError {
         AccumulatorError::Ruc(format!("{}", e))
+    }
+}
+
+impl error::Error for AccumulatorError {
+    #[cfg(feature = "std")]
+    fn description(&self) -> &str {
+        Box::leak(format!("{}", self).into_boxed_str())
     }
 }
