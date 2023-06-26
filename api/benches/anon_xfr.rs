@@ -24,8 +24,8 @@ use noah::{
 };
 use noah_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
 use noah_algebra::ristretto::PedersenCommitmentRistretto;
-use noah_algebra::{bls12_381::BLSScalar, prelude::*};
-use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381};
+use noah_algebra::{bn254::BN254Scalar, prelude::*};
+use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive254};
 use parking_lot::RwLock;
 use sha2::Sha512;
 use std::sync::Arc;
@@ -410,8 +410,8 @@ fn build_oabar<R: CryptoRng + RngCore>(
         .unwrap()
 }
 
-fn hash_abar(uid: u64, abar: &AnonAssetRecord) -> BLSScalar {
-    AnemoiJive381::eval_variable_length_hash(&[BLSScalar::from(uid), abar.commitment])
+fn hash_abar(uid: u64, abar: &AnonAssetRecord) -> BN254Scalar {
+    AnemoiJive254::eval_variable_length_hash(&[BN254Scalar::from(uid), abar.commitment])
 }
 
 fn build_mt_leaf_info_from_proof(proof: Proof, uid: u64) -> MTLeafInfo {
