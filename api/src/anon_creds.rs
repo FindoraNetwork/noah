@@ -1,8 +1,8 @@
 use crate::errors::Result;
-use noah_algebra::bls12_381::BLSPairingEngine;
-use noah_algebra::bls12_381::BLSG2;
+use noah_algebra::bn254::BN254PairingEngine;
+use noah_algebra::bn254::BN254G2;
 use noah_algebra::{
-    bls12_381::{BLSScalar, BLSG1},
+    bn254::{BN254Scalar, BN254G1},
     prelude::*,
     traits::Pairing,
 };
@@ -11,9 +11,9 @@ use noah_crypto::{
     elgamal::elgamal_key_gen,
 };
 
-type G1 = BLSG1;
-type G2 = BLSG2;
-type S = BLSScalar;
+type G1 = BN254G1;
+type G2 = BN254G2;
+type S = BN254Scalar;
 
 /// The isssuer's public key.
 pub type ACIssuerPublicKey = noah_crypto::anon_creds::CredentialIssuerPK<G1, G2>;
@@ -56,7 +56,7 @@ pub fn ac_keygen_issuer<R: CryptoRng + RngCore>(
     prng: &mut R,
     num_attrs: usize,
 ) -> (ACIssuerSecretKey, ACIssuerPublicKey) {
-    noah_crypto::anon_creds::issuer_keygen::<_, BLSPairingEngine>(prng, num_attrs)
+    noah_crypto::anon_creds::issuer_keygen::<_, BN254PairingEngine>(prng, num_attrs)
 }
 
 /// Generate a credential user key pair for a given credential issuer.
@@ -73,7 +73,7 @@ pub fn ac_keygen_user<R: CryptoRng + RngCore>(
     prng: &mut R,
     issuer_pk: &ACIssuerPublicKey,
 ) -> (ACUserSecretKey, ACUserPublicKey) {
-    noah_crypto::anon_creds::user_keygen::<_, BLSPairingEngine>(prng, issuer_pk)
+    noah_crypto::anon_creds::user_keygen::<_, BN254PairingEngine>(prng, issuer_pk)
 }
 
 /// Compute a credential signature for a set of attributes.
@@ -81,7 +81,7 @@ pub fn ac_keygen_user<R: CryptoRng + RngCore>(
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
 /// use noah::anon_creds::{ac_keygen_issuer,ac_keygen_user, ac_sign};
-/// use noah_algebra::bls12_381::BLSScalar;
+/// use noah_algebra::bn254::BN254Scalar;
 /// use noah_algebra::traits::Scalar;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 2;
@@ -96,10 +96,10 @@ pub fn ac_sign<R: CryptoRng + RngCore>(
     user_pk: &ACUserPublicKey,
     attrs: &[Attr],
 ) -> Result<ACSignature> {
-    let attrs_scalar: Vec<BLSScalar> = attrs.iter().map(|x| BLSScalar::from(*x)).collect();
+    let attrs_scalar: Vec<BN254Scalar> = attrs.iter().map(|x| BN254Scalar::from(*x)).collect();
     Ok(noah_crypto::anon_creds::grant_credential::<
         _,
-        BLSPairingEngine,
+        BN254PairingEngine,
     >(prng, issuer_sk, user_pk, attrs_scalar.as_slice())?)
 }
 
@@ -113,7 +113,7 @@ pub fn ac_sign<R: CryptoRng + RngCore>(
 /// let com_key = ac_keygen_commitment::<ChaChaRng>(&mut prng);
 /// ```
 pub fn ac_keygen_commitment<R: CryptoRng + RngCore>(prng: &mut R) -> ACCommitmentKey {
-    noah_crypto::anon_creds::randomizer_gen::<_, BLSPairingEngine>(prng)
+    noah_crypto::anon_creds::randomizer_gen::<_, BN254PairingEngine>(prng)
 }
 
 /// Compute a commitment to a credential signature with a binding message, returning the opening key.
@@ -122,7 +122,7 @@ pub fn ac_keygen_commitment<R: CryptoRng + RngCore>(prng: &mut R) -> ACCommitmen
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
 /// use noah::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_commit, Credential};
-/// use noah_algebra::bls12_381::BLSScalar;
+/// use noah_algebra::bn254::BN254Scalar;
 /// use noah_algebra::traits::Scalar;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 2;
@@ -146,9 +146,9 @@ pub fn ac_commit<R: CryptoRng + RngCore>(
     msg: &[u8],
 ) -> Result<
     CommOutput<
-        <BLSPairingEngine as Pairing>::G1,
-        <BLSPairingEngine as Pairing>::G2,
-        <BLSPairingEngine as Pairing>::ScalarField,
+        <BN254PairingEngine as Pairing>::G1,
+        <BN254PairingEngine as Pairing>::G2,
+        <BN254PairingEngine as Pairing>::ScalarField,
     >,
 > {
     let c = noah_crypto::anon_creds::Credential {
@@ -156,13 +156,13 @@ pub fn ac_commit<R: CryptoRng + RngCore>(
         attrs: credential
             .attrs
             .iter()
-            .map(|x| BLSScalar::from(*x))
+            .map(|x| BN254Scalar::from(*x))
             .collect_vec(),
         ipk: credential.ipk.clone(),
     };
     Ok(noah_crypto::anon_creds::commit_without_randomizer::<
         _,
-        BLSPairingEngine,
+        BN254PairingEngine,
     >(prng, user_sk, &c, msg)?)
 }
 
@@ -172,7 +172,7 @@ pub fn ac_commit<R: CryptoRng + RngCore>(
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
 /// use noah::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_commit, ac_keygen_commitment, ac_commit_with_key, Credential};
-/// use noah_algebra::bls12_381::BLSScalar;
+/// use noah_algebra::bn254::BN254Scalar;
 /// use noah_algebra::traits::Scalar;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 2;
@@ -197,9 +197,9 @@ pub fn ac_commit_with_key<R: CryptoRng + RngCore>(
     msg: &[u8],
 ) -> Result<
     CommOutput<
-        <BLSPairingEngine as Pairing>::G1,
-        <BLSPairingEngine as Pairing>::G2,
-        <BLSPairingEngine as Pairing>::ScalarField,
+        <BN254PairingEngine as Pairing>::G1,
+        <BN254PairingEngine as Pairing>::G2,
+        <BN254PairingEngine as Pairing>::ScalarField,
     >,
 > {
     let c = noah_crypto::anon_creds::Credential {
@@ -207,11 +207,11 @@ pub fn ac_commit_with_key<R: CryptoRng + RngCore>(
         attrs: credential
             .attrs
             .iter()
-            .map(|x| BLSScalar::from(*x))
+            .map(|x| BN254Scalar::from(*x))
             .collect_vec(),
         ipk: credential.ipk.clone(),
     };
-    Ok(noah_crypto::anon_creds::commit::<_, BLSPairingEngine>(
+    Ok(noah_crypto::anon_creds::commit::<_, BN254PairingEngine>(
         prng, user_sk, &c, key, msg,
     )?)
 }
@@ -224,7 +224,7 @@ pub fn ac_verify_commitment(
     sok: &ACPoK,
     msg: &[u8],
 ) -> Result<()> {
-    Ok(noah_crypto::anon_creds::check_comm::<BLSPairingEngine>(
+    Ok(noah_crypto::anon_creds::check_comm::<BN254PairingEngine>(
         issuer_pub_key,
         sig_commitment,
         sok,
@@ -265,14 +265,14 @@ pub fn ac_open_commitment<R: CryptoRng + RngCore>(
         attrs: credential
             .attrs
             .iter()
-            .map(|a| BLSScalar::from(*a))
+            .map(|a| BN254Scalar::from(*a))
             .collect_vec(),
         ipk: credential.ipk.clone(),
     };
 
     let cm = ACCommitment::new(&credential.sig, &rand);
 
-    Ok(noah_crypto::anon_creds::open_comm::<_, BLSPairingEngine>(
+    Ok(noah_crypto::anon_creds::open_comm::<_, BN254PairingEngine>(
         prng, usk, &c, &cm, &rand, reveal_map,
     )?)
 }
@@ -289,13 +289,13 @@ pub fn ac_reveal<R: CryptoRng + RngCore>(
         attrs: credential
             .attrs
             .iter()
-            .map(|a| BLSScalar::from(*a))
+            .map(|a| BN254Scalar::from(*a))
             .collect_vec(),
         ipk: credential.ipk.clone(),
     };
     Ok(noah_crypto::anon_creds::open_credential::<
         _,
-        BLSPairingEngine,
+        BN254PairingEngine,
     >(prng, user_sk, &c, reveal_bitmap)?)
 }
 /// Verifies an anonymous credential reveal proof.
@@ -304,7 +304,7 @@ pub fn ac_reveal<R: CryptoRng + RngCore>(
 /// use rand_core::SeedableRng;
 /// use rand_chacha::ChaChaRng;
 /// use noah_algebra::traits::Scalar;
-/// use noah_algebra::bls12_381::BLSScalar;
+/// use noah_algebra::bn254::BN254Scalar;
 /// use noah::anon_creds::{ac_keygen_issuer, ac_keygen_user, ac_sign, ac_open_commitment, ac_verify, ac_reveal, Credential};
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
 /// let num_attrs = 2;
@@ -335,12 +335,12 @@ pub fn ac_verify(
     let attrs_scalar: Vec<Attribute<S>> = attrs
         .iter()
         .map(|attr| match attr {
-            Some(x) => Attribute::Revealed(BLSScalar::from(*x)),
+            Some(x) => Attribute::Revealed(BN254Scalar::from(*x)),
             None => Attribute::Hidden(None),
         })
         .collect();
 
-    Ok(noah_crypto::anon_creds::verify_open::<BLSPairingEngine>(
+    Ok(noah_crypto::anon_creds::verify_open::<BN254PairingEngine>(
         issuer_pub_key,
         &cm,
         &proof_open,
@@ -365,7 +365,7 @@ pub type ConfidentialAC = noah_crypto::confidential_anon_creds::ConfidentialAC<G
 /// use noah::anon_creds::{ac_confidential_open_commitment, ac_confidential_verify, ac_confidential_gen_encryption_keys};
 /// use rand_chacha::ChaChaRng;
 /// use rand_core::SeedableRng;
-/// use noah_algebra::bls12_381::{BLSScalar };
+/// use noah_algebra::bn254::BN254Scalar;
 /// use noah_algebra::traits::Group;
 /// use noah::anon_creds::Credential;
 /// let mut prng = ChaChaRng::from_seed([0u8;32]);
@@ -396,7 +396,7 @@ pub fn ac_confidential_open_commitment<R: CryptoRng + RngCore>(
     let attrs_scalar = credential
         .attrs
         .iter()
-        .map(|x| BLSScalar::from(*x))
+        .map(|x| BN254Scalar::from(*x))
         .collect_vec();
     let c = noah_crypto::anon_creds::Credential {
         sig: credential.sig.clone(),
@@ -405,7 +405,7 @@ pub fn ac_confidential_open_commitment<R: CryptoRng + RngCore>(
     };
     let cm = ACCommitment::new(&credential.sig, &rand);
     Ok(
-        noah_crypto::confidential_anon_creds::confidential_open_comm::<R, BLSPairingEngine>(
+        noah_crypto::confidential_anon_creds::confidential_open_comm::<R, BN254PairingEngine>(
             prng, usk, &c, &cm, rand, reveal_map, enc_key, msg,
         )?,
     )
@@ -422,7 +422,7 @@ pub fn ac_confidential_verify(
     msg: &[u8],
 ) -> Result<()> {
     Ok(
-        noah_crypto::confidential_anon_creds::confidential_verify_open::<BLSPairingEngine>(
+        noah_crypto::confidential_anon_creds::confidential_verify_open::<BN254PairingEngine>(
             issuer_pk,
             enc_key,
             reveal_map,

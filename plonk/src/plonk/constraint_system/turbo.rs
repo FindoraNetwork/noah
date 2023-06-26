@@ -900,11 +900,11 @@ impl<F: Scalar> TurboCS<F> {
                 if o_i != d_i_next {
                     return Err(PlonkError::Message(format!(
                         "cs index {} round {}: the output wire {:?} does not equal to the fourth wire {:?} in the next constraint",
-                            cs_index,
-                            r,
-                            o_i,
-                            d_i_next
-                        )));
+                        cs_index,
+                        r,
+                        o_i,
+                        d_i_next
+                    )));
                 }
 
                 let prk_i_a = self.anemoi_preprocessed_round_keys_x[r][0].clone();
@@ -974,8 +974,520 @@ impl<F: Scalar> TurboCS<F> {
     }
 }
 
+macro_rules! _test_turbo {
+    ($scalar: ty, $pairingEngine: ty) => {
+        #[test]
+        fn test_select() {
+            let mut cs = TurboCS::new();
+            let num: Vec<$scalar> = (0..4).map(|x| <$scalar>::from(x as u32)).collect();
+            let index_0 = cs.new_variable(num[0]); // bit0 = 0 -- Variable index 2
+            let index_1 = cs.new_variable(num[1]); // bit1 = 1 -- Variable index 3
+            let index_2 = cs.new_variable(num[2]); // var0     -- Variable index 4
+            let index_3 = cs.new_variable(num[3]); // var1     -- Variable index 5
+
+            // select(var0, var1, bit0)
+            let a_idx = cs.select(index_2, index_3, index_0);
+            assert_eq!(cs.witness[a_idx], num[2]);
+            // select(var0, var1, bit1)
+            let b_idx = cs.select(index_2, index_3, index_1);
+            assert_eq!(cs.witness[b_idx], num[3]);
+
+            assert!(cs
+                .verify_witness(
+                    &[
+                        <$scalar>::zero(),
+                        <$scalar>::one(),
+                        num[0],
+                        num[1],
+                        num[2],
+                        num[3],
+                        num[2],
+                        num[3]
+                    ],
+                    &[]
+                )
+                .is_ok());
+
+            // Set bit0 = 1 and bit1 = 0
+            assert!(cs
+                .verify_witness(
+                    &[
+                        <$scalar>::zero(),
+                        <$scalar>::one(),
+                        num[1],
+                        num[0],
+                        num[2],
+                        num[3],
+                        num[3],
+                        num[2]
+                    ],
+                    &[]
+                )
+                .is_ok());
+
+            assert!(cs
+                .verify_witness(
+                    &[
+                        <$scalar>::zero(),
+                        <$scalar>::one(),
+                        num[0],
+                        num[1],
+                        num[2],
+                        num[3],
+                        num[3],
+                        num[2]
+                    ],
+                    &[]
+                )
+                .is_err());
+        }
+
+        #[test]
+        fn test_sub_and_equal() {
+            let mut cs = TurboCS::new();
+            let zero = <$scalar>::zero();
+            let one = <$scalar>::one();
+            let two = one.add(&one);
+            let three = two.add(&one);
+            cs.new_variable(zero);
+            cs.new_variable(one);
+            cs.new_variable(two);
+            cs.new_variable(three);
+            let add = cs.add(0 + 2, 2 + 2);
+            let sub = cs.sub(3 + 2, 1 + 2);
+            cs.equal(add, sub);
+
+            let witness = cs.get_and_clear_witness();
+            cs.verify_witness(&witness[..], &[]).unwrap();
+
+            assert!(cs
+                .verify_witness(&[zero, one, two, two, two, one, zero], &[])
+                .is_err());
+        }
+
+        #[test]
+        fn test_is_equal() {
+            let mut cs = TurboCS::new();
+            let zero = <$scalar>::zero();
+            let one = <$scalar>::one();
+            let two = one.add(&one);
+            cs.new_variable(one);
+            cs.new_variable(two);
+            cs.new_variable(two);
+            let one_equals_two = cs.is_equal(0 + 2, 1 + 2);
+            assert_eq!(cs.witness[one_equals_two], zero);
+            let two_equals_two = cs.is_equal(1 + 2, 2 + 2);
+            assert_eq!(cs.witness[two_equals_two], one);
+
+            let mut witness = cs.get_and_clear_witness();
+            cs.verify_witness(&witness, &[]).unwrap();
+
+            witness[0] = two;
+            assert!(cs.verify_witness(&witness, &[]).is_err());
+        }
+
+        #[test]
+        fn test_turbo_plonk_circuit_1() {
+            let mut cs = TurboCS::new();
+            let num: Vec<$scalar> = (0..6).map(|x| <$scalar>::from(x as u32)).collect();
+
+            // The circuit description:
+            // 1. c = add(a, b)
+            // 2. d = mul(a, b)
+            // 3. e = linear_combine(a, b, c, d)
+            // 4. 0 <= e < 8
+            // The secret inputs: [a, b] = [1, 1]
+            cs.new_variable(num[1]);
+            cs.new_variable(num[1]);
+            let c_idx = cs.add(0 + 2, 1 + 2);
+            let d_idx = cs.mul(0 + 2, 1 + 2);
+            let e_idx = cs.linear_combine(
+                &[0 + 2, 1 + 2, c_idx, d_idx],
+                num[1],
+                num[1],
+                num[1],
+                num[1],
+            );
+
+            cs.range_check(e_idx, 3);
+
+            let witness = cs.get_and_clear_witness();
+            cs.verify_witness(&witness[..], &[]).unwrap();
+
+            let eight = num[3].add(&num[5]);
+            // Bad witness: [a, b] = [1, 2], [c, d, e] = [3, 2, 8] and e >= 8
+            // set e_binary = [1, 1, 1]
+            assert!(cs
+                .verify_witness(
+                    &[
+                        <$scalar>::zero(),
+                        <$scalar>::one(),
+                        num[1],
+                        num[2],
+                        num[3],
+                        num[2],
+                        eight,
+                        num[1],
+                        num[1],
+                        num[1]
+                    ],
+                    &[]
+                )
+                .is_err());
+        }
+
+        #[test]
+        fn test_turbo_plonk_circuit_2() {
+            let mut cs = TurboCS::new();
+            let num: Vec<$scalar> = (0..9).map(|x| <$scalar>::from(x as u32)).collect();
+
+            // The circuit description:
+            // 1. a \in {0, 1}
+            // 2. a + b = c
+            // 3. a + b + c + d = e
+            // 4. b * c = f
+            // 5. 0 <= e < 8
+            // 6. 0 <= f < 8
+            // The witness: [a, b, c, d, e, f] = [1, 2, 3, 1, 7, 6]
+            let variables = vec![num[1], num[2], num[3], num[1], num[7], num[6]];
+            cs.add_variables(&variables);
+            cs.insert_boolean_gate(0 + 2); // add 2 because when init, has 2 default variable
+            cs.insert_add_gate(0 + 2, 1 + 2, 2 + 2);
+            cs.insert_lc_gate(
+                &[0 + 2, 1 + 2, 2 + 2, 3 + 2],
+                4 + 2,
+                num[1],
+                num[1],
+                num[1],
+                num[1],
+            );
+            cs.insert_mul_gate(1 + 2, 2 + 2, 5 + 2);
+            cs.range_check(4 + 2, 3);
+            cs.range_check(5 + 2, 3);
+
+            let twelve = num[8].add(&num[4]);
+            // Good witness: [1, 2, 3, 1, 7, 6], e_binary_le = [1, 1, 1], f_binary_le = [0, 1, 1]
+            let witness = cs.get_and_clear_witness();
+            cs.verify_witness(&witness[..], &[]).unwrap();
+
+            // Another good witness also satisfies the circuit:
+            // [0, 2, 2, 1, 5, 4], e_binary_le = [1, 0, 1], f_binary_le = [0, 0, 1]
+            cs.verify_witness(
+                &[
+                    <$scalar>::zero(),
+                    <$scalar>::one(),
+                    num[0],
+                    num[2],
+                    num[2],
+                    num[1],
+                    num[5],
+                    num[4],
+                    num[1],
+                    num[0],
+                    num[1],
+                    num[0],
+                    num[0],
+                    num[1],
+                ],
+                &[],
+            )
+            .unwrap();
+
+            // Bad witness: a is not boolean
+            assert!(cs
+                .verify_witness(
+                    &[
+                        <$scalar>::zero(),
+                        <$scalar>::one(),
+                        num[2],
+                        num[0],
+                        num[2],
+                        num[1],
+                        num[5],
+                        num[0],
+                        num[1],
+                        num[0],
+                        num[1],
+                        num[0],
+                        num[0],
+                        num[0]
+                    ],
+                    &[]
+                )
+                .is_err());
+            // Bad witness: a + b != c
+            assert!(cs
+                .verify_witness(
+                    &[
+                        <$scalar>::zero(),
+                        <$scalar>::one(),
+                        num[1],
+                        num[1],
+                        num[1],
+                        num[2],
+                        num[5],
+                        num[1],
+                        num[1],
+                        num[0],
+                        num[1],
+                        num[1],
+                        num[0],
+                        num[0]
+                    ],
+                    &[]
+                )
+                .is_err());
+            // Bad witness: a + b + c + d != e
+            assert!(cs
+                .verify_witness(
+                    &[
+                        <$scalar>::zero(),
+                        <$scalar>::one(),
+                        num[1],
+                        num[1],
+                        num[2],
+                        num[2],
+                        num[5],
+                        num[2],
+                        num[1],
+                        num[0],
+                        num[1],
+                        num[0],
+                        num[1],
+                        num[0]
+                    ],
+                    &[]
+                )
+                .is_err());
+            // Bad witness: b * c != f
+            assert!(cs
+                .verify_witness(
+                    &[
+                        <$scalar>::zero(),
+                        <$scalar>::one(),
+                        num[1],
+                        num[1],
+                        num[2],
+                        num[2],
+                        num[6],
+                        num[1],
+                        num[0],
+                        num[1],
+                        num[1],
+                        num[1],
+                        num[0],
+                        num[0]
+                    ],
+                    &[]
+                )
+                .is_err());
+            // Bad witness: e >= 8, set e_binary_le = [1, 1, 1]
+            assert!(cs
+                .verify_witness(
+                    &[
+                        <$scalar>::zero(),
+                        <$scalar>::one(),
+                        num[1],
+                        num[2],
+                        num[3],
+                        num[2],
+                        num[8],
+                        num[6],
+                        num[1],
+                        num[1],
+                        num[1],
+                        num[0],
+                        num[1],
+                        num[1]
+                    ],
+                    &[]
+                )
+                .is_err());
+            // Bad witness: f >= 8, set f_binary_le = [1, 1, 1]
+            assert!(cs
+                .verify_witness(
+                    &[
+                        <$scalar>::zero(),
+                        <$scalar>::one(),
+                        num[0],
+                        num[3],
+                        num[4],
+                        num[0],
+                        num[7],
+                        twelve,
+                        num[1],
+                        num[1],
+                        num[1],
+                        num[1],
+                        num[1],
+                        num[1]
+                    ],
+                    &[]
+                )
+                .is_err());
+        }
+
+        #[test]
+        fn test_turbo_plonk_kzg() {
+            let mut prng = test_rng();
+            let pcs = KZGCommitmentScheme::<$pairingEngine>::new(20, &mut prng);
+            test_turbo_plonk_with_constant_and_online_values(&pcs, &mut prng);
+            test_turbo_plonk_arithmetic_gates(&pcs, &mut prng);
+        }
+
+        fn test_turbo_plonk_with_constant_and_online_values<
+            PCS: PolyComScheme,
+            R: CryptoRng + RngCore,
+        >(
+            pcs: &PCS,
+            prng: &mut R,
+        ) {
+            let one = PCS::Field::one();
+            let two = one.add(&one);
+            let three = two.add(&one);
+            let four = three.add(&one);
+            let seven = four.add(&three);
+            let twenty_one = seven.mul(&three);
+            let twenty_five = twenty_one.add(&four);
+
+            // circuit (x_0 + y0) * (x_2 + 4) + x_0 * y1;
+            // y0, y1 are online variables
+            // witness (1 + 2) * (3 + 4) + 1 * 4 = 25
+            let mut cs = TurboCS::<PCS::Field>::new();
+            cs.add_variables(&[
+                one,
+                two,
+                three,
+                four,
+                three,
+                seven,
+                twenty_one,
+                four,
+                four,
+                twenty_five,
+            ]);
+            cs.insert_add_gate(0 + 2, 1 + 2, 4 + 2);
+            cs.insert_add_gate(2 + 2, 3 + 2, 5 + 2);
+            cs.insert_mul_gate(4 + 2, 5 + 2, 6 + 2);
+            cs.insert_mul_gate(0 + 2, 7 + 2, 8 + 2);
+            cs.insert_add_gate(6 + 2, 8 + 2, 9 + 2);
+            cs.insert_constant_gate(3 + 2, four);
+            cs.prepare_pi_variable(1 + 2);
+            cs.prepare_pi_variable(7 + 2);
+            cs.pad();
+
+            let mut online_vars = [two, four];
+            let witness = cs.get_and_clear_witness();
+            assert!(cs.verify_witness(&witness, &online_vars).is_ok());
+            check_turbo_plonk_proof(pcs, prng, &cs, &witness, &online_vars);
+
+            online_vars[0] = four;
+            assert!(cs.verify_witness(&witness, &online_vars).is_err());
+        }
+
+        fn test_turbo_plonk_arithmetic_gates<PCS: PolyComScheme, R: CryptoRng + RngCore>(
+            pcs: &PCS,
+            prng: &mut R,
+        ) {
+            let mut cs = TurboCS::new();
+            let num: Vec<PCS::Field> = (0..9).map(|x| PCS::Field::from(x as u32)).collect();
+
+            // The circuit description:
+            // 1. a \in {0, 1}
+            // 2. c = add(a, b)
+            // 3. d = mul(a, b)
+            // 4. e = 2 * a + 3 * b + c + d
+            // 5. 0 <= e < 16
+            // The secret inputs: [a, b] = [1, 2]
+            cs.new_variable(num[1]);
+            cs.new_variable(num[2]);
+            cs.insert_boolean_gate(0 + 2);
+            let c_idx = cs.add(0 + 2, 1 + 2);
+            let d_idx = cs.mul(0 + 2, 1 + 2);
+            let e_idx = cs.linear_combine(
+                &[0 + 2, 1 + 2, c_idx, d_idx],
+                num[2],
+                num[3],
+                num[1],
+                num[1],
+            );
+            cs.range_check(e_idx, 4);
+            cs.pad();
+
+            let witness = cs.get_and_clear_witness();
+            assert!(cs.verify_witness(&witness[..], &[]).is_ok());
+            check_turbo_plonk_proof(pcs, prng, &cs, &witness, &[]);
+        }
+
+        fn check_turbo_plonk_proof<PCS: PolyComScheme, R: CryptoRng + RngCore>(
+            pcs: &PCS,
+            prng: &mut R,
+            cs: &TurboCS<PCS::Field>,
+            witness: &[PCS::Field],
+            online_vars: &[PCS::Field],
+        ) {
+            let prover_params = indexer(cs, pcs).unwrap();
+            let verifier_params_ref = &prover_params.verifier_params;
+
+            let mut transcript = Transcript::new(b"TestTurboPlonk");
+            let proof = prover(prng, &mut transcript, pcs, cs, &prover_params, witness).unwrap();
+
+            let mut transcript = Transcript::new(b"TestTurboPlonk");
+            assert!(verifier(
+                &mut transcript,
+                pcs,
+                cs,
+                verifier_params_ref,
+                online_vars,
+                &proof
+            )
+            .is_ok());
+
+            let prover_cs = cs.shrink_to_verifier_only();
+
+            let mut transcript = Transcript::new(b"TestTurboPlonk");
+            assert!(prover(
+                prng,
+                &mut transcript,
+                pcs,
+                &prover_cs,
+                &prover_params,
+                witness
+            )
+            .is_err());
+
+            let mut transcript = Transcript::new(b"TestTurboPlonk");
+            assert!(verifier(
+                &mut transcript,
+                pcs,
+                &prover_cs,
+                verifier_params_ref,
+                online_vars,
+                &proof
+            )
+            .is_ok());
+        }
+    };
+}
+
 #[cfg(test)]
-mod test {
+mod test_turbo_bn254 {
+    use crate::plonk::{
+        constraint_system::{ConstraintSystem, TurboCS},
+        indexer::indexer,
+        prover::prover,
+        verifier::verifier,
+    };
+    use crate::poly_commit::{kzg_poly_com::KZGCommitmentScheme, pcs::PolyComScheme};
+    use merlin::Transcript;
+    use noah_algebra::bn254::{BN254PairingEngine, BN254Scalar};
+    use noah_algebra::prelude::*;
+
+    _test_turbo!(BN254Scalar, BN254PairingEngine);
+}
+
+#[cfg(test)]
+mod test_turbo_bls12_381 {
     use crate::plonk::{
         constraint_system::{ConstraintSystem, TurboCS},
         indexer::indexer,
@@ -987,504 +1499,12 @@ mod test {
     use noah_algebra::bls12_381::BLSPairingEngine;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 
-    type F = BLSScalar;
-
-    #[test]
-    fn test_select() {
-        let mut cs = TurboCS::new();
-        let num: Vec<F> = (0..4).map(|x| F::from(x as u32)).collect();
-        let index_0 = cs.new_variable(num[0]); // bit0 = 0 -- Variable index 2
-        let index_1 = cs.new_variable(num[1]); // bit1 = 1 -- Variable index 3
-        let index_2 = cs.new_variable(num[2]); // var0     -- Variable index 4
-        let index_3 = cs.new_variable(num[3]); // var1     -- Variable index 5
-
-        // select(var0, var1, bit0)
-        let a_idx = cs.select(index_2, index_3, index_0);
-        assert_eq!(cs.witness[a_idx], num[2]);
-        // select(var0, var1, bit1)
-        let b_idx = cs.select(index_2, index_3, index_1);
-        assert_eq!(cs.witness[b_idx], num[3]);
-
-        assert!(cs
-            .verify_witness(
-                &[
-                    F::zero(),
-                    F::one(),
-                    num[0],
-                    num[1],
-                    num[2],
-                    num[3],
-                    num[2],
-                    num[3]
-                ],
-                &[]
-            )
-            .is_ok());
-
-        // Set bit0 = 1 and bit1 = 0
-        assert!(cs
-            .verify_witness(
-                &[
-                    F::zero(),
-                    F::one(),
-                    num[1],
-                    num[0],
-                    num[2],
-                    num[3],
-                    num[3],
-                    num[2]
-                ],
-                &[]
-            )
-            .is_ok());
-
-        assert!(cs
-            .verify_witness(
-                &[
-                    F::zero(),
-                    F::one(),
-                    num[0],
-                    num[1],
-                    num[2],
-                    num[3],
-                    num[3],
-                    num[2]
-                ],
-                &[]
-            )
-            .is_err());
-    }
-
-    #[test]
-    fn test_sub_and_equal() {
-        let mut cs = TurboCS::new();
-        let zero = F::zero();
-        let one = F::one();
-        let two = one.add(&one);
-        let three = two.add(&one);
-        cs.new_variable(zero);
-        cs.new_variable(one);
-        cs.new_variable(two);
-        cs.new_variable(three);
-        let add = cs.add(0 + 2, 2 + 2);
-        let sub = cs.sub(3 + 2, 1 + 2);
-        cs.equal(add, sub);
-
-        let witness = cs.get_and_clear_witness();
-        cs.verify_witness(&witness[..], &[]).unwrap();
-
-        assert!(cs
-            .verify_witness(&[zero, one, two, two, two, one, zero], &[])
-            .is_err());
-    }
-
-    #[test]
-    fn test_is_equal() {
-        let mut cs = TurboCS::new();
-        let zero = F::zero();
-        let one = F::one();
-        let two = one.add(&one);
-        cs.new_variable(one);
-        cs.new_variable(two);
-        cs.new_variable(two);
-        let one_equals_two = cs.is_equal(0 + 2, 1 + 2);
-        assert_eq!(cs.witness[one_equals_two], zero);
-        let two_equals_two = cs.is_equal(1 + 2, 2 + 2);
-        assert_eq!(cs.witness[two_equals_two], one);
-
-        let mut witness = cs.get_and_clear_witness();
-        cs.verify_witness(&witness, &[]).unwrap();
-
-        witness[0] = two;
-        assert!(cs.verify_witness(&witness, &[]).is_err());
-    }
-
-    #[test]
-    fn test_turbo_plonk_circuit_1() {
-        let mut cs = TurboCS::new();
-        let num: Vec<F> = (0..6).map(|x| F::from(x as u32)).collect();
-
-        // The circuit description:
-        // 1. c = add(a, b)
-        // 2. d = mul(a, b)
-        // 3. e = linear_combine(a, b, c, d)
-        // 4. 0 <= e < 8
-        // The secret inputs: [a, b] = [1, 1]
-        cs.new_variable(num[1]);
-        cs.new_variable(num[1]);
-        let c_idx = cs.add(0 + 2, 1 + 2);
-        let d_idx = cs.mul(0 + 2, 1 + 2);
-        let e_idx = cs.linear_combine(
-            &[0 + 2, 1 + 2, c_idx, d_idx],
-            num[1],
-            num[1],
-            num[1],
-            num[1],
-        );
-
-        cs.range_check(e_idx, 3);
-
-        let witness = cs.get_and_clear_witness();
-        cs.verify_witness(&witness[..], &[]).unwrap();
-
-        let eight = num[3].add(&num[5]);
-        // Bad witness: [a, b] = [1, 2], [c, d, e] = [3, 2, 8] and e >= 8
-        // set e_binary = [1, 1, 1]
-        assert!(cs
-            .verify_witness(
-                &[
-                    F::zero(),
-                    F::one(),
-                    num[1],
-                    num[2],
-                    num[3],
-                    num[2],
-                    eight,
-                    num[1],
-                    num[1],
-                    num[1]
-                ],
-                &[]
-            )
-            .is_err());
-    }
-
-    #[test]
-    fn test_turbo_plonk_circuit_2() {
-        let mut cs = TurboCS::new();
-        let num: Vec<F> = (0..9).map(|x| F::from(x as u32)).collect();
-
-        // The circuit description:
-        // 1. a \in {0, 1}
-        // 2. a + b = c
-        // 3. a + b + c + d = e
-        // 4. b * c = f
-        // 5. 0 <= e < 8
-        // 6. 0 <= f < 8
-        // The witness: [a, b, c, d, e, f] = [1, 2, 3, 1, 7, 6]
-        let variables = vec![num[1], num[2], num[3], num[1], num[7], num[6]];
-        cs.add_variables(&variables);
-        cs.insert_boolean_gate(0 + 2); // add 2 because when init, has 2 default variable
-        cs.insert_add_gate(0 + 2, 1 + 2, 2 + 2);
-        cs.insert_lc_gate(
-            &[0 + 2, 1 + 2, 2 + 2, 3 + 2],
-            4 + 2,
-            num[1],
-            num[1],
-            num[1],
-            num[1],
-        );
-        cs.insert_mul_gate(1 + 2, 2 + 2, 5 + 2);
-        cs.range_check(4 + 2, 3);
-        cs.range_check(5 + 2, 3);
-
-        let twelve = num[8].add(&num[4]);
-        // Good witness: [1, 2, 3, 1, 7, 6], e_binary_le = [1, 1, 1], f_binary_le = [0, 1, 1]
-        let witness = cs.get_and_clear_witness();
-        cs.verify_witness(&witness[..], &[]).unwrap();
-
-        // Another good witness also satisfies the circuit:
-        // [0, 2, 2, 1, 5, 4], e_binary_le = [1, 0, 1], f_binary_le = [0, 0, 1]
-        cs.verify_witness(
-            &[
-                F::zero(),
-                F::one(),
-                num[0],
-                num[2],
-                num[2],
-                num[1],
-                num[5],
-                num[4],
-                num[1],
-                num[0],
-                num[1],
-                num[0],
-                num[0],
-                num[1],
-            ],
-            &[],
-        )
-        .unwrap();
-
-        // Bad witness: a is not boolean
-        assert!(cs
-            .verify_witness(
-                &[
-                    F::zero(),
-                    F::one(),
-                    num[2],
-                    num[0],
-                    num[2],
-                    num[1],
-                    num[5],
-                    num[0],
-                    num[1],
-                    num[0],
-                    num[1],
-                    num[0],
-                    num[0],
-                    num[0]
-                ],
-                &[]
-            )
-            .is_err());
-        // Bad witness: a + b != c
-        assert!(cs
-            .verify_witness(
-                &[
-                    F::zero(),
-                    F::one(),
-                    num[1],
-                    num[1],
-                    num[1],
-                    num[2],
-                    num[5],
-                    num[1],
-                    num[1],
-                    num[0],
-                    num[1],
-                    num[1],
-                    num[0],
-                    num[0]
-                ],
-                &[]
-            )
-            .is_err());
-        // Bad witness: a + b + c + d != e
-        assert!(cs
-            .verify_witness(
-                &[
-                    F::zero(),
-                    F::one(),
-                    num[1],
-                    num[1],
-                    num[2],
-                    num[2],
-                    num[5],
-                    num[2],
-                    num[1],
-                    num[0],
-                    num[1],
-                    num[0],
-                    num[1],
-                    num[0]
-                ],
-                &[]
-            )
-            .is_err());
-        // Bad witness: b * c != f
-        assert!(cs
-            .verify_witness(
-                &[
-                    F::zero(),
-                    F::one(),
-                    num[1],
-                    num[1],
-                    num[2],
-                    num[2],
-                    num[6],
-                    num[1],
-                    num[0],
-                    num[1],
-                    num[1],
-                    num[1],
-                    num[0],
-                    num[0]
-                ],
-                &[]
-            )
-            .is_err());
-        // Bad witness: e >= 8, set e_binary_le = [1, 1, 1]
-        assert!(cs
-            .verify_witness(
-                &[
-                    F::zero(),
-                    F::one(),
-                    num[1],
-                    num[2],
-                    num[3],
-                    num[2],
-                    num[8],
-                    num[6],
-                    num[1],
-                    num[1],
-                    num[1],
-                    num[0],
-                    num[1],
-                    num[1]
-                ],
-                &[]
-            )
-            .is_err());
-        // Bad witness: f >= 8, set f_binary_le = [1, 1, 1]
-        assert!(cs
-            .verify_witness(
-                &[
-                    F::zero(),
-                    F::one(),
-                    num[0],
-                    num[3],
-                    num[4],
-                    num[0],
-                    num[7],
-                    twelve,
-                    num[1],
-                    num[1],
-                    num[1],
-                    num[1],
-                    num[1],
-                    num[1]
-                ],
-                &[]
-            )
-            .is_err());
-    }
-
-    #[test]
-    fn test_turbo_plonk_kzg() {
-        let mut prng = test_rng();
-        let pcs = KZGCommitmentScheme::<BLSPairingEngine>::new(20, &mut prng);
-        test_turbo_plonk_with_constant_and_online_values(&pcs, &mut prng);
-        test_turbo_plonk_arithmetic_gates(&pcs, &mut prng);
-    }
-
-    fn test_turbo_plonk_with_constant_and_online_values<
-        PCS: PolyComScheme,
-        R: CryptoRng + RngCore,
-    >(
-        pcs: &PCS,
-        prng: &mut R,
-    ) {
-        let one = PCS::Field::one();
-        let two = one.add(&one);
-        let three = two.add(&one);
-        let four = three.add(&one);
-        let seven = four.add(&three);
-        let twenty_one = seven.mul(&three);
-        let twenty_five = twenty_one.add(&four);
-
-        // circuit (x_0 + y0) * (x_2 + 4) + x_0 * y1;
-        // y0, y1 are online variables
-        // witness (1 + 2) * (3 + 4) + 1 * 4 = 25
-        let mut cs = TurboCS::<PCS::Field>::new();
-        cs.add_variables(&[
-            one,
-            two,
-            three,
-            four,
-            three,
-            seven,
-            twenty_one,
-            four,
-            four,
-            twenty_five,
-        ]);
-        cs.insert_add_gate(0 + 2, 1 + 2, 4 + 2);
-        cs.insert_add_gate(2 + 2, 3 + 2, 5 + 2);
-        cs.insert_mul_gate(4 + 2, 5 + 2, 6 + 2);
-        cs.insert_mul_gate(0 + 2, 7 + 2, 8 + 2);
-        cs.insert_add_gate(6 + 2, 8 + 2, 9 + 2);
-        cs.insert_constant_gate(3 + 2, four);
-        cs.prepare_pi_variable(1 + 2);
-        cs.prepare_pi_variable(7 + 2);
-        cs.pad();
-
-        let mut online_vars = [two, four];
-        let witness = cs.get_and_clear_witness();
-        assert!(cs.verify_witness(&witness, &online_vars).is_ok());
-        check_turbo_plonk_proof(pcs, prng, &cs, &witness, &online_vars);
-
-        online_vars[0] = four;
-        assert!(cs.verify_witness(&witness, &online_vars).is_err());
-    }
-
-    fn test_turbo_plonk_arithmetic_gates<PCS: PolyComScheme, R: CryptoRng + RngCore>(
-        pcs: &PCS,
-        prng: &mut R,
-    ) {
-        let mut cs = TurboCS::new();
-        let num: Vec<PCS::Field> = (0..9).map(|x| PCS::Field::from(x as u32)).collect();
-
-        // The circuit description:
-        // 1. a \in {0, 1}
-        // 2. c = add(a, b)
-        // 3. d = mul(a, b)
-        // 4. e = 2 * a + 3 * b + c + d
-        // 5. 0 <= e < 16
-        // The secret inputs: [a, b] = [1, 2]
-        cs.new_variable(num[1]);
-        cs.new_variable(num[2]);
-        cs.insert_boolean_gate(0 + 2);
-        let c_idx = cs.add(0 + 2, 1 + 2);
-        let d_idx = cs.mul(0 + 2, 1 + 2);
-        let e_idx = cs.linear_combine(
-            &[0 + 2, 1 + 2, c_idx, d_idx],
-            num[2],
-            num[3],
-            num[1],
-            num[1],
-        );
-        cs.range_check(e_idx, 4);
-        cs.pad();
-
-        let witness = cs.get_and_clear_witness();
-        assert!(cs.verify_witness(&witness[..], &[]).is_ok());
-        check_turbo_plonk_proof(pcs, prng, &cs, &witness, &[]);
-    }
-
-    fn check_turbo_plonk_proof<PCS: PolyComScheme, R: CryptoRng + RngCore>(
-        pcs: &PCS,
-        prng: &mut R,
-        cs: &TurboCS<PCS::Field>,
-        witness: &[PCS::Field],
-        online_vars: &[PCS::Field],
-    ) {
-        let prover_params = indexer(cs, pcs).unwrap();
-        let verifier_params_ref = &prover_params.verifier_params;
-
-        let mut transcript = Transcript::new(b"TestTurboPlonk");
-        let proof = prover(prng, &mut transcript, pcs, cs, &prover_params, witness).unwrap();
-
-        let mut transcript = Transcript::new(b"TestTurboPlonk");
-        assert!(verifier(
-            &mut transcript,
-            pcs,
-            cs,
-            verifier_params_ref,
-            online_vars,
-            &proof
-        )
-        .is_ok());
-
-        let prover_cs = cs.shrink_to_verifier_only();
-
-        let mut transcript = Transcript::new(b"TestTurboPlonk");
-        assert!(prover(
-            prng,
-            &mut transcript,
-            pcs,
-            &prover_cs,
-            &prover_params,
-            witness
-        )
-        .is_err());
-
-        let mut transcript = Transcript::new(b"TestTurboPlonk");
-        assert!(verifier(
-            &mut transcript,
-            pcs,
-            &prover_cs,
-            verifier_params_ref,
-            online_vars,
-            &proof
-        )
-        .is_ok());
-    }
+    _test_turbo!(BLSScalar, BLSPairingEngine);
 
     #[test]
     #[cfg(feature = "debug")]
     fn test_dangling_witness_without_panic() {
-        let one = F::one();
+        let one = BLSScalar::one();
         let two = one.add(&one);
         let three = one.add(&two);
         let four = one.add(&three);
@@ -1519,7 +1539,7 @@ mod test {
     fn test_dangling_witness_should_panic() {
         use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381};
 
-        let one = F::one();
+        let one = BLSScalar::one();
         let two = one.add(&one);
         let three = one.add(&two);
         let four = one.add(&three);

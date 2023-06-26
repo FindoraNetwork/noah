@@ -11,8 +11,8 @@ use crate::parameters::params::ProverParams;
 use crate::parameters::params::VerifierParams;
 use crate::xfr::structs::{BlindAssetRecord, OpenAssetRecord};
 use merlin::Transcript;
-use noah_algebra::{bls12_381::BLSScalar, prelude::*};
-use noah_crypto::anemoi_jive::{AnemoiJive381, AnemoiVLHTrace};
+use noah_algebra::{bn254::BN254Scalar, prelude::*};
+use noah_crypto::anemoi_jive::{AnemoiJive254, AnemoiVLHTrace};
 use noah_plonk::plonk::{
     constraint_system::TurboCS, prover::prover_with_lagrange, verifier::verifier,
 };
@@ -170,8 +170,8 @@ pub fn verify_ar_to_abar_body(params: &VerifierParams, body: &ArToAbarBody) -> R
     let asset_type = body.input.asset_type.get_asset_type().unwrap();
 
     let mut transcript = Transcript::new(AR_TO_ABAR_PLONK_PROOF_TRANSCRIPT);
-    let mut online_inputs: Vec<BLSScalar> = vec![];
-    online_inputs.push(BLSScalar::from(amount));
+    let mut online_inputs: Vec<BN254Scalar> = vec![];
+    online_inputs.push(BN254Scalar::from(amount));
     online_inputs.push(asset_type.as_scalar());
     online_inputs.push(body.output.commitment);
 
@@ -188,19 +188,19 @@ pub fn verify_ar_to_abar_body(params: &VerifierParams, body: &ArToAbarBody) -> R
 /// Construct the transparent-to-anonymous constraint system.
 pub fn build_ar_to_abar_cs(
     payee_data: PayeeWitness,
-    output_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
+    output_trace: &AnemoiVLHTrace<BN254Scalar, 2, 12>,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
-    cs.load_anemoi_jive_parameters::<AnemoiJive381>();
+    cs.load_anemoi_jive_parameters::<AnemoiJive254>();
 
-    let ar_amount_var = cs.new_variable(BLSScalar::from(payee_data.amount));
+    let ar_amount_var = cs.new_variable(BN254Scalar::from(payee_data.amount));
     cs.prepare_pi_variable(ar_amount_var);
     let ar_asset_var = cs.new_variable(payee_data.asset_type);
     cs.prepare_pi_variable(ar_asset_var);
 
     let blind = cs.new_variable(payee_data.blind);
 
-    let public_key_scalars = payee_data.public_key.to_bls_scalars().unwrap();
+    let public_key_scalars = payee_data.public_key.to_bn_scalars().unwrap();
     let public_key_scalars_vars = [
         cs.new_variable(public_key_scalars[0]),
         cs.new_variable(public_key_scalars[1]),
@@ -208,8 +208,8 @@ pub fn build_ar_to_abar_cs(
     ];
 
     let public_key_type = match payee_data.public_key.0 {
-        PublicKeyInner::Ed25519(_) => cs.new_variable(BLSScalar::one()),
-        PublicKeyInner::Secp256k1(_) => cs.new_variable(BLSScalar::zero()),
+        PublicKeyInner::Ed25519(_) => cs.new_variable(BN254Scalar::one()),
+        PublicKeyInner::Secp256k1(_) => cs.new_variable(BN254Scalar::zero()),
         PublicKeyInner::EthAddress(_) => unimplemented!(),
     };
     cs.insert_boolean_gate(public_key_type);

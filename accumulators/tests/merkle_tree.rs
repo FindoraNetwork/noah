@@ -1,6 +1,6 @@
 use mem_db::MemoryDB;
 use noah_accumulators::merkle_tree::{verify, PersistentMerkleTree, TREE_DEPTH};
-use noah_algebra::{bls12_381::BLSScalar, prelude::*};
+use noah_algebra::{bn254::BN254Scalar, prelude::*};
 use parking_lot::RwLock;
 use std::sync::Arc;
 use std::time::Instant;
@@ -23,10 +23,10 @@ fn test_merkle_tree() {
 
     let start = Instant::now();
     for _ in 0..10 {
-        let sid_0 = mt.add_commitment_hash(BLSScalar::one()).unwrap();
+        let sid_0 = mt.add_commitment_hash(BN254Scalar::one()).unwrap();
         let proof0 = mt.generate_proof(sid_0).unwrap();
         assert_eq!(proof0.uid, sid_0);
-        assert!(verify(BLSScalar::one(), &proof0));
+        assert!(verify(BN254Scalar::one(), &proof0));
     }
     let end = start.elapsed();
     println!("Time: {:?} microseconds", end.as_micros());
@@ -35,10 +35,10 @@ fn test_merkle_tree() {
     assert_eq!(v1, mt.version());
     assert_eq!(1, v1);
 
-    let sid_x = mt.add_commitment_hash(BLSScalar::one()).unwrap();
+    let sid_x = mt.add_commitment_hash(BN254Scalar::one()).unwrap();
     let proofx = mt.generate_proof_with_depth(sid_x, TREE_DEPTH).unwrap();
 
-    assert!(verify(BLSScalar::one(), &proofx));
+    assert!(verify(BN254Scalar::one(), &proofx));
     assert!(mt.generate_proof_with_depth(sid_x, 31).is_err());
     assert!(mt.generate_proof_with_depth(sid_x, 2).is_err());
     assert_eq!(

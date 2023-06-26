@@ -24,9 +24,9 @@ use crate::xfr::{
 };
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
-use noah_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::PedersenCommitmentRistretto};
+use noah_algebra::{bn254::BN254Scalar, prelude::*, ristretto::PedersenCommitmentRistretto};
 use noah_crypto::anemoi_jive::{
-    AnemoiJive, AnemoiJive381, AnemoiVLHTrace, ANEMOI_JIVE_381_SALTS_OLD,
+    AnemoiJive, AnemoiJive254, AnemoiVLHTrace, ANEMOI_JIVE_BN254_SALTS,
 };
 use noah_plonk::plonk::{
     constraint_system::{TurboCS, VarIndex},
@@ -61,9 +61,9 @@ pub struct AbarToArPreNote {
     /// Witness.
     pub witness: PayerWitness,
     /// The trace of the input commitment.
-    pub input_commitment_trace: AnemoiVLHTrace<BLSScalar, 2, 12>,
+    pub input_commitment_trace: AnemoiVLHTrace<BN254Scalar, 2, 12>,
     /// The trace of the nullifier.
-    pub nullifier_trace: AnemoiVLHTrace<BLSScalar, 2, 12>,
+    pub nullifier_trace: AnemoiVLHTrace<BN254Scalar, 2, 12>,
     /// Input key pair.
     pub input_keypair: KeyPair,
 }
@@ -76,7 +76,7 @@ pub struct AbarToArBody {
     /// The new AR to be created.
     pub output: BlindAssetRecord,
     /// The Merkle root hash.
-    pub merkle_root: BLSScalar,
+    pub merkle_root: BN254Scalar,
     /// The Merkle root version.
     pub merkle_root_version: u64,
     /// The owner memo.
@@ -206,7 +206,7 @@ pub fn finish_abar_to_ar_note<R: CryptoRng + RngCore, D: Digest<OutputSize = U64
 pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
     params: &VerifierParams,
     note: &AbarToArNote,
-    merkle_root: &BLSScalar,
+    merkle_root: &BN254Scalar,
     hash: D,
 ) -> Result<()> {
     // require the output amount & asset type are non-confidential
@@ -243,7 +243,7 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
     let mut online_inputs = vec![];
     online_inputs.push(note.body.input.clone());
     online_inputs.push(merkle_root.clone());
-    online_inputs.push(BLSScalar::from(payer_amount));
+    online_inputs.push(BN254Scalar::from(payer_amount));
     online_inputs.push(payer_asset_type.as_scalar());
     online_inputs.extend_from_slice(&address_folding_public_input);
 
@@ -263,7 +263,7 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
 pub fn batch_verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default + Sync + Send>(
     params: &VerifierParams,
     notes: &[&AbarToArNote],
-    merkle_roots: &[&BLSScalar],
+    merkle_roots: &[&BN254Scalar],
     hashes: Vec<D>,
 ) -> Result<()> {
     // require the output amount & asset type are non-confidential
@@ -314,7 +314,7 @@ pub fn batch_verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default + Sync
             let mut online_inputs = vec![];
             online_inputs.push(note.body.input.clone());
             online_inputs.push(*merkle_root.clone());
-            online_inputs.push(BLSScalar::from(payer_amount));
+            online_inputs.push(BN254Scalar::from(payer_amount));
             online_inputs.push(payer_asset_type.as_scalar());
             online_inputs.extend_from_slice(&address_folding_public_input);
 
@@ -339,8 +339,8 @@ fn prove_abar_to_ar<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
     payers_witness: &PayerWitness,
-    nullifier_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
-    input_commitment_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
+    nullifier_trace: &AnemoiVLHTrace<BN254Scalar, 2, 12>,
+    input_commitment_trace: &AnemoiVLHTrace<BN254Scalar, 2, 12>,
     folding_witness: &AXfrAddressFoldingWitness,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(ABAR_TO_AR_PLONK_PROOF_TRANSCRIPT);
@@ -367,20 +367,20 @@ fn prove_abar_to_ar<R: CryptoRng + RngCore>(
 /// Construct the anonymous-to-transparent constraint system.
 pub fn build_abar_to_ar_cs(
     payer_witness: &PayerWitness,
-    nullifier_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
-    input_commitment_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
+    nullifier_trace: &AnemoiVLHTrace<BN254Scalar, 2, 12>,
+    input_commitment_trace: &AnemoiVLHTrace<BN254Scalar, 2, 12>,
     folding_witness: &AXfrAddressFoldingWitness,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
 
-    cs.load_anemoi_jive_parameters::<AnemoiJive381>();
+    cs.load_anemoi_jive_parameters::<AnemoiJive254>();
 
     let payers_witnesses_vars = add_payers_witnesses(&mut cs, &[payer_witness]);
     let payer_witness_var = &payers_witnesses_vars[0];
 
     let keypair = folding_witness.keypair();
-    let public_key_scalars = keypair.get_pk().to_bls_scalars().unwrap();
-    let secret_key_scalars = keypair.get_sk().to_bls_scalars().unwrap();
+    let public_key_scalars = keypair.get_pk().to_bn_scalars().unwrap();
+    let secret_key_scalars = keypair.get_sk().to_bn_scalars().unwrap();
 
     let public_key_scalars_vars = [
         cs.new_variable(public_key_scalars[0]),
@@ -392,15 +392,15 @@ pub fn build_abar_to_ar_cs(
         cs.new_variable(secret_key_scalars[1]),
     ];
 
-    let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::one());
-    let zero = BLSScalar::zero();
-    let one = BLSScalar::one();
+    let pow_2_64 = BN254Scalar::from(u64::MAX).add(&BN254Scalar::one());
+    let zero = BN254Scalar::zero();
+    let one = BN254Scalar::one();
     let zero_var = cs.zero_var();
     let mut root_var: Option<VarIndex> = None;
 
     let key_type = match keypair.get_sk() {
-        SecretKey::Ed25519(_) => cs.new_variable(BLSScalar::one()),
-        SecretKey::Secp256k1(_) => cs.new_variable(BLSScalar::zero()),
+        SecretKey::Ed25519(_) => cs.new_variable(BN254Scalar::one()),
+        SecretKey::Secp256k1(_) => cs.new_variable(BN254Scalar::zero()),
     };
 
     // commitments
@@ -452,14 +452,14 @@ pub fn build_abar_to_ar_cs(
         payer_witness.asset_type,
     )
     .unwrap();
-    let leaf_trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
-        BLSScalar::from(payer_witness.uid),
+    let leaf_trace = AnemoiJive254::eval_variable_length_hash_with_trace(&[
+        BN254Scalar::from(payer_witness.uid),
         commitment,
     ]);
     for (i, mt_node) in payer_witness.path.nodes.iter().enumerate() {
-        let trace = AnemoiJive381::eval_jive_with_trace(
+        let trace = AnemoiJive254::eval_jive_with_trace(
             &[mt_node.left, mt_node.mid],
-            &[mt_node.right, ANEMOI_JIVE_381_SALTS_OLD[i]],
+            &[mt_node.right, ANEMOI_JIVE_BN254_SALTS[i]],
         );
         path_traces.push(trace);
     }

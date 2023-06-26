@@ -4,7 +4,7 @@ use crate::xfr::structs::{
     AssetTracerDecKeys, AssetTracerEncKeys, AssetType, TracerMemo, ASSET_TYPE_LENGTH,
 };
 use noah_algebra::{
-    bls12_381::{BLSScalar, BLSG1},
+    bn254::{BN254Scalar, BN254G1},
     prelude::*,
     ristretto::{RistrettoPoint, RistrettoScalar},
 };
@@ -199,7 +199,7 @@ impl TracerMemo {
     /// Otherwise, it returns a boolean vector indicating true for every positive match and false otherwise.
     pub fn verify_identity_attributes(
         &self,
-        dec_key: &ElGamalDecKey<BLSScalar>,
+        dec_key: &ElGamalDecKey<BN254Scalar>,
         expected_attributes: &[u32],
     ) -> Result<Vec<bool>> {
         if self.lock_attributes.len() != expected_attributes.len() {
@@ -207,9 +207,9 @@ impl TracerMemo {
         }
         let mut result = vec![];
         for (ctext, expected) in self.lock_attributes.iter().zip(expected_attributes.iter()) {
-            let scalar_attr = BLSScalar::from(*expected);
+            let scalar_attr = BN254Scalar::from(*expected);
             let elem = elgamal_partial_decrypt(ctext, dec_key);
-            if elem != BLSG1::get_base().mul(&scalar_attr) {
+            if elem != BN254G1::get_base().mul(&scalar_attr) {
                 result.push(false);
             } else {
                 result.push(true);
@@ -223,7 +223,8 @@ impl TracerMemo {
 mod tests {
     use crate::errors::NoahError;
     use crate::xfr::structs::{AssetTracerKeyPair, AssetType, TracerMemo};
-    use noah_algebra::{bls12_381::BLSScalar, prelude::*, ristretto::RistrettoScalar};
+    use noah_algebra::bn254::BN254Scalar;
+    use noah_algebra::{prelude::*, ristretto::RistrettoScalar};
     use noah_crypto::elgamal::elgamal_encrypt;
 
     #[test]
@@ -337,12 +338,12 @@ mod tests {
         let attrs_and_ctexts = attrs
             .iter()
             .map(|x| {
-                let scalar = BLSScalar::from(*x);
+                let scalar = BN254Scalar::from(*x);
                 (
                     *x,
                     elgamal_encrypt(
                         &scalar,
-                        &BLSScalar::from(1000u32),
+                        &BN254Scalar::from(1000u32),
                         &tracer_keys.enc_key.attrs_enc_key,
                     ),
                 )

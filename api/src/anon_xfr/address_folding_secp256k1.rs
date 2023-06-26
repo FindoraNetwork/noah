@@ -5,18 +5,18 @@ use crate::parameters::bulletproofs::BulletproofURS;
 use crate::parameters::params::AddressFormat::SECP256K1;
 use digest::{consts::U64, Digest};
 use merlin::Transcript;
-use noah_algebra::bls12_381::BLSScalar;
+use noah_algebra::bn254::BN254Scalar;
 use noah_algebra::prelude::*;
 use noah_algebra::secp256k1::SECP256K1Scalar;
 use noah_algebra::secq256k1::{
     PedersenCommitmentSecq256k1, SECQ256K1Scalar, Secq256k1BulletproofGens, SECQ256K1G1,
 };
-use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381};
+use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive254};
 use noah_crypto::bulletproofs::scalar_mul::secp256k1::ScalarMulProof;
 use noah_crypto::delegated_schnorr::{
     prove_delegated_schnorr, verify_delegated_schnorr, DSInspection, DSProof,
 };
-use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsBLSSecq256k1};
+use noah_crypto::field_simulation::{SimFr, SimFrParams, SimFrParamsBN254Secq256k1};
 use noah_plonk::plonk::constraint_system::field_simulation::SimFrVar;
 use noah_plonk::plonk::constraint_system::VarIndex;
 use num_bigint::BigUint;
@@ -26,7 +26,7 @@ use rand_core::{CryptoRng, RngCore};
 /// The instance for address folding.
 pub struct AXfrAddressFoldingInstanceSecp256k1 {
     /// The inspector's proof.
-    pub delegated_schnorr_proof: DSProof<BLSScalar, SECQ256K1Scalar, SECQ256K1G1>,
+    pub delegated_schnorr_proof: DSProof<BN254Scalar, SECQ256K1Scalar, SECQ256K1G1>,
     /// The commitments generated during the scalar mul proof, used in delegated CP.
     pub scalar_mul_commitments: Vec<SECQ256K1G1>,
     /// The scalar mul proof.
@@ -41,9 +41,9 @@ pub struct AXfrAddressFoldingWitnessSecp256k1 {
     /// Blinding factors of the commitments
     pub blinding_factors: Vec<SECQ256K1Scalar>,
     /// The inspector's proof.
-    pub delegated_schnorr_proof: DSProof<BLSScalar, SECQ256K1Scalar, SECQ256K1G1>,
+    pub delegated_schnorr_proof: DSProof<BN254Scalar, SECQ256K1Scalar, SECQ256K1G1>,
     /// Inspection data in the delegated Schnorr proof.
-    pub delegated_schnorr_inspection: DSInspection<BLSScalar, SECQ256K1Scalar, SECQ256K1G1>,
+    pub delegated_schnorr_inspection: DSInspection<BN254Scalar, SECQ256K1Scalar, SECQ256K1G1>,
     /// Beta.
     pub beta: SECQ256K1Scalar,
     /// Lambda.
@@ -55,23 +55,24 @@ impl Default for AXfrAddressFoldingWitnessSecp256k1 {
         let keypair = KeyPair::default(SECP256K1);
         let blinding_factors = vec![SECQ256K1Scalar::default(); 3];
 
-        let delegated_schnorr_proof = DSProof::<BLSScalar, SECQ256K1Scalar, SECQ256K1G1> {
+        let delegated_schnorr_proof = DSProof::<BN254Scalar, SECQ256K1Scalar, SECQ256K1G1> {
             inspection_comm: Default::default(),
             randomizers: vec![SECQ256K1G1::default(); 3],
             response_scalars: vec![(SECQ256K1Scalar::default(), SECQ256K1Scalar::default()); 3],
         };
 
-        let delegated_schnorr_inspection = DSInspection::<BLSScalar, SECQ256K1Scalar, SECQ256K1G1> {
-            committed_data_and_randomizer: vec![
-                (
-                    SECQ256K1Scalar::default(),
-                    SECQ256K1Scalar::default()
-                );
-                3
-            ],
-            r: BLSScalar::default(),
-            group_phantom: Default::default(),
-        };
+        let delegated_schnorr_inspection =
+            DSInspection::<BN254Scalar, SECQ256K1Scalar, SECQ256K1G1> {
+                committed_data_and_randomizer: vec![
+                    (
+                        SECQ256K1Scalar::default(),
+                        SECQ256K1Scalar::default()
+                    );
+                    3
+                ],
+                r: BN254Scalar::default(),
+                group_phantom: Default::default(),
+            };
 
         let beta = SECQ256K1Scalar::default();
         let lambda = SECQ256K1Scalar::default();
@@ -114,7 +115,7 @@ pub fn create_address_folding_secp256k1<
     let (delegated_schnorr_proof, delegated_schnorr_inspection, beta, lambda) = {
         let secret_key_in_fq = SECQ256K1Scalar::from_bytes(&sk.to_bytes())?;
 
-        prove_delegated_schnorr::<BLSScalar, AnemoiJive381, _, _, _, SimFrParamsBLSSecq256k1, _>(
+        prove_delegated_schnorr::<BN254Scalar, AnemoiJive254, _, _, _, SimFrParamsBN254Secq256k1, _>(
             prng,
             &vec![
                 (pk.get_x(), blinding_factors[0]),
@@ -236,10 +237,10 @@ pub fn prove_address_folding_in_cs_secp256k1(
                 flag_smaller_than_modulus || (!secret_key_bit && !flag_meet_first_different_bit);
 
             flag_smaller_than_modulus_var = {
-                let res = cs.new_variable(BLSScalar::from(flag_smaller_than_modulus as u32));
+                let res = cs.new_variable(BN254Scalar::from(flag_smaller_than_modulus as u32));
 
-                let zero = BLSScalar::zero();
-                let one = BLSScalar::one();
+                let zero = BN254Scalar::zero();
+                let one = BN254Scalar::one();
                 let zero_var = cs.zero_var();
 
                 cs.push_add_selectors(one.neg(), one.neg(), one, zero);
@@ -262,10 +263,10 @@ pub fn prove_address_folding_in_cs_secp256k1(
             flag_meet_first_different_bit = flag_meet_first_different_bit || !secret_key_bit;
 
             flag_meet_first_different_bit_var = {
-                let res = cs.new_variable(BLSScalar::from(flag_meet_first_different_bit as u32));
+                let res = cs.new_variable(BN254Scalar::from(flag_meet_first_different_bit as u32));
 
-                let zero = BLSScalar::zero();
-                let one = BLSScalar::one();
+                let zero = BN254Scalar::zero();
+                let one = BN254Scalar::one();
                 let zero_var = cs.zero_var();
 
                 cs.push_add_selectors(zero, one.neg(), zero, zero);
@@ -288,10 +289,10 @@ pub fn prove_address_folding_in_cs_secp256k1(
             flag_meet_first_different_bit = flag_meet_first_different_bit || *secret_key_bit;
 
             flag_meet_first_different_bit_var = {
-                let res = cs.new_variable(BLSScalar::from(flag_meet_first_different_bit as u32));
+                let res = cs.new_variable(BN254Scalar::from(flag_meet_first_different_bit as u32));
 
-                let zero = BLSScalar::zero();
-                let one = BLSScalar::one();
+                let zero = BN254Scalar::zero();
+                let one = BN254Scalar::one();
                 let zero_var = cs.zero_var();
 
                 cs.push_add_selectors(one, one, zero, zero);
@@ -314,8 +315,8 @@ pub fn prove_address_folding_in_cs_secp256k1(
 
     // Enforce `flag_smaller_than_modulus_var = true` and `flag_meet_first_different_bit_var = true`
     {
-        let zero = BLSScalar::zero();
-        let one = BLSScalar::one();
+        let zero = BN254Scalar::zero();
+        let one = BN254Scalar::one();
         let zero_var = cs.zero_var();
 
         cs.push_add_selectors(zero, zero, zero, zero);
@@ -333,13 +334,13 @@ pub fn prove_address_folding_in_cs_secp256k1(
     }
 
     // 3. allocate the simulated field elements and obtain their bit representations.
-    let x_sim_fr = SimFr::<BLSScalar, SimFrParamsBLSSecq256k1>::from(&pk.get_x().into());
+    let x_sim_fr = SimFr::<BN254Scalar, SimFrParamsBN254Secq256k1>::from(&pk.get_x().into());
     let (x_sim_fr_var, x_sim_bits_vars) = SimFrVar::alloc_witness(cs, &x_sim_fr);
-    let y_sim_fr = SimFr::<BLSScalar, SimFrParamsBLSSecq256k1>::from(&pk.get_y().into());
+    let y_sim_fr = SimFr::<BN254Scalar, SimFrParamsBN254Secq256k1>::from(&pk.get_y().into());
     let (y_sim_fr_var, y_sim_bits_vars) = SimFrVar::alloc_witness(cs, &y_sim_fr);
 
     // we can do so only because the secp256k1's order is smaller than its base field modulus.
-    let s_sim_fr = SimFr::<BLSScalar, SimFrParamsBLSSecq256k1>::from(&sk.into());
+    let s_sim_fr = SimFr::<BN254Scalar, SimFrParamsBN254Secq256k1>::from(&sk.into());
     let (s_sim_fr_var, s_sim_bits_vars) = SimFrVar::alloc_witness(cs, &s_sim_fr);
 
     // 4. check that the bit representations are the same as the one provided through scalars.
@@ -376,65 +377,65 @@ pub fn prove_address_folding_in_cs_secp256k1(
     let mut lambda_series_vars_skip_first = vec![];
     for lambda_series_val in lambda_series.iter().skip(1) {
         let sim_fr =
-            SimFr::<BLSScalar, SimFrParamsBLSSecq256k1>::from(&<SECQ256K1Scalar as Into<
+            SimFr::<BN254Scalar, SimFrParamsBN254Secq256k1>::from(&<SECQ256K1Scalar as Into<
                 BigUint,
             >>::into(
                 *lambda_series_val
             ));
-        lambda_series_vars_skip_first.push(
-            SimFrVar::<BLSScalar, SimFrParamsBLSSecq256k1>::alloc_input(cs, &sim_fr),
-        );
+        lambda_series_vars_skip_first
+            .push(SimFrVar::<BN254Scalar, SimFrParamsBN254Secq256k1>::alloc_input(cs, &sim_fr));
     }
 
     // include the first one
     let mut beta_lambda_series_vars = vec![];
     for beta_lambda_series_var in beta_lambda_series.iter() {
         let sim_fr =
-            SimFr::<BLSScalar, SimFrParamsBLSSecq256k1>::from(&<SECQ256K1Scalar as Into<
+            SimFr::<BN254Scalar, SimFrParamsBN254Secq256k1>::from(&<SECQ256K1Scalar as Into<
                 BigUint,
             >>::into(
                 *beta_lambda_series_var
             ));
-        beta_lambda_series_vars.push(SimFrVar::<BLSScalar, SimFrParamsBLSSecq256k1>::alloc_input(
-            cs, &sim_fr,
-        ));
+        beta_lambda_series_vars
+            .push(SimFrVar::<BN254Scalar, SimFrParamsBN254Secq256k1>::alloc_input(cs, &sim_fr));
     }
 
-    let query_vars = [x_sim_fr_var, y_sim_fr_var, s_sim_fr_var]
-        .iter()
-        .zip(
-            witness
-                .delegated_schnorr_inspection
-                .committed_data_and_randomizer
-                .iter(),
-        )
-        .map(|(v_var, (_, blinding_factor))| {
-            let sim_fr =
-                SimFr::<BLSScalar, SimFrParamsBLSSecq256k1>::from(&<SECQ256K1Scalar as Into<
-                    BigUint,
-                >>::into(
-                    *blinding_factor
-                ));
-            let (blinding_factor_var, _) =
-                SimFrVar::<BLSScalar, SimFrParamsBLSSecq256k1>::alloc_witness(cs, &sim_fr);
+    let query_vars =
+        [x_sim_fr_var, y_sim_fr_var, s_sim_fr_var]
+            .iter()
+            .zip(
+                witness
+                    .delegated_schnorr_inspection
+                    .committed_data_and_randomizer
+                    .iter(),
+            )
+            .map(|(v_var, (_, blinding_factor))| {
+                let sim_fr = SimFr::<BN254Scalar, SimFrParamsBN254Secq256k1>::from(
+                    &<SECQ256K1Scalar as Into<BigUint>>::into(*blinding_factor),
+                );
+                let (blinding_factor_var, _) =
+                    SimFrVar::<BN254Scalar, SimFrParamsBN254Secq256k1>::alloc_witness(cs, &sim_fr);
 
-            (v_var.clone(), blinding_factor_var)
-        })
-        .collect::<Vec<(
-            SimFrVar<BLSScalar, SimFrParamsBLSSecq256k1>,
-            SimFrVar<BLSScalar, SimFrParamsBLSSecq256k1>,
-        )>>();
+                (v_var.clone(), blinding_factor_var)
+            })
+            .collect::<Vec<(
+                SimFrVar<BN254Scalar, SimFrParamsBN254Secq256k1>,
+                SimFrVar<BN254Scalar, SimFrParamsBN254Secq256k1>,
+            )>>();
 
     let combined_response_scalar = witness.delegated_schnorr_proof.response_scalars[0].0
         + witness.delegated_schnorr_proof.response_scalars[1].0 * witness.lambda
         + witness.delegated_schnorr_proof.response_scalars[2].0 * witness.lambda * witness.lambda;
-    let combined_response_scalar_sim_fr = SimFr::<BLSScalar, SimFrParamsBLSSecq256k1>::from(
-        &<SECQ256K1Scalar as Into<BigUint>>::into(combined_response_scalar),
-    );
-    let combined_response_scalar_var = SimFrVar::<BLSScalar, SimFrParamsBLSSecq256k1>::alloc_input(
-        cs,
-        &combined_response_scalar_sim_fr,
-    );
+    let combined_response_scalar_sim_fr =
+        SimFr::<BN254Scalar, SimFrParamsBN254Secq256k1>::from(&<SECQ256K1Scalar as Into<
+            BigUint,
+        >>::into(
+            combined_response_scalar
+        ));
+    let combined_response_scalar_var =
+        SimFrVar::<BN254Scalar, SimFrParamsBN254Secq256k1>::alloc_input(
+            cs,
+            &combined_response_scalar_sim_fr,
+        );
 
     let mut lhs = query_vars[0].0.mul(cs, &beta_lambda_series_vars[0]);
 
@@ -462,9 +463,9 @@ pub fn prove_address_folding_in_cs_secp256k1(
 
     // 6. merge limbs of the committed data as well as the randomizer scalars.
     let mut all_limbs =
-        Vec::with_capacity(2 * query_vars.len() * SimFrParamsBLSSecq256k1::NUM_OF_LIMBS);
+        Vec::with_capacity(2 * query_vars.len() * SimFrParamsBN254Secq256k1::NUM_OF_LIMBS);
     let mut all_limbs_var =
-        Vec::with_capacity(2 * query_vars.len() * SimFrParamsBLSSecq256k1::NUM_OF_LIMBS);
+        Vec::with_capacity(2 * query_vars.len() * SimFrParamsBN254Secq256k1::NUM_OF_LIMBS);
 
     // append all the data
     for (v, _) in query_vars.iter() {
@@ -481,11 +482,13 @@ pub fn prove_address_folding_in_cs_secp256k1(
     let mut compressed_limbs = Vec::new();
     let mut compressed_limbs_var = Vec::new();
 
-    let num_limbs_compressed = BLSScalar::capacity() / SimFrParamsBLSSecq256k1::BIT_PER_LIMB;
+    let num_limbs_compressed = BN254Scalar::capacity() / SimFrParamsBN254Secq256k1::BIT_PER_LIMB;
 
     let step_vec = (1..=num_limbs_compressed)
-        .map(|i| BLSScalar::from(&BigUint::one().shl(SimFrParamsBLSSecq256k1::BIT_PER_LIMB * i)))
-        .collect::<Vec<BLSScalar>>();
+        .map(|i| {
+            BN254Scalar::from(&BigUint::one().shl(SimFrParamsBN254Secq256k1::BIT_PER_LIMB * i))
+        })
+        .collect::<Vec<BN254Scalar>>();
 
     for (limbs, limbs_var) in all_limbs
         .chunks(num_limbs_compressed)
@@ -494,14 +497,14 @@ pub fn prove_address_folding_in_cs_secp256k1(
         let mut sum = BigUint::zero();
         for (i, limb) in limbs.iter().enumerate() {
             sum.add_assign(
-                <BLSScalar as Into<BigUint>>::into(*limb)
-                    .shl(SimFrParamsBLSSecq256k1::BIT_PER_LIMB * i),
+                <BN254Scalar as Into<BigUint>>::into(*limb)
+                    .shl(SimFrParamsBN254Secq256k1::BIT_PER_LIMB * i),
             );
         }
-        compressed_limbs.push(BLSScalar::from(&sum));
+        compressed_limbs.push(BN254Scalar::from(&sum));
 
-        let one = BLSScalar::one();
-        let zero = BLSScalar::zero();
+        let one = BN254Scalar::one();
+        let zero = BN254Scalar::zero();
         let zero_var = cs.zero_var();
 
         let mut sum_var = {
@@ -545,24 +548,24 @@ pub fn prove_address_folding_in_cs_secp256k1(
         let mut input = compressed_limbs.clone();
         input.push(r);
 
-        let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&input);
-        cs.anemoi_variable_length_hash::<AnemoiJive381>(&trace, &input_vars, comm_var);
+        let trace = AnemoiJive254::eval_variable_length_hash_with_trace(&input);
+        cs.anemoi_variable_length_hash::<AnemoiJive254>(&trace, &input_vars, comm_var);
     }
     cs.prepare_pi_variable(comm_var);
 
     for fr_var in lambda_series_vars_skip_first.iter() {
-        for i in 0..SimFrParamsBLSSecq256k1::NUM_OF_LIMBS {
+        for i in 0..SimFrParamsBN254Secq256k1::NUM_OF_LIMBS {
             cs.prepare_pi_variable(fr_var.var[i]);
         }
     }
 
     for fr_var in beta_lambda_series_vars.iter() {
-        for i in 0..SimFrParamsBLSSecq256k1::NUM_OF_LIMBS {
+        for i in 0..SimFrParamsBN254Secq256k1::NUM_OF_LIMBS {
             cs.prepare_pi_variable(fr_var.var[i]);
         }
     }
 
-    for i in 0..SimFrParamsBLSSecq256k1::NUM_OF_LIMBS {
+    for i in 0..SimFrParamsBN254Secq256k1::NUM_OF_LIMBS {
         cs.prepare_pi_variable(combined_response_scalar_var.var[i]);
     }
 
@@ -574,7 +577,7 @@ pub fn prepare_verifier_input_secp256k1(
     instance: &AXfrAddressFoldingInstanceSecp256k1,
     beta: &SECQ256K1Scalar,
     lambda: &SECQ256K1Scalar,
-) -> Vec<BLSScalar> {
+) -> Vec<BN254Scalar> {
     let mut v = vec![instance.delegated_schnorr_proof.inspection_comm];
 
     let lambda_series = vec![SECQ256K1Scalar::one(), *lambda, *lambda * lambda];
@@ -585,7 +588,7 @@ pub fn prepare_verifier_input_secp256k1(
 
     for lambda_series_val in lambda_series.iter().skip(1) {
         let sim_fr =
-            SimFr::<BLSScalar, SimFrParamsBLSSecq256k1>::from(&<SECQ256K1Scalar as Into<
+            SimFr::<BN254Scalar, SimFrParamsBN254Secq256k1>::from(&<SECQ256K1Scalar as Into<
                 BigUint,
             >>::into(
                 *lambda_series_val
@@ -595,7 +598,7 @@ pub fn prepare_verifier_input_secp256k1(
 
     for beta_lambda_series_val in beta_lambda_series.iter() {
         let sim_fr =
-            SimFr::<BLSScalar, SimFrParamsBLSSecq256k1>::from(&<SECQ256K1Scalar as Into<
+            SimFr::<BN254Scalar, SimFrParamsBN254Secq256k1>::from(&<SECQ256K1Scalar as Into<
                 BigUint,
             >>::into(
                 *beta_lambda_series_val
@@ -606,9 +609,12 @@ pub fn prepare_verifier_input_secp256k1(
     let combined_response_scalar = instance.delegated_schnorr_proof.response_scalars[0].0
         + instance.delegated_schnorr_proof.response_scalars[1].0 * lambda
         + instance.delegated_schnorr_proof.response_scalars[2].0 * lambda * lambda;
-    let combined_response_scalar_sim_fr = SimFr::<BLSScalar, SimFrParamsBLSSecq256k1>::from(
-        &<SECQ256K1Scalar as Into<BigUint>>::into(combined_response_scalar),
-    );
+    let combined_response_scalar_sim_fr =
+        SimFr::<BN254Scalar, SimFrParamsBN254Secq256k1>::from(&<SECQ256K1Scalar as Into<
+            BigUint,
+        >>::into(
+            combined_response_scalar
+        ));
     v.extend_from_slice(&combined_response_scalar_sim_fr.limbs);
 
     v

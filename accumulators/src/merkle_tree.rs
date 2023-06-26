@@ -1,11 +1,11 @@
 use crate::errors::{AccumulatorError, Result};
 use noah_algebra::{
-    bls12_381::BLSScalar,
+    bn254::BN254Scalar,
     borrow::ToOwned,
     collections::{hash_map::Iter, HashMap},
     prelude::*,
 };
-use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS_OLD};
+use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive254, ANEMOI_JIVE_BN254_SALTS};
 use storage::db::MerkleDB;
 use storage::store::{ImmutablePrefixedStore, PrefixedStore, Stated, Store};
 
@@ -35,7 +35,7 @@ const ENTRY_COUNT_KEY: [u8; 4] = [0, 0, 0, 1];
 /// use storage::state::{ChainState, State};
 /// use storage::store::PrefixedStore;
 /// use noah_accumulators::merkle_tree::{PersistentMerkleTree, verify};
-/// use noah_algebra::{bls12_381::BLSScalar, One};
+/// use noah_algebra::{bn254::BN254Scalar, One};
 ///
 /// let fdb = MemoryDB::new();
 /// let cs = Arc::new(RwLock::new(ChainState::new(fdb, "test_db".to_string(), 0)));
@@ -44,10 +44,10 @@ const ENTRY_COUNT_KEY: [u8; 4] = [0, 0, 0, 1];
 /// let mut mt = PersistentMerkleTree::new(store).unwrap();
 /// assert_eq!(0, mt.version());
 ///
-/// let uid = mt.add_commitment_hash(BLSScalar::one()).unwrap();
+/// let uid = mt.add_commitment_hash(BN254Scalar::one()).unwrap();
 /// let proof = mt.generate_proof(uid).unwrap();
 /// assert_eq!(proof.uid, uid);
-/// assert!(verify(BLSScalar::one(), &proof));
+/// assert!(verify(BN254Scalar::one(), &proof));
 /// let v = mt.commit().unwrap();
 /// assert_eq!(1, mt.version());
 /// assert_eq!(1, v);
@@ -69,7 +69,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
             ];
             entry_count = u64::from_be_bytes(array);
         } else {
-            store.set(&ROOT_KEY, BLSScalar::zero().noah_to_bytes())?;
+            store.set(&ROOT_KEY, BN254Scalar::zero().noah_to_bytes())?;
             store.set(&ENTRY_COUNT_KEY, 0u64.to_be_bytes().to_vec())?;
 
             if !store.state_mut().cache_mut().good2_commit() {
@@ -85,7 +85,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
     }
 
     /// add a new leaf and return the leaf uid.
-    pub fn add_commitment_hash(&mut self, hash: BLSScalar) -> Result<u64> {
+    pub fn add_commitment_hash(&mut self, hash: BN254Scalar) -> Result<u64> {
         let mut cache = Cache::new();
         // 1. generate keys of ancestors for update in tree
         let keys = get_path_keys(self.entry_count);
@@ -97,15 +97,15 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
 
         // 3. update hash of all ancestors of the new leaf
         for (index, (node_key, path)) in keys[0..TREE_DEPTH].iter().enumerate() {
-            let parse_hash = |key: u64| -> Result<BLSScalar> {
+            let parse_hash = |key: u64| -> Result<BN254Scalar> {
                 if let Some(b) = cache.get(&key) {
-                    return Ok(BLSScalar::noah_from_bytes(b.as_slice())?);
+                    return Ok(BN254Scalar::noah_from_bytes(b.as_slice())?);
                 }
                 let mut store_key = KEY_PAD.to_vec();
                 store_key.extend(key.to_be_bytes());
                 match self.store.get(&store_key)? {
-                    Some(b) => Ok(BLSScalar::noah_from_bytes(b.as_slice())?),
-                    None => Ok(BLSScalar::zero()),
+                    Some(b) => Ok(BN254Scalar::noah_from_bytes(b.as_slice())?),
+                    None => Ok(BN254Scalar::zero()),
                 }
             };
 
@@ -128,8 +128,8 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
             };
 
             let hash =
-                AnemoiJive381::eval_jive(&[left, mid], &[right, ANEMOI_JIVE_381_SALTS_OLD[index]]);
-            cache.set(keys[index + 1].0, BLSScalar::noah_to_bytes(&hash));
+                AnemoiJive254::eval_jive(&[left, mid], &[right, ANEMOI_JIVE_BN254_SALTS[index]]);
+            cache.set(keys[index + 1].0, BN254Scalar::noah_to_bytes(&hash));
         }
 
         for (k, v) in cache.iter() {
@@ -187,19 +187,19 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
                 let mut left_key = KEY_PAD.to_vec();
                 left_key.extend(left_key_id.to_be_bytes());
                 if let Some(b) = self.store.get(&left_key)? {
-                    node.left = BLSScalar::noah_from_bytes(b.as_slice())?;
+                    node.left = BN254Scalar::noah_from_bytes(b.as_slice())?;
                 }
 
                 let mut mid_key = KEY_PAD.to_vec();
                 mid_key.extend(mid_key_id.to_be_bytes());
                 if let Some(b) = self.store.get(&mid_key)? {
-                    node.mid = BLSScalar::noah_from_bytes(b.as_slice())?;
+                    node.mid = BN254Scalar::noah_from_bytes(b.as_slice())?;
                 }
 
                 let mut right_key = KEY_PAD.to_vec();
                 right_key.extend(right_key_id.to_be_bytes());
                 if let Some(b) = self.store.get(&right_key)? {
-                    node.right = BLSScalar::noah_from_bytes(b.as_slice())?;
+                    node.right = BN254Scalar::noah_from_bytes(b.as_slice())?;
                 }
 
                 Ok(node)
@@ -215,12 +215,12 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
     }
 
     /// get tree current root
-    pub fn get_root(&self) -> Result<BLSScalar> {
+    pub fn get_root(&self) -> Result<BN254Scalar> {
         self.get_root_with_depth(TREE_DEPTH)
     }
 
     /// get tree root by depth
-    pub fn get_root_with_depth(&self, depth: usize) -> Result<BLSScalar> {
+    pub fn get_root_with_depth(&self, depth: usize) -> Result<BN254Scalar> {
         let mut pos = 0u64;
         for i in 0..(TREE_DEPTH - depth) {
             pos += 3u64.pow(i as u32);
@@ -229,7 +229,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
         store_key.extend(pos.to_be_bytes());
 
         match self.store.get(&store_key)? {
-            Some(hash) => Ok(BLSScalar::noah_from_bytes(hash.as_slice())?),
+            Some(hash) => Ok(BN254Scalar::noah_from_bytes(hash.as_slice())?),
             None => Err(AccumulatorError::Message(
                 "root hash key not found at this depth".to_owned(),
             )),
@@ -237,9 +237,13 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
     }
 
     /// get tree root by depth and version.
-    pub fn get_root_with_depth_and_version(&self, depth: usize, version: u64) -> Result<BLSScalar> {
+    pub fn get_root_with_depth_and_version(
+        &self,
+        depth: usize,
+        version: u64,
+    ) -> Result<BN254Scalar> {
         if version == 0 {
-            return Ok(BLSScalar::zero());
+            return Ok(BN254Scalar::zero());
         }
 
         let mut pos = 0u64;
@@ -249,7 +253,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
         let mut store_key = KEY_PAD.to_vec();
         store_key.extend(pos.to_be_bytes());
         match self.store.get_v(&store_key, version)? {
-            Some(hash) => Ok(BLSScalar::noah_from_bytes(hash.as_slice())?),
+            Some(hash) => Ok(BN254Scalar::noah_from_bytes(hash.as_slice())?),
             None => Err(AccumulatorError::Message(
                 "root hash key not found at this depth and version".to_owned(),
             )),
@@ -271,12 +275,12 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
     }
 
     /// get leaf hash by uid
-    pub fn get_leaf(&self, uid: u64) -> Result<Option<BLSScalar>> {
+    pub fn get_leaf(&self, uid: u64) -> Result<Option<BN254Scalar>> {
         let mut store_key = KEY_PAD.to_vec();
         store_key.extend(uid.to_be_bytes());
 
         match self.store.get(&store_key)? {
-            Some(hash) => Ok(Some(BLSScalar::noah_from_bytes(hash.as_slice())?)),
+            Some(hash) => Ok(Some(BN254Scalar::noah_from_bytes(hash.as_slice())?)),
             None => Ok(None),
         }
     }
@@ -360,19 +364,19 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
                 let mut left_key = KEY_PAD.to_vec();
                 left_key.extend(left_key_id.to_be_bytes());
                 if let Some(b) = self.store.get_v(&left_key, v)? {
-                    node.left = BLSScalar::noah_from_bytes(b.as_slice())?;
+                    node.left = BN254Scalar::noah_from_bytes(b.as_slice())?;
                 }
 
                 let mut mid_key = KEY_PAD.to_vec();
                 mid_key.extend(mid_key_id.to_be_bytes());
                 if let Some(b) = self.store.get_v(&mid_key, v)? {
-                    node.mid = BLSScalar::noah_from_bytes(b.as_slice())?;
+                    node.mid = BN254Scalar::noah_from_bytes(b.as_slice())?;
                 }
 
                 let mut right_key = KEY_PAD.to_vec();
                 right_key.extend(right_key_id.to_be_bytes());
                 if let Some(b) = self.store.get_v(&right_key, v)? {
-                    node.right = BLSScalar::noah_from_bytes(b.as_slice())?;
+                    node.right = BN254Scalar::noah_from_bytes(b.as_slice())?;
                 }
 
                 Ok(node)
@@ -388,20 +392,24 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
     }
 
     /// get tree current root
-    pub fn get_root(&self) -> Result<BLSScalar> {
+    pub fn get_root(&self) -> Result<BN254Scalar> {
         self.get_root_with_depth(TREE_DEPTH)
     }
 
     /// get tree root by depth
-    pub fn get_root_with_depth(&self, depth: usize) -> Result<BLSScalar> {
+    pub fn get_root_with_depth(&self, depth: usize) -> Result<BN254Scalar> {
         let v = self.version();
         self.get_root_with_depth_and_version(depth, v)
     }
 
     /// get tree root by depth and version.
-    pub fn get_root_with_depth_and_version(&self, depth: usize, version: u64) -> Result<BLSScalar> {
+    pub fn get_root_with_depth_and_version(
+        &self,
+        depth: usize,
+        version: u64,
+    ) -> Result<BN254Scalar> {
         if version == 0 {
-            return Ok(BLSScalar::zero());
+            return Ok(BN254Scalar::zero());
         }
 
         let mut pos = 0u64;
@@ -411,7 +419,7 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
         let mut store_key = KEY_PAD.to_vec();
         store_key.extend(pos.to_be_bytes());
         match self.store.get_v(&store_key, version)? {
-            Some(hash) => Ok(BLSScalar::noah_from_bytes(hash.as_slice())?),
+            Some(hash) => Ok(BN254Scalar::noah_from_bytes(hash.as_slice())?),
             None => Err(AccumulatorError::Message(
                 "root hash key not found at this depth and version".to_owned(),
             )),
@@ -419,13 +427,13 @@ impl<'a, D: MerkleDB> ImmutablePersistentMerkleTree<'a, D> {
     }
 
     /// get leaf hash by uid
-    pub fn get_leaf(&self, uid: u64) -> Result<Option<BLSScalar>> {
+    pub fn get_leaf(&self, uid: u64) -> Result<Option<BN254Scalar>> {
         let mut store_key = KEY_PAD.to_vec();
         store_key.extend(uid.to_be_bytes());
         let v = self.version();
 
         match self.store.get_v(&store_key, v)? {
-            Some(hash) => Ok(Some(BLSScalar::noah_from_bytes(hash.as_slice())?)),
+            Some(hash) => Ok(Some(BN254Scalar::noah_from_bytes(hash.as_slice())?)),
             None => Ok(None),
         }
     }
@@ -453,14 +461,14 @@ impl EphemeralMerkleTree {
         let entry_count = 0;
         let mut store = HashMap::<Vec<u8>, Vec<u8>>::new();
 
-        store.insert(ROOT_KEY.to_vec(), BLSScalar::zero().noah_to_bytes());
+        store.insert(ROOT_KEY.to_vec(), BN254Scalar::zero().noah_to_bytes());
         store.insert(ENTRY_COUNT_KEY.to_vec(), 0u64.to_be_bytes().to_vec());
 
         Ok(EphemeralMerkleTree { entry_count, store })
     }
 
     /// add a new leaf and return the leaf uid.
-    pub fn add_commitment_hash(&mut self, hash: BLSScalar) -> Result<u64> {
+    pub fn add_commitment_hash(&mut self, hash: BN254Scalar) -> Result<u64> {
         let mut cache = Cache::new();
         // 1. generate keys of ancestors for update in tree
         let keys = get_path_keys(self.entry_count);
@@ -472,15 +480,15 @@ impl EphemeralMerkleTree {
 
         // 3. update hash of all ancestors of the new leaf
         for (index, (node_key, path)) in keys[0..TREE_DEPTH].iter().enumerate() {
-            let parse_hash = |key: u64| -> Result<BLSScalar> {
+            let parse_hash = |key: u64| -> Result<BN254Scalar> {
                 if let Some(b) = cache.get(&key) {
-                    return Ok(BLSScalar::noah_from_bytes(b.as_slice())?);
+                    return Ok(BN254Scalar::noah_from_bytes(b.as_slice())?);
                 }
                 let mut store_key = KEY_PAD.to_vec();
                 store_key.extend(key.to_be_bytes());
                 match self.store.get(&store_key) {
-                    Some(b) => Ok(BLSScalar::noah_from_bytes(b.as_slice())?),
-                    None => Ok(BLSScalar::zero()),
+                    Some(b) => Ok(BN254Scalar::noah_from_bytes(b.as_slice())?),
+                    None => Ok(BN254Scalar::zero()),
                 }
             };
 
@@ -503,8 +511,8 @@ impl EphemeralMerkleTree {
             };
 
             let hash =
-                AnemoiJive381::eval_jive(&[left, mid], &[right, ANEMOI_JIVE_381_SALTS_OLD[index]]);
-            cache.set(keys[index + 1].0, BLSScalar::noah_to_bytes(&hash));
+                AnemoiJive254::eval_jive(&[left, mid], &[right, ANEMOI_JIVE_BN254_SALTS[index]]);
+            cache.set(keys[index + 1].0, BN254Scalar::noah_to_bytes(&hash));
         }
 
         for (k, v) in cache.iter() {
@@ -564,19 +572,19 @@ impl EphemeralMerkleTree {
                 let mut left_key = KEY_PAD.to_vec();
                 left_key.extend(left_key_id.to_be_bytes());
                 if let Some(b) = self.store.get(&left_key) {
-                    node.left = BLSScalar::noah_from_bytes(b.as_slice())?;
+                    node.left = BN254Scalar::noah_from_bytes(b.as_slice())?;
                 }
 
                 let mut mid_key = KEY_PAD.to_vec();
                 mid_key.extend(mid_key_id.to_be_bytes());
                 if let Some(b) = self.store.get(&mid_key) {
-                    node.mid = BLSScalar::noah_from_bytes(b.as_slice())?;
+                    node.mid = BN254Scalar::noah_from_bytes(b.as_slice())?;
                 }
 
                 let mut right_key = KEY_PAD.to_vec();
                 right_key.extend(right_key_id.to_be_bytes());
                 if let Some(b) = self.store.get(&right_key) {
-                    node.right = BLSScalar::noah_from_bytes(b.as_slice())?;
+                    node.right = BN254Scalar::noah_from_bytes(b.as_slice())?;
                 }
 
                 Ok(node)
@@ -592,12 +600,12 @@ impl EphemeralMerkleTree {
     }
 
     /// get tree current root
-    pub fn get_root(&self) -> Result<BLSScalar> {
+    pub fn get_root(&self) -> Result<BN254Scalar> {
         self.get_root_with_depth(TREE_DEPTH)
     }
 
     /// get tree root by depth
-    pub fn get_root_with_depth(&self, depth: usize) -> Result<BLSScalar> {
+    pub fn get_root_with_depth(&self, depth: usize) -> Result<BN254Scalar> {
         let mut pos = 0u64;
         for i in 0..(TREE_DEPTH - depth) {
             pos += 3u64.pow(i as u32);
@@ -606,7 +614,7 @@ impl EphemeralMerkleTree {
         store_key.extend(pos.to_be_bytes());
 
         match self.store.get(&store_key) {
-            Some(hash) => Ok(BLSScalar::noah_from_bytes(hash.as_slice())?),
+            Some(hash) => Ok(BN254Scalar::noah_from_bytes(hash.as_slice())?),
             None => Err(AccumulatorError::Message(
                 "root hash key not found at this depth".to_owned(),
             )),
@@ -618,7 +626,7 @@ impl EphemeralMerkleTree {
         &self,
         _depth: usize,
         _version: u64,
-    ) -> Result<BLSScalar> {
+    ) -> Result<BN254Scalar> {
         unimplemented!()
     }
 
@@ -628,12 +636,12 @@ impl EphemeralMerkleTree {
     }
 
     /// get leaf hash by uid
-    pub fn get_leaf(&self, uid: u64) -> Result<Option<BLSScalar>> {
+    pub fn get_leaf(&self, uid: u64) -> Result<Option<BN254Scalar>> {
         let mut store_key = KEY_PAD.to_vec();
         store_key.extend(uid.to_be_bytes());
 
         match self.store.get(&store_key) {
-            Some(hash) => Ok(Some(BLSScalar::noah_from_bytes(hash.as_slice())?)),
+            Some(hash) => Ok(Some(BN254Scalar::noah_from_bytes(hash.as_slice())?)),
             None => Ok(None),
         }
     }
@@ -650,15 +658,15 @@ impl EphemeralMerkleTree {
 }
 
 /// verify merkle proof.
-pub fn verify(leaf: BLSScalar, proof: &Proof) -> bool {
+pub fn verify(leaf: BN254Scalar, proof: &Proof) -> bool {
     let mut next = leaf;
     if proof.nodes.len() != TREE_DEPTH {
         return false;
     }
     for (i, node) in proof.nodes.iter().enumerate() {
-        let hash = AnemoiJive381::eval_jive(
+        let hash = AnemoiJive254::eval_jive(
             &[node.left, node.mid],
-            &[node.right, ANEMOI_JIVE_381_SALTS_OLD[i]],
+            &[node.right, ANEMOI_JIVE_BN254_SALTS[i]],
         );
         next = hash
     }
@@ -671,7 +679,7 @@ pub struct Proof {
     /// proof nodes, from lower(leaf) to upper.
     pub nodes: Vec<ProofNode>,
     /// current root.
-    pub root: BLSScalar,
+    pub root: BN254Scalar,
     /// current root version.
     pub root_version: u64,
     /// leaf's uid.
@@ -683,11 +691,11 @@ pub struct Proof {
 #[derive(Clone, Debug)]
 pub struct ProofNode {
     /// left.
-    pub left: BLSScalar,
+    pub left: BN254Scalar,
     /// mid.
-    pub mid: BLSScalar,
+    pub mid: BN254Scalar,
     /// right.
-    pub right: BLSScalar,
+    pub right: BN254Scalar,
     /// representative the own position in the branch.
     pub path: TreePath,
 }

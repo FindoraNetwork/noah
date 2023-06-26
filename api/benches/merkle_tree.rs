@@ -5,10 +5,10 @@ use merlin::Transcript;
 use noah::anon_xfr::add_merkle_path_variables;
 use noah::anon_xfr::structs::{AccElemVars, MTLeafInfo, MTNode, MTPath, MerklePathVars};
 use noah_accumulators::merkle_tree::{PersistentMerkleTree, Proof, TreePath};
-use noah_algebra::bls12_381::{BLSPairingEngine, BLSScalar};
+use noah_algebra::bn254::{BN254PairingEngine, BN254Scalar};
 use noah_algebra::prelude::*;
 use noah_crypto::anemoi_jive::{
-    AnemoiJive, AnemoiJive381, AnemoiVLHTrace, JiveTrace, ANEMOI_JIVE_381_SALTS_OLD,
+    AnemoiJive, AnemoiJive254, AnemoiVLHTrace, JiveTrace, ANEMOI_JIVE_BN254_SALTS,
 };
 use noah_plonk::plonk::constraint_system::{TurboCS, VarIndex};
 use noah_plonk::plonk::indexer::indexer;
@@ -30,9 +30,9 @@ fn merkle_tree_proof_bench(c: &mut Criterion) {
     let store = PrefixedStore::new("my_store", &mut state);
     let mut mt = PersistentMerkleTree::new(store).unwrap();
     let uid = mt
-        .add_commitment_hash(AnemoiJive381::eval_variable_length_hash(&[
-            BLSScalar::from(mt.entry_count()),
-            BLSScalar::one(),
+        .add_commitment_hash(AnemoiJive254::eval_variable_length_hash(&[
+            BN254Scalar::from(mt.entry_count()),
+            BN254Scalar::one(),
         ]))
         .unwrap();
     mt.commit().unwrap();
@@ -40,23 +40,23 @@ fn merkle_tree_proof_bench(c: &mut Criterion) {
     let proof = mt.generate_proof(uid).unwrap();
 
     let mut cs = TurboCS::new();
-    cs.load_anemoi_jive_parameters::<AnemoiJive381>();
+    cs.load_anemoi_jive_parameters::<AnemoiJive254>();
 
-    let uid_var = cs.new_variable(BLSScalar::from(uid));
-    let commitment_var = cs.new_variable(BLSScalar::one());
+    let uid_var = cs.new_variable(BN254Scalar::from(uid));
+    let commitment_var = cs.new_variable(BN254Scalar::one());
 
     // Merkle path authentication.
 
     let mut path_traces = Vec::new();
 
-    let leaf_trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
-        BLSScalar::from(uid),
-        BLSScalar::one(),
+    let leaf_trace = AnemoiJive254::eval_variable_length_hash_with_trace(&[
+        BN254Scalar::from(uid),
+        BN254Scalar::one(),
     ]);
     for (i, mt_node) in proof.nodes.iter().enumerate() {
-        let trace = AnemoiJive381::eval_jive_with_trace(
+        let trace = AnemoiJive254::eval_jive_with_trace(
             &[mt_node.left, mt_node.mid],
-            &[mt_node.right, ANEMOI_JIVE_381_SALTS_OLD[i]],
+            &[mt_node.right, ANEMOI_JIVE_BN254_SALTS[i]],
         );
         path_traces.push(trace);
     }
@@ -79,7 +79,7 @@ fn merkle_tree_proof_bench(c: &mut Criterion) {
     let witness = cs.get_and_clear_witness();
 
     let mut prng = test_rng();
-    let pcs = KZGCommitmentScheme::<BLSPairingEngine>::new(16400, &mut prng);
+    let pcs = KZGCommitmentScheme::<BN254PairingEngine>::new(16400, &mut prng);
 
     let prover_params = indexer(&cs, &pcs).unwrap();
 
@@ -129,13 +129,13 @@ pub fn compute_merkle_root_variables_2_20(
     cs: &mut TurboPlonkCS,
     elem: AccElemVars,
     path_vars: &MerklePathVars,
-    leaf_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
-    traces: &Vec<JiveTrace<BLSScalar, 2, 12>>,
+    leaf_trace: &AnemoiVLHTrace<BN254Scalar, 2, 12>,
+    traces: &Vec<JiveTrace<BN254Scalar, 2, 12>>,
 ) -> VarIndex {
     let (uid, commitment) = (elem.uid, elem.commitment);
 
     let mut node_var = cs.new_variable(leaf_trace.output);
-    cs.anemoi_variable_length_hash::<AnemoiJive381>(leaf_trace, &[uid, commitment], node_var);
+    cs.anemoi_variable_length_hash::<AnemoiJive254>(leaf_trace, &[uid, commitment], node_var);
     for (idx, (path_node, trace)) in path_vars
         .nodes
         .iter()
@@ -151,12 +151,12 @@ pub fn compute_merkle_root_variables_2_20(
             path_node.is_left_child,
             path_node.is_right_child,
         );
-        node_var = cs.jive_crh::<AnemoiJive381>(trace, &input_var, ANEMOI_JIVE_381_SALTS_OLD[idx]);
+        node_var = cs.jive_crh::<AnemoiJive254>(trace, &input_var, ANEMOI_JIVE_BN254_SALTS[idx]);
     }
     node_var
 }
 
-pub(crate) type TurboPlonkCS = TurboCS<BLSScalar>;
+pub(crate) type TurboPlonkCS = TurboCS<BN254Scalar>;
 
 fn parse_merkle_tree_path(
     cs: &mut TurboPlonkCS,
@@ -169,7 +169,7 @@ fn parse_merkle_tree_path(
     let left = cs.select(sib1, node, is_left_child);
     let right = cs.select(sib2, node, is_right_child);
     let sum_left_right = cs.add(left, right);
-    let one = BLSScalar::one();
+    let one = BN254Scalar::one();
     let mid = cs.linear_combine(
         &[node, sib1, sib2, sum_left_right],
         one,

@@ -910,7 +910,9 @@ impl<'de> Deserialize<'de> for OwnerMemo {
                             if blind_share_bytes.is_some() {
                                 return Err(de::Error::duplicate_field("blind_share"));
                             }
-                            blind_share_bytes = Some(map.next_value()?);
+
+                            let tmp = map.next_value::<CompactByteArray>()?;
+                            blind_share_bytes = Some(tmp.noah_to_bytes().to_vec());
                         }
                         Field::Lock => {
                             if lock_bytes.is_some() {
@@ -923,7 +925,9 @@ impl<'de> Deserialize<'de> for OwnerMemo {
                             if lock_bytes.is_some() {
                                 return Err(de::Error::duplicate_field("lock"));
                             }
-                            lock_bytes = Some(map.next_value()?);
+
+                            let tmp = map.next_value::<CompactByteArray>()?;
+                            lock_bytes = Some(tmp.noah_to_bytes().to_vec());
                         }
                     }
                 }

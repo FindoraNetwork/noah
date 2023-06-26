@@ -1,5 +1,5 @@
-use noah_algebra::bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN};
-use noah_algebra::jubjub::JubjubPoint;
+use noah_algebra::baby_jubjub::BabyJubjubPoint;
+use noah_algebra::bn254::{BN254Scalar, BN254_SCALAR_LEN};
 use noah_algebra::prelude::*;
 use serde::de::Error as SerdeError;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -47,11 +47,11 @@ pub struct NabarAuditorMemo {
     ///
     /// Note: we explicitly stress that this point is often uncompressed and unchecked,
     /// and the application should take the responsibility to make application-specific checks.
-    pub dh_point_unchecked: JubjubPoint,
+    pub dh_point_unchecked: BabyJubjubPoint,
     /// The fast-detection element.
-    pub fast_detection: BLSScalar,
+    pub fast_detection: BN254Scalar,
     /// The body of the memo.
-    pub body: Vec<BLSScalar>,
+    pub body: Vec<BN254Scalar>,
 }
 
 impl Serialize for NabarAuditorMemo {
@@ -89,7 +89,7 @@ impl<'de> Deserialize<'de> for NabarAuditorMemo {
         };
 
         let dh_point_unchecked = {
-            let res = JubjubPoint::from_unchecked_bytes(&bytes[0..64]);
+            let res = BabyJubjubPoint::from_unchecked_bytes(&bytes[0..64]);
 
             if res.is_err() {
                 return Err(SerdeError::custom(res.unwrap_err()));
@@ -99,7 +99,7 @@ impl<'de> Deserialize<'de> for NabarAuditorMemo {
         };
 
         let fast_detection = {
-            let res = BLSScalar::noah_from_bytes(&bytes[64..96]);
+            let res = BN254Scalar::noah_from_bytes(&bytes[64..96]);
 
             if res.is_err() {
                 return Err(SerdeError::custom(res.unwrap_err()));
@@ -109,15 +109,15 @@ impl<'de> Deserialize<'de> for NabarAuditorMemo {
         };
 
         let remaining_bytes = bytes.len() - 96;
-        if remaining_bytes % BLS12_381_SCALAR_LEN != 0 {
+        if remaining_bytes % BN254_SCALAR_LEN != 0 {
             return Err(SerdeError::custom(
                 "The auditor memo does not have the correct length.",
             ));
         }
 
-        let mut body = Vec::with_capacity(remaining_bytes / BLS12_381_SCALAR_LEN);
+        let mut body = Vec::with_capacity(remaining_bytes / BN254_SCALAR_LEN);
         for elem_bytes in bytes[96..].chunks_exact(96) {
-            let res = BLSScalar::noah_from_bytes(&elem_bytes);
+            let res = BN254Scalar::noah_from_bytes(&elem_bytes);
             if res.is_err() {
                 return Err(SerdeError::custom(res.unwrap_err()));
             }

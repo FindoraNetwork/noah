@@ -11,19 +11,19 @@ use crate::{
 use aes_gcm::aead::Aead;
 use digest::{generic_array::GenericArray, Digest, KeyInit};
 use noah_algebra::{
-    bls12_381::{BLSScalar, BLS12_381_SCALAR_LEN},
+    bn254::{BN254Scalar, BN254_SCALAR_LEN},
     collections::HashMap,
     prelude::*,
 };
 use noah_crypto::anemoi_jive::{
-    AnemoiJive, AnemoiJive381, AnemoiVLHTrace, JiveTrace, ANEMOI_JIVE_381_SALTS_OLD,
+    AnemoiJive, AnemoiJive254, AnemoiVLHTrace, JiveTrace, ANEMOI_JIVE_BN254_SALTS,
 };
 use noah_plonk::{
     plonk::{
         constraint_system::{TurboCS, VarIndex},
         indexer::PlonkPf,
     },
-    poly_commit::kzg_poly_com::KZGCommitmentSchemeBLS,
+    poly_commit::kzg_poly_com::KZGCommitmentSchemeBN254,
 };
 
 use noah_algebra::{
@@ -60,12 +60,12 @@ pub const TWO_POW_32: u64 = 1 << 32;
 /// Restricting the maximum size of memo to 121.
 pub const MAX_AXFR_MEMO_SIZE: usize = 121;
 
-pub(crate) type TurboPlonkCS = TurboCS<BLSScalar>;
+pub(crate) type TurboPlonkCS = TurboCS<BN254Scalar>;
 
 use crate::parameters::params::AddressFormat;
 
 /// The Plonk proof type.
-pub(crate) type AXfrPlonkPf = PlonkPf<KZGCommitmentSchemeBLS>;
+pub(crate) type AXfrPlonkPf = PlonkPf<KZGCommitmentSchemeBN254>;
 
 /// The address folding instance.
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Eq)]
@@ -196,8 +196,8 @@ pub fn parse_memo(
     bytes: &[u8],
     key_pair: &KeyPair,
     abar: &AnonAssetRecord,
-) -> Result<(u64, AssetType, BLSScalar)> {
-    if bytes.len() != 8 + ASSET_TYPE_LENGTH + BLS12_381_SCALAR_LEN {
+) -> Result<(u64, AssetType, BN254Scalar)> {
+    if bytes.len() != 8 + ASSET_TYPE_LENGTH + BN254_SCALAR_LEN {
         return Err(NoahError::ParameterError);
     }
     let amount = u8_le_slice_to_u64(&bytes[0..8]);
@@ -206,7 +206,7 @@ pub fn parse_memo(
     asset_type_array.copy_from_slice(&bytes[i..i + ASSET_TYPE_LENGTH]);
     let asset_type = AssetType(asset_type_array);
     i += ASSET_TYPE_LENGTH;
-    let blind = BLSScalar::from_bytes(&bytes[i..i + BLS12_381_SCALAR_LEN])?;
+    let blind = BN254Scalar::from_bytes(&bytes[i..i + BN254_SCALAR_LEN])?;
 
     let (expected_commitment, _) =
         commit(&key_pair.get_pk(), blind, amount, asset_type.as_scalar())?;
@@ -227,7 +227,7 @@ pub fn decrypt_memo(
     memo: &AxfrOwnerMemo,
     key_pair: &KeyPair,
     abar: &AnonAssetRecord,
-) -> Result<(u64, AssetType, BLSScalar)> {
+) -> Result<(u64, AssetType, BN254Scalar)> {
     let plaintext = memo.decrypt(&key_pair.get_sk())?;
     parse_memo(&plaintext, key_pair, abar)
 }
@@ -236,26 +236,26 @@ pub fn decrypt_memo(
 pub fn nullify(
     key_pair: &KeyPair,
     amount: u64,
-    asset_type_scalar: BLSScalar,
+    asset_type_scalar: BN254Scalar,
     uid: u64,
-) -> Result<(BLSScalar, AnemoiVLHTrace<BLSScalar, 2, 12>)> {
+) -> Result<(BN254Scalar, AnemoiVLHTrace<BN254Scalar, 2, 12>)> {
     let pub_key = key_pair.get_pk();
 
-    let pow_2_64 = BLSScalar::from(u64::MAX).add(&BLSScalar::from(1u32));
-    let uid_shifted = BLSScalar::from(uid).mul(&pow_2_64);
-    let uid_amount = uid_shifted.add(&BLSScalar::from(amount));
+    let pow_2_64 = BN254Scalar::from(u64::MAX).add(&BN254Scalar::from(1u32));
+    let uid_shifted = BN254Scalar::from(uid).mul(&pow_2_64);
+    let uid_amount = uid_shifted.add(&BN254Scalar::from(amount));
 
-    let public_key_scalars = pub_key.to_bls_scalars()?;
-    let secret_key_scalars = key_pair.get_sk().to_bls_scalars()?;
+    let public_key_scalars = pub_key.to_bn_scalars()?;
+    let secret_key_scalars = key_pair.get_sk().to_bn_scalars()?;
 
-    let zero = BLSScalar::zero();
+    let zero = BN254Scalar::zero();
 
     let address_format_number = match key_pair.get_sk() {
-        SecretKey::Ed25519(_) => BLSScalar::one(),
-        SecretKey::Secp256k1(_) => BLSScalar::zero(),
+        SecretKey::Ed25519(_) => BN254Scalar::one(),
+        SecretKey::Secp256k1(_) => BN254Scalar::zero(),
     };
 
-    let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
+    let trace = AnemoiJive254::eval_variable_length_hash_with_trace(&[
         zero,                  /* protocol version number */
         uid_amount,            /* uid and amount */
         asset_type_scalar,     /* asset type */
@@ -284,12 +284,12 @@ pub fn commit_in_cs(
     asset_var: VarIndex,
     public_key_type_var: VarIndex,
     public_key_scalars: &[VarIndex; 3],
-    trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
+    trace: &AnemoiVLHTrace<BN254Scalar, 2, 12>,
 ) -> VarIndex {
     let output_var = cs.new_variable(trace.output);
     let zero_var = cs.zero_var();
 
-    cs.anemoi_variable_length_hash::<AnemoiJive381>(
+    cs.anemoi_variable_length_hash::<AnemoiJive254>(
         trace,
         &[
             zero_var,
@@ -309,30 +309,30 @@ pub fn commit_in_cs(
 /// Compute the record's amount||asset type||pub key commitment
 pub fn commit(
     public_key: &PublicKey,
-    blind: BLSScalar,
+    blind: BN254Scalar,
     amount: u64,
-    asset_type_scalar: BLSScalar,
-) -> Result<(Commitment, AnemoiVLHTrace<BLSScalar, 2, 12>)> {
-    let address_format_number: BLSScalar;
+    asset_type_scalar: BN254Scalar,
+) -> Result<(Commitment, AnemoiVLHTrace<BN254Scalar, 2, 12>)> {
+    let address_format_number: BN254Scalar;
     match public_key.0 {
         PublicKeyInner::Ed25519(_) => {
-            address_format_number = BLSScalar::one();
+            address_format_number = BN254Scalar::one();
         }
         PublicKeyInner::Secp256k1(_) => {
-            address_format_number = BLSScalar::zero();
+            address_format_number = BN254Scalar::zero();
         }
         PublicKeyInner::EthAddress(_) => {
             return Err(NoahError::ParameterError);
         }
     };
 
-    let zero = BLSScalar::zero();
-    let public_key_scalars = public_key.to_bls_scalars()?;
+    let zero = BN254Scalar::zero();
+    let public_key_scalars = public_key.to_bn_scalars()?;
 
-    let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[
+    let trace = AnemoiJive254::eval_variable_length_hash_with_trace(&[
         zero, /* protocol version number */
         blind,
-        BLSScalar::from(amount),
+        BN254Scalar::from(amount),
         asset_type_scalar,
         address_format_number, /* address format number */
         public_key_scalars[0], /* public key */
@@ -351,12 +351,12 @@ pub(crate) fn nullify_in_cs(
     asset_type: VarIndex,
     secret_key_type: VarIndex,
     public_key_scalars: &[VarIndex; 3],
-    trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
+    trace: &AnemoiVLHTrace<BN254Scalar, 2, 12>,
 ) -> VarIndex {
     let output_var = cs.new_variable(trace.output);
     let zero_var = cs.zero_var();
 
-    cs.anemoi_variable_length_hash::<AnemoiJive381>(
+    cs.anemoi_variable_length_hash::<AnemoiJive254>(
         trace,
         &[
             zero_var,
@@ -383,15 +383,15 @@ pub fn add_merkle_path_variables(cs: &mut TurboPlonkCS, path: MTPath) -> MerkleP
             left: cs.new_variable(node.left),
             mid: cs.new_variable(node.mid),
             right: cs.new_variable(node.right),
-            is_left_child: cs.new_variable(BLSScalar::from(node.is_left_child as u32)),
-            is_mid_child: cs.new_variable(BLSScalar::from(node.is_mid_child as u32)),
-            is_right_child: cs.new_variable(BLSScalar::from(node.is_right_child as u32)),
+            is_left_child: cs.new_variable(BN254Scalar::from(node.is_left_child as u32)),
+            is_mid_child: cs.new_variable(BN254Scalar::from(node.is_mid_child as u32)),
+            is_right_child: cs.new_variable(BN254Scalar::from(node.is_right_child as u32)),
         })
         .collect();
     // Boolean-constrain `is_left_child` and `is_right_child`
     for node_var in path_vars.iter() {
-        let zero = BLSScalar::zero();
-        let one = BLSScalar::one();
+        let zero = BN254Scalar::zero();
+        let one = BN254Scalar::one();
         cs.push_add_selectors(zero, one, one, one);
         cs.push_mul_selectors(zero, zero);
         cs.push_constant_selector(one.neg());
@@ -426,8 +426,8 @@ fn check_merkle_tree_validity(
     is_mid_child: VarIndex,
     is_right_child: VarIndex,
 ) {
-    let zero = BLSScalar::zero();
-    let one = BLSScalar::one();
+    let zero = BN254Scalar::zero();
+    let one = BN254Scalar::one();
 
     let sum = if cs.witness[is_right_child].is_one() {
         zero
@@ -475,13 +475,13 @@ pub fn compute_merkle_root_variables(
     cs: &mut TurboPlonkCS,
     elem: AccElemVars,
     path_vars: &MerklePathVars,
-    leaf_trace: &AnemoiVLHTrace<BLSScalar, 2, 12>,
-    traces: &Vec<JiveTrace<BLSScalar, 2, 12>>,
+    leaf_trace: &AnemoiVLHTrace<BN254Scalar, 2, 12>,
+    traces: &Vec<JiveTrace<BN254Scalar, 2, 12>>,
 ) -> VarIndex {
     let (uid, commitment) = (elem.uid, elem.commitment);
 
     let mut node_var = cs.new_variable(leaf_trace.output);
-    cs.anemoi_variable_length_hash::<AnemoiJive381>(leaf_trace, &[uid, commitment], node_var);
+    cs.anemoi_variable_length_hash::<AnemoiJive254>(leaf_trace, &[uid, commitment], node_var);
     for (idx, (path_node, trace)) in path_vars.nodes.iter().zip(traces.iter()).enumerate() {
         check_merkle_tree_validity(
             cs,
@@ -493,10 +493,10 @@ pub fn compute_merkle_root_variables(
             path_node.is_mid_child,
             path_node.is_right_child,
         );
-        node_var = cs.jive_crh::<AnemoiJive381>(
+        node_var = cs.jive_crh::<AnemoiJive254>(
             trace,
             &[path_node.left, path_node.mid, path_node.right],
-            ANEMOI_JIVE_381_SALTS_OLD[idx],
+            ANEMOI_JIVE_BN254_SALTS[idx],
         );
     }
     node_var
