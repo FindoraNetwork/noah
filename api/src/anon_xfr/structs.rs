@@ -329,7 +329,7 @@ pub struct PayeeWitness {
 
 /// Information directed to secret key holder of a BlindAssetRecord
 #[derive(Clone, Debug, Deserialize, Eq, PartialEq, Serialize)]
-pub struct AxfrOwnerMemo(Vec<u8>);
+pub struct AxfrOwnerMemo(CompactByteArray);
 
 impl AxfrOwnerMemo {
     /// Crate an encrypted memo using the public key.
@@ -339,17 +339,17 @@ impl AxfrOwnerMemo {
         msg: &[u8],
     ) -> Result<Self> {
         let ctext = axfr_hybrid_encrypt(pub_key, prng, msg)?;
-        Ok(Self(ctext))
+        Ok(Self(CompactByteArray(ctext)))
     }
 
     /// Decrypt a memo using the viewing key.
     pub fn decrypt(&self, secret_key: &SecretKey) -> Result<Vec<u8>> {
-        axfr_hybrid_decrypt(secret_key, &self.0)
+        axfr_hybrid_decrypt(secret_key, &self.0 .0)
     }
 
     /// Return the size of the memo.
     pub fn size(&self) -> usize {
-        self.0.len()
+        self.0 .0.len()
     }
 }
 
