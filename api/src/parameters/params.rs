@@ -710,6 +710,7 @@ fn load_lagrange_params(size: usize) -> Option<KZGCommitmentSchemeBLS> {
     }
 }
 
+#[allow(unused)]
 fn load_lagrange_params_bn254(size: usize) -> Option<KZGCommitmentSchemeBN254> {
     match BN254_LAGRANGE_BASES.get(&size) {
         None => None,
@@ -746,6 +747,7 @@ fn load_srs_params(size: usize) -> Result<KZGCommitmentSchemeBLS> {
     })
 }
 
+#[allow(unused)]
 fn load_srs_params_bn254(size: usize) -> Result<KZGCommitmentSchemeBN254> {
     let srs = BN254_SRS.ok_or(NoahError::MissingSRSError)?;
 
