@@ -251,4 +251,9 @@ impl Scalar for JubjubScalar {
             None
         }
     }
+
+    #[inline]
+    fn double(&self) -> Self {
+        Self(self.0.double())
+    }
 }

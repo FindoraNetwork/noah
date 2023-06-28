@@ -87,7 +87,7 @@ impl<F: Scalar, S: Scalar, G: Group<ScalarType = S>> DSProof<F, S, G> {
 /// Generate a proof in the delegated Schnorr protocol.
 pub fn prove_delegated_schnorr<
     F: Scalar,
-    H: AnemoiJive<F, 2usize, 12usize>,
+    H: AnemoiJive<F, 2usize, 14usize>,
     R: CryptoRng + RngCore,
     S: Scalar,
     G: Group<ScalarType = S>,

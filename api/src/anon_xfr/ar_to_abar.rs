@@ -188,7 +188,7 @@ pub fn verify_ar_to_abar_body(params: &VerifierParams, body: &ArToAbarBody) -> R
 /// Construct the transparent-to-anonymous constraint system.
 pub fn build_ar_to_abar_cs(
     payee_data: PayeeWitness,
-    output_trace: &AnemoiVLHTrace<BN254Scalar, 2, 12>,
+    output_trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
     cs.load_anemoi_jive_parameters::<AnemoiJive254>();

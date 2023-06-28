@@ -302,7 +302,7 @@ pub(crate) fn prove_bar_to_abar_cs<R: CryptoRng + RngCore>(
     inspection: &DSInspection<BN254Scalar, RistrettoScalar, RistrettoPoint>,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
-    comm_trace: &AnemoiVLHTrace<BN254Scalar, 2, 12>,
+    comm_trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(BAR_TO_ABAR_PLONK_PROOF_TRANSCRIPT);
     let (mut cs, _) = build_bar_to_abar_cs(
@@ -385,7 +385,7 @@ pub(crate) fn build_bar_to_abar_cs(
     non_zk_state: &DSInspection<BN254Scalar, RistrettoScalar, RistrettoPoint>,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
-    comm_trace: &AnemoiVLHTrace<BN254Scalar, 2, 12>,
+    comm_trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
     cs.load_anemoi_jive_parameters::<AnemoiJive254>();

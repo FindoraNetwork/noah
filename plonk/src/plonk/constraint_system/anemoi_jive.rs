@@ -4,14 +4,16 @@ use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiStreamCipherTrace, AnemoiVLHTra
 
 impl<F: Scalar> TurboCS<F> {
     /// Create constraints for the Anemoi permutation.
-    fn anemoi_permutation_round<P: AnemoiJive<F, 2usize, 12usize>>(
+    fn anemoi_permutation_round<P: AnemoiJive<F, 2usize, 14usize>>(
         &mut self,
         input_var: &([VarIndex; 2], [VarIndex; 2]),
         output_var: &([Option<VarIndex>; 2], [Option<VarIndex>; 2]),
-        intermediate_val: &([[F; 2]; 12], [[F; 2]; 12]),
+        intermediate_val: &([[F; 2]; 14], [[F; 2]; 14]),
         checksum: Option<F>,
         salt: Option<F>,
     ) -> Option<VarIndex> {
+        assert!(P::USE_PHT);
+
         let zero = F::zero();
         let one = F::one();
         let zero_var = self.zero_var();
@@ -19,9 +21,9 @@ impl<F: Scalar> TurboCS<F> {
         // Allocate the intermediate values
         // (the last line of the intermediate values is the output of the last round
         // before the final linear layer)
-        let mut intermediate_var = ([[zero_var; 2]; 12], [[zero_var; 2]; 12]);
+        let mut intermediate_var = ([[zero_var; 2]; 14], [[zero_var; 2]; 14]);
 
-        for r in 0..12 {
+        for r in 0..14 {
             intermediate_var.0[r][0] = self.new_variable(intermediate_val.0[r][0]);
             intermediate_var.0[r][1] = self.new_variable(intermediate_val.0[r][1]);
             intermediate_var.1[r][0] = self.new_variable(intermediate_val.1[r][0]);
@@ -50,8 +52,8 @@ impl<F: Scalar> TurboCS<F> {
 
         self.attach_anemoi_jive_constraints_to_gate();
 
-        // Create the remaining 11 gates
-        for r in 1..12 {
+        // Create the remaining 13 gates
+        for r in 1..14 {
             self.push_add_selectors(zero, zero, zero, zero);
             self.push_mul_selectors(zero, zero);
             self.push_constant_selector(zero);
@@ -70,16 +72,21 @@ impl<F: Scalar> TurboCS<F> {
         if output_var.0[0].is_some() {
             let var = output_var.0[0].unwrap();
 
-            self.push_add_selectors(P::MDS_MATRIX[0][0], P::MDS_MATRIX[0][1], zero, zero);
+            self.push_add_selectors(
+                P::MDS_MATRIX[0][0].double(),
+                P::MDS_MATRIX[0][1].double(),
+                P::MDS_MATRIX[0][1],
+                P::MDS_MATRIX[0][0],
+            );
             self.push_mul_selectors(zero, zero);
             self.push_constant_selector(zero);
             self.push_ecc_selector(zero);
             self.push_out_selector(one);
 
-            self.wiring[0].push(intermediate_var.0[11][0]); // a_r
-            self.wiring[1].push(intermediate_var.0[11][1]); // b_r
-            self.wiring[2].push(intermediate_var.1[11][0]); // c_r
-            self.wiring[3].push(intermediate_var.1[11][1]); // d_r
+            self.wiring[0].push(intermediate_var.0[13][0]); // a_r
+            self.wiring[1].push(intermediate_var.0[13][1]); // b_r
+            self.wiring[2].push(intermediate_var.1[13][0]); // c_r
+            self.wiring[3].push(intermediate_var.1[13][1]); // d_r
             self.wiring[4].push(var); // a_final
 
             self.finish_new_gate();
@@ -88,16 +95,21 @@ impl<F: Scalar> TurboCS<F> {
         if output_var.0[1].is_some() {
             let var = output_var.0[1].unwrap();
 
-            self.push_add_selectors(P::MDS_MATRIX[1][0], P::MDS_MATRIX[1][1], zero, zero);
+            self.push_add_selectors(
+                P::MDS_MATRIX[1][0].double(),
+                P::MDS_MATRIX[1][1].double(),
+                P::MDS_MATRIX[1][1],
+                P::MDS_MATRIX[1][0],
+            );
             self.push_mul_selectors(zero, zero);
             self.push_constant_selector(zero);
             self.push_ecc_selector(zero);
             self.push_out_selector(one);
 
-            self.wiring[0].push(intermediate_var.0[11][0]); // a_r
-            self.wiring[1].push(intermediate_var.0[11][1]); // b_r
-            self.wiring[2].push(intermediate_var.1[11][0]); // c_r
-            self.wiring[3].push(intermediate_var.1[11][1]); // d_r
+            self.wiring[0].push(intermediate_var.0[13][0]); // a_r
+            self.wiring[1].push(intermediate_var.0[13][1]); // b_r
+            self.wiring[2].push(intermediate_var.1[13][0]); // c_r
+            self.wiring[3].push(intermediate_var.1[13][1]); // d_r
             self.wiring[4].push(var); // b_final
 
             self.finish_new_gate();
@@ -106,16 +118,21 @@ impl<F: Scalar> TurboCS<F> {
         if output_var.1[0].is_some() {
             let var = output_var.1[0].unwrap();
 
-            self.push_add_selectors(zero, zero, P::MDS_MATRIX[0][1], P::MDS_MATRIX[0][0]);
+            self.push_add_selectors(
+                P::MDS_MATRIX[0][0],
+                P::MDS_MATRIX[0][1],
+                P::MDS_MATRIX[0][1],
+                P::MDS_MATRIX[0][0],
+            );
             self.push_mul_selectors(zero, zero);
             self.push_constant_selector(zero);
             self.push_ecc_selector(zero);
             self.push_out_selector(one);
 
-            self.wiring[0].push(intermediate_var.0[11][0]); // a_r
-            self.wiring[1].push(intermediate_var.0[11][1]); // b_r
-            self.wiring[2].push(intermediate_var.1[11][0]); // c_r
-            self.wiring[3].push(intermediate_var.1[11][1]); // d_r
+            self.wiring[0].push(intermediate_var.0[13][0]); // a_r
+            self.wiring[1].push(intermediate_var.0[13][1]); // b_r
+            self.wiring[2].push(intermediate_var.1[13][0]); // c_r
+            self.wiring[3].push(intermediate_var.1[13][1]); // d_r
             self.wiring[4].push(var); // c_final
 
             self.finish_new_gate();
@@ -124,16 +141,21 @@ impl<F: Scalar> TurboCS<F> {
         if output_var.1[1].is_some() {
             let var = output_var.1[1].unwrap();
 
-            self.push_add_selectors(zero, zero, P::MDS_MATRIX[1][1], P::MDS_MATRIX[1][0]);
+            self.push_add_selectors(
+                P::MDS_MATRIX[1][0],
+                P::MDS_MATRIX[1][1],
+                P::MDS_MATRIX[1][1],
+                P::MDS_MATRIX[1][0],
+            );
             self.push_mul_selectors(zero, zero);
             self.push_constant_selector(zero);
             self.push_ecc_selector(zero);
             self.push_out_selector(one);
 
-            self.wiring[0].push(intermediate_var.0[11][0]); // a_r
-            self.wiring[1].push(intermediate_var.0[11][1]); // b_r
-            self.wiring[2].push(intermediate_var.1[11][0]); // c_r
-            self.wiring[3].push(intermediate_var.1[11][1]); // d_r
+            self.wiring[0].push(intermediate_var.0[13][0]); // a_r
+            self.wiring[1].push(intermediate_var.0[13][1]); // b_r
+            self.wiring[2].push(intermediate_var.1[13][0]); // c_r
+            self.wiring[3].push(intermediate_var.1[13][1]); // d_r
             self.wiring[4].push(var); // d_final
 
             self.finish_new_gate();
@@ -143,20 +165,22 @@ impl<F: Scalar> TurboCS<F> {
             let var = self.new_variable(checksum.unwrap());
 
             self.push_add_selectors(
-                P::MDS_MATRIX[0][0] + P::MDS_MATRIX[1][0],
-                P::MDS_MATRIX[0][1] + P::MDS_MATRIX[1][1],
-                P::MDS_MATRIX[0][1] + P::MDS_MATRIX[1][1],
-                P::MDS_MATRIX[0][0] + P::MDS_MATRIX[1][0],
+                (P::MDS_MATRIX[0][0] + P::MDS_MATRIX[1][0]).double()
+                    + (P::MDS_MATRIX[0][0] + P::MDS_MATRIX[1][0]),
+                (P::MDS_MATRIX[0][1] + P::MDS_MATRIX[1][1]).double()
+                    + (P::MDS_MATRIX[0][1] + P::MDS_MATRIX[1][1]),
+                (P::MDS_MATRIX[0][1] + P::MDS_MATRIX[1][1]).double(),
+                (P::MDS_MATRIX[0][0] + P::MDS_MATRIX[1][0]).double(),
             );
             self.push_mul_selectors(zero, zero);
             self.push_constant_selector(zero);
             self.push_ecc_selector(zero);
             self.push_out_selector(one);
 
-            self.wiring[0].push(intermediate_var.0[11][0]); // a_r
-            self.wiring[1].push(intermediate_var.0[11][1]); // b_r
-            self.wiring[2].push(intermediate_var.1[11][0]); // c_r
-            self.wiring[3].push(intermediate_var.1[11][1]); // d_r
+            self.wiring[0].push(intermediate_var.0[13][0]); // a_r
+            self.wiring[1].push(intermediate_var.0[13][1]); // b_r
+            self.wiring[2].push(intermediate_var.1[13][0]); // c_r
+            self.wiring[3].push(intermediate_var.1[13][1]); // d_r
             self.wiring[4].push(var); // sum
 
             self.finish_new_gate();
@@ -168,9 +192,9 @@ impl<F: Scalar> TurboCS<F> {
     }
 
     /// Create constraints for the Anemoi variable length hash function.
-    pub fn anemoi_variable_length_hash<P: AnemoiJive<F, 2usize, 12usize>>(
+    pub fn anemoi_variable_length_hash<P: AnemoiJive<F, 2usize, 14usize>>(
         &mut self,
-        trace: &AnemoiVLHTrace<F, 2, 12>,
+        trace: &AnemoiVLHTrace<F, 2, 14>,
         input_var: &[VarIndex],
         output_var: VarIndex,
     ) {
@@ -285,9 +309,9 @@ impl<F: Scalar> TurboCS<F> {
     }
 
     /// Create constraints for the Jive CRH.
-    pub fn jive_crh<P: AnemoiJive<F, 2usize, 12usize>>(
+    pub fn jive_crh<P: AnemoiJive<F, 2usize, 14usize>>(
         &mut self,
-        trace: &JiveTrace<F, 2, 12>,
+        trace: &JiveTrace<F, 2, 14>,
         input_var: &[VarIndex; 3],
         salt: F,
     ) -> VarIndex {
@@ -338,9 +362,9 @@ impl<F: Scalar> TurboCS<F> {
     }
 
     /// Create constraints for the Anemoi stream cipher
-    pub fn anemoi_stream_cipher<P: AnemoiJive<F, 2usize, 12usize>>(
+    pub fn anemoi_stream_cipher<P: AnemoiJive<F, 2usize, 14usize>>(
         &mut self,
-        trace: &AnemoiStreamCipherTrace<F, 2, 12>,
+        trace: &AnemoiStreamCipherTrace<F, 2, 14>,
         input_var: &[VarIndex],
         output_var: &[VarIndex],
     ) {
@@ -573,11 +597,11 @@ impl<F: Scalar> TurboCS<F> {
 mod test_bls12_381 {
     use crate::plonk::constraint_system::TurboCS;
     use noah_algebra::bls12_381::BLSScalar;
-    use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS_OLD};
+    use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_BLS12_381_SALTS};
 
     #[test]
     fn test_jive_constraint_system() {
-        let salt = ANEMOI_JIVE_381_SALTS_OLD[10];
+        let salt = ANEMOI_JIVE_BLS12_381_SALTS[10];
 
         let trace = AnemoiJive381::eval_jive_with_trace(
             &[BLSScalar::from(1u64), BLSScalar::from(2u64)],
@@ -671,7 +695,7 @@ mod kzg_test_bls12_381 {
     use merlin::Transcript;
     use noah_algebra::bls12_381::BLSPairingEngine;
     use noah_algebra::{bls12_381::BLSScalar, prelude::*};
-    use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_381_SALTS_OLD};
+    use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381, ANEMOI_JIVE_BLS12_381_SALTS};
 
     #[test]
     fn test_turbo_plonk_kzg_anemoi_jive() {
@@ -722,7 +746,7 @@ mod kzg_test_bls12_381 {
         pcs: &PCS,
         prng: &mut R,
     ) {
-        let salt = ANEMOI_JIVE_381_SALTS_OLD[10];
+        let salt = ANEMOI_JIVE_BLS12_381_SALTS[10];
 
         let trace = AnemoiJive381::eval_jive_with_trace(
             &[BLSScalar::from(1u64), BLSScalar::from(2u64)],

@@ -61,9 +61,9 @@ pub struct AbarToArPreNote {
     /// Witness.
     pub witness: PayerWitness,
     /// The trace of the input commitment.
-    pub input_commitment_trace: AnemoiVLHTrace<BN254Scalar, 2, 12>,
+    pub input_commitment_trace: AnemoiVLHTrace<BN254Scalar, 2, 14>,
     /// The trace of the nullifier.
-    pub nullifier_trace: AnemoiVLHTrace<BN254Scalar, 2, 12>,
+    pub nullifier_trace: AnemoiVLHTrace<BN254Scalar, 2, 14>,
     /// Input key pair.
     pub input_keypair: KeyPair,
 }
@@ -339,8 +339,8 @@ fn prove_abar_to_ar<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
     payers_witness: &PayerWitness,
-    nullifier_trace: &AnemoiVLHTrace<BN254Scalar, 2, 12>,
-    input_commitment_trace: &AnemoiVLHTrace<BN254Scalar, 2, 12>,
+    nullifier_trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
+    input_commitment_trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
     folding_witness: &AXfrAddressFoldingWitness,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(ABAR_TO_AR_PLONK_PROOF_TRANSCRIPT);
@@ -367,8 +367,8 @@ fn prove_abar_to_ar<R: CryptoRng + RngCore>(
 /// Construct the anonymous-to-transparent constraint system.
 pub fn build_abar_to_ar_cs(
     payer_witness: &PayerWitness,
-    nullifier_trace: &AnemoiVLHTrace<BN254Scalar, 2, 12>,
-    input_commitment_trace: &AnemoiVLHTrace<BN254Scalar, 2, 12>,
+    nullifier_trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
+    input_commitment_trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
     folding_witness: &AXfrAddressFoldingWitness,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();

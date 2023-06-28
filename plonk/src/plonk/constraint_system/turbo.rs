@@ -23,9 +23,9 @@ pub struct TurboCS<F> {
     /// the wiring of the circuit.
     pub wiring: [Vec<VarIndex>; N_WIRES_PER_GATE],
     /// the first part of the Anemoi preprocessed round keys.
-    pub anemoi_preprocessed_round_keys_x: [[F; 2]; 12],
+    pub anemoi_preprocessed_round_keys_x: [[F; 2]; 14],
     /// the second part of the Anemoi preprocessed round keys.
-    pub anemoi_preprocessed_round_keys_y: [[F; 2]; 12],
+    pub anemoi_preprocessed_round_keys_y: [[F; 2]; 14],
     /// the Anemoi generator.
     pub anemoi_generator: F,
     /// the Anemoi generator's inverse.
@@ -175,8 +175,8 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
         Self {
             selectors: vec![],
             wiring: [vec![], vec![], vec![], vec![], vec![]],
-            anemoi_preprocessed_round_keys_x: [[F::zero(); 2]; 12],
-            anemoi_preprocessed_round_keys_y: [[F::zero(); 2]; 12],
+            anemoi_preprocessed_round_keys_x: [[F::zero(); 2]; 14],
+            anemoi_preprocessed_round_keys_y: [[F::zero(); 2]; 14],
             anemoi_generator: F::zero(),
             anemoi_generator_inv: F::zero(),
             anemoi_constraints_indices: vec![],
@@ -261,8 +261,8 @@ impl<F: Scalar> TurboCS<F> {
         Self {
             selectors,
             wiring: [vec![], vec![], vec![], vec![], vec![]],
-            anemoi_preprocessed_round_keys_x: [[F::zero(); 2]; 12],
-            anemoi_preprocessed_round_keys_y: [[F::zero(); 2]; 12],
+            anemoi_preprocessed_round_keys_x: [[F::zero(); 2]; 14],
+            anemoi_preprocessed_round_keys_y: [[F::zero(); 2]; 14],
             anemoi_generator: F::zero(),
             anemoi_generator_inv: F::zero(),
             anemoi_constraints_indices: vec![],
@@ -735,7 +735,7 @@ impl<F: Scalar> TurboCS<F> {
     }
 
     /// Set the parameters for the Anemoi/Jive hash function.
-    pub fn load_anemoi_jive_parameters<H: AnemoiJive<F, 2, 12>>(&mut self) {
+    pub fn load_anemoi_jive_parameters<H: AnemoiJive<F, 2, 14>>(&mut self) {
         self.anemoi_preprocessed_round_keys_x = H::PREPROCESSED_ROUND_KEYS_X;
         self.anemoi_preprocessed_round_keys_y = H::PREPROCESSED_ROUND_KEYS_Y;
 
@@ -818,6 +818,95 @@ impl<F: Scalar> TurboCS<F> {
             ));
         }
 
+        if !self.anemoi_constraints_indices.is_empty() {
+            assert!(!self.anemoi_generator.is_zero());
+        }
+
+        for cs_index in self.anemoi_constraints_indices.iter() {
+            for r in 0..14 {
+                let a_i = witness[self.get_witness_index(0, cs_index + r)];
+                let b_i = witness[self.get_witness_index(1, cs_index + r)];
+                let c_i = witness[self.get_witness_index(2, cs_index + r)];
+                let d_i = witness[self.get_witness_index(3, cs_index + r)];
+                let o_i = witness[self.get_witness_index(4, cs_index + r)];
+
+                let a_i_next = witness[self.get_witness_index(0, cs_index + 1 + r)];
+                let b_i_next = witness[self.get_witness_index(1, cs_index + 1 + r)];
+                let c_i_next = witness[self.get_witness_index(2, cs_index + 1 + r)];
+                let d_i_next = witness[self.get_witness_index(3, cs_index + 1 + r)];
+
+                if o_i != d_i_next {
+                    return Err(PlonkError::Message(format!(
+                        "cs index {} round {}: the output wire {:?} does not equal to the fourth wire {:?} in the next constraint",
+                        cs_index,
+                        r,
+                        o_i,
+                        d_i_next
+                    )));
+                }
+
+                let prk_i_a = self.anemoi_preprocessed_round_keys_x[r][0].clone();
+                let prk_i_b = self.anemoi_preprocessed_round_keys_x[r][1].clone();
+                let prk_i_c = self.anemoi_preprocessed_round_keys_y[r][0].clone();
+                let prk_i_d = self.anemoi_preprocessed_round_keys_y[r][1].clone();
+
+                let g = self.anemoi_generator;
+                let g2 = g.square().add(F::one());
+
+                let da_i = a_i + d_i;
+                let cb_i = b_i + c_i;
+
+                let d2a_i = da_i + a_i;
+                let c2b_i = cb_i + b_i;
+
+                // equation 1
+                let left = (da_i + g * cb_i + prk_i_c - &c_i_next).pow(&[5u64])
+                    + g * (da_i + g * cb_i + prk_i_c).square();
+                let right = d2a_i + g * c2b_i + prk_i_a;
+                if left != right {
+                    return Err(PlonkError::Message(format!(
+                        "cs index {} round {}: the first equation does not equal: {:?} != {:?}",
+                        cs_index, r, left, right
+                    )));
+                }
+
+                // equation 2
+                let left = (g * da_i + g2 * cb_i + prk_i_d - &d_i_next).pow(&[5u64])
+                    + g * (g * da_i + g2 * cb_i + prk_i_d).square();
+                let right = g * d2a_i + g2 * c2b_i + prk_i_b;
+                if left != right {
+                    return Err(PlonkError::Message(format!(
+                        "cs index {} round {}: the second equation does not equal: {:?} != {:?}",
+                        cs_index, r, left, right
+                    )));
+                }
+
+                // equation 3
+                let left = (da_i + g * cb_i + prk_i_c - &c_i_next).pow(&[5u64])
+                    + g * c_i_next.square()
+                    + self.anemoi_generator_inv;
+                let right = a_i_next;
+                if left != right {
+                    return Err(PlonkError::Message(format!(
+                        "cs index {} round {}: the third equation does not equal: {:?} != {:?}",
+                        cs_index, r, left, right
+                    )));
+                }
+
+                // equation 4
+                let left = (g * da_i + g2 * cb_i + prk_i_d - &d_i_next).pow(&[5u64])
+                    + g * d_i_next.square()
+                    + self.anemoi_generator_inv;
+                let right = b_i_next;
+                if left != right {
+                    return Err(PlonkError::Message(format!(
+                        "cs index {} round {}: the fourth equation does not equal: {:?} != {:?}",
+                        cs_index, r, left, right
+                    )));
+                }
+            }
+        }
+
         for cs_index in 0..self.size() {
             let mut public_online = F::zero();
             // check if the constraint constrains a public variable
@@ -849,6 +938,7 @@ impl<F: Scalar> TurboCS<F> {
                 .map(|i| &self.selectors[i][cs_index])
                 .collect();
             let eval_gate = Self::eval_gate_func(&wire_vals, &sel_vals, &public_online)?;
+
             if eval_gate != F::zero() {
                 return Err(PlonkError::Message(format!(
                     "cs index {}: wire_vals = ({:?}), sel_vals = ({:?})",
@@ -875,89 +965,6 @@ impl<F: Scalar> TurboCS<F> {
                     return Err(PlonkError::Message(format!(
                         "cs index {}: the fourth wire {:?} is not one or zero",
                         cs_index, w4_value
-                    )));
-                }
-            }
-        }
-
-        if !self.anemoi_constraints_indices.is_empty() {
-            assert!(!self.anemoi_generator.is_zero());
-        }
-
-        for cs_index in self.anemoi_constraints_indices.iter() {
-            for r in 0..12 {
-                let a_i = witness[self.get_witness_index(0, cs_index + r)];
-                let b_i = witness[self.get_witness_index(1, cs_index + r)];
-                let c_i = witness[self.get_witness_index(2, cs_index + r)];
-                let d_i = witness[self.get_witness_index(3, cs_index + r)];
-                let o_i = witness[self.get_witness_index(4, cs_index + r)];
-
-                let a_i_next = witness[self.get_witness_index(0, cs_index + 1 + r)];
-                let b_i_next = witness[self.get_witness_index(1, cs_index + 1 + r)];
-                let c_i_next = witness[self.get_witness_index(2, cs_index + 1 + r)];
-                let d_i_next = witness[self.get_witness_index(3, cs_index + 1 + r)];
-
-                if o_i != d_i_next {
-                    return Err(PlonkError::Message(format!(
-                        "cs index {} round {}: the output wire {:?} does not equal to the fourth wire {:?} in the next constraint",
-                        cs_index,
-                        r,
-                        o_i,
-                        d_i_next
-                    )));
-                }
-
-                let prk_i_a = self.anemoi_preprocessed_round_keys_x[r][0].clone();
-                let prk_i_b = self.anemoi_preprocessed_round_keys_x[r][1].clone();
-                let prk_i_c = self.anemoi_preprocessed_round_keys_y[r][0].clone();
-                let prk_i_d = self.anemoi_preprocessed_round_keys_y[r][1].clone();
-
-                let g = self.anemoi_generator;
-                let g2 = g.square().add(F::one());
-
-                // equation 1
-                let left = (d_i + g * c_i + prk_i_c - &c_i_next).pow(&[5u64])
-                    + g * (d_i + g * c_i + prk_i_c).square();
-                let right = a_i + g * b_i + prk_i_a;
-                if left != right {
-                    return Err(PlonkError::Message(format!(
-                        "cs index {} round {}: the first equation does not equal: {:?} != {:?}",
-                        cs_index, r, left, right
-                    )));
-                }
-
-                // equation 2
-                let left = (g * d_i + g2 * c_i + prk_i_d - &d_i_next).pow(&[5u64])
-                    + g * (g * d_i + g2 * c_i + prk_i_d).square();
-                let right = g * a_i + g2 * b_i + prk_i_b;
-                if left != right {
-                    return Err(PlonkError::Message(format!(
-                        "cs index {} round {}: the second equation does not equal: {:?} != {:?}",
-                        cs_index, r, left, right
-                    )));
-                }
-
-                // equation 3
-                let left = (d_i + g * c_i + prk_i_c - &c_i_next).pow(&[5u64])
-                    + g * c_i_next.square()
-                    + self.anemoi_generator_inv;
-                let right = a_i_next;
-                if left != right {
-                    return Err(PlonkError::Message(format!(
-                        "cs index {} round {}: the third equation does not equal: {:?} != {:?}",
-                        cs_index, r, left, right
-                    )));
-                }
-
-                // equation 4
-                let left = (g * d_i + g2 * c_i + prk_i_d - &d_i_next).pow(&[5u64])
-                    + g * d_i_next.square()
-                    + self.anemoi_generator_inv;
-                let right = b_i_next;
-                if left != right {
-                    return Err(PlonkError::Message(format!(
-                        "cs index {} round {}: the fourth equation does not equal: {:?} != {:?}",
-                        cs_index, r, left, right
                     )));
                 }
             }

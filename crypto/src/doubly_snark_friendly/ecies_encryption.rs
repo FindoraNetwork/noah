@@ -59,7 +59,7 @@ impl<G: CurveGroup> ECIESDecryptionKey<G> {
     /// Decrypt the ciphertext with the decryption key.
     pub fn decrypt<H>(&self, ciphertext: &ECIESCiphertext<G>) -> ECIESPlaintext<G>
     where
-        H: AnemoiJive<G::BaseType, 2, 12>,
+        H: AnemoiJive<G::BaseType, 2, 14>,
     {
         let point = ciphertext
             .dh_point_div_by_cofactor
@@ -98,7 +98,7 @@ impl<G: CurveGroup> ECIESEncryptionKey<G> {
     /// Encrypt the plaintext with the encryption key.
     pub fn encrypt<H, R>(&self, prng: &mut R, plaintext: &ECIESPlaintext<G>) -> ECIESCiphertext<G>
     where
-        H: AnemoiJive<G::BaseType, 2, 12>,
+        H: AnemoiJive<G::BaseType, 2, 14>,
         R: CryptoRng + RngCore,
     {
         let k = G::ScalarType::random(prng);

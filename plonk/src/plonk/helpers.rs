@@ -357,21 +357,27 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
             let g_inv = prover_params.verifier_params.anemoi_generator_inv;
             let five = &[5u64];
 
-            let tmp = w3_eval_point + &(g * &w2_eval_point) + &q_prk3_eval_point;
+            let w3_w0_eval_point = w0_eval_point + w3_eval_point;
+            let w2_w1_eval_point = w1_eval_point + w2_eval_point;
+
+            let w3_2w0_eval_point = w0_eval_point + w3_w0_eval_point;
+            let w2_2w1_eval_point = w1_eval_point + w2_w1_eval_point;
+
+            let tmp = w3_w0_eval_point + &(g * &w2_w1_eval_point) + &q_prk3_eval_point;
 
             // - alpha^6 * q_{prk3} *
             //  (
-            //    (w[3] + g * w[2] + q_{prk3} - w_next[2]) ^ 5
-            //    + g * (w[3] + g * w[2] + q_{prk3}) ^ 2
-            //    - (w[0] + g * w[1] + q_{prk1})
+            //    (w[0] + w[3] + g * (w[1] + w[2]) + q_{prk3} - w_next[2]) ^ 5
+            //    + g * (w[0] + w[3] + g * (w[1] + w[2]) + q_{prk3}) ^ 2
+            //    - (2w[0] + w[3] + g * (2w[1] + w[2]) + q_{prk1})
             //  )
             let term8 = alpha_pow_6.mul(&q_prk3_eval_point).mul(
                 (tmp - &w2_eval_point_next).pow(five) + &(g * tmp.square())
-                    - &(w0_eval_point + g * w1_eval_point + &q_prk1_eval_point),
+                    - &(w3_2w0_eval_point + g * w2_2w1_eval_point + &q_prk1_eval_point),
             );
             // - alpha^8 * q_{prk3} *
             //  (
-            //    (w[3] + g * w[2] + q_{prk3} - w_next[2]) ^ 5
+            //    (w[0] + w[3] + g * (w[1] + w[2]) + q_{prk3} - w_next[2]) ^ 5
             //    + g * w_next[2] ^ 2 + g^-1
             //    - w_next[0]
             //  )
@@ -382,22 +388,23 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
 
             // - alpha^7 * q_{prk3} *
             //  (
-            //    (g * w[3] + (g^2 + 1) * w[2] + q_{prk4} - w[4]) ^ 5
-            //    + g * (g * w[3] + (g^2 + 1) * w[2] + q_{prk4}) ^ 2
-            //    - (g * w[0] + (g^2 + 1) * w[1] + q_{prk2})
+            //    (g * (w[0] + w[3]) + (g^2 + 1) * (w[1] + w[2]) + q_{prk4} - w[4]) ^ 5
+            //    + g * (g * (w[0] + w[3]) + (g^2 + 1) * (w[1] + w[2]) + q_{prk4}) ^ 2
+            //    - (g * (2w[0] + w[3]) + (g^2 + 1) * (2w[1] + w[2]) + q_{prk2})
             //  )
-            let tmp =
-                g * &w3_eval_point + &(g_square_plus_one * &w2_eval_point) + &q_prk4_eval_point;
+            let tmp = g * &w3_w0_eval_point
+                + &(g_square_plus_one * &w2_w1_eval_point)
+                + &q_prk4_eval_point;
             let term9 = alpha_pow_7.mul(&q_prk3_eval_point).mul(
                 (tmp - &wo_eval_point).pow(five) + &(g * tmp.square())
-                    - &(g * &w0_eval_point
-                        + g_square_plus_one * w1_eval_point
+                    - &(g * &w3_2w0_eval_point
+                        + g_square_plus_one * &w2_2w1_eval_point
                         + &q_prk2_eval_point),
             );
 
             // - alpha^9 * q_{prk3} *
             //  (
-            //    (g * w[3] + (g^2 + 1) * w[2] + q_{prk4} - w[4]) ^ 5
+            //    (g * (w[0] + w[3]) + (g^2 + 1) * (w[1] + w[2]) + q_{prk4} - w[4]) ^ 5
             //    + g * w[4] ^ 2 + g^-1
             //    - w_next[1]
             //  )
@@ -829,13 +836,17 @@ pub(super) fn r_eval_zeta<PCS: PolyComScheme>(
 
     let term2 = first_lagrange_eval_zeta.mul(alpha_pow_2);
 
+    let w3_w0 = proof.w_polys_eval_zeta[3] + proof.w_polys_eval_zeta[0];
+    let w2_w1 = proof.w_polys_eval_zeta[2] + proof.w_polys_eval_zeta[1];
+
+    let w3_2w0 = w3_w0 + proof.w_polys_eval_zeta[0];
+    let w2_2w1 = w2_w1 + proof.w_polys_eval_zeta[1];
+
     let five = &[5u64];
-    let tmp = proof.w_polys_eval_zeta[3]
-        + &(anemoi_generator * &proof.w_polys_eval_zeta[2])
-        + &proof.prk_3_poly_eval_zeta;
+    let tmp = w3_w0 + &(anemoi_generator * &w2_w1) + &proof.prk_3_poly_eval_zeta;
     let term3 = alpha_pow_6.mul(&proof.prk_3_poly_eval_zeta).mul(
         (tmp - &proof.w_polys_eval_zeta_omega[2]).pow(five) + anemoi_generator * &tmp.square()
-            - &(proof.w_polys_eval_zeta[0] + &(anemoi_generator * &proof.w_polys_eval_zeta[1])),
+            - &(w3_2w0 + &(anemoi_generator * &w2_2w1)),
     );
     let term5 = alpha_pow_8.mul(&proof.prk_3_poly_eval_zeta).mul(
         (tmp - &proof.w_polys_eval_zeta_omega[2]).pow(five)
@@ -845,13 +856,12 @@ pub(super) fn r_eval_zeta<PCS: PolyComScheme>(
     );
 
     let anemoi_generator_square_plus_one = anemoi_generator.square().add(PCS::Field::one());
-    let tmp = anemoi_generator * &proof.w_polys_eval_zeta[3]
-        + &(anemoi_generator_square_plus_one * &proof.w_polys_eval_zeta[2])
+    let tmp = anemoi_generator * &w3_w0
+        + &(anemoi_generator_square_plus_one * &w2_w1)
         + &proof.prk_4_poly_eval_zeta;
     let term4 = alpha_pow_7.mul(&proof.prk_3_poly_eval_zeta).mul(
         (tmp - &proof.w_polys_eval_zeta[4]).pow(five) + anemoi_generator * &tmp.square()
-            - &(anemoi_generator * &proof.w_polys_eval_zeta[0]
-                + &(anemoi_generator_square_plus_one * &proof.w_polys_eval_zeta[1])),
+            - &(anemoi_generator * &w3_2w0 + &(anemoi_generator_square_plus_one * &w2_2w1)),
     );
     let term6 = alpha_pow_9.mul(&proof.prk_3_poly_eval_zeta).mul(
         (tmp - &proof.w_polys_eval_zeta[4]).pow(five)

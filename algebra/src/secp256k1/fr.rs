@@ -303,6 +303,11 @@ impl Scalar for SECP256K1Scalar {
             None
         }
     }
+
+    #[inline]
+    fn double(&self) -> Self {
+        Self(self.0.double())
+    }
 }
 
 impl SECP256K1Scalar {

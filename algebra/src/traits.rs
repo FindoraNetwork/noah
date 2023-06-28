@@ -85,6 +85,9 @@ pub trait Scalar:
     /// Return the square of the field element
     fn square(&self) -> Self;
 
+    /// Return the double of the field element
+    fn double(&self) -> Self;
+
     /// Return the square root.
     fn sqrt(&self) -> Option<Self>;
 

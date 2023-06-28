@@ -238,7 +238,7 @@ pub fn nullify(
     amount: u64,
     asset_type_scalar: BN254Scalar,
     uid: u64,
-) -> Result<(BN254Scalar, AnemoiVLHTrace<BN254Scalar, 2, 12>)> {
+) -> Result<(BN254Scalar, AnemoiVLHTrace<BN254Scalar, 2, 14>)> {
     let pub_key = key_pair.get_pk();
 
     let pow_2_64 = BN254Scalar::from(u64::MAX).add(&BN254Scalar::from(1u32));
@@ -274,7 +274,7 @@ pub fn nullify(
 pub(crate) const AMOUNT_LEN: usize = 64;
 
 /// Depth of the Merkle Tree circuit.
-pub const TREE_DEPTH: usize = 30;
+pub const TREE_DEPTH: usize = 25;
 
 /// Add the commitment constraints to the constraint system
 pub fn commit_in_cs(
@@ -284,7 +284,7 @@ pub fn commit_in_cs(
     asset_var: VarIndex,
     public_key_type_var: VarIndex,
     public_key_scalars: &[VarIndex; 3],
-    trace: &AnemoiVLHTrace<BN254Scalar, 2, 12>,
+    trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
 ) -> VarIndex {
     let output_var = cs.new_variable(trace.output);
     let zero_var = cs.zero_var();
@@ -312,7 +312,7 @@ pub fn commit(
     blind: BN254Scalar,
     amount: u64,
     asset_type_scalar: BN254Scalar,
-) -> Result<(Commitment, AnemoiVLHTrace<BN254Scalar, 2, 12>)> {
+) -> Result<(Commitment, AnemoiVLHTrace<BN254Scalar, 2, 14>)> {
     let address_format_number: BN254Scalar;
     match public_key.0 {
         PublicKeyInner::Ed25519(_) => {
@@ -351,7 +351,7 @@ pub(crate) fn nullify_in_cs(
     asset_type: VarIndex,
     secret_key_type: VarIndex,
     public_key_scalars: &[VarIndex; 3],
-    trace: &AnemoiVLHTrace<BN254Scalar, 2, 12>,
+    trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
 ) -> VarIndex {
     let output_var = cs.new_variable(trace.output);
     let zero_var = cs.zero_var();
@@ -475,8 +475,8 @@ pub fn compute_merkle_root_variables(
     cs: &mut TurboPlonkCS,
     elem: AccElemVars,
     path_vars: &MerklePathVars,
-    leaf_trace: &AnemoiVLHTrace<BN254Scalar, 2, 12>,
-    traces: &Vec<JiveTrace<BN254Scalar, 2, 12>>,
+    leaf_trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
+    traces: &Vec<JiveTrace<BN254Scalar, 2, 14>>,
 ) -> VarIndex {
     let (uid, commitment) = (elem.uid, elem.commitment);
 

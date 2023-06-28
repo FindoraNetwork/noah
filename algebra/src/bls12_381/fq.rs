@@ -290,4 +290,9 @@ impl Scalar for BLSFq {
             None
         }
     }
+
+    #[inline]
+    fn double(&self) -> Self {
+        Self(self.0.double())
+    }
 }

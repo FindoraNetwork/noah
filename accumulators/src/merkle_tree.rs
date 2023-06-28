@@ -9,15 +9,15 @@ use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive254, ANEMOI_JIVE_BN254_SALT
 use storage::db::MerkleDB;
 use storage::store::{ImmutablePrefixedStore, PrefixedStore, Stated, Store};
 
-// 3^0 + 3^1 + 3^2 + ... 3^30 < 2^64 (u64 can include all leaf & ancestor)
-// store max num is 3^30 = 205891132094649 (max uid = 3^30 - 1)
+// 3^0 + 3^1 + 3^2 + ... 3^25 < 2^64 (u64 can include all leaf & ancestor)
+// store max num is 3^25 = 847288609443 (max uid = 3^25 - 1)
 // sid   max num is 2^64 = 18446744073709551616 (max uid = 2^64 - 1)
 
 /// default merkle tree depth.
-pub const TREE_DEPTH: usize = 30;
+pub const TREE_DEPTH: usize = 25;
 
-// 102945566047324 = 3^0 + 3^1 + 3^2 + ... 3^29, if change TREE_DEPTH, MUST update.
-const LEAF_START: u64 = 102945566047324;
+// 423644304721 = 3^0 + 3^1 + 3^2 + ... 3^24, if change TREE_DEPTH, MUST update.
+const LEAF_START: u64 = 423644304721;
 
 const KEY_PAD: [u8; 4] = [0, 0, 0, 0];
 const ROOT_KEY: [u8; 12] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -821,16 +821,11 @@ mod tests {
             TreePath::Middle,
             TreePath::Middle,
             TreePath::Left,
-            TreePath::Middle,
             TreePath::Left,
-            TreePath::Left,
-            TreePath::Left,
-            TreePath::Left,
-            TreePath::Right,
         ];
         assert_eq!(tmp_path, tmp_right);
 
-        let last_keys = get_path_keys(3u64.pow(30) - 1);
+        let last_keys = get_path_keys(3u64.pow(25) - 1);
         let mut last_sum = 0u64;
         for (i, (key, path)) in last_keys.iter().rev().enumerate() {
             last_sum += 3u64.pow(i as u32);

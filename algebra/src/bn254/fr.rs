@@ -303,6 +303,11 @@ impl Scalar for BN254Scalar {
             None
         }
     }
+
+    #[inline]
+    fn double(&self) -> Self {
+        Self(self.0.double())
+    }
 }
 
 impl Domain for BN254Scalar {

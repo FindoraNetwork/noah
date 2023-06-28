@@ -253,6 +253,11 @@ impl Scalar for Ed25519Scalar {
             None
         }
     }
+
+    #[inline]
+    fn double(&self) -> Self {
+        Self(self.0.double())
+    }
 }
 
 impl Ed25519Scalar {
