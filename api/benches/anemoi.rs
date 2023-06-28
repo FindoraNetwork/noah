@@ -2,14 +2,12 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use merlin::Transcript;
 use noah_algebra::bn254::{BN254PairingEngine, BN254Scalar};
 use noah_algebra::prelude::*;
-use noah_crypto::anemoi_jive::{
-    AnemoiJive, AnemoiJive254, ANEMOI_JIVE_BN254_SALTS,
-};
+use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive254, ANEMOI_JIVE_BN254_SALTS};
 use noah_plonk::plonk::constraint_system::{ConstraintSystem, TurboCS};
 use noah_plonk::plonk::indexer::indexer;
 use noah_plonk::plonk::prover::prover;
-use noah_plonk::poly_commit::kzg_poly_com::KZGCommitmentScheme;
 use noah_plonk::plonk::verifier::verifier;
+use noah_plonk::poly_commit::kzg_poly_com::KZGCommitmentScheme;
 use noah_plonk::poly_commit::pcs::PolyComScheme;
 
 fn merkle_tree_proof_bench(c: &mut Criterion) {
@@ -25,7 +23,6 @@ fn merkle_tree_proof_bench(c: &mut Criterion) {
         &[BN254Scalar::from(3u64), ANEMOI_JIVE_BN254_SALTS[0]],
     );
 
-    println!("number of constraints: {}", cs.size);
     for _ in 0..500 {
         let _ = cs.jive_crh::<AnemoiJive254>(&trace, &[va, vb, vc], ANEMOI_JIVE_BN254_SALTS[0]);
     }
@@ -58,7 +55,7 @@ fn merkle_tree_proof_bench(c: &mut Criterion) {
     });
     single_group.finish();
 
-    let proof =  prover(
+    let proof = prover(
         &mut prng,
         &mut transcript,
         &pcs,
@@ -66,7 +63,7 @@ fn merkle_tree_proof_bench(c: &mut Criterion) {
         &prover_params,
         &witness,
     )
-        .unwrap();
+    .unwrap();
 
     let mut single_group = c.benchmark_group("verify");
     single_group.sample_size(10);
@@ -81,7 +78,7 @@ fn merkle_tree_proof_bench(c: &mut Criterion) {
                 &[],
                 &proof,
             )
-                .unwrap()
+            .unwrap()
         });
     });
     single_group.finish();
