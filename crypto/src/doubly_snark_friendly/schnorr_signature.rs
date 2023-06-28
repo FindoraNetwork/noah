@@ -60,7 +60,7 @@ impl<G: CurveGroup> SchnorrSigningKey<G> {
         msg: &[G::BaseType],
     ) -> SchnorrSignature<G>
     where
-        H: AnemoiJive<G::BaseType, 2, 12>,
+        H: AnemoiJive<G::BaseType, 2, 14>,
         R: CryptoRng + RngCore,
     {
         let k = G::ScalarType::random(prng);
@@ -107,7 +107,7 @@ impl<G: CurveGroup> SchnorrVerifyingKey<G> {
         msg: &[G::BaseType],
     ) -> Result<()>
     where
-        H: AnemoiJive<G::BaseType, 2, 12>,
+        H: AnemoiJive<G::BaseType, 2, 14>,
     {
         let e_converted = G::ScalarType::from(&signature.schnorr_e.into());
 

@@ -2,6 +2,8 @@ use noah_algebra::prelude::*;
 
 /// The module for the AnemoiJive381 data structure.
 mod bls12_381;
+/// The deprecated module for the old AnemoiJive381 implementation.
+pub mod bls12_381_deprecated;
 /// The module for the AnemoiJive254 data structure.
 mod bn254;
 /// The module for the MDS matrices.
@@ -51,6 +53,10 @@ where
 
     /// The MDS matrix.
     const MDS_MATRIX: [[F; N]; N];
+
+    /// Whether or not a PHT map is used.
+    /// Note: PHT map should be used to withstand algebraic attacks.
+    const USE_PHT: bool;
 
     /// Return the inverse of alpha over `r - 1`.
     fn get_alpha_inv() -> Vec<u64>;
@@ -142,6 +148,12 @@ where
                     y[i] += &Self::ROUND_KEYS_Y[r][i];
                 }
                 mds.permute_in_place(&mut x, &mut y);
+                if Self::USE_PHT {
+                    for i in 0..N {
+                        y[i] += &x[i];
+                        x[i] += &y[i];
+                    }
+                }
                 for i in 0..N {
                     x[i] -= &(Self::GENERATOR * &(y[i].square()));
                     y[i] -= &x[i].pow(&alpha_inv);
@@ -153,6 +165,12 @@ where
             }
 
             mds.permute_in_place(&mut x, &mut y);
+            if Self::USE_PHT {
+                for i in 0..N {
+                    y[i] += &x[i];
+                    x[i] += &y[i];
+                }
+            }
 
             trace
                 .intermediate_values_before_constant_additions
@@ -196,6 +214,12 @@ where
                 y[i] += &Self::ROUND_KEYS_Y[r][i];
             }
             mds.permute_in_place(&mut x, &mut y);
+            if Self::USE_PHT {
+                for i in 0..N {
+                    y[i] += &x[i];
+                    x[i] += &y[i];
+                }
+            }
             for i in 0..N {
                 x[i] -= &(Self::GENERATOR * &(y[i].square()));
                 y[i] -= &x[i].pow(&alpha_inv);
@@ -205,6 +229,13 @@ where
             trace.intermediate_y_before_constant_additions[r] = y;
         }
         mds.permute_in_place(&mut x, &mut y);
+        if Self::USE_PHT {
+            for i in 0..N {
+                y[i] += &x[i];
+                x[i] += &y[i];
+            }
+        }
+
         trace.final_x = x;
         trace.final_y = y;
         let sum_after_perm: F = x.iter().sum::<F>() + y.iter().sum::<F>();
@@ -318,6 +349,12 @@ where
                     y[i] += &Self::ROUND_KEYS_Y[r][i];
                 }
                 mds.permute_in_place(x, y);
+                if Self::USE_PHT {
+                    for i in 0..N {
+                        y[i] += &x[i];
+                        x[i] += &y[i];
+                    }
+                }
                 for i in 0..N {
                     x[i] -= &(Self::GENERATOR * &(y[i].square()));
                     y[i] -= &x[i].pow(&alpha_inv);
@@ -329,6 +366,12 @@ where
             }
 
             mds.permute_in_place(x, y);
+            if Self::USE_PHT {
+                for i in 0..N {
+                    y[i] += &x[i];
+                    x[i] += &y[i];
+                }
+            }
 
             trace
                 .intermediate_values_before_constant_additions
@@ -394,6 +437,12 @@ where
                 y[i] += &Self::ROUND_KEYS_Y[r][i];
             }
             mds.permute_in_place(x, y);
+            if Self::USE_PHT {
+                for i in 0..N {
+                    y[i] += &x[i];
+                    x[i] += &y[i];
+                }
+            }
             for i in 0..N {
                 x[i] -= &(Self::GENERATOR * &(y[i].square()));
                 y[i] -= &x[i].pow(&alpha_inv);
@@ -401,5 +450,11 @@ where
             }
         }
         mds.permute_in_place(x, y);
+        if Self::USE_PHT {
+            for i in 0..N {
+                y[i] += &x[i];
+                x[i] += &y[i];
+            }
+        }
     }
 }

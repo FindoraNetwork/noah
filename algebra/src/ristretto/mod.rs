@@ -288,6 +288,11 @@ impl Scalar for RistrettoScalar {
             None
         }
     }
+
+    #[inline]
+    fn double(&self) -> Self {
+        *self + self
+    }
 }
 
 impl RistrettoScalar {

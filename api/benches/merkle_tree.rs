@@ -129,8 +129,8 @@ pub fn compute_merkle_root_variables_2_20(
     cs: &mut TurboPlonkCS,
     elem: AccElemVars,
     path_vars: &MerklePathVars,
-    leaf_trace: &AnemoiVLHTrace<BN254Scalar, 2, 12>,
-    traces: &Vec<JiveTrace<BN254Scalar, 2, 12>>,
+    leaf_trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
+    traces: &Vec<JiveTrace<BN254Scalar, 2, 14>>,
 ) -> VarIndex {
     let (uid, commitment) = (elem.uid, elem.commitment);
 

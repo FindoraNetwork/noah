@@ -303,6 +303,11 @@ impl Scalar for BLSScalar {
             None
         }
     }
+
+    #[inline]
+    fn double(&self) -> Self {
+        Self(self.0.double())
+    }
 }
 
 impl Domain for BLSScalar {

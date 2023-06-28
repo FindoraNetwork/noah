@@ -287,4 +287,9 @@ impl Scalar for BN254Fq {
             None
         }
     }
+
+    #[inline]
+    fn double(&self) -> Self {
+        Self(self.0.double())
+    }
 }

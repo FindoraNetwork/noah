@@ -42,7 +42,7 @@ pub trait HomomorphicPolyComElem<F: Scalar>: ToBytes + Clone + Sync + Send + Def
 /// Trait for polynomial commitment scheme.
 pub trait PolyComScheme: Sized {
     /// Type of prime field.
-    type Field: Domain + Debug + Sync + Send;
+    type Field: Copy + Domain + Debug + Sync + Send;
 
     /// Type of commitment produces, need to implement `HomomorphicPolyComElem`.
     type Commitment: HomomorphicPolyComElem<Self::Field>
