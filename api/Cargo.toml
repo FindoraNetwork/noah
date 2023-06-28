@@ -23,6 +23,11 @@ name = 'merkle_tree'
 path = 'benches/merkle_tree.rs'
 harness = false
 
+[[bench]]
+name = 'anemoi'
+path = 'benches/anemoi.rs'
+harness = false
+
 [package]
 name = 'noah'
 version = '0.5.0'
