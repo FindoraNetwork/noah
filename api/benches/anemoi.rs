@@ -4,13 +4,13 @@ use noah_algebra::bn254::{BN254PairingEngine, BN254Scalar};
 use noah_algebra::prelude::*;
 use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive254, ANEMOI_JIVE_BN254_SALTS};
 use noah_plonk::plonk::constraint_system::{ConstraintSystem, TurboCS};
-use noah_plonk::plonk::indexer::indexer;
+use noah_plonk::plonk::indexer::{indexer, indexer_with_lagrange, PlonkVK};
 use noah_plonk::plonk::prover::prover;
 use noah_plonk::plonk::verifier::verifier;
 use noah_plonk::poly_commit::kzg_poly_com::KZGCommitmentScheme;
 use noah_plonk::poly_commit::pcs::PolyComScheme;
 
-fn merkle_tree_proof_bench(c: &mut Criterion) {
+fn anemoi(c: &mut Criterion) {
     let mut cs = TurboCS::new();
     cs.load_anemoi_jive_parameters::<AnemoiJive254>();
 
@@ -36,12 +36,11 @@ fn merkle_tree_proof_bench(c: &mut Criterion) {
     let prover_params = indexer(&cs, &pcs).unwrap();
     let verifier_params = prover_params.get_verifier_params_ref();
 
-    let mut transcript = Transcript::new(b"TestTurboPlonk");
-
     let mut single_group = c.benchmark_group("prover");
     single_group.sample_size(10);
     single_group.bench_function("batch of 500".to_string(), |b| {
         b.iter(|| {
+            let mut transcript = Transcript::new(b"TestTurboPlonk");
             prover(
                 &mut prng,
                 &mut transcript,
@@ -55,6 +54,7 @@ fn merkle_tree_proof_bench(c: &mut Criterion) {
     });
     single_group.finish();
 
+    let mut transcript = Transcript::new(b"TestTurboPlonk");
     let proof = prover(
         &mut prng,
         &mut transcript,
@@ -65,9 +65,9 @@ fn merkle_tree_proof_bench(c: &mut Criterion) {
     )
     .unwrap();
 
-    let mut single_group = c.benchmark_group("verify");
+    let mut single_group = c.benchmark_group("verifier");
     single_group.sample_size(10);
-    single_group.bench_function("batch of 30".to_string(), |b| {
+    single_group.bench_function("batch of 500".to_string(), |b| {
         b.iter(|| {
             let mut transcript = Transcript::new(b"TestTurboPlonk");
             verifier(
@@ -82,7 +82,26 @@ fn merkle_tree_proof_bench(c: &mut Criterion) {
         });
     });
     single_group.finish();
+
+    let mut single_group = c.benchmark_group("indexer");
+    single_group.sample_size(10);
+    single_group.bench_function("batch of 500".to_string(), |b| {
+        b.iter(|| {
+            let _ = indexer_with_lagrange(&cs, &pcs, Some(&pcs), None).unwrap();
+        });
+    });
+    single_group.finish();
+
+    let vk = PlonkVK::<KZGCommitmentScheme<BN254PairingEngine>>::from(verifier_params.clone());
+    let mut single_group = c.benchmark_group("re-indexer");
+    single_group.sample_size(10);
+    single_group.bench_function("batch of 500".to_string(), |b| {
+        b.iter(|| {
+            let _ = indexer_with_lagrange(&cs, &pcs, Some(&pcs), Some(vk.clone())).unwrap();
+        });
+    });
+    single_group.finish();
 }
 
-criterion_group!(benches, merkle_tree_proof_bench);
+criterion_group!(benches, anemoi);
 criterion_main!(benches);
