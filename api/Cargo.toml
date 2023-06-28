@@ -4,6 +4,26 @@ path = 'src/parameters/setup.rs'
 required-features = ['gen']
 
 [[bench]]
+name = 'bulletproofs'
+path = 'benches/bulletproofs.rs'
+harness = false
+
+[[bench]]
+name = 'xfr'
+path = 'benches/xfr.rs'
+harness = false
+
+[[bench]]
+name = 'anon_xfr'
+path = 'benches/anon_xfr.rs'
+harness = false
+
+[[bench]]
+name = 'merkle_tree'
+path = 'benches/merkle_tree.rs'
+harness = false
+
+[[bench]]
 name = 'anemoi'
 path = 'benches/anemoi.rs'
 harness = false
