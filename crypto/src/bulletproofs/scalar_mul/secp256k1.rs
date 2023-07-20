@@ -38,8 +38,8 @@ impl PointVar {
         x: &Option<Fq>,
         y: &Option<Fq>,
     ) -> Result<Self> {
-        let x_var = cs.allocate((*x))?;
-        let y_var = cs.allocate((*y))?;
+        let x_var = cs.allocate(*x)?;
+        let y_var = cs.allocate(*y)?;
 
         Ok(Self { x_var, y_var })
     }
@@ -87,11 +87,7 @@ impl ScalarMulProof {
         };
 
         let mut cur_var = if public_key.is_some() {
-            PointVar::allocate(
-                cs,
-                &Some(dummy_point.x),
-                &Some(dummy_point.y),
-            )?
+            PointVar::allocate(cs, &Some(dummy_point.x), &Some(dummy_point.y))?
         } else {
             PointVar::allocate(cs, &None, &None)?
         };
@@ -179,11 +175,11 @@ impl ScalarMulProof {
         right: &Affine,
     ) -> Result<(Option<Affine>, PointVar)> {
         let (s_var, res_var, res) = if let Some(left) = left {
-            let s = (left.y - &right.y) * (left.x - &right.x).inverse().unwrap();
+            let s = (left.y - right.y) * (left.x - right.x).inverse().unwrap();
             let s_var = cs.allocate(Some(s))?;
 
-            let new_x = s * &s - &left.x - &right.x;
-            let new_y = s * (left.x - &new_x) - &left.y;
+            let new_x = s * s - left.x - right.x;
+            let new_y = s * (left.x - new_x) - left.y;
 
             let res_var = PointVar::allocate(cs, &Some(new_x), &Some(new_y))?;
             let res = left.add(right).into_affine();
@@ -276,8 +272,7 @@ impl ScalarMulProof {
         let secret_key_fq = Fq::from_le_bytes_mod_order(&secret_key.into_bigint().to_bytes_le());
 
         let secret_key_blinding = Fq::rand(prng);
-        let (secret_key_comm, secret_key_var) =
-            prover.commit(secret_key_fq, secret_key_blinding);
+        let (secret_key_comm, secret_key_var) = prover.commit(secret_key_fq, secret_key_blinding);
 
         let secret_key_var = ScalarVar(secret_key_var);
 
@@ -313,7 +308,7 @@ impl ScalarMulProof {
         &self,
         bp_gens: &BulletproofGens<AffineBig>,
         transcript: &mut Transcript,
-        commitments: &Vec<SECQ256K1G1>,
+        commitments: &[SECQ256K1G1],
     ) -> Result<()> {
         let pc_gens = PedersenCommitmentSecq256k1::default();
         let commitments = commitments

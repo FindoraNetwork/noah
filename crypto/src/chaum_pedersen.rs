@@ -330,7 +330,7 @@ pub fn chaum_pedersen_verify_multiple_eq<R: CryptoRng + RngCore>(
 /// of each, grouping scalars and elements, and executing a single multiexponentiation.
 /// Returns [CryptoError::ZKProofBatchVerificationError] if at least one instance has an incorrect proof.
 pub fn chaum_pedersen_batch_verify_multiple_eq<R: CryptoRng + RngCore>(
-    transcript: &mut Transcript,
+    transcript: &Transcript,
     prng: &mut R,
     instances: &[(Vec<RistrettoPoint>, &ChaumPedersenProofX)],
 ) -> Result<()> {

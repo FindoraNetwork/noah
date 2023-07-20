@@ -34,7 +34,7 @@ impl<G: CurveGroup, P: ElligatorParameters<G>> Elligator<G, P> {
             y_squared += &(*x * x * P::A);
         }
         if !P::B.is_zero() {
-            y_squared += &(*x * &P::B);
+            y_squared += &(*x * P::B);
         }
 
         y_squared.legendre() != LegendreSymbol::QuadraticNonResidue
@@ -66,7 +66,7 @@ impl<G: CurveGroup, P: ElligatorParameters<G>> HashingToCurve<G> for Elligator<G
             y_squared += &(x1 * x1 * P::A);
         }
         if !P::B.is_zero() {
-            y_squared += &(x1 * &P::B);
+            y_squared += &(x1 * P::B);
         }
 
         let b1 = y_squared.legendre() != LegendreSymbol::QuadraticNonResidue;
@@ -94,7 +94,7 @@ impl<G: CurveGroup, P: ElligatorParameters<G>> HashingToCurve<G> for Elligator<G
             y_squared += &(x1 * x1 * P::A);
         }
         if !P::B.is_zero() {
-            y_squared += &(x1 * &P::B);
+            y_squared += &(x1 * P::B);
         }
 
         let b1 = y_squared.legendre() != LegendreSymbol::QuadraticNonResidue;
@@ -110,7 +110,7 @@ impl<G: CurveGroup, P: ElligatorParameters<G>> HashingToCurve<G> for Elligator<G
                 y_squared += &(x2 * x2 * P::A);
             }
             if !P::B.is_zero() {
-                y_squared += &(x2 * &P::B);
+                y_squared += &(x2 * P::B);
             }
 
             let y = y_squared.sqrt().unwrap();
@@ -130,7 +130,7 @@ impl<G: CurveGroup, P: ElligatorParameters<G>> HashingToCurve<G> for Elligator<G
             y_squared += &(x1 * x1 * P::A);
         }
         if !P::B.is_zero() {
-            y_squared += &(x1 * &P::B);
+            y_squared += &(x1 * P::B);
         }
 
         let b1 = y_squared.legendre() != LegendreSymbol::QuadraticNonResidue;
@@ -147,7 +147,7 @@ impl<G: CurveGroup, P: ElligatorParameters<G>> HashingToCurve<G> for Elligator<G
                 y_squared += &(x2 * x2 * P::A);
             }
             if !P::B.is_zero() {
-                y_squared += &(x2 * &P::B);
+                y_squared += &(x2 * P::B);
             }
             let y = y_squared.sqrt().unwrap();
 
@@ -173,7 +173,7 @@ impl<G: CurveGroup, P: ElligatorParameters<G>> HashingToCurve<G> for Elligator<G
             y_squared += &(x1 * x1 * P::A);
         }
         if !P::B.is_zero() {
-            y_squared += &(x1 * &P::B);
+            y_squared += &(x1 * P::B);
         }
 
         if trace.b1 {
@@ -187,7 +187,7 @@ impl<G: CurveGroup, P: ElligatorParameters<G>> HashingToCurve<G> for Elligator<G
         let b1 = trace.b1;
 
         if b1 {
-            return *final_x == x1
+            return *final_x == x1;
         }
 
         let x2 = P::A.add(x1).neg();

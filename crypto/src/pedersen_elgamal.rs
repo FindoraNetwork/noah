@@ -250,7 +250,7 @@ pub struct PedersenElGamalProofInstance<'a> {
 /// of size `2 + n*7` elems. Each instance verification equation is scaled by a random factor.
 /// Then, scaled equations are aggregated into a single equation of size 2 + n*7 elements.
 pub fn pedersen_elgamal_batch_verify<R: CryptoRng + RngCore>(
-    transcript: &mut Transcript,
+    transcript: &Transcript,
     prng: &mut R,
     instances: &[PedersenElGamalProofInstance<'_>],
 ) -> Result<()> {
@@ -328,7 +328,7 @@ pub fn pedersen_elgamal_batch_verify<R: CryptoRng + RngCore>(
 }
 /// Verify Proof of Knowledge for PedersenElGamal equality proof, for a set of statement.
 pub fn pedersen_elgamal_aggregate_eq_verify<R: CryptoRng + RngCore>(
-    transcript: &mut Transcript,
+    transcript: &Transcript,
     prng: &mut R,
     public_key: &ElGamalEncKey<RistrettoPoint>,
     ctexts: &[ElGamalCiphertext<RistrettoPoint>],

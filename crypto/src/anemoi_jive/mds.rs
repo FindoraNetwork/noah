@@ -42,19 +42,19 @@ impl<F: Scalar> ApplicableMDSMatrix<F, 2> for MDSMatrix<F, 2> {
         // The one for y has a simple word permutation.
 
         let old_x = *x;
-        for i in 0..2 {
-            x[i] = F::zero();
-            for j in 0..2 {
-                x[i] += &(self.0[i][j] * old_x[j]);
+        for (i, _x) in x.iter_mut().enumerate().take(2) {
+            *_x = F::zero();
+            for (j, ox) in old_x.iter().enumerate() {
+                *_x += &(self.0[i][j] * ox);
             }
         }
 
         // y has a simple word permutation.
         let old_y = [y[1], y[0]];
-        for i in 0..2 {
-            y[i] = F::zero();
-            for j in 0..2 {
-                y[i] += &(self.0[i][j] * old_y[j]);
+        for (i, _y) in y.iter_mut().enumerate().take(2) {
+            *_y = F::zero();
+            for (j, oy) in old_y.iter().enumerate() {
+                *_y += &(self.0[i][j] * oy);
             }
         }
     }

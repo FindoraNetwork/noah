@@ -57,9 +57,7 @@ impl<G: CurveGroup, H: HashingToCurve<G>> GapDHSignature<G, H> for StandardGDH<G
             G::ScalarType::random(&mut rng)
         };
 
-        let response = r * &beta + sk;
-
-        
+        let response = r * beta + sk;
 
         StandardGDHProof {
             point_r_1,

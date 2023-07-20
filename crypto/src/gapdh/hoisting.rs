@@ -84,11 +84,9 @@ impl<G: CurveGroup, H: HashingToCurve<G>> GapDHSignature<G, H> for HoistingGDH<G
             G::ScalarType::random(&mut rng)
         };
 
-        let response_1 = r2 * &beta + sk;
-        let response_2 = r3 * &beta + r1;
-        let response_3 = r4 * &beta + sk.square();
-
-        
+        let response_1 = r2 * beta + sk;
+        let response_2 = r3 * beta + r1;
+        let response_3 = r4 * beta + sk.square();
 
         HoistingGDHProof {
             point_p,

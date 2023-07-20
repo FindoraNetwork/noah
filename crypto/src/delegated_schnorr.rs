@@ -38,6 +38,12 @@ pub struct DSInspection<F, S, G> {
 /// The state of the inspector over Ristretto in BLS12-381.
 pub type DSInspectionBN254Ristretto = DSInspection<BN254Scalar, RistrettoScalar, RistrettoPoint>;
 
+impl<F: Scalar, S: Scalar, G: Group<ScalarType = S>> Default for DSInspection<F, S, G> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<F: Scalar, S: Scalar, G: Group<ScalarType = S>> DSInspection<F, S, G> {
     /// Create a dummy new one.
     pub fn new() -> Self {
@@ -46,6 +52,12 @@ impl<F: Scalar, S: Scalar, G: Group<ScalarType = S>> DSInspection<F, S, G> {
             r: F::default(),
             group_phantom: PhantomData,
         }
+    }
+}
+
+impl<F: Scalar, S: Scalar, G: Group<ScalarType = S>> Default for DSProof<F, S, G> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

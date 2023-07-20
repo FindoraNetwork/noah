@@ -36,8 +36,8 @@ impl PointVar {
         x: &Option<Fq>,
         y: &Option<Fq>,
     ) -> Result<Self> {
-        let x_var = cs.allocate((*x))?;
-        let y_var = cs.allocate((*y))?;
+        let x_var = cs.allocate(*x)?;
+        let y_var = cs.allocate(*y)?;
 
         Ok(Self { x_var, y_var })
     }
@@ -85,11 +85,7 @@ impl ScalarMulProof {
         };
 
         let mut cur_var = if public_key.is_some() {
-            PointVar::allocate(
-                cs,
-                &Some(dummy_point.x),
-                &Some(dummy_point.y),
-            )?
+            PointVar::allocate(cs, &Some(dummy_point.x), &Some(dummy_point.y))?
         } else {
             PointVar::allocate(cs, &None, &None)?
         };
@@ -314,7 +310,7 @@ impl ScalarMulProof {
         &self,
         bp_gens: &BulletproofGens<G1AffineBig>,
         transcript: &mut Transcript,
-        commitments: &Vec<ZorroG1>,
+        commitments: &[ZorroG1],
     ) -> Result<()> {
         let pc_gens = PedersenCommitmentZorro::default();
         let commitments = commitments

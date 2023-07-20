@@ -155,9 +155,9 @@ where
                     }
                 }
                 for i in 0..N {
-                    x[i] -= &(Self::GENERATOR * &(y[i].square()));
+                    x[i] -= &(Self::GENERATOR * (y[i].square()));
                     y[i] -= &x[i].pow(&alpha_inv);
-                    x[i] += &(Self::GENERATOR * &(y[i].square()) + Self::GENERATOR_INV);
+                    x[i] += &(Self::GENERATOR * (y[i].square()) + Self::GENERATOR_INV);
                 }
 
                 intermediate_values_before_constant_additions.0[r] = x;
@@ -202,9 +202,13 @@ where
     fn eval_jive_with_trace(x: &[F; N], y: &[F; N]) -> JiveTrace<F, N, NUM_ROUNDS> {
         let mds = MDSMatrix::<F, N>(Self::MDS_MATRIX);
         let alpha_inv = Self::get_alpha_inv();
-        let mut trace = JiveTrace::default();
-        trace.input_x = *x;
-        trace.input_y = *y;
+
+        let mut trace = JiveTrace::<F, N, NUM_ROUNDS> {
+            input_x: *x,
+            input_y: *y,
+            ..Default::default()
+        };
+
         let mut x = *x;
         let mut y = *y;
         let sum_before_perm: F = x.iter().sum::<F>() + y.iter().sum::<F>();
@@ -221,9 +225,9 @@ where
                 }
             }
             for i in 0..N {
-                x[i] -= &(Self::GENERATOR * &(y[i].square()));
+                x[i] -= &(Self::GENERATOR * (y[i].square()));
                 y[i] -= &x[i].pow(&alpha_inv);
-                x[i] += &(Self::GENERATOR * &(y[i].square()) + Self::GENERATOR_INV);
+                x[i] += &(Self::GENERATOR * (y[i].square()) + Self::GENERATOR_INV);
             }
             trace.intermediate_x_before_constant_additions[r] = x;
             trace.intermediate_y_before_constant_additions[r] = y;
@@ -356,9 +360,9 @@ where
                     }
                 }
                 for i in 0..N {
-                    x[i] -= &(Self::GENERATOR * &(y[i].square()));
+                    x[i] -= &(Self::GENERATOR * (y[i].square()));
                     y[i] -= &x[i].pow(&alpha_inv);
-                    x[i] += &(Self::GENERATOR * &(y[i].square()) + Self::GENERATOR_INV);
+                    x[i] += &(Self::GENERATOR * (y[i].square()) + Self::GENERATOR_INV);
                 }
 
                 intermediate_values_before_constant_additions.0[r] = *x;
@@ -444,9 +448,9 @@ where
                 }
             }
             for i in 0..N {
-                x[i] -= &(Self::GENERATOR * &(y[i].square()));
+                x[i] -= &(Self::GENERATOR * (y[i].square()));
                 y[i] -= &x[i].pow(&alpha_inv);
-                x[i] += &(Self::GENERATOR * &(y[i].square()) + Self::GENERATOR_INV);
+                x[i] += &(Self::GENERATOR * (y[i].square()) + Self::GENERATOR_INV);
             }
         }
         mds.permute_in_place(x, y);
