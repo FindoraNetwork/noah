@@ -32,7 +32,7 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
     transcript_init_plonk(transcript, verifier_params, pi, &root);
     let mut challenges = PlonkChallenges::new();
     // 1. compute all challenges such as gamma, beta, alpha, zeta and u.
-    compute_challenges::<PCS>(&mut challenges, transcript, &proof, cs.size());
+    compute_challenges::<PCS>(&mut challenges, transcript, proof, cs.size());
 
     // 2. compute Z_h(\zeta) and L_1(\zeta).
     let (z_h_eval_zeta, first_lagrange_eval_zeta) =
@@ -105,7 +105,7 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
         transcript,
         &commitments[..],
         verifier_params.cs_size + 2,
-        &zeta,
+        zeta,
         &values[..],
     );
 
@@ -131,7 +131,7 @@ pub fn verifier<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field>>(
         transcript,
         &[comm, comm_omega],
         verifier_params.cs_size + 32,
-        &[zeta.clone(), zeta_omega.clone()],
+        &[*zeta, zeta_omega],
         &[val, val_omega],
         &[
             proof.opening_witness_zeta.clone(),
@@ -161,7 +161,7 @@ fn compute_challenges<PCS: PolyComScheme>(
     let alpha = transcript_get_plonk_challenge_alpha(transcript, group_order);
     challenges.insert_alpha(alpha).unwrap();
     for cm_t in &proof.cm_t_vec {
-        transcript.append_commitment::<PCS::Commitment>(&cm_t);
+        transcript.append_commitment::<PCS::Commitment>(cm_t);
     }
 
     // 3. compute zeta challenge.

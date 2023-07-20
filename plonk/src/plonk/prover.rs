@@ -146,7 +146,7 @@ pub fn prover_with_lagrange<
         start_timer!(|| "Prepare the extended witness and the input");
     // Prepare extended witness
     let extended_witness = cs.extend_witness(w);
-    let pi = pi_poly::<PCS, Radix2EvaluationDomain<_>>(&prover_params, &online_values, &domain);
+    let pi = pi_poly::<PCS, Radix2EvaluationDomain<_>>(prover_params, &online_values, &domain);
     end_timer!(extended_witness_and_pi_timer);
 
     // 1. build witness polynomials, hide them and commit
@@ -369,7 +369,7 @@ pub fn prover_with_lagrange<
             transcript,
             lagrange_pcs,
             &polys_to_open[..],
-            &zeta,
+            zeta,
             n_constraints + 2,
         )
         .map_err(|_| PlonkError::ProofError)?;

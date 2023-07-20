@@ -194,7 +194,7 @@ pub(super) fn z_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
                 let k_x = k[j].mul(&group[i]);
                 let f_x = &w[j * n_constraints + i];
                 let f_plus_beta_id_plus_gamma = &f_x.add(gamma).add(&beta.mul(&k_x));
-                numerator.mul_assign(&f_plus_beta_id_plus_gamma);
+                numerator.mul_assign(f_plus_beta_id_plus_gamma);
 
                 let p_x = p_of_x(perm[j * n_constraints + i], n_constraints, group, k);
                 let f_plus_beta_perm_plus_gamma = f_x.add(gamma).add(&beta.mul(&p_x));
@@ -248,8 +248,8 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
     let k = &prover_params.verifier_params.k;
 
     let mut z_h_inv_coset_evals: Vec<<PCS::Field as Domain>::Field> = Vec::with_capacity(factor);
-    let group_gen_pow_n = domain_m.group_gen.pow(&[n as u64]);
-    let mut multiplier = k[1].get_field().pow(&[n as u64]);
+    let group_gen_pow_n = domain_m.group_gen.pow([n as u64]);
+    let mut multiplier = k[1].get_field().pow([n as u64]);
     for _ in 0..factor {
         let eval = multiplier.sub(&<PCS::Field as Domain>::Field::one());
         z_h_inv_coset_evals.push(eval);
@@ -312,7 +312,7 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
                 let tmp = &w_poly_coset_evals[point]
                     .add(gamma)
                     .add(&beta.mul(&s_coset_evals[point]));
-                term3.mul_assign(&tmp);
+                term3.mul_assign(tmp);
             }
 
             // alpha^2 * (z(X) - 1) * L_1(X)
@@ -363,7 +363,7 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
             let w3_2w0_eval_point = w0_eval_point + w3_w0_eval_point;
             let w2_2w1_eval_point = w1_eval_point + w2_w1_eval_point;
 
-            let tmp = w3_w0_eval_point + &(g * &w2_w1_eval_point) + &q_prk3_eval_point;
+            let tmp = w3_w0_eval_point + (g * w2_w1_eval_point) + q_prk3_eval_point;
 
             // - alpha^6 * q_{prk3} *
             //  (
@@ -372,8 +372,8 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
             //    - (2w[0] + w[3] + g * (2w[1] + w[2]) + q_{prk1})
             //  )
             let term8 = alpha_pow_6.mul(&q_prk3_eval_point).mul(
-                (tmp - &w2_eval_point_next).pow(five) + &(g * tmp.square())
-                    - &(w3_2w0_eval_point + g * w2_2w1_eval_point + &q_prk1_eval_point),
+                (tmp - &w2_eval_point_next).pow(five) + (g * tmp.square())
+                    - &(w3_2w0_eval_point + g * w2_2w1_eval_point + q_prk1_eval_point),
             );
             // - alpha^8 * q_{prk3} *
             //  (
@@ -382,7 +382,7 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
             //    - w_next[0]
             //  )
             let term10 = alpha_pow_8.mul(&q_prk3_eval_point).mul(
-                (tmp - &w2_eval_point_next).pow(five) + &(g * w2_eval_point_next.square()) + g_inv
+                (tmp - &w2_eval_point_next).pow(five) + (g * w2_eval_point_next.square()) + g_inv
                     - &w0_eval_point_next,
             );
 
@@ -392,14 +392,13 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
             //    + g * (g * (w[0] + w[3]) + (g^2 + 1) * (w[1] + w[2]) + q_{prk4}) ^ 2
             //    - (g * (2w[0] + w[3]) + (g^2 + 1) * (2w[1] + w[2]) + q_{prk2})
             //  )
-            let tmp = g * &w3_w0_eval_point
-                + &(g_square_plus_one * &w2_w1_eval_point)
-                + &q_prk4_eval_point;
+            let tmp =
+                g * w3_w0_eval_point + (g_square_plus_one * w2_w1_eval_point) + q_prk4_eval_point;
             let term9 = alpha_pow_7.mul(&q_prk3_eval_point).mul(
-                (tmp - &wo_eval_point).pow(five) + &(g * tmp.square())
-                    - &(g * &w3_2w0_eval_point
-                        + g_square_plus_one * &w2_2w1_eval_point
-                        + &q_prk2_eval_point),
+                (tmp - &wo_eval_point).pow(five) + (g * tmp.square())
+                    - &(g * w3_2w0_eval_point
+                        + g_square_plus_one * w2_2w1_eval_point
+                        + q_prk2_eval_point),
             );
 
             // - alpha^9 * q_{prk3} *
@@ -409,7 +408,7 @@ pub(super) fn t_poly<PCS: PolyComScheme, CS: ConstraintSystem<Field = PCS::Field
             //    - w_next[1]
             //  )
             let term11 = alpha_pow_9.mul(&q_prk3_eval_point).mul(
-                (tmp - &wo_eval_point).pow(five) + &(g * wo_eval_point.square()) + g_inv
+                (tmp - &wo_eval_point).pow(five) + (g * wo_eval_point.square()) + g_inv
                     - &w1_eval_point_next,
             );
 
@@ -503,7 +502,7 @@ fn r_poly_or_comm<F: Scalar, PCSType: HomomorphicPolyComElem<F>>(
 
     let factor = zeta.pow(&[n_t_polys as u64]);
     let mut exponent = z_h_eval_zeta.mul(factor);
-    let mut t_poly_combined = t_polys_or_comms[0].clone().mul(&z_h_eval_zeta);
+    let mut t_poly_combined = t_polys_or_comms[0].clone().mul(z_h_eval_zeta);
     for t_poly in t_polys_or_comms.iter().skip(1) {
         t_poly_combined.add_assign(&t_poly.mul(&exponent));
         exponent.mul_assign(&factor);
@@ -843,36 +842,36 @@ pub(super) fn r_eval_zeta<PCS: PolyComScheme>(
     let w2_2w1 = w2_w1 + proof.w_polys_eval_zeta[1];
 
     let five = &[5u64];
-    let tmp = w3_w0 + &(anemoi_generator * &w2_w1) + &proof.prk_3_poly_eval_zeta;
+    let tmp = w3_w0 + (anemoi_generator * w2_w1) + proof.prk_3_poly_eval_zeta;
     let term3 = alpha_pow_6.mul(&proof.prk_3_poly_eval_zeta).mul(
-        (tmp - &proof.w_polys_eval_zeta_omega[2]).pow(five) + anemoi_generator * &tmp.square()
-            - &(w3_2w0 + &(anemoi_generator * &w2_2w1)),
+        (tmp - &proof.w_polys_eval_zeta_omega[2]).pow(five) + anemoi_generator * tmp.square()
+            - &(w3_2w0 + (anemoi_generator * w2_2w1)),
     );
     let term5 = alpha_pow_8.mul(&proof.prk_3_poly_eval_zeta).mul(
         (tmp - &proof.w_polys_eval_zeta_omega[2]).pow(five)
-            + anemoi_generator * &proof.w_polys_eval_zeta_omega[2].square()
+            + anemoi_generator * proof.w_polys_eval_zeta_omega[2].square()
             + anemoi_generator_inv
             - &proof.w_polys_eval_zeta_omega[0],
     );
 
     let anemoi_generator_square_plus_one = anemoi_generator.square().add(PCS::Field::one());
-    let tmp = anemoi_generator * &w3_w0
-        + &(anemoi_generator_square_plus_one * &w2_w1)
-        + &proof.prk_4_poly_eval_zeta;
+    let tmp = anemoi_generator * w3_w0
+        + (anemoi_generator_square_plus_one * w2_w1)
+        + proof.prk_4_poly_eval_zeta;
     let term4 = alpha_pow_7.mul(&proof.prk_3_poly_eval_zeta).mul(
-        (tmp - &proof.w_polys_eval_zeta[4]).pow(five) + anemoi_generator * &tmp.square()
-            - &(anemoi_generator * &w3_2w0 + &(anemoi_generator_square_plus_one * &w2_2w1)),
+        (tmp - &proof.w_polys_eval_zeta[4]).pow(five) + anemoi_generator * tmp.square()
+            - &(anemoi_generator * w3_2w0 + (anemoi_generator_square_plus_one * w2_2w1)),
     );
     let term6 = alpha_pow_9.mul(&proof.prk_3_poly_eval_zeta).mul(
         (tmp - &proof.w_polys_eval_zeta[4]).pow(five)
-            + anemoi_generator * &proof.w_polys_eval_zeta[4].square()
+            + anemoi_generator * proof.w_polys_eval_zeta[4].square()
             + anemoi_generator_inv
             - &proof.w_polys_eval_zeta_omega[1],
     );
 
     let term1_plus_term2 = term1.add(&term2);
     term1_plus_term2
-        .sub(&term0)
+        .sub(term0)
         .add(&term3)
         .add(&term4)
         .add(&term5)
@@ -914,12 +913,10 @@ pub(crate) fn split_t_and_commit<R: CryptoRng + RngCore, PCS: PolyComScheme>(
             coefs.resize(n + 1, zero);
             coefs[n].add_assign(&rand);
             coefs[0].sub_assign(&prev_coef);
+        } else if coefs.is_empty() {
+            coefs = vec![prev_coef.neg()];
         } else {
-            if coefs.len() == 0 {
-                coefs = vec![prev_coef.neg()];
-            } else {
-                coefs[0].sub_assign(&prev_coef);
-            }
+            coefs[0].sub_assign(&prev_coef);
         }
         prev_coef = rand;
 
@@ -940,7 +937,7 @@ pub(crate) fn split_t_and_commit<R: CryptoRng + RngCore, PCS: PolyComScheme>(
 
             let mut new_coefs = coefs[..max_power_of_2].to_vec();
             for (i, v) in blinds.iter().enumerate() {
-                new_coefs[i] = new_coefs[i] - v;
+                new_coefs[i] -= v;
             }
 
             let sub_q = FpPolynomial::from_coefs(new_coefs);

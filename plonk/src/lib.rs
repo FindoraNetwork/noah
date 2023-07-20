@@ -16,7 +16,7 @@
     rust_2018_idioms,
     rust_2021_compatibility
 )]
-#![allow(clippy::too_many_arguments)]
+#![allow(clippy::too_many_arguments, clippy::type_complexity)]
 
 #[macro_use]
 extern crate serde_derive;

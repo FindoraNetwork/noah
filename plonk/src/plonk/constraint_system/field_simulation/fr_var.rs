@@ -17,7 +17,7 @@ pub struct SimFrVar<F: Scalar, P: SimFrParams<F>> {
 
 impl<F: Scalar, P: SimFrParams<F>> SimFrVar<F, P> {
     /// Create a zero `SimFr`.
-    pub fn new(cs: &mut TurboCS<F>) -> Self {
+    pub fn new(cs: &TurboCS<F>) -> Self {
         Self {
             val: SimFr::<F, P>::default(),
             var: vec![cs.zero_var(); P::NUM_OF_LIMBS],
@@ -39,12 +39,12 @@ impl<F: Scalar, P: SimFrParams<F>> SimFrVar<F, P> {
 
         // The following gate represents
         // res.var[i] := self.var[i] - other.var[i] + r_limbs[i]
-        for i in 0..P::NUM_OF_LIMBS {
+        for (i, r_limb) in r_limbs.iter().enumerate().take(P::NUM_OF_LIMBS) {
             res.var[i] = cs.new_variable(res.val.limbs[i]);
 
             cs.push_add_selectors(one, zero, minus_one, zero);
             cs.push_mul_selectors(zero, zero);
-            cs.push_constant_selector(r_limbs[i]);
+            cs.push_constant_selector(*r_limb);
             cs.push_ecc_selector(zero);
             cs.push_out_selector(one);
 

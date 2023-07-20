@@ -221,9 +221,9 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
     fn get_hiding_degree(&self, idx: usize) -> usize {
         // The first three wires, i.e., 0, 1, 2, would require a hiding degree of 3.
         if idx < 3 {
-            return 3;
+            3
         } else {
-            return 2;
+            2
         }
     }
 }
@@ -560,7 +560,7 @@ impl<F: Scalar> TurboCS<F> {
         let two = one.add(&one);
         let four = two.add(&two);
         let eight = four.add(&four);
-        let bin = vec![one, two, four, eight];
+        let bin = [one, two, four, eight];
 
         let mut acc = b[n_bits - 1];
         self.insert_boolean_gate(b[n_bits - 1]);
@@ -845,10 +845,10 @@ impl<F: Scalar> TurboCS<F> {
                     )));
                 }
 
-                let prk_i_a = self.anemoi_preprocessed_round_keys_x[r][0].clone();
-                let prk_i_b = self.anemoi_preprocessed_round_keys_x[r][1].clone();
-                let prk_i_c = self.anemoi_preprocessed_round_keys_y[r][0].clone();
-                let prk_i_d = self.anemoi_preprocessed_round_keys_y[r][1].clone();
+                let prk_i_a = self.anemoi_preprocessed_round_keys_x[r][0];
+                let prk_i_b = self.anemoi_preprocessed_round_keys_x[r][1];
+                let prk_i_c = self.anemoi_preprocessed_round_keys_y[r][0];
+                let prk_i_d = self.anemoi_preprocessed_round_keys_y[r][1];
 
                 let g = self.anemoi_generator;
                 let g2 = g.square().add(F::one());

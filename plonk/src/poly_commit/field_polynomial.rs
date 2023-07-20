@@ -157,7 +157,7 @@ impl<F: Domain> FpPolynomial<F> {
     /// assert_eq!(poly.degree(), 0)
     /// ```
     pub fn degree(&self) -> usize {
-        if self.coefs.len() == 0 {
+        if self.coefs.is_empty() {
             0
         } else {
             self.coefs.len() - 1

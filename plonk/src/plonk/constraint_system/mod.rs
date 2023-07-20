@@ -100,7 +100,7 @@ pub trait ConstraintSystem: Sized {
         let mut extended = Vec::with_capacity(Self::n_wires_per_gate() * self.size());
         for wire_slice in self.wiring().iter() {
             for index in wire_slice.iter() {
-                extended.push(witness[*index].clone());
+                extended.push(witness[*index]);
             }
         }
         extended

@@ -195,13 +195,11 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
         .ok_or(PlonkError::GroupNotFound(m))?;
     let group = domain
         .elements()
-        .into_iter()
-        .map(|x| PCS::Field::from_field(x))
+        .map(PCS::Field::from_field)
         .collect::<Vec<_>>();
     let k = choose_ks::<_, PCS::Field>(&mut prng, n_wires_per_gate);
     let coset_quotient = domain_m
         .elements()
-        .into_iter()
         .map(|x| k[1].mul(&PCS::Field::from_field(x)))
         .collect();
 
@@ -216,7 +214,7 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
             Ok(cm)
         } else {
             let cm = pcs
-                .commit(&polynomial)
+                .commit(polynomial)
                 .map_err(|_| PlonkError::SetupError)?;
             Ok(cm)
         }
@@ -301,7 +299,7 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
 
         let q_prk_polys: Vec<FpPolynomial<PCS::Field>> = q_prk_evals
             .iter()
-            .map(|p| FpPolynomial::ifft_with_domain(&domain, &p))
+            .map(|p| FpPolynomial::ifft_with_domain(&domain, p))
             .collect::<Vec<FpPolynomial<PCS::Field>>>();
 
         let q_prk_coset_evals = q_prk_polys
