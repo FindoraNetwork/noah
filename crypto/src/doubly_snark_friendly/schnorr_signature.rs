@@ -74,7 +74,7 @@ impl<G: CurveGroup> SchnorrSigningKey<G> {
         // This will perform a modular reduction.
         let e_converted = G::ScalarType::from(&e.into());
 
-        let s = k - &(self.0 * &e_converted);
+        let s = k - &(self.0 * e_converted);
 
         SchnorrSignature {
             schnorr_s: s,

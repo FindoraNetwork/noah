@@ -75,24 +75,18 @@ impl Group for SECQ256K1G1 {
 
     #[inline]
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
-        let affine = Affine::deserialize_with_mode(bytes, Compress::Yes, Validate::Yes);
+        let affine = Affine::deserialize_with_mode(bytes, Compress::Yes, Validate::Yes)
+            .map_err(|_| AlgebraError::DeserializationError)?;
 
-        if affine.is_ok() {
-            Ok(Self(Projective::from(affine.unwrap()))) // safe unwrap
-        } else {
-            Err(AlgebraError::DeserializationError)
-        }
+        Ok(Self(Projective::from(affine)))
     }
 
     #[inline]
     fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
-        let affine = Affine::deserialize_with_mode(bytes, Compress::No, Validate::No);
+        let affine = Affine::deserialize_with_mode(bytes, Compress::No, Validate::No)
+            .map_err(|_| AlgebraError::DeserializationError)?;
 
-        if affine.is_ok() {
-            Ok(Self(Projective::from(affine.unwrap()))) // safe unwrap
-        } else {
-            Err(AlgebraError::DeserializationError)
-        }
+        Ok(Self(Projective::from(affine)))
     }
 
     #[inline]
@@ -175,6 +169,6 @@ impl<'a> SubAssign<&'a SECQ256K1G1> for SECQ256K1G1 {
 impl<'a> MulAssign<&'a SECQ256K1Scalar> for SECQ256K1G1 {
     #[inline]
     fn mul_assign(&mut self, rhs: &'a SECQ256K1Scalar) {
-        self.0.mul_assign(rhs.0.clone())
+        self.0.mul_assign(rhs.0)
     }
 }

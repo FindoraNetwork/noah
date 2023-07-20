@@ -39,7 +39,7 @@ impl<'a> Sub<&'a BLSGt> for BLSGt {
 
     #[inline]
     fn sub(self, rhs: &'a BLSGt) -> Self::Output {
-        let mut rhs_inverse = rhs.0.clone();
+        let mut rhs_inverse = rhs.0;
         rhs_inverse.conjugate_in_place();
 
         Self(self.0.mul(&rhs_inverse))
@@ -87,7 +87,7 @@ impl<'a> AddAssign<&'a BLSGt> for BLSGt {
 impl<'a> SubAssign<&'a BLSGt> for BLSGt {
     #[inline]
     fn sub_assign(&mut self, rhs: &'a BLSGt) {
-        let mut rhs_inverse = rhs.0.clone();
+        let mut rhs_inverse = rhs.0;
         rhs_inverse.conjugate_in_place();
 
         self.0.mul_assign(&rhs_inverse)
@@ -146,24 +146,18 @@ impl Group for BLSGt {
 
     #[inline]
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
-        let res = Fp12::<Fq12Config>::deserialize_with_mode(bytes, Compress::Yes, Validate::Yes);
+        let res = Fp12::<Fq12Config>::deserialize_with_mode(bytes, Compress::Yes, Validate::Yes)
+            .map_err(|_| AlgebraError::DeserializationError)?;
 
-        if res.is_ok() {
-            Ok(Self(res.unwrap()))
-        } else {
-            Err(AlgebraError::DeserializationError)
-        }
+        Ok(Self(res))
     }
 
     #[inline]
     fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
-        let res = Fp12::<Fq12Config>::deserialize_with_mode(bytes, Compress::No, Validate::No);
+        let res = Fp12::<Fq12Config>::deserialize_with_mode(bytes, Compress::No, Validate::No)
+            .map_err(|_| AlgebraError::DeserializationError)?;
 
-        if res.is_ok() {
-            Ok(Self(res.unwrap()))
-        } else {
-            Err(AlgebraError::DeserializationError)
-        }
+        Ok(Self(res))
     }
 
     #[inline]

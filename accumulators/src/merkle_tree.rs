@@ -207,7 +207,7 @@ impl<'a, D: MerkleDB> PersistentMerkleTree<'a, D> {
             .collect::<Result<Vec<ProofNode>>>()?;
 
         Ok(Proof {
-            nodes: nodes,
+            nodes,
             root: self.get_root_with_depth(depth)?,
             root_version: self.version(),
             uid: id,
@@ -592,7 +592,7 @@ impl EphemeralMerkleTree {
             .collect::<Result<Vec<ProofNode>>>()?;
 
         Ok(Proof {
-            nodes: nodes,
+            nodes,
             root: self.get_root_with_depth(depth)?,
             root_version: 0,
             uid: id,
@@ -741,11 +741,11 @@ fn get_path_keys(uid: u64) -> Vec<(u64, TreePath)> {
         match rem {
             1 => {
                 keys.push((key, TreePath::Left));
-                key = key / 3;
+                key /= 3;
             }
             2 => {
                 keys.push((key, TreePath::Middle));
-                key = key / 3;
+                key /= 3;
             }
             0 => {
                 keys.push((key, TreePath::Right));

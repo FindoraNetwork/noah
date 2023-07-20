@@ -138,7 +138,7 @@ impl<S: Scalar> TurboCS<S> {
         assert!(p1_var.1 < self.num_vars, "p1.y variable index out of bound");
         assert!(p2_var.0 < self.num_vars, "p2.x variable index out of bound");
         assert!(p2_var.1 < self.num_vars, "p2.y variable index out of bound");
-        let p_out_ext = p1_ext.add(&p2_ext);
+        let p_out_ext = p1_ext.add(p2_ext);
         let p_out_var = self.new_point_variable(p_out_ext);
         self.insert_ecc_add_gate::<T>(p1_var, p2_var, &p_out_var);
         ExtendedPointVar(p_out_var, p_out_ext)

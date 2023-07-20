@@ -86,19 +86,17 @@ impl<G: CurveGroup> SchnorrGadget<G> for Gadget2<G> {
             G::ScalarType::random(&mut rng)
         };
 
-        let response_1 = r1 * &beta + witness.a;
-        let response_2 = r2 * &beta + witness.b;
-        let response_3 = r3 * &beta + witness.d - &witness.b.mul(&witness.c);
+        let response_1 = r1 * beta + witness.a;
+        let response_2 = r2 * beta + witness.b;
+        let response_3 = r3 * beta + witness.d - &witness.b.mul(&witness.c);
 
-        let proof = Gadget2Proof {
+        Gadget2Proof {
             point_r_p,
             point_r_r,
             response_1,
             response_2,
             response_3,
-        };
-
-        proof
+        }
     }
 
     fn verify(

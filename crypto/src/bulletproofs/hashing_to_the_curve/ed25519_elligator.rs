@@ -72,11 +72,11 @@ impl HashingGadget {
 
         let (_, _, b1_mul_minus_b1) = cs.multiply(
             trace_var.b1_var.into(),
-            -LinearCombination::from(trace_var.b1_var.clone()) + Fq::ONE,
+            -LinearCombination::from(trace_var.b1_var) + Fq::ONE,
         );
         cs.constrain(b1_mul_minus_b1.into());
 
-        let x1_var = -trace_var.a2_var.clone() * Ed25519ElligatorParameters::A.get_raw();
+        let x1_var = -trace_var.a2_var * Ed25519ElligatorParameters::A.get_raw();
 
         let (_, _, x1_sq_var) = cs.multiply(x1_var.clone(), x1_var.clone());
         let (_, _, x1_cubic_var) = cs.multiply(x1_sq_var.into(), x1_var.clone());
@@ -88,7 +88,7 @@ impl HashingGadget {
         let (_, _, a3_sq_var) = cs.multiply(trace_var.a3_var.into(), trace_var.a3_var.into());
         let (_, _, y_squared_adjusted_var) = cs.multiply(
             y_squared_var,
-            LinearCombination::from(trace_var.b1_var.clone())
+            LinearCombination::from(trace_var.b1_var)
                 * (Fq::ONE - Ed25519ElligatorParameters::QNR.get_raw())
                 + Ed25519ElligatorParameters::QNR.get_raw(),
         );
@@ -97,12 +97,11 @@ impl HashingGadget {
 
         let (_, _, b1_times_double_x1_plus_a) = cs.multiply(
             trace_var.b1_var.into(),
-            LinearCombination::from(x1_var.clone()) * Fq::from(2u32)
-                + Ed25519ElligatorParameters::A.get_raw(),
+            x1_var.clone() * Fq::from(2u32) + Ed25519ElligatorParameters::A.get_raw(),
         );
 
         cs.constrain(
-            LinearCombination::from((*final_var).clone())
+            LinearCombination::from(*final_var)
                 + Ed25519ElligatorParameters::A.get_raw()
                 + x1_var.clone()
                 - b1_times_double_x1_plus_a,

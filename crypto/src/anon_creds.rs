@@ -372,7 +372,7 @@ pub fn open_comm<R: CryptoRng + RngCore, P: Pairing>(
         .collect_vec();
 
     let mut transcript = Transcript::new(REVEAL_PROOF_NEW_TRANSCRIPT_INSTANCE);
-    init_pok_transcript::<P>(&mut transcript, &credential.ipk, &cm); // public parameters
+    init_pok_transcript::<P>(&mut transcript, &credential.ipk, cm); // public parameters
     let pok = prove_pok::<_, P>(
         &mut transcript,
         prng,
@@ -411,7 +411,7 @@ pub(super) fn init_pok_transcript<P: Pairing>(
 ) {
     let g1 = P::G1::get_base();
     let g2 = P::G2::get_base();
-    let g1_elems = vec![&g1, &ipk.zz1, &cm.0.sigma1, &cm.0.sigma2];
+    let g1_elems = [&g1, &ipk.zz1, &cm.0.sigma1, &cm.0.sigma2];
     let mut g2_elems = vec![&g2, &ipk.gen2, &ipk.xx2, &ipk.zz2];
     for e in ipk.yy2.iter() {
         g2_elems.push(e);

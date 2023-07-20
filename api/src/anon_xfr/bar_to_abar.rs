@@ -291,6 +291,7 @@ pub(crate) fn verify_bar_to_abar(
 }
 
 /// Generate the inspector's proof.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn prove_bar_to_abar_cs<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
@@ -376,6 +377,7 @@ pub(crate) fn verify_inspection(
 }
 
 /// Construct the confidential-to-anonymous constraint system.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn build_bar_to_abar_cs(
     amount: BN254Scalar,
     asset_type: BN254Scalar,
@@ -479,7 +481,7 @@ pub(crate) fn build_bar_to_abar_cs(
         compressed_limbs.push(BN254Scalar::from(&sum));
 
         let mut sum_var = {
-            let first_var = *limbs_var.get(0).unwrap_or(&zero_var);
+            let first_var = *limbs_var.first().unwrap_or(&zero_var);
             let second_var = *limbs_var.get(1).unwrap_or(&zero_var);
             let third_var = *limbs_var.get(2).unwrap_or(&zero_var);
             let fourth_var = *limbs_var.get(3).unwrap_or(&zero_var);

@@ -135,10 +135,10 @@ impl From<u64> for ZorroFq {
     }
 }
 
-impl Into<BigUint> for ZorroFq {
+impl From<ZorroFq> for BigUint {
     #[inline]
-    fn into(self) -> BigUint {
-        self.0.into_bigint().into()
+    fn from(val: ZorroFq) -> Self {
+        val.0.into_bigint().into()
     }
 }
 
@@ -244,12 +244,7 @@ impl Scalar for ZorroFq {
 
     #[inline]
     fn sqrt(&self) -> Option<Self> {
-        let res = self.0.sqrt();
-        if res.is_some() {
-            Some(Self(res.unwrap()))
-        } else {
-            None
-        }
+        self.0.sqrt().map(Self)
     }
 
     #[inline]

@@ -187,7 +187,7 @@ impl TracerMemo {
             return Err(NoahError::ParameterError);
         }
         for candidate in candidate_asset_types.iter() {
-            if self.verify_asset_type(&dec_key, &candidate).is_ok() {
+            if self.verify_asset_type(dec_key, candidate).is_ok() {
                 return Ok(*candidate);
             }
         }

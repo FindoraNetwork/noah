@@ -185,10 +185,10 @@ impl PublicKey {
     pub fn to_eth_address(&self) -> Result<PublicKey> {
         match self.inner() {
             PublicKeyInner::Secp256k1(pk) => {
-                let address = convert_libsecp256k1_public_key_to_address(&pk);
+                let address = convert_libsecp256k1_public_key_to_address(pk);
                 Ok(PublicKey(PublicKeyInner::EthAddress(address)))
             }
-            PublicKeyInner::EthAddress(_) => Ok(self.clone()),
+            PublicKeyInner::EthAddress(_) => Ok(*self),
             _ => Err(NoahError::ParameterError),
         }
     }
@@ -196,7 +196,7 @@ impl PublicKey {
     /// Change to algebra secp256k1 Point
     pub fn to_secp256k1(&self) -> Result<SECP256K1G1> {
         match self.inner() {
-            PublicKeyInner::Secp256k1(pk) => Ok(convert_point_libsecp256k1_to_algebra(&pk)?),
+            PublicKeyInner::Secp256k1(pk) => Ok(convert_point_libsecp256k1_to_algebra(pk)?),
             _ => Err(NoahError::ParameterError),
         }
     }
@@ -204,7 +204,7 @@ impl PublicKey {
     /// Change to algebra Ristretto Point
     pub fn to_ed25519(&self) -> Result<Ed25519Point> {
         match self.inner() {
-            PublicKeyInner::Ed25519(pk) => Ok(convert_ed25519_pk_to_algebra(&pk)?),
+            PublicKeyInner::Ed25519(pk) => Ok(convert_ed25519_pk_to_algebra(pk)?),
             _ => Err(NoahError::ParameterError),
         }
     }
@@ -426,7 +426,7 @@ impl SecretKey {
     /// Change to algebra Ristretto Point
     pub fn to_ed25519(&self) -> Result<Ed25519Scalar> {
         match self {
-            SecretKey::Ed25519(sk) => Ok(convert_ed25519_sk_to_algebra(&sk)?),
+            SecretKey::Ed25519(sk) => Ok(convert_ed25519_sk_to_algebra(sk)?),
             _ => Err(NoahError::ParameterError),
         }
     }
@@ -762,7 +762,7 @@ impl SignatureList {
         let mut sorted = pubkeys.to_owned();
         sorted.sort_unstable_by_key(|k| k.noah_to_bytes());
         for (pk, sig) in sorted.iter().zip(self.signatures.iter()) {
-            pk.verify(&message, &sig)?;
+            pk.verify(message, sig)?;
         }
         Ok(())
     }

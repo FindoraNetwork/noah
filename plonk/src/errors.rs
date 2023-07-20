@@ -41,7 +41,7 @@ impl fmt::Display for PlonkError {
         use PlonkError::*;
         f.write_str(match self {
             Algebra(e) => Box::leak(format!("Algebra: {}", e).into_boxed_str()),
-            Message(e) => Box::leak(format!("{}", e).into_boxed_str()),
+            Message(e) => Box::leak(e.to_string().into_boxed_str()),
             GroupNotFound(_n) => "Group not found.",
             GroupDoesNotExist => "Group does not exist.",
             ProofError => "Proof error.",

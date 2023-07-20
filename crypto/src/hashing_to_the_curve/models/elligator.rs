@@ -34,14 +34,10 @@ impl<G: CurveGroup, P: ElligatorParameters<G>> Elligator<G, P> {
             y_squared += &(*x * x * P::A);
         }
         if !P::B.is_zero() {
-            y_squared += &(*x * &P::B);
+            y_squared += &(*x * P::B);
         }
 
-        if y_squared.legendre() == LegendreSymbol::QuadraticNonResidue {
-            false
-        } else {
-            true
-        }
+        y_squared.legendre() != LegendreSymbol::QuadraticNonResidue
     }
 }
 
@@ -57,7 +53,7 @@ impl<G: CurveGroup, P: ElligatorParameters<G>> HashingToCurve<G> for Elligator<G
             return Ok(x1);
         }
         let x2 = P::A.add(x1).neg();
-        return Ok(x2);
+        Ok(x2)
     }
 
     fn get_cofactor_uncleared_x_and_trace(t: &G::BaseType) -> Result<(G::BaseType, Self::Trace)> {
@@ -70,12 +66,12 @@ impl<G: CurveGroup, P: ElligatorParameters<G>> HashingToCurve<G> for Elligator<G
             y_squared += &(x1 * x1 * P::A);
         }
         if !P::B.is_zero() {
-            y_squared += &(x1 * &P::B);
+            y_squared += &(x1 * P::B);
         }
 
         let b1 = y_squared.legendre() != LegendreSymbol::QuadraticNonResidue;
 
-        return if b1 {
+        if b1 {
             let a3 = y_squared.sqrt().unwrap();
             let trace = Self::Trace { a2, b1, a3 };
             Ok((x1, trace))
@@ -84,7 +80,7 @@ impl<G: CurveGroup, P: ElligatorParameters<G>> HashingToCurve<G> for Elligator<G
             let a3 = (y_squared * P::QNR).sqrt().unwrap();
             let trace = Self::Trace { a2, b1, a3 };
             Ok((x2, trace))
-        };
+        }
     }
 
     fn get_cofactor_uncleared_point(t: &G::BaseType) -> Result<(G::BaseType, G::BaseType)> {
@@ -98,12 +94,12 @@ impl<G: CurveGroup, P: ElligatorParameters<G>> HashingToCurve<G> for Elligator<G
             y_squared += &(x1 * x1 * P::A);
         }
         if !P::B.is_zero() {
-            y_squared += &(x1 * &P::B);
+            y_squared += &(x1 * P::B);
         }
 
         let b1 = y_squared.legendre() != LegendreSymbol::QuadraticNonResidue;
 
-        return if b1 {
+        if b1 {
             let y = y_squared.sqrt().unwrap();
             Ok((x1, y))
         } else {
@@ -114,12 +110,12 @@ impl<G: CurveGroup, P: ElligatorParameters<G>> HashingToCurve<G> for Elligator<G
                 y_squared += &(x2 * x2 * P::A);
             }
             if !P::B.is_zero() {
-                y_squared += &(x2 * &P::B);
+                y_squared += &(x2 * P::B);
             }
 
             let y = y_squared.sqrt().unwrap();
             Ok((x2, y))
-        };
+        }
     }
 
     fn get_cofactor_uncleared_point_and_trace(
@@ -134,12 +130,12 @@ impl<G: CurveGroup, P: ElligatorParameters<G>> HashingToCurve<G> for Elligator<G
             y_squared += &(x1 * x1 * P::A);
         }
         if !P::B.is_zero() {
-            y_squared += &(x1 * &P::B);
+            y_squared += &(x1 * P::B);
         }
 
         let b1 = y_squared.legendre() != LegendreSymbol::QuadraticNonResidue;
 
-        return if b1 {
+        if b1 {
             let a3 = y_squared.sqrt().unwrap();
             let trace = Self::Trace { a2, b1, a3 };
             Ok((x1, a3, trace))
@@ -151,14 +147,14 @@ impl<G: CurveGroup, P: ElligatorParameters<G>> HashingToCurve<G> for Elligator<G
                 y_squared += &(x2 * x2 * P::A);
             }
             if !P::B.is_zero() {
-                y_squared += &(x2 * &P::B);
+                y_squared += &(x2 * P::B);
             }
             let y = y_squared.sqrt().unwrap();
 
             let a3 = (y_squared * P::QNR).sqrt().unwrap();
             let trace = Self::Trace { a2, b1, a3 };
             Ok((x2, y, trace))
-        };
+        }
     }
 
     fn verify_trace(t: &G::BaseType, final_x: &G::BaseType, trace: &Self::Trace) -> bool {
@@ -177,27 +173,21 @@ impl<G: CurveGroup, P: ElligatorParameters<G>> HashingToCurve<G> for Elligator<G
             y_squared += &(x1 * x1 * P::A);
         }
         if !P::B.is_zero() {
-            y_squared += &(x1 * &P::B);
+            y_squared += &(x1 * P::B);
         }
 
         if trace.b1 {
             if y_squared != trace.a3.square() {
                 return false;
             }
-        } else {
-            if y_squared * P::QNR != trace.a3.square() {
-                return false;
-            }
+        } else if y_squared * P::QNR != trace.a3.square() {
+            return false;
         }
 
         let b1 = trace.b1;
 
         if b1 {
-            if *final_x != x1 {
-                return false;
-            } else {
-                return true;
-            }
+            return *final_x == x1;
         }
 
         let x2 = P::A.add(x1).neg();
@@ -206,7 +196,7 @@ impl<G: CurveGroup, P: ElligatorParameters<G>> HashingToCurve<G> for Elligator<G
             return false;
         }
 
-        return true;
+        true
     }
 
     fn convert_to_group(x: &G::BaseType, y: &G::BaseType) -> Result<G> {

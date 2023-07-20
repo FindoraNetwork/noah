@@ -154,10 +154,8 @@ fn check_asset_amount(
             if sum != 0i128 {
                 return Err(NoahError::XfrCreationAssetAmountError);
             }
-        } else {
-            if sum != fee.into() {
-                return Err(NoahError::XfrCreationAssetAmountError);
-            }
+        } else if sum != fee.into() {
+            return Err(NoahError::XfrCreationAssetAmountError);
         }
     }
 
@@ -313,14 +311,9 @@ pub fn commit(
     amount: u64,
     asset_type_scalar: BN254Scalar,
 ) -> Result<(Commitment, AnemoiVLHTrace<BN254Scalar, 2, 14>)> {
-    let address_format_number: BN254Scalar;
-    match public_key.0 {
-        PublicKeyInner::Ed25519(_) => {
-            address_format_number = BN254Scalar::one();
-        }
-        PublicKeyInner::Secp256k1(_) => {
-            address_format_number = BN254Scalar::zero();
-        }
+    let address_format_number: BN254Scalar = match public_key.0 {
+        PublicKeyInner::Ed25519(_) => BN254Scalar::one(),
+        PublicKeyInner::Secp256k1(_) => BN254Scalar::zero(),
         PublicKeyInner::EthAddress(_) => {
             return Err(NoahError::ParameterError);
         }
@@ -416,6 +409,7 @@ pub fn add_merkle_path_variables(cs: &mut TurboPlonkCS, path: MTPath) -> MerkleP
 /// If `node` is the left child of parent, output (`node`, `sib1`, `sib2`);
 /// if `node` is the right child of parent, output (`sib1`, `sib2`, `node`);
 /// otherwise, output (`sib1`, `node`, `sib2`).
+#[allow(clippy::too_many_arguments)]
 fn check_merkle_tree_validity(
     cs: &mut TurboPlonkCS,
     present: VarIndex,
@@ -431,12 +425,10 @@ fn check_merkle_tree_validity(
 
     let sum = if cs.witness[is_right_child].is_one() {
         zero
+    } else if cs.witness[is_left_child].is_one() {
+        cs.witness[left]
     } else {
-        if cs.witness[is_left_child].is_one() {
-            cs.witness[left]
-        } else {
-            cs.witness[mid]
-        }
+        cs.witness[mid]
     };
 
     let sum_var = cs.new_variable(sum);
@@ -476,7 +468,7 @@ pub fn compute_merkle_root_variables(
     elem: AccElemVars,
     path_vars: &MerklePathVars,
     leaf_trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
-    traces: &Vec<JiveTrace<BN254Scalar, 2, 14>>,
+    traces: &[JiveTrace<BN254Scalar, 2, 14>],
 ) -> VarIndex {
     let (uid, commitment) = (elem.uid, elem.commitment);
 

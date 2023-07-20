@@ -33,27 +33,23 @@ impl FromStr for BN254Scalar {
     type Err = AlgebraError;
 
     fn from_str(string: &str) -> StdResult<Self, AlgebraError> {
-        let res = Fr::from_str(string);
+        let res = Fr::from_str(string).map_err(|_| AlgebraError::DeserializationError)?;
 
-        if res.is_ok() {
-            Ok(Self(res.unwrap()))
-        } else {
-            Err(AlgebraError::DeserializationError)
-        }
+        Ok(Self(res))
     }
 }
 
 impl BN254Scalar {
     /// Create a new scalar element from the arkworks-rs representation.
     pub const fn new(is_positive: bool, limbs: &[u64]) -> Self {
-        BN254Scalar(Fr::from_sign_and_limbs(is_positive, &limbs))
+        BN254Scalar(Fr::from_sign_and_limbs(is_positive, limbs))
     }
 }
 
-impl Into<BigUint> for BN254Scalar {
+impl From<BN254Scalar> for BigUint {
     #[inline]
-    fn into(self) -> BigUint {
-        self.0.into_bigint().into()
+    fn from(val: BN254Scalar) -> Self {
+        val.0.into_bigint().into()
     }
 }
 
@@ -281,7 +277,7 @@ impl Scalar for BN254Scalar {
         let len = exponent.len();
         let mut array = [0u64; 4];
         array[..len].copy_from_slice(exponent);
-        Self(self.0.pow(&array))
+        Self(self.0.pow(array))
     }
 
     #[inline]
@@ -296,12 +292,7 @@ impl Scalar for BN254Scalar {
 
     #[inline]
     fn sqrt(&self) -> Option<Self> {
-        let res = self.0.sqrt();
-        if res.is_some() {
-            Some(Self(res.unwrap()))
-        } else {
-            None
-        }
+        self.0.sqrt().map(Self)
     }
 
     #[inline]

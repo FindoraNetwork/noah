@@ -58,8 +58,8 @@ pub(crate) fn asset_amount_tracing_proofs<R: CryptoRng + RngCore>(
         let proof = build_same_key_asset_type_amount_tracing_proof(
             prng,
             &mut transcript,
-            &tracer_pub_key,
-            &records_memos,
+            tracer_pub_key,
+            records_memos,
         )?;
         proofs.push(proof)
     }
@@ -119,7 +119,7 @@ fn build_same_key_asset_type_amount_tracing_proof<R: CryptoRng + RngCore>(
         prng,
         m.as_slice(),
         r.as_slice(),
-        &pub_key,
+        pub_key,
         ctexts.as_slice(),
         commitments.as_slice(),
     ))
@@ -339,9 +339,9 @@ fn batch_verify_asset_tracing_proofs<R: CryptoRng + RngCore>(
             instances.push(peg_eq_instance);
         }
     }
-    let mut transcript = Transcript::new(b"AssetTracingProofs");
+    let transcript = Transcript::new(b"AssetTracingProofs");
     Ok(pedersen_elgamal_batch_verify(
-        &mut transcript,
+        &transcript,
         prng,
         &instances,
     )?)
@@ -421,7 +421,7 @@ fn verify_identity_proofs(
                     ac_confidential_verify(
                         &policy.cred_issuer_pub_key,
                         enc_keys,
-                        &policy.reveal_map.as_slice(),
+                        policy.reveal_map.as_slice(),
                         sig_com,
                         &memo.lock_attributes[..],
                         proof,
@@ -727,7 +727,7 @@ pub(crate) fn batch_verify_confidential_asset<R: CryptoRng + RngCore>(
     )],
 ) -> Result<()> {
     let pc_gens = PedersenCommitmentRistretto::default();
-    let mut transcript = Transcript::new(b"AssetEquality");
+    let transcript = Transcript::new(b"AssetEquality");
     let mut proof_instances = Vec::with_capacity(instances.len());
     for (inputs, outputs, proof) in instances {
         let instance_commitments: Result<Vec<RistrettoPoint>> = inputs
@@ -745,7 +745,7 @@ pub(crate) fn batch_verify_confidential_asset<R: CryptoRng + RngCore>(
         proof_instances.push((instance_commitments?, *proof));
     }
     Ok(chaum_pedersen_batch_verify_multiple_eq(
-        &mut transcript,
+        &transcript,
         prng,
         &proof_instances,
     )?)

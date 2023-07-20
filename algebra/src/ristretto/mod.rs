@@ -169,10 +169,10 @@ impl From<u64> for RistrettoScalar {
     }
 }
 
-impl Into<BigUint> for RistrettoScalar {
+impl From<RistrettoScalar> for BigUint {
     #[inline]
-    fn into(self) -> BigUint {
-        BigUint::from_bytes_le(self.0.as_bytes())
+    fn from(val: RistrettoScalar) -> Self {
+        BigUint::from_bytes_le(val.0.as_bytes())
     }
 }
 
@@ -280,13 +280,13 @@ impl Scalar for RistrettoScalar {
     #[inline]
     fn sqrt(&self) -> Option<Self> {
         let biguint: BigUint = (*self).into();
-        let res = crate::ed25519::Ed25519Scalar::from(&biguint).sqrt();
-        if res.is_some() {
-            let v: BigUint = res.unwrap().0.into();
-            Some(Self::from(&v))
-        } else {
-            None
-        }
+
+        crate::ed25519::Ed25519Scalar::from(&biguint)
+            .sqrt()
+            .map(|v| {
+                let v: BigUint = v.0.into();
+                Self::from(&v)
+            })
     }
 
     #[inline]
@@ -489,7 +489,7 @@ impl<'a> SubAssign<&'a RistrettoPoint> for RistrettoPoint {
 impl<'a> MulAssign<&'a RistrettoScalar> for RistrettoPoint {
     #[inline]
     fn mul_assign(&mut self, rhs: &'a RistrettoScalar) {
-        self.0.mul_assign(rhs.0.clone())
+        self.0.mul_assign(rhs.0)
     }
 }
 

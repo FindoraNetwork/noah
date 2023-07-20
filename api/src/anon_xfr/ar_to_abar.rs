@@ -53,7 +53,7 @@ pub fn gen_ar_to_abar_note<R: CryptoRng + RngCore>(
     abar_pubkey: &PublicKey,
 ) -> Result<ArToAbarNote> {
     // generate body
-    let body = gen_ar_to_abar_body(prng, params, record, &abar_pubkey)?;
+    let body = gen_ar_to_abar_body(prng, params, record, abar_pubkey)?;
 
     let msg = bincode::serialize(&body).map_err(|_| NoahError::SerializationError)?;
     let signature = bar_keypair.sign(&msg)?;
@@ -124,13 +124,13 @@ pub fn gen_ar_to_abar_body<R: CryptoRng + RngCore>(
 
     let payee_witness = PayeeWitness {
         amount: oabar.get_amount(),
-        blind: oabar.blind.clone(),
+        blind: oabar.blind,
         asset_type: oabar.asset_type.as_scalar(),
-        public_key: abar_pubkey.clone(),
+        public_key: *abar_pubkey,
     };
 
     let (_, output_trace) = commit(
-        &abar_pubkey,
+        abar_pubkey,
         oabar.blind,
         oabar.amount,
         oabar.asset_type.as_scalar(),
@@ -170,10 +170,11 @@ pub fn verify_ar_to_abar_body(params: &VerifierParams, body: &ArToAbarBody) -> R
     let asset_type = body.input.asset_type.get_asset_type().unwrap();
 
     let mut transcript = Transcript::new(AR_TO_ABAR_PLONK_PROOF_TRANSCRIPT);
-    let mut online_inputs: Vec<BN254Scalar> = vec![];
-    online_inputs.push(BN254Scalar::from(amount));
-    online_inputs.push(asset_type.as_scalar());
-    online_inputs.push(body.output.commitment);
+    let online_inputs: Vec<BN254Scalar> = vec![
+        BN254Scalar::from(amount),
+        asset_type.as_scalar(),
+        body.output.commitment,
+    ];
 
     Ok(verifier(
         &mut transcript,
@@ -219,7 +220,7 @@ pub fn build_ar_to_abar_cs(
         blind,
         asset_type: ar_asset_var,
         public_key_type,
-        public_key_scalars: public_key_scalars_vars.clone(),
+        public_key_scalars: public_key_scalars_vars,
     };
 
     // commitment
@@ -230,7 +231,7 @@ pub fn build_ar_to_abar_cs(
         payee.asset_type,
         public_key_type,
         &public_key_scalars_vars,
-        &output_trace,
+        output_trace,
     );
 
     // prepare the public input for the output commitment

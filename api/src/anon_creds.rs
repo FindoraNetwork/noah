@@ -270,10 +270,10 @@ pub fn ac_open_commitment<R: CryptoRng + RngCore>(
         ipk: credential.ipk.clone(),
     };
 
-    let cm = ACCommitment::new(&credential.sig, &rand);
+    let cm = ACCommitment::new(&credential.sig, rand);
 
     Ok(noah_crypto::anon_creds::open_comm::<_, BN254PairingEngine>(
-        prng, usk, &c, &cm, &rand, reveal_map,
+        prng, usk, &c, &cm, rand, reveal_map,
     )?)
 }
 
@@ -342,8 +342,8 @@ pub fn ac_verify(
 
     Ok(noah_crypto::anon_creds::verify_open::<BN254PairingEngine>(
         issuer_pub_key,
-        &cm,
-        &proof_open,
+        cm,
+        proof_open,
         attrs_scalar.as_slice(),
     )?)
 }
@@ -403,7 +403,7 @@ pub fn ac_confidential_open_commitment<R: CryptoRng + RngCore>(
         attrs: attrs_scalar,
         ipk: credential.ipk.clone(),
     };
-    let cm = ACCommitment::new(&credential.sig, &rand);
+    let cm = ACCommitment::new(&credential.sig, rand);
     Ok(
         noah_crypto::confidential_anon_creds::confidential_open_comm::<R, BN254PairingEngine>(
             prng, usk, &c, &cm, rand, reveal_map, enc_key, msg,

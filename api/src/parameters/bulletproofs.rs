@@ -26,7 +26,7 @@ impl BulletproofURS for BulletproofParams {
         let urs = BULLETPROOF_CURVE25519_URS.ok_or(NoahError::MissingSRSError)?;
 
         let pp: BulletproofParams =
-            bincode::deserialize(&urs).map_err(|_| NoahError::DeserializationError)?;
+            bincode::deserialize(urs).map_err(|_| NoahError::DeserializationError)?;
         Ok(pp)
     }
 

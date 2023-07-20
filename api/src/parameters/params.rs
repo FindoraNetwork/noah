@@ -456,11 +456,11 @@ impl VerifierParams {
         n_payees: usize,
         address_format: AddressFormat,
     ) -> Result<VerifierParams> {
-        if (!(n_payees <= MAX_ANONYMOUS_RECORD_NUMBER_STANDARD
-            && n_payers <= MAX_ANONYMOUS_RECORD_NUMBER_STANDARD))
-            && (!(n_payers <= MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER
-                && n_payees <= MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER))
-            && (!(n_payers == 1 && n_payees <= MAX_ANONYMOUS_RECORD_NUMBER_ONE_INPUT))
+        if !(n_payees <= MAX_ANONYMOUS_RECORD_NUMBER_STANDARD
+            && n_payers <= MAX_ANONYMOUS_RECORD_NUMBER_STANDARD
+            || n_payers <= MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_SENDER
+                && n_payees <= MAX_ANONYMOUS_RECORD_NUMBER_CONSOLIDATION_RECEIVER
+            || n_payers == 1 && n_payees <= MAX_ANONYMOUS_RECORD_NUMBER_ONE_INPUT)
         {
             Err(NoahError::MissingVerifierParamsError)
         } else {
@@ -578,7 +578,7 @@ impl VerifierParams {
         if let Some(bytes) = BAR_TO_ABAR_VERIFIER_PARAMS {
             let verifier_params = bincode::deserialize::<VerifierParams>(bytes);
             if let Ok(verifier_params) = verifier_params {
-                if verifier_params.label != String::from("bar_to_abar") {
+                if verifier_params.label != *"bar_to_abar" {
                     Err(NoahError::MissingVerifierParamsError)
                 } else {
                     Ok(verifier_params)
@@ -607,7 +607,7 @@ impl VerifierParams {
         if let Some(bytes) = AR_TO_ABAR_VERIFIER_PARAMS {
             let verifier_params = bincode::deserialize::<VerifierParams>(bytes);
             if let Ok(verifier_params) = verifier_params {
-                if verifier_params.label != String::from("ar_to_abar") {
+                if verifier_params.label != *"ar_to_abar" {
                     Err(NoahError::MissingVerifierParamsError)
                 } else {
                     Ok(verifier_params)
@@ -703,7 +703,7 @@ pub struct ProverParams {
 fn load_lagrange_params(size: usize) -> Option<KZGCommitmentSchemeBN254> {
     match LAGRANGE_BASES.get(&size) {
         None => None,
-        Some(bytes) => KZGCommitmentSchemeBN254::from_unchecked_bytes(&bytes).ok(),
+        Some(bytes) => KZGCommitmentSchemeBN254::from_unchecked_bytes(bytes).ok(),
     }
 }
 
@@ -713,7 +713,7 @@ fn load_srs_params(size: usize) -> Result<KZGCommitmentSchemeBN254> {
     let KZGCommitmentSchemeBN254 {
         public_parameter_group_1,
         public_parameter_group_2,
-    } = KZGCommitmentSchemeBN254::from_unchecked_bytes(&srs)?;
+    } = KZGCommitmentSchemeBN254::from_unchecked_bytes(srs)?;
 
     let mut new_group_1 = vec![BN254G1::default(); core::cmp::max(size + 3, 2051)];
     new_group_1[0..2051].copy_from_slice(&public_parameter_group_1[0..2051]);

@@ -102,13 +102,13 @@ pub fn init_abar_to_ar_note<R: CryptoRng + RngCore>(
         oar_amount,
         oar_type,
         NonConfidentialAmount_NonConfidentialAssetType,
-        ar_pub_key.clone(),
+        *ar_pub_key,
     );
     let (oar, _, owner_memo) = build_open_asset_record(prng, &pc_gens, &art, vec![]);
 
     let mt_leaf_info = oabar.mt_leaf_info.as_ref().unwrap();
     let (this_nullifier, this_nullifier_trace) = nullify(
-        &abar_keypair,
+        abar_keypair,
         oabar.amount,
         oabar.asset_type.as_scalar(),
         mt_leaf_info.uid,
@@ -224,11 +224,11 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
     let address_folding_public_input = match &note.folding_instance {
         AXfrAddressFoldingInstance::Secp256k1(a) => {
             let (beta, lambda) = verify_address_folding_secp256k1(hash, &mut transcript, a)?;
-            prepare_verifier_input_secp256k1(&a, &beta, &lambda)
+            prepare_verifier_input_secp256k1(a, &beta, &lambda)
         }
         AXfrAddressFoldingInstance::Ed25519(a) => {
             let (beta, lambda) = verify_address_folding_ed25519(hash, &mut transcript, a)?;
-            prepare_verifier_input_ed25519(&a, &beta, &lambda)
+            prepare_verifier_input_ed25519(a, &beta, &lambda)
         }
     };
 
@@ -240,11 +240,12 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
     }
 
     let mut transcript = Transcript::new(ABAR_TO_AR_PLONK_PROOF_TRANSCRIPT);
-    let mut online_inputs = vec![];
-    online_inputs.push(note.body.input.clone());
-    online_inputs.push(merkle_root.clone());
-    online_inputs.push(BN254Scalar::from(payer_amount));
-    online_inputs.push(payer_asset_type.as_scalar());
+    let mut online_inputs = vec![
+        note.body.input,
+        *merkle_root,
+        BN254Scalar::from(payer_amount),
+        payer_asset_type.as_scalar(),
+    ];
     online_inputs.extend_from_slice(&address_folding_public_input);
 
     Ok(verifier(
@@ -313,7 +314,7 @@ pub fn batch_verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default + Sync
             let mut transcript = Transcript::new(ABAR_TO_AR_PLONK_PROOF_TRANSCRIPT);
             let mut online_inputs = vec![];
             online_inputs.push(note.body.input.clone());
-            online_inputs.push(*merkle_root.clone());
+            online_inputs.push(**merkle_root);
             online_inputs.push(BN254Scalar::from(payer_amount));
             online_inputs.push(payer_asset_type.as_scalar());
             online_inputs.extend_from_slice(&address_folding_public_input);
@@ -349,7 +350,7 @@ fn prove_abar_to_ar<R: CryptoRng + RngCore>(
         payers_witness,
         nullifier_trace,
         input_commitment_trace,
-        &folding_witness,
+        folding_witness,
     );
     let witness = cs.get_and_clear_witness();
 
@@ -435,7 +436,7 @@ pub fn build_abar_to_ar_cs(
         payer_witness_var.asset_type,
         key_type,
         &public_key_scalars_vars,
-        &nullifier_trace,
+        nullifier_trace,
     );
 
     // Merkle path authentication
@@ -490,14 +491,14 @@ pub fn build_abar_to_ar_cs(
             &mut cs,
             &public_key_scalars_vars,
             &secret_key_scalars_vars,
-            &a,
+            a,
         )
         .unwrap(),
         AXfrAddressFoldingWitness::Ed25519(a) => prove_address_folding_in_cs_ed25519(
             &mut cs,
             &public_key_scalars_vars,
             &secret_key_scalars_vars,
-            &a,
+            a,
         )
         .unwrap(),
     }

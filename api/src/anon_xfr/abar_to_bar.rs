@@ -125,14 +125,14 @@ pub fn init_abar_to_bar_note<R: CryptoRng + RngCore>(
         obar_amount,
         obar_type,
         asset_record_type,
-        bar_pub_key.clone(),
+        *bar_pub_key,
     );
     let (obar, _, owner_memo) = build_open_asset_record(prng, &pc_gens, &art, vec![]);
 
     // 1. Build input witness info.
     let mt_leaf_info = oabar.mt_leaf_info.as_ref().unwrap();
     let (this_nullifier, this_nullifier_trace) = nullify(
-        &abar_keypair,
+        abar_keypair,
         oabar.amount,
         oabar.asset_type.as_scalar(),
         mt_leaf_info.uid,
@@ -337,19 +337,19 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     let address_folding_public_input = match &note.folding_instance {
         AXfrAddressFoldingInstance::Secp256k1(a) => {
             let (beta, lambda) = verify_address_folding_secp256k1(hash, &mut transcript, a)?;
-            prepare_verifier_input_secp256k1(&a, &beta, &lambda)
+            prepare_verifier_input_secp256k1(a, &beta, &lambda)
         }
         AXfrAddressFoldingInstance::Ed25519(a) => {
             let (beta, lambda) = verify_address_folding_ed25519(hash, &mut transcript, a)?;
-            prepare_verifier_input_ed25519(&a, &beta, &lambda)
+            prepare_verifier_input_ed25519(a, &beta, &lambda)
         }
     };
 
     let delegated_schnorr_proof = note.body.delegated_schnorr_proof.clone();
 
-    let beta_lambda = beta * &lambda;
+    let beta_lambda = beta * lambda;
     let s1_plus_lambda_s2 = delegated_schnorr_proof.response_scalars[0].0
-        + delegated_schnorr_proof.response_scalars[1].0 * &lambda;
+        + delegated_schnorr_proof.response_scalars[1].0 * lambda;
 
     let beta_sim_fr = SimFr::<BN254Scalar, SimFrParamsBN254Ristretto>::from(
         &BigUint::from_bytes_le(&beta.to_bytes()),
@@ -367,8 +367,8 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
     let mut transcript = Transcript::new(ABAR_TO_BAR_PLONK_PROOF_TRANSCRIPT);
     let mut online_inputs = vec![];
 
-    online_inputs.push(input.clone());
-    online_inputs.push(merkle_root.clone());
+    online_inputs.push(input);
+    online_inputs.push(*merkle_root);
     online_inputs.push(delegated_schnorr_proof.inspection_comm);
     online_inputs.extend_from_slice(&beta_sim_fr.limbs);
     online_inputs.extend_from_slice(&lambda_sim_fr.limbs);
@@ -506,7 +506,7 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
             let mut online_inputs = vec![];
 
             online_inputs.push(input.clone());
-            online_inputs.push(*merkle_root.clone());
+            online_inputs.push(**merkle_root);
             online_inputs.push(delegated_schnorr_proof.inspection_comm);
             online_inputs.extend_from_slice(&beta_sim_fr.limbs);
             online_inputs.extend_from_slice(&lambda_sim_fr.limbs);
@@ -655,7 +655,7 @@ pub fn build_abar_to_bar_cs(
         payers_witness_vars.asset_type,
         secret_key_type_var,
         &public_key_scalars_vars,
-        &nullifier_trace,
+        nullifier_trace,
     );
 
     // Merkle path authentication.
@@ -767,7 +767,7 @@ pub fn build_abar_to_bar_cs(
         compressed_limbs.push(BN254Scalar::from(&sum));
 
         let mut sum_var = {
-            let first_var = *limbs_var.get(0).unwrap_or(&zero_var);
+            let first_var = *limbs_var.first().unwrap_or(&zero_var);
             let second_var = *limbs_var.get(1).unwrap_or(&zero_var);
             let third_var = *limbs_var.get(2).unwrap_or(&zero_var);
             let fourth_var = *limbs_var.get(3).unwrap_or(&zero_var);
@@ -916,14 +916,14 @@ pub fn build_abar_to_bar_cs(
             &mut cs,
             &public_key_scalars_vars,
             &secret_key_scalars_vars,
-            &a,
+            a,
         )
         .unwrap(),
         AXfrAddressFoldingWitness::Ed25519(a) => prove_address_folding_in_cs_ed25519(
             &mut cs,
             &public_key_scalars_vars,
             &secret_key_scalars_vars,
-            &a,
+            a,
         )
         .unwrap(),
     }

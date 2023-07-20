@@ -20,7 +20,7 @@ pub struct SimFrMulVar<F: Scalar, P: SimFrParams<F>> {
 
 impl<F: Scalar, P: SimFrParams<F>> SimFrMulVar<F, P> {
     /// Create a zero `SimFrMul`.
-    pub fn new(cs: &mut TurboCS<F>) -> Self {
+    pub fn new(cs: &TurboCS<F>) -> Self {
         Self {
             val: SimFrMul::<F, P>::default(),
             var: vec![cs.zero_var(); P::NUM_OF_LIMBS_MUL],
@@ -71,7 +71,8 @@ impl<F: Scalar, P: SimFrParams<F>> SimFrMulVar<F, P> {
         let minus_one = one.neg();
 
         let r_limbs = P::scalar_field_sub_pad_in_limbs();
-        for i in 0..P::NUM_OF_LIMBS {
+
+        for (i, r_limb) in r_limbs.iter().enumerate().take(P::NUM_OF_LIMBS) {
             res.var[i] = cs.new_variable(res.val.limbs[i]);
 
             // The following gate represents
@@ -79,12 +80,7 @@ impl<F: Scalar, P: SimFrParams<F>> SimFrMulVar<F, P> {
 
             cs.push_add_selectors(one, zero, minus_one, zero);
             cs.push_mul_selectors(zero, zero);
-            cs.push_constant_selector(
-                r_limbs[i]
-                    .add(&r_limbs[i])
-                    .add(&r_limbs[i])
-                    .add(&r_limbs[i]),
-            );
+            cs.push_constant_selector(r_limb.add(r_limb).add(r_limb).add(r_limb));
             cs.push_ecc_selector(zero);
             cs.push_out_selector(one);
 
@@ -123,8 +119,9 @@ impl<F: Scalar, P: SimFrParams<F>> SimFrMulVar<F, P> {
         let r_limbs = P::scalar_field_in_limbs().to_vec();
         let k_limbs = SimFr::<F, P>::from(&k).limbs.to_vec();
         let mut k_limbs_var = Vec::with_capacity(k_limbs.len());
-        for i in 0..P::NUM_OF_LIMBS {
-            let new_var = cs.new_variable(k_limbs[i]);
+
+        for (i, k_limb) in k_limbs.iter().enumerate().take(P::NUM_OF_LIMBS) {
+            let new_var = cs.new_variable(*k_limb);
             if i == P::NUM_OF_LIMBS - 1 {
                 cs.range_check(new_var, P::BIT_IN_TOP_LIMB + 5);
             } else {
@@ -254,15 +251,15 @@ impl<F: Scalar, P: SimFrParams<F>> SimFrMulVar<F, P> {
                 (num_limbs_in_this_group + 1) * P::BIT_PER_LIMB + num_limbs_in_this_group + surfeit,
             );
             let pad_limb = F::from(&pad);
-            assert!(pad > <F as Into<BigUint>>::into(right_group_limb.clone()));
+            assert!(pad > <F as Into<BigUint>>::into(*right_group_limb));
 
             // Compute the carry number for the next cycle
             let mut carry = left_group_limb
                 .add(&carry_in)
                 .add(&pad_limb)
-                .sub(&right_group_limb);
+                .sub(right_group_limb);
 
-            let carry_biguint: BigUint = carry.clone().into();
+            let carry_biguint: BigUint = carry.into();
             carry = F::from(&carry_biguint.shr(num_limbs_in_this_group * P::BIT_PER_LIMB));
 
             accumulated_extra += BigUint::from_bytes_le(&pad_limb.to_bytes());

@@ -249,10 +249,10 @@ pub struct PedersenElGamalProofInstance<'a> {
 /// Verify a batch of PedersenElGamal aggregate proof instances with a single multiexponentiation
 /// of size `2 + n*7` elems. Each instance verification equation is scaled by a random factor.
 /// Then, scaled equations are aggregated into a single equation of size 2 + n*7 elements.
-pub fn pedersen_elgamal_batch_verify<'a, R: CryptoRng + RngCore>(
-    transcript: &mut Transcript,
+pub fn pedersen_elgamal_batch_verify<R: CryptoRng + RngCore>(
+    transcript: &Transcript,
     prng: &mut R,
-    instances: &[PedersenElGamalProofInstance<'a>],
+    instances: &[PedersenElGamalProofInstance<'_>],
 ) -> Result<()> {
     let m = instances.len();
     let pc_gens = PedersenCommitmentRistretto::default();
@@ -328,7 +328,7 @@ pub fn pedersen_elgamal_batch_verify<'a, R: CryptoRng + RngCore>(
 }
 /// Verify Proof of Knowledge for PedersenElGamal equality proof, for a set of statement.
 pub fn pedersen_elgamal_aggregate_eq_verify<R: CryptoRng + RngCore>(
-    transcript: &mut Transcript,
+    transcript: &Transcript,
     prng: &mut R,
     public_key: &ElGamalEncKey<RistrettoPoint>,
     ctexts: &[ElGamalCiphertext<RistrettoPoint>],

@@ -17,6 +17,7 @@
     rust_2018_idioms,
     rust_2021_compatibility
 )]
+#![allow(clippy::type_complexity, clippy::too_many_arguments)]
 
 #[macro_use]
 extern crate itertools;

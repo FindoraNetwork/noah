@@ -103,14 +103,14 @@ pub trait PolyComScheme: Sized {
         point: &Self::Field,
         max_degree: usize,
     ) -> Result<Self::Commitment> {
-        assert!(polys.len() > 0);
+        assert!(!polys.is_empty());
 
         Self::init_pcs_batch_eval_transcript(transcript, max_degree, point);
 
         let alpha = transcript.get_challenge_field_elem(b"alpha");
         let mut h = FpPolynomial::<Self::Field>::zero();
         let mut multiplier = Self::Field::one();
-        let z = FpPolynomial::from_zeroes(&[point.clone()]);
+        let z = FpPolynomial::from_zeroes(&[*point]);
 
         for poly in polys.iter() {
             let mut poly = (*poly).clone();
@@ -143,7 +143,7 @@ pub trait PolyComScheme: Sized {
 
             let mut new_coefs = q.coefs[..max_power_of_2].to_vec();
             for (i, v) in blinds.iter().enumerate() {
-                new_coefs[i] = new_coefs[i] - v;
+                new_coefs[i] -= v;
             }
 
             let sub_q = FpPolynomial::from_coefs(new_coefs);
@@ -193,7 +193,7 @@ pub trait PolyComScheme: Sized {
         let (cm_combined, eval_combined) =
             self.batch(transcript, commitments, max_degree, point, values);
 
-        self.verify(&cm_combined, max_degree, &point, &eval_combined, &proof)
+        self.verify(&cm_combined, max_degree, point, &eval_combined, proof)
     }
 
     /// Batch verify a list of proofs with different points.

@@ -15,7 +15,7 @@ use noah_algebra::{
 #[derive(Clone, Debug, Serialize, Deserialize, Eq, PartialEq, Default)]
 pub struct KZGCommitment<G>(pub G);
 
-impl<'a, G> ToBytes for KZGCommitment<G>
+impl<G> ToBytes for KZGCommitment<G>
 where
     G: Group,
 {
@@ -54,7 +54,7 @@ impl<G: Group> HomomorphicPolyComElem<G::ScalarType> for KZGCommitment<G> {
     }
 
     fn mul_assign(&mut self, exp: &G::ScalarType) {
-        self.0.mul_assign(&exp)
+        self.0.mul_assign(exp)
     }
 }
 
@@ -129,13 +129,13 @@ impl<P: Pairing> KZGCommitmentScheme<P> {
         let mut elem_g1 = P::G1::get_base();
 
         for _ in 0..=max_degree {
-            public_parameter_group_1.push(elem_g1.clone());
+            public_parameter_group_1.push(elem_g1);
             elem_g1 = elem_g1.mul(&s);
         }
 
         let mut public_parameter_group_2: Vec<P::G2> = Vec::new();
         let elem_g2 = P::G2::get_base();
-        public_parameter_group_2.push(elem_g2.clone());
+        public_parameter_group_2.push(elem_g2);
         public_parameter_group_2.push(elem_g2.mul(&s));
 
         KZGCommitmentScheme {
@@ -269,9 +269,9 @@ impl<P: Pairing> PolyComScheme for KZGCommitmentScheme<P> {
         value: &Self::Field,
         proof: &Self::Commitment,
     ) -> Result<()> {
-        let g1_0 = self.public_parameter_group_1[0].clone();
-        let g2_0 = self.public_parameter_group_2[0].clone();
-        let g2_1 = self.public_parameter_group_2[1].clone();
+        let g1_0 = self.public_parameter_group_1[0];
+        let g2_0 = self.public_parameter_group_2[0];
+        let g2_1 = self.public_parameter_group_2[1];
 
         let x_minus_point_group_element_group_2 = &g2_1.sub(&g2_0.mul(point));
 
@@ -281,7 +281,7 @@ impl<P: Pairing> PolyComScheme for KZGCommitmentScheme<P> {
             P::pairing(&commitment.0.sub(&g1_0.mul(value)), &g2_0)
         };
 
-        let right_pairing_eval = P::pairing(&proof.0, &x_minus_point_group_element_group_2);
+        let right_pairing_eval = P::pairing(&proof.0, x_minus_point_group_element_group_2);
 
         if left_pairing_eval == right_pairing_eval {
             Ok(())
@@ -296,12 +296,12 @@ impl<P: Pairing> PolyComScheme for KZGCommitmentScheme<P> {
         blinds: &[Self::Field],
         zeroing_degree: usize,
     ) -> Self::Commitment {
-        let mut commitment = commitment.0.clone();
+        let mut commitment = commitment.0;
         for (i, blind) in blinds.iter().enumerate() {
-            let mut blind = blind.clone();
-            commitment = commitment + &(self.public_parameter_group_1[i] * &blind);
+            let mut blind = *blind;
+            commitment += &(self.public_parameter_group_1[i] * &blind);
             blind = blind.neg();
-            commitment = commitment + &(self.public_parameter_group_1[zeroing_degree + i] * &blind);
+            commitment += &(self.public_parameter_group_1[zeroing_degree + i] * &blind);
         }
         KZGCommitment(commitment)
     }
@@ -316,24 +316,24 @@ impl<P: Pairing> PolyComScheme for KZGCommitmentScheme<P> {
         proofs: &[Self::Commitment],
         challenge: &Self::Field,
     ) -> Result<()> {
-        assert!(proofs.len() > 0);
+        assert!(!proofs.is_empty());
         assert_eq!(proofs.len(), point_vec.len());
         assert_eq!(proofs.len(), eval_vec.len());
         assert_eq!(proofs.len(), cm_vec.len());
 
-        let g1_0 = self.public_parameter_group_1[0].clone();
-        let g2_0 = self.public_parameter_group_2[0].clone();
-        let g2_1 = self.public_parameter_group_2[1].clone();
+        let g1_0 = self.public_parameter_group_1[0];
+        let g2_0 = self.public_parameter_group_2[0];
+        let g2_1 = self.public_parameter_group_2[1];
 
         let left_second = g2_1;
         let right_second = g2_0;
 
-        let mut left_first = proofs[0].0.clone();
+        let mut left_first = proofs[0].0;
         let mut right_first = proofs[0].0.mul(&point_vec[0]);
-        let mut right_first_val = eval_vec[0].clone();
-        let mut right_first_comm = cm_vec[0].0.clone();
+        let mut right_first_val = eval_vec[0];
+        let mut right_first_comm = cm_vec[0].0;
 
-        let mut cur_challenge = challenge.clone();
+        let mut cur_challenge = *challenge;
         for i in 1..proofs.len() {
             let new_comm = proofs[i].0.mul(&cur_challenge);
 
@@ -342,7 +342,7 @@ impl<P: Pairing> PolyComScheme for KZGCommitmentScheme<P> {
             right_first_val.add_assign(&eval_vec[i].mul(&cur_challenge));
             right_first_comm.add_assign(&cm_vec[i].0.mul(&cur_challenge));
 
-            cur_challenge.mul_assign(&challenge);
+            cur_challenge.mul_assign(challenge);
         }
         right_first.sub_assign(&g1_0.mul(&right_first_val));
         right_first.add_assign(&right_first_comm);
@@ -361,10 +361,10 @@ impl<P: Pairing> PolyComScheme for KZGCommitmentScheme<P> {
 
     fn shrink_to_verifier_only(&self) -> Self {
         Self {
-            public_parameter_group_1: vec![self.public_parameter_group_1[0].clone()],
+            public_parameter_group_1: vec![self.public_parameter_group_1[0]],
             public_parameter_group_2: vec![
-                self.public_parameter_group_2[0].clone(),
-                self.public_parameter_group_2[1].clone(),
+                self.public_parameter_group_2[0],
+                self.public_parameter_group_2[1],
             ],
         }
     }

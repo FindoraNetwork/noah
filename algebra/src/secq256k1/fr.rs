@@ -33,13 +33,9 @@ impl FromStr for SECQ256K1Scalar {
     type Err = AlgebraError;
 
     fn from_str(string: &str) -> StdResult<Self, AlgebraError> {
-        let res = Fr::from_str(string);
+        let res = Fr::from_str(string).map_err(|_| AlgebraError::DeserializationError)?;
 
-        if res.is_ok() {
-            Ok(Self(res.unwrap()))
-        } else {
-            Err(AlgebraError::DeserializationError)
-        }
+        Ok(Self(res))
     }
 }
 
@@ -254,7 +250,7 @@ impl Scalar for SECQ256K1Scalar {
         let len = exponent.len();
         let mut array = [0u64; 5];
         array[..len].copy_from_slice(exponent);
-        Self(self.0.pow(&array))
+        Self(self.0.pow(array))
     }
 
     #[inline]
@@ -269,12 +265,7 @@ impl Scalar for SECQ256K1Scalar {
 
     #[inline]
     fn sqrt(&self) -> Option<Self> {
-        let res = self.0.sqrt();
-        if res.is_some() {
-            Some(Self(res.unwrap()))
-        } else {
-            None
-        }
+        self.0.sqrt().map(Self)
     }
 
     #[inline]
@@ -286,7 +277,7 @@ impl Scalar for SECQ256K1Scalar {
 impl SECQ256K1Scalar {
     /// Get the raw data.
     pub fn get_raw(&self) -> Fr {
-        self.0.clone()
+        self.0
     }
 
     /// From the raw data.
@@ -296,14 +287,14 @@ impl SECQ256K1Scalar {
 
     /// Create a new scalar element from the arkworks-rs representation.
     pub const fn new(is_positive: bool, limbs: &[u64]) -> Self {
-        SECQ256K1Scalar(Fr::from_sign_and_limbs(is_positive, &limbs))
+        SECQ256K1Scalar(Fr::from_sign_and_limbs(is_positive, limbs))
     }
 }
 
-impl Into<BigUint> for SECQ256K1Scalar {
+impl From<SECQ256K1Scalar> for BigUint {
     #[inline]
-    fn into(self) -> BigUint {
-        let value: BigUint = self.0.into_bigint().into();
+    fn from(val: SECQ256K1Scalar) -> Self {
+        let value: BigUint = val.0.into_bigint().into();
         value
     }
 }

@@ -136,10 +136,10 @@ impl From<u64> for Ed25519Scalar {
     }
 }
 
-impl Into<BigUint> for Ed25519Scalar {
+impl From<Ed25519Scalar> for BigUint {
     #[inline]
-    fn into(self) -> BigUint {
-        self.0.into_bigint().into()
+    fn from(val: Ed25519Scalar) -> Self {
+        val.0.into_bigint().into()
     }
 }
 
@@ -246,12 +246,7 @@ impl Scalar for Ed25519Scalar {
 
     #[inline]
     fn sqrt(&self) -> Option<Self> {
-        let res = self.0.sqrt();
-        if res.is_some() {
-            Some(Self(res.unwrap()))
-        } else {
-            None
-        }
+        self.0.sqrt().map(Self)
     }
 
     #[inline]
@@ -274,7 +269,7 @@ impl Ed25519Scalar {
 
     /// Get the raw data.
     pub fn get_raw(&self) -> Fr {
-        self.0.clone()
+        self.0
     }
 
     /// From the raw data.

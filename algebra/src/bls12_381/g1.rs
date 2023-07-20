@@ -98,24 +98,18 @@ impl Group for BLSG1 {
 
     #[inline]
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
-        let affine = G1Affine::deserialize_with_mode(bytes, Compress::Yes, Validate::Yes);
+        let affine = G1Affine::deserialize_with_mode(bytes, Compress::Yes, Validate::Yes)
+            .map_err(|_| AlgebraError::DeserializationError)?;
 
-        if affine.is_ok() {
-            Ok(Self(G1Projective::from(affine.unwrap()))) // safe unwrap
-        } else {
-            Err(AlgebraError::DeserializationError)
-        }
+        Ok(Self(G1Projective::from(affine)))
     }
 
     #[inline]
     fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
-        let affine = G1Affine::deserialize_with_mode(bytes, Compress::No, Validate::No);
+        let affine = G1Affine::deserialize_with_mode(bytes, Compress::No, Validate::No)
+            .map_err(|_| AlgebraError::DeserializationError)?;
 
-        if affine.is_ok() {
-            Ok(Self(G1Projective::from(affine.unwrap()))) // safe unwrap
-        } else {
-            Err(AlgebraError::DeserializationError)
-        }
+        Ok(Self(G1Projective::from(affine)))
     }
 
     #[inline]
@@ -295,7 +289,7 @@ impl<'a> SubAssign<&'a BLSG1> for BLSG1 {
 impl<'a> MulAssign<&'a BLSScalar> for BLSG1 {
     #[inline]
     fn mul_assign(&mut self, rhs: &'a BLSScalar) {
-        self.0.mul_assign(rhs.0.clone())
+        self.0.mul_assign(rhs.0)
     }
 }
 

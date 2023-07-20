@@ -31,9 +31,9 @@ impl<F: Scalar> TurboCS<F> {
         }
 
         // Create the first gate --- which puts the initial value
-        if salt.is_some() {
+        if let Some(s) = salt {
             self.push_add_selectors(zero, zero, zero, one);
-            self.push_constant_selector(salt.unwrap().neg());
+            self.push_constant_selector(s.neg());
         } else {
             self.push_add_selectors(zero, zero, zero, zero);
             self.push_constant_selector(zero);
@@ -161,8 +161,8 @@ impl<F: Scalar> TurboCS<F> {
             self.finish_new_gate();
         }
 
-        if checksum.is_some() {
-            let var = self.new_variable(checksum.unwrap());
+        if let Some(c) = checksum {
+            let var = self.new_variable(c);
 
             self.push_add_selectors(
                 (P::MDS_MATRIX[0][0] + P::MDS_MATRIX[1][0]).double()
@@ -258,13 +258,13 @@ impl<F: Scalar> TurboCS<F> {
                 None,
             );
 
-            for rr in 1..num_chunks - 1 {
+            for (rr, chunk) in chunks.iter().enumerate().take(num_chunks - 1).skip(1) {
                 x_var = new_x_var;
                 y_var = new_y_var;
 
-                x_var[0] = self.add(x_var[0], chunks[rr][0]);
-                x_var[1] = self.add(x_var[1], chunks[rr][1]);
-                y_var[0] = self.add(y_var[0], chunks[rr][2]);
+                x_var[0] = self.add(x_var[0], chunk[0]);
+                x_var[1] = self.add(x_var[1], chunk[1]);
+                y_var[0] = self.add(y_var[0], chunk[2]);
 
                 new_x_var = [
                     self.new_variable(trace.after_permutation[rr].0[0]),
@@ -448,7 +448,12 @@ impl<F: Scalar> TurboCS<F> {
             new_y_var[1] = self.add(new_y_var[1], sigma_var);
 
             // the squeezing round
-            for rr in 1..num_output_chunks {
+            for (rr, output_chunk) in output_chunks
+                .iter()
+                .enumerate()
+                .take(num_output_chunks)
+                .skip(1)
+            {
                 x_var = new_x_var;
                 y_var = new_y_var;
 
@@ -466,10 +471,7 @@ impl<F: Scalar> TurboCS<F> {
 
                 self.anemoi_permutation_round::<P>(
                     &(x_var, y_var),
-                    &(
-                        [output_chunks[rr][0], output_chunks[rr][1]],
-                        [output_chunks[rr][2], None],
-                    ),
+                    &([output_chunk[0], output_chunk[1]], [output_chunk[2], None]),
                     &trace.intermediate_values_before_constant_additions[rr],
                     None,
                     None,
@@ -497,13 +499,18 @@ impl<F: Scalar> TurboCS<F> {
                 None,
             );
 
-            for rr in 1..num_input_chunks - 1 {
+            for (rr, input_chunk) in input_chunks
+                .iter()
+                .enumerate()
+                .take(num_input_chunks - 1)
+                .skip(1)
+            {
                 x_var = new_x_var;
                 y_var = new_y_var;
 
-                x_var[0] = self.add(x_var[0], input_chunks[rr][0]);
-                x_var[1] = self.add(x_var[1], input_chunks[rr][1]);
-                y_var[0] = self.add(y_var[0], input_chunks[rr][2]);
+                x_var[0] = self.add(x_var[0], input_chunk[0]);
+                x_var[1] = self.add(x_var[1], input_chunk[1]);
+                y_var[0] = self.add(y_var[0], input_chunk[2]);
 
                 new_x_var = [
                     self.new_variable(trace.after_permutation[rr].0[0]),
@@ -562,7 +569,12 @@ impl<F: Scalar> TurboCS<F> {
             }
 
             // the squeezing round
-            for rr in 1..num_output_chunks {
+            for (rr, output_chunk) in output_chunks
+                .iter()
+                .enumerate()
+                .take(num_output_chunks)
+                .skip(1)
+            {
                 x_var = new_x_var;
                 y_var = new_y_var;
 
@@ -580,10 +592,7 @@ impl<F: Scalar> TurboCS<F> {
 
                 self.anemoi_permutation_round::<P>(
                     &(x_var, y_var),
-                    &(
-                        [output_chunks[rr][0], output_chunks[rr][1]],
-                        [output_chunks[rr][2], None],
-                    ),
+                    &([output_chunk[0], output_chunk[1]], [output_chunk[2], None]),
                     &trace.intermediate_values_before_constant_additions[rr - 1 + num_input_chunks],
                     None,
                     None,

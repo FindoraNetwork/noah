@@ -77,7 +77,7 @@ impl<F: Scalar, P: SimFrParams<F>> Default for SimFr<F, P> {
             limbs: vec![F::zero(); P::NUM_OF_LIMBS],
             val: BigUint::zero(),
             num_of_additions_over_normal_form: SimReducibility::StrictlyNotReducible,
-            params_phantom: PhantomData::default(),
+            params_phantom: PhantomData,
         }
     }
 }
@@ -99,8 +99,8 @@ impl<F: Scalar, P: SimFrParams<F>> Sub<&SimFr<F, P>> for &SimFr<F, P> {
         let r_limbs = P::scalar_field_sub_pad_in_limbs();
         let r_biguint = P::scalar_field_sub_pad_in_biguint();
 
-        for i in 0..P::NUM_OF_LIMBS {
-            res.limbs[i] = self.limbs[i].add(&r_limbs[i]).sub(&rhs.limbs[i]);
+        for (i, r_limb) in r_limbs.iter().enumerate().take(P::NUM_OF_LIMBS) {
+            res.limbs[i] = self.limbs[i].add(r_limb).sub(&rhs.limbs[i]);
         }
         res.val = (&self.val).add(&r_biguint).sub(&rhs.val);
 
@@ -115,6 +115,7 @@ impl<F: Scalar, P: SimFrParams<F>> Sub<&SimFr<F, P>> for &SimFr<F, P> {
 impl<F: Scalar, P: SimFrParams<F>> Mul<&SimFr<F, P>> for &SimFr<F, P> {
     type Output = SimFrMul<F, P>;
 
+    #[allow(clippy::suspicious_arithmetic_impl)]
     fn mul(self, rhs: &SimFr<F, P>) -> SimFrMul<F, P> {
         let mut mul_res = SimFrMul::<F, P>::default();
         for i in 0..P::NUM_OF_LIMBS {
@@ -137,8 +138,11 @@ impl<F: Scalar, P: SimFrParams<F>> From<&BigUint> for SimFr<F, P> {
 
         let step = BigUint::from(1u32).shl(P::BIT_PER_LIMB);
 
-        let mut res = SimFr::<F, P>::default();
-        res.val = rem.clone();
+        let mut res = SimFr::<F, P> {
+            val: rem.clone(),
+            ..Default::default()
+        };
+
         for i in 0..P::NUM_OF_LIMBS {
             let (new_rem, limb) = rem.div_rem(&step);
             rem = new_rem;
@@ -150,15 +154,15 @@ impl<F: Scalar, P: SimFrParams<F>> From<&BigUint> for SimFr<F, P> {
     }
 }
 
-impl<F: Scalar, P: SimFrParams<F>> Into<BigUint> for &SimFr<F, P> {
-    fn into(self) -> BigUint {
+impl<F: Scalar, P: SimFrParams<F>> From<&SimFr<F, P>> for BigUint {
+    fn from(t: &SimFr<F, P>) -> Self {
         let step = BigUint::from(1u32).shl(P::BIT_PER_LIMB);
         let mut res = BigUint::zero();
-        for limb in self.limbs.iter().rev() {
+        for limb in t.limbs.iter().rev() {
             res.mul_assign(&step);
-            res.add_assign(&limb.clone().into());
+            res.add_assign(&(*limb).into());
         }
-        assert_eq!(res, self.val);
+        assert_eq!(res, t.val);
         res
     }
 }
@@ -196,20 +200,20 @@ impl<F: Scalar, P: SimFrParams<F>> Default for SimFrMul<F, P> {
             limbs: vec![F::zero(); P::NUM_OF_LIMBS_MUL],
             val: BigUint::zero(),
             prod_of_num_of_additions: BigUint::zero(),
-            params_phantom: PhantomData::default(),
+            params_phantom: PhantomData,
         }
     }
 }
 
-impl<F: Scalar, P: SimFrParams<F>> Into<BigUint> for &SimFrMul<F, P> {
-    fn into(self) -> BigUint {
+impl<F: Scalar, P: SimFrParams<F>> From<&SimFrMul<F, P>> for BigUint {
+    fn from(t: &SimFrMul<F, P>) -> Self {
         let step = BigUint::from(1u32).shl(P::BIT_PER_LIMB);
         let mut res = BigUint::zero();
-        for limb in self.limbs.iter().rev() {
+        for limb in t.limbs.iter().rev() {
             res.mul_assign(&step);
-            res.add_assign(&limb.clone().into());
+            res.add_assign(&(*limb).into());
         }
-        assert_eq!(self.val, res);
+        assert_eq!(t.val, res);
         res
     }
 }
@@ -244,12 +248,12 @@ impl<F: Scalar, P: SimFrParams<F>> Sub<&SimFr<F, P>> for &SimFrMul<F, P> {
         let r_limbs = P::scalar_field_sub_pad_in_limbs();
         let r_biguint = P::scalar_field_sub_pad_in_biguint();
 
-        for i in 0..P::NUM_OF_LIMBS {
+        for (i, r_limb) in r_limbs.iter().enumerate().take(P::NUM_OF_LIMBS) {
             res.limbs[i] = res.limbs[i]
-                .add(&r_limbs[i])
-                .add(&r_limbs[i])
-                .add(&r_limbs[i])
-                .add(&r_limbs[i])
+                .add(r_limb)
+                .add(r_limb)
+                .add(r_limb)
+                .add(r_limb)
                 .sub(&rhs.limbs[i]);
         }
         res.val = &res.val + &r_biguint + &r_biguint + &r_biguint + &r_biguint - &rhs.val;
@@ -341,13 +345,13 @@ impl<F: Scalar, P: SimFrParams<F>> SimFrMul<F, P> {
                 (num_limbs_in_this_group + 1) * P::BIT_PER_LIMB + num_limbs_in_this_group + surfeit,
             );
             let pad_limb = F::from(&pad);
-            assert!(pad > <F as Into<BigUint>>::into(right_group_limb.clone()));
+            assert!(pad > <F as Into<BigUint>>::into(*right_group_limb));
 
             // Compute the carry number for the next cycle
             let mut carry = left_group_limb
                 .add(&carry_in)
                 .add(&pad_limb)
-                .sub(&right_group_limb);
+                .sub(right_group_limb);
             let carry_biguint: BigUint = carry.into();
             carry = F::from(&carry_biguint.shr(num_limbs_in_this_group * P::BIT_PER_LIMB));
             accumulated_extra += BigUint::from_bytes_le(&pad_limb.to_bytes());
@@ -359,9 +363,9 @@ impl<F: Scalar, P: SimFrParams<F>> SimFrMul<F, P> {
             let eqn_left = left_group_limb
                 .add(&pad_limb)
                 .add(&carry_in)
-                .sub(&right_group_limb);
+                .sub(right_group_limb);
 
-            let eqn_right = (&carry)
+            let eqn_right = carry
                 .mul(&(&BigUint::from(1u32).shl(P::BIT_PER_LIMB * num_limbs_in_this_group)).into())
                 .add(&remainder);
 

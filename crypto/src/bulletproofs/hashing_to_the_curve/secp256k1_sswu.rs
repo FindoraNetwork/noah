@@ -69,7 +69,7 @@ impl HashingGadget {
         let (_, _, t4_var) = cs.multiply(t2_var.into(), t2_var.into());
 
         let a3_inv_var = LinearCombination::from(t4_var) + t2_var;
-        let (_, _, a3_mul_a3_inv_var) = cs.multiply(trace_var.a3_var.into(), a3_inv_var.into());
+        let (_, _, a3_mul_a3_inv_var) = cs.multiply(trace_var.a3_var.into(), a3_inv_var);
         cs.constrain(a3_mul_a3_inv_var - Fq::ONE);
 
         let x1_var = (LinearCombination::from(trace_var.a3_var) + Fq::ONE)
@@ -85,7 +85,7 @@ impl HashingGadget {
         let (_, _, a4_sq_var) = cs.multiply(trace_var.a4_var.into(), trace_var.a4_var.into());
         let (_, _, y_squared_adjusted_var) = cs.multiply(
             y_squared_var,
-            LinearCombination::from(trace_var.b1_var.clone())
+            LinearCombination::from(trace_var.b1_var)
                 * (Fq::ONE - Secp256k1SSWUParameters::QNR.get_raw())
                 + Secp256k1SSWUParameters::QNR.get_raw(),
         );
@@ -97,7 +97,7 @@ impl HashingGadget {
         let (_, _, b1_t2_var) = cs.multiply(trace_var.b1_var.into(), t2_var.into());
         let x_multiplier_var = LinearCombination::from(trace_var.b1_var) + t2_var - b1_t2_var;
 
-        let (_, _, x_var) = cs.multiply(x_multiplier_var.into(), x1_var);
+        let (_, _, x_var) = cs.multiply(x_multiplier_var, x1_var);
 
         let mut numerator_var = LinearCombination::<Fq>::from(
             Secp256k1SSWUParameters::get_isogeny_numerator_term(0).get_raw(),
@@ -123,9 +123,8 @@ impl HashingGadget {
             + cur_var
                 * Secp256k1SSWUParameters::get_isogeny_numerator_term(degree as usize).get_raw();
 
-        let (_, _, denominator_times_res_var) =
-            cs.multiply(denominator_var.into(), (*final_var).into());
-        cs.constrain(LinearCombination::from(numerator_var) - denominator_times_res_var);
+        let (_, _, denominator_times_res_var) = cs.multiply(denominator_var, (*final_var).into());
+        cs.constrain(numerator_var - denominator_times_res_var);
 
         Ok(())
     }

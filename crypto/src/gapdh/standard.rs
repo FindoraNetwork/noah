@@ -38,7 +38,7 @@ impl<G: CurveGroup, H: HashingToCurve<G>> GapDHSignature<G, H> for StandardGDH<G
         sigma: &G,
     ) -> Self::Proof {
         let r = G::ScalarType::random(prng);
-        let pk = G::get_base().mul(&sk);
+        let pk = G::get_base().mul(sk);
 
         let point_r_1 = m.mul(&r);
         let point_r_2 = G::get_base().mul(&r);
@@ -57,15 +57,13 @@ impl<G: CurveGroup, H: HashingToCurve<G>> GapDHSignature<G, H> for StandardGDH<G
             G::ScalarType::random(&mut rng)
         };
 
-        let response = r * &beta + sk;
+        let response = r * beta + sk;
 
-        let proof = StandardGDHProof {
+        StandardGDHProof {
             point_r_1,
             point_r_2,
             response,
-        };
-
-        proof
+        }
     }
 
     fn verify(

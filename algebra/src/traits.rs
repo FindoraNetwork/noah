@@ -96,7 +96,7 @@ pub trait Scalar:
 
     /// exponent form: least significant limb first, with u64 limbs
     fn pow(&self, exponent: &[u64]) -> Self {
-        let mut base = self.clone();
+        let mut base = *self;
         let mut result = Self::one();
         for exp_u64 in exponent {
             let mut e = *exp_u64;
@@ -366,8 +366,8 @@ pub fn pippenger<G: Group>(scalars: &[&G::ScalarType], elems: &[&G]) -> Result<G
                 buckets[b_index].sub_assign(elem);
             }
         }
-        let mut intermediate_sum = buckets[buckets.len() - 1].clone();
-        let mut sum = buckets[buckets.len() - 1].clone();
+        let mut intermediate_sum = buckets[buckets.len() - 1];
+        let mut sum = buckets[buckets.len() - 1];
         for i in (0..buckets.len() - 1).rev() {
             intermediate_sum = intermediate_sum.add(&buckets[i]);
             sum = sum.add(&intermediate_sum);

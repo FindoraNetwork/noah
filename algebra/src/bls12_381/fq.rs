@@ -31,20 +31,16 @@ impl FromStr for BLSFq {
     type Err = AlgebraError;
 
     fn from_str(string: &str) -> StdResult<Self, AlgebraError> {
-        let res = Fq::from_str(string);
+        let res = Fq::from_str(string).map_err(|_| AlgebraError::DeserializationError)?;
 
-        if res.is_ok() {
-            Ok(Self(res.unwrap()))
-        } else {
-            Err(AlgebraError::DeserializationError)
-        }
+        Ok(Self(res))
     }
 }
 
-impl Into<BigUint> for BLSFq {
+impl From<BLSFq> for BigUint {
     #[inline]
-    fn into(self) -> BigUint {
-        self.0.into_bigint().into()
+    fn from(val: BLSFq) -> Self {
+        val.0.into_bigint().into()
     }
 }
 
@@ -268,7 +264,7 @@ impl Scalar for BLSFq {
         let len = exponent.len();
         let mut array = [0u64; 6];
         array[..len].copy_from_slice(exponent);
-        Self(self.0.pow(&array))
+        Self(self.0.pow(array))
     }
 
     #[inline]
@@ -283,12 +279,7 @@ impl Scalar for BLSFq {
 
     #[inline]
     fn sqrt(&self) -> Option<Self> {
-        let res = self.0.sqrt();
-        if res.is_some() {
-            Some(Self(res.unwrap()))
-        } else {
-            None
-        }
+        self.0.sqrt().map(Self)
     }
 
     #[inline]

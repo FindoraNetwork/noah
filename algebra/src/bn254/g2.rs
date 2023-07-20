@@ -65,24 +65,18 @@ impl Group for BN254G2 {
 
     #[inline]
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
-        let affine = G2Affine::deserialize_with_mode(bytes, Compress::Yes, Validate::Yes);
+        let affine = G2Affine::deserialize_with_mode(bytes, Compress::Yes, Validate::Yes)
+            .map_err(|_| AlgebraError::DeserializationError)?;
 
-        if affine.is_ok() {
-            Ok(Self(affine.unwrap().into_group()))
-        } else {
-            Err(AlgebraError::DeserializationError)
-        }
+        Ok(Self(affine.into_group()))
     }
 
     #[inline]
     fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
-        let affine = G2Affine::deserialize_with_mode(bytes, Compress::No, Validate::No);
+        let affine = G2Affine::deserialize_with_mode(bytes, Compress::No, Validate::No)
+            .map_err(|_| AlgebraError::DeserializationError)?;
 
-        if affine.is_ok() {
-            Ok(Self(affine.unwrap().into_group()))
-        } else {
-            Err(AlgebraError::DeserializationError)
-        }
+        Ok(Self(affine.into_group()))
     }
 
     #[inline]
@@ -152,6 +146,6 @@ impl<'a> SubAssign<&'a BN254G2> for BN254G2 {
 impl<'a> MulAssign<&'a BN254Scalar> for BN254G2 {
     #[inline]
     fn mul_assign(&mut self, rhs: &'a BN254Scalar) {
-        self.0.mul_assign(rhs.0.clone())
+        self.0.mul_assign(rhs.0)
     }
 }
