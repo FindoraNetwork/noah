@@ -128,7 +128,7 @@ pub fn u64_limbs_from_bytes(slice: &[u8]) -> Vec<u64> {
 pub fn save_to_file(params_ser: &[u8], out_filename: ark_std::path::PathBuf) {
     use ark_std::io::Write;
     let filename = out_filename.to_str().unwrap();
-    let mut f = ark_std::fs::File::create(&filename).expect("Unable to create file");
+    let mut f = ark_std::fs::File::create(filename).expect("Unable to create file");
     f.write_all(params_ser).expect("Unable to write data");
 }
 

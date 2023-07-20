@@ -555,7 +555,8 @@ pub fn batch_verify_xfr_notes<R: CryptoRng + RngCore>(
     batch_verify_xfr_bodies(prng, params, &bodies, policies)
 }
 
-pub(crate) fn batch_verify_xfr_body_asset_records<R: CryptoRng + RngCore>(
+/// Verify xfr body
+pub fn batch_verify_xfr_body_asset_records<R: CryptoRng + RngCore>(
     prng: &mut R,
     params: &mut BulletproofParams,
     bodies: &[&XfrBody],
