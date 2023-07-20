@@ -363,11 +363,9 @@ pub fn prove_address_folding_in_cs_secp256k1(
 
     // 5. allocate the simulated field elements for the delegated Schnorr protocol.
     // note: the verifier will combine the challenges using the power series of lambda.
-    let lambda_series = vec![
-        SECQ256K1Scalar::one(),
+    let lambda_series = [SECQ256K1Scalar::one(),
         witness.lambda,
-        witness.lambda * witness.lambda,
-    ];
+        witness.lambda * witness.lambda];
     let beta_lambda_series = lambda_series
         .iter()
         .map(|v| *v * witness.beta)
@@ -508,7 +506,7 @@ pub fn prove_address_folding_in_cs_secp256k1(
         let zero_var = cs.zero_var();
 
         let mut sum_var = {
-            let first_var = *limbs_var.get(0).unwrap_or(&zero_var);
+            let first_var = *limbs_var.first().unwrap_or(&zero_var);
             let second_var = *limbs_var.get(1).unwrap_or(&zero_var);
             let third_var = *limbs_var.get(2).unwrap_or(&zero_var);
             let fourth_var = *limbs_var.get(3).unwrap_or(&zero_var);
@@ -580,7 +578,7 @@ pub fn prepare_verifier_input_secp256k1(
 ) -> Vec<BN254Scalar> {
     let mut v = vec![instance.delegated_schnorr_proof.inspection_comm];
 
-    let lambda_series = vec![SECQ256K1Scalar::one(), *lambda, *lambda * lambda];
+    let lambda_series = [SECQ256K1Scalar::one(), *lambda, *lambda * lambda];
     let beta_lambda_series = lambda_series
         .iter()
         .map(|v| *v * beta)

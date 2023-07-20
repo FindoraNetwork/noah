@@ -137,9 +137,9 @@ lazy_static! {
 }
 
 #[cfg(not(feature = "no_srs"))]
-static LAGRANGE_BASE_4096: &'static [u8] = include_bytes!("../../parameters/lagrange-srs-4096.bin");
+static LAGRANGE_BASE_4096: &[u8] = include_bytes!("../../parameters/lagrange-srs-4096.bin");
 #[cfg(all(not(feature = "no_srs"), not(feature = "lightweight")))]
-static LAGRANGE_BASE_8192: &'static [u8] = include_bytes!("../../parameters/lagrange-srs-8192.bin");
+static LAGRANGE_BASE_8192: &[u8] = include_bytes!("../../parameters/lagrange-srs-8192.bin");
 
 #[cfg(not(feature = "no_srs"))]
 lazy_static! {

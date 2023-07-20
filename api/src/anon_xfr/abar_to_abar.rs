@@ -318,11 +318,11 @@ pub fn verify_anon_xfr_note<D: Digest<OutputSize = U64> + Default>(
     let address_folding_public_input = match &note.folding_instance {
         AXfrAddressFoldingInstance::Secp256k1(a) => {
             let (beta, lambda) = verify_address_folding_secp256k1(hash, &mut transcript, a)?;
-            prepare_verifier_input_secp256k1(&a, &beta, &lambda)
+            prepare_verifier_input_secp256k1(a, &beta, &lambda)
         }
         AXfrAddressFoldingInstance::Ed25519(a) => {
             let (beta, lambda) = verify_address_folding_ed25519(hash, &mut transcript, a)?;
-            prepare_verifier_input_ed25519(&a, &beta, &lambda)
+            prepare_verifier_input_ed25519(a, &beta, &lambda)
         }
     };
 
@@ -452,7 +452,7 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
         nullifiers_traces,
         input_commitments_traces,
         output_commitments_traces,
-        &folding_witness,
+        folding_witness,
     );
     let witness = cs.get_and_clear_witness();
 
@@ -685,7 +685,7 @@ pub(crate) fn build_multi_xfr_cs(
             payer_witness_var.asset_type,
             secret_key_type_var,
             &public_key_scalars_vars,
-            &input_commitment_trace,
+            input_commitment_trace,
         );
 
         // prove pre-image of the nullifier.
@@ -770,7 +770,7 @@ pub(crate) fn build_multi_xfr_cs(
             payee.asset_type,
             payee.public_key_type,
             &payee.public_key_scalars,
-            &output_commitment_trace,
+            output_commitment_trace,
         );
 
         // Range check `amount`.
@@ -798,14 +798,14 @@ pub(crate) fn build_multi_xfr_cs(
             &mut cs,
             &public_key_scalars_vars,
             &secret_key_scalars_vars,
-            &a,
+            a,
         )
         .unwrap(),
         AXfrAddressFoldingWitness::Ed25519(a) => prove_address_folding_in_cs_ed25519(
             &mut cs,
             &public_key_scalars_vars,
             &secret_key_scalars_vars,
-            &a,
+            a,
         )
         .unwrap(),
     }
@@ -841,7 +841,7 @@ pub fn asset_summing(
     fee_var: VarIndex,
 ) {
     assert_eq!(inputs.len(), 1);
-    assert!(outputs.len() >= 1);
+    assert!(!outputs.is_empty());
 
     // Prove that all the types are the same.
     for output in outputs.iter() {

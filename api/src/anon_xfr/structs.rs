@@ -166,7 +166,7 @@ impl OpenAnonAssetRecordBuilder {
 
     /// Specify public_key
     pub fn pub_key(mut self, pub_key: &PublicKey) -> Self {
-        self.oabar.pub_key = pub_key.clone();
+        self.oabar.pub_key = *pub_key;
         self
     }
 

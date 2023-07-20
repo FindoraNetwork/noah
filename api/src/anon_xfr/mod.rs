@@ -154,10 +154,8 @@ fn check_asset_amount(
             if sum != 0i128 {
                 return Err(NoahError::XfrCreationAssetAmountError);
             }
-        } else {
-            if sum != fee.into() {
-                return Err(NoahError::XfrCreationAssetAmountError);
-            }
+        } else if sum != fee.into() {
+            return Err(NoahError::XfrCreationAssetAmountError);
         }
     }
 
@@ -431,12 +429,10 @@ fn check_merkle_tree_validity(
 
     let sum = if cs.witness[is_right_child].is_one() {
         zero
+    } else if cs.witness[is_left_child].is_one() {
+        cs.witness[left]
     } else {
-        if cs.witness[is_left_child].is_one() {
-            cs.witness[left]
-        } else {
-            cs.witness[mid]
-        }
+        cs.witness[mid]
     };
 
     let sum_var = cs.new_variable(sum);

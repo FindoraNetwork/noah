@@ -58,8 +58,8 @@ pub(crate) fn asset_amount_tracing_proofs<R: CryptoRng + RngCore>(
         let proof = build_same_key_asset_type_amount_tracing_proof(
             prng,
             &mut transcript,
-            &tracer_pub_key,
-            &records_memos,
+            tracer_pub_key,
+            records_memos,
         )?;
         proofs.push(proof)
     }
@@ -119,7 +119,7 @@ fn build_same_key_asset_type_amount_tracing_proof<R: CryptoRng + RngCore>(
         prng,
         m.as_slice(),
         r.as_slice(),
-        &pub_key,
+        pub_key,
         ctexts.as_slice(),
         commitments.as_slice(),
     ))
@@ -421,7 +421,7 @@ fn verify_identity_proofs(
                     ac_confidential_verify(
                         &policy.cred_issuer_pub_key,
                         enc_keys,
-                        &policy.reveal_map.as_slice(),
+                        policy.reveal_map.as_slice(),
                         sig_com,
                         &memo.lock_attributes[..],
                         proof,

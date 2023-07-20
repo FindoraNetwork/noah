@@ -74,7 +74,7 @@ impl AssetType {
         const ASSET_TYPE_NOAH_REPR_LENGTH: usize = 30;
 
         let mut hash = sha2::Sha256::default();
-        hash.update(&self.0);
+        hash.update(self.0);
         let array = hash.finalize();
         let mut noah_repr = [0u8; MIN_SCALAR_LENGTH];
         noah_repr[0..ASSET_TYPE_NOAH_REPR_LENGTH]
@@ -428,7 +428,7 @@ impl OwnerMemo {
             OwnerMemo::derive_shared_point(&key_type, &r, &pub_key.as_compressed_point()?)?;
         let amount_blinds = OwnerMemo::calc_amount_blinds(&shared_point);
 
-        let lock_bytes = xfr_hybrid_encrypt(&pub_key, prng, &amount.to_be_bytes())?;
+        let lock_bytes = xfr_hybrid_encrypt(pub_key, prng, &amount.to_be_bytes())?;
         Ok((
             OwnerMemo {
                 key_type,
@@ -450,7 +450,7 @@ impl OwnerMemo {
             OwnerMemo::derive_shared_point(&key_type, &r, &pub_key.as_compressed_point()?)?;
         let asset_type_blind = OwnerMemo::calc_asset_type_blind(&shared_point);
 
-        let lock_bytes = xfr_hybrid_encrypt(&pub_key, prng, &asset_type.0)?;
+        let lock_bytes = xfr_hybrid_encrypt(pub_key, prng, &asset_type.0)?;
         Ok((
             OwnerMemo {
                 key_type,
@@ -477,7 +477,7 @@ impl OwnerMemo {
         let mut amount_asset_type_plaintext = vec![];
         amount_asset_type_plaintext.extend_from_slice(&amount.to_be_bytes()[..]);
         amount_asset_type_plaintext.extend_from_slice(&asset_type.0[..]);
-        let lock_bytes = xfr_hybrid_encrypt(&pub_key, prng, &amount_asset_type_plaintext)?;
+        let lock_bytes = xfr_hybrid_encrypt(pub_key, prng, &amount_asset_type_plaintext)?;
         Ok((
             OwnerMemo {
                 key_type,
@@ -492,7 +492,7 @@ impl OwnerMemo {
     /// Decrypt the `OwnerMemo.lock` which encrypts only the confidential amount
     /// returns error if the decrypted bytes length doesn't match.
     pub fn decrypt_amount(&self, keypair: &KeyPair) -> Result<u64> {
-        let decrypted_bytes = self.decrypt(&keypair)?;
+        let decrypted_bytes = self.decrypt(keypair)?;
         // amount is u64, thus u64.to_be_bytes should be 8 bytes
         if decrypted_bytes.len() != 8 {
             return Err(NoahError::InconsistentStructureError);
@@ -505,7 +505,7 @@ impl OwnerMemo {
     /// Decrypt the `OwnerMemo.lock` which encrypts only the confidential asset type
     /// returns error if the decrypted bytes length doesn't match.
     pub fn decrypt_asset_type(&self, keypair: &KeyPair) -> Result<AssetType> {
-        let decrypted_bytes = self.decrypt(&keypair)?;
+        let decrypted_bytes = self.decrypt(keypair)?;
         if decrypted_bytes.len() != ASSET_TYPE_LENGTH {
             return Err(NoahError::InconsistentStructureError);
         }
@@ -517,7 +517,7 @@ impl OwnerMemo {
     /// Decrypt the `OwnerMemo.lock` which encrypts "amount || asset type", both amount and asset type
     /// are confidential.
     pub fn decrypt_amount_and_asset_type(&self, keypair: &KeyPair) -> Result<(u64, AssetType)> {
-        let decrypted_bytes = self.decrypt(&keypair)?;
+        let decrypted_bytes = self.decrypt(keypair)?;
         if decrypted_bytes.len() != ASSET_TYPE_LENGTH + 8 {
             return Err(NoahError::InconsistentStructureError);
         }
@@ -561,14 +561,14 @@ impl OwnerMemo {
     // Given a shared point, calculate the amount blinds.
     fn calc_amount_blinds(shared_point: &[u8]) -> (RistrettoScalar, RistrettoScalar) {
         (
-            OwnerMemo::hash_to_scalar(&shared_point, b"amount_low"),
-            OwnerMemo::hash_to_scalar(&shared_point, b"amount_high"),
+            OwnerMemo::hash_to_scalar(shared_point, b"amount_low"),
+            OwnerMemo::hash_to_scalar(shared_point, b"amount_high"),
         )
     }
 
     // Given a shared point, calculate the asset type blind.
     fn calc_asset_type_blind(shared_point: &[u8]) -> RistrettoScalar {
-        OwnerMemo::hash_to_scalar(&shared_point, b"asset_type")
+        OwnerMemo::hash_to_scalar(shared_point, b"asset_type")
     }
 
     // Return the shared point.
@@ -645,7 +645,7 @@ pub fn check_memo_size(output: &BlindAssetRecord, memo: &Option<OwnerMemo>) -> R
 
             Ok(())
         }
-        _ => return Err(NoahError::AXfrVerificationError),
+        _ => Err(NoahError::AXfrVerificationError),
     }
 }
 
@@ -943,7 +943,7 @@ impl<'de> Deserialize<'de> for OwnerMemo {
             }
         }
 
-        const FIELDS: &'static [&'static str] = &[
+        const FIELDS: &[&str] = &[
             "key_type",
             "blind_share",
             "blind_share_bytes",

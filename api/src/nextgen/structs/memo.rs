@@ -37,7 +37,7 @@ pub fn get_auditor_memo_length(num_inputs: usize, num_outputs: usize) -> usize {
     //
     // Finally, there is one element for zk-ID
 
-    return 3 + num_inputs * (1 + 1 + 1) + num_outputs * (1 + 1 + 3 + 1) + 1;
+    3 + num_inputs * (1 + 1 + 1) + num_outputs * (1 + 1 + 3 + 1) + 1
 }
 
 /// A struct for the auditor's memo.
@@ -117,7 +117,7 @@ impl<'de> Deserialize<'de> for NabarAuditorMemo {
 
         let mut body = Vec::with_capacity(remaining_bytes / BN254_SCALAR_LEN);
         for elem_bytes in bytes[96..].chunks_exact(96) {
-            let res = BN254Scalar::noah_from_bytes(&elem_bytes);
+            let res = BN254Scalar::noah_from_bytes(elem_bytes);
             if res.is_err() {
                 return Err(SerdeError::custom(res.unwrap_err()));
             }

@@ -245,7 +245,7 @@ impl AssetRecord {
                 return Err(NoahError::ParameterError);
             }
         }
-        build_record_input_from_template(prng, &template, empty_id_proofs_and_ctext.as_slice())
+        build_record_input_from_template(prng, template, empty_id_proofs_and_ctext.as_slice())
     }
 
     /// Create the asset record using a template, with identity tracing.
@@ -276,7 +276,7 @@ impl AssetRecord {
             };
             id_proofs_and_attrs.push((conf_id, attrs));
         }
-        build_record_input_from_template(prng, &template, id_proofs_and_attrs.as_slice())
+        build_record_input_from_template(prng, template, id_proofs_and_attrs.as_slice())
     }
 }
 
@@ -345,7 +345,7 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
 
                 (
                     XfrAmount::from_blinds(
-                        &pc_gens,
+                        pc_gens,
                         asset_record.amount,
                         &amount_blinds.0,
                         &amount_blinds.1,
@@ -367,7 +367,7 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
 
                 (
                     XfrAmount::NonConfidential(asset_record.amount),
-                    XfrAssetType::from_blind(&pc_gens, &asset_record.asset_type, &asset_type_blind),
+                    XfrAssetType::from_blind(pc_gens, &asset_record.asset_type, &asset_type_blind),
                     (RistrettoScalar::zero(), RistrettoScalar::zero()),
                     asset_type_blind,
                     Some(owner_memo),
@@ -385,12 +385,12 @@ fn sample_blind_asset_record<R: CryptoRng + RngCore>(
                     .unwrap(); //safe unwrap
                 (
                     XfrAmount::from_blinds(
-                        &pc_gens,
+                        pc_gens,
                         asset_record.amount,
                         &amount_blinds.0,
                         &amount_blinds.1,
                     ),
-                    XfrAssetType::from_blind(&pc_gens, &asset_record.asset_type, &asset_type_blind),
+                    XfrAssetType::from_blind(pc_gens, &asset_record.asset_type, &asset_type_blind),
                     amount_blinds,
                     asset_type_blind,
                     Some(owner_memo),
@@ -489,8 +489,8 @@ pub fn open_blind_asset_record(
 
         AssetRecordType::ConfidentialAmount_NonConfidentialAssetType => {
             let owner_memo = owner_memo.as_ref().ok_or(NoahError::ParameterError)?;
-            let amount = owner_memo.decrypt_amount(&keypair)?;
-            let amount_blinds = owner_memo.derive_amount_blinds(&keypair)?;
+            let amount = owner_memo.decrypt_amount(keypair)?;
+            let amount_blinds = owner_memo.derive_amount_blinds(keypair)?;
 
             let pc_gens = PedersenCommitmentRistretto::default();
             if input.amount
@@ -512,8 +512,8 @@ pub fn open_blind_asset_record(
 
         AssetRecordType::NonConfidentialAmount_ConfidentialAssetType => {
             let owner_memo = owner_memo.as_ref().ok_or(NoahError::ParameterError)?;
-            let asset_type = owner_memo.decrypt_asset_type(&keypair)?;
-            let asset_type_blind = owner_memo.derive_asset_type_blind(&keypair)?;
+            let asset_type = owner_memo.decrypt_asset_type(keypair)?;
+            let asset_type_blind = owner_memo.derive_asset_type_blind(keypair)?;
 
             let pc_gens = PedersenCommitmentRistretto::default();
             if input.asset_type
@@ -532,9 +532,9 @@ pub fn open_blind_asset_record(
 
         AssetRecordType::ConfidentialAmount_ConfidentialAssetType => {
             let owner_memo = owner_memo.as_ref().ok_or(NoahError::ParameterError)?;
-            let (amount, asset_type) = owner_memo.decrypt_amount_and_asset_type(&keypair)?;
-            let amount_blinds = owner_memo.derive_amount_blinds(&keypair)?;
-            let asset_type_blind = owner_memo.derive_asset_type_blind(&keypair)?;
+            let (amount, asset_type) = owner_memo.decrypt_amount_and_asset_type(keypair)?;
+            let amount_blinds = owner_memo.derive_amount_blinds(keypair)?;
+            let asset_type_blind = owner_memo.derive_asset_type_blind(keypair)?;
 
             let pc_gens = PedersenCommitmentRistretto::default();
             if input.amount

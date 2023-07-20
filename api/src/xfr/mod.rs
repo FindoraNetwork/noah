@@ -485,7 +485,7 @@ pub(crate) fn compute_transfer_multisig(
     let mut bytes = vec![];
     body.serialize(&mut rmp_serde::Serializer::new(&mut bytes))
         .map_err(|_| NoahError::SerializationError)?;
-    Ok(SignatureList::sign(&keys, &bytes)?)
+    SignatureList::sign(keys, &bytes)
 }
 
 /// Verify the multisignature over the body.
@@ -511,7 +511,7 @@ pub fn verify_xfr_note<R: CryptoRng + RngCore>(
     xfr_note: &XfrNote,
     policies: &XfrNotePoliciesRef<'_>,
 ) -> Result<()> {
-    batch_verify_xfr_notes(prng, params, &[&xfr_note], &[&policies])
+    batch_verify_xfr_notes(prng, params, &[xfr_note], &[policies])
 }
 
 /// Batch-verify confidential transfer notes.
@@ -568,8 +568,8 @@ pub fn batch_verify_xfr_body_asset_records<R: CryptoRng + RngCore>(
     for body in bodies {
         match &body.proofs.asset_type_and_amount_proof {
             AssetTypeAndAmountProof::ConfAll(x) => {
-                let range_proof = &(*x).0;
-                let asset_proof = &(*x).1;
+                let range_proof = &x.0;
+                let asset_proof = &x.1;
                 conf_amount_records.push((&body.inputs, &body.outputs, range_proof));
                 conf_asset_type_records.push((&body.inputs, &body.outputs, asset_proof));
                 // save for batching
