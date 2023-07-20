@@ -38,8 +38,8 @@ impl PointVar {
         x: &Option<Fq>,
         y: &Option<Fq>,
     ) -> Result<Self> {
-        let x_var = cs.allocate((*x).clone())?;
-        let y_var = cs.allocate((*y).clone())?;
+        let x_var = cs.allocate((*x))?;
+        let y_var = cs.allocate((*y))?;
 
         Ok(Self { x_var, y_var })
     }
@@ -81,7 +81,7 @@ impl ScalarMulProof {
         };
 
         let mut cur = if public_key.is_some() {
-            Some(dummy_point.clone())
+            Some(dummy_point)
         } else {
             None
         };
@@ -89,15 +89,15 @@ impl ScalarMulProof {
         let mut cur_var = if public_key.is_some() {
             PointVar::allocate(
                 cs,
-                &Some(dummy_point.x.clone()),
-                &Some(dummy_point.y.clone()),
+                &Some(dummy_point.x),
+                &Some(dummy_point.y),
             )?
         } else {
             PointVar::allocate(cs, &None, &None)?
         };
 
-        cs.constrain(cur_var.x_var - dummy_point.x.clone());
-        cs.constrain(cur_var.y_var - dummy_point.y.clone());
+        cs.constrain(cur_var.x_var - dummy_point.x);
+        cs.constrain(cur_var.y_var - dummy_point.y);
 
         // 2. Compute the bit decomposition of `secret_key`.
         let (bits, bits_var) = if let Some(secret_key) = secret_key {
@@ -136,7 +136,7 @@ impl ScalarMulProof {
         let mut lc = Vec::new();
         let mut multiplier = Fq::one();
         for bit_var in bits_var.iter() {
-            lc.push((*bit_var, multiplier.clone()));
+            lc.push((*bit_var, multiplier));
             multiplier.double_in_place();
         }
 
@@ -156,7 +156,7 @@ impl ScalarMulProof {
 
         // 5. Add the points.
         for ((bit, bit_var), point) in bits.iter().zip(bits_var.iter()).zip(points.iter()) {
-            let (next, next_var) = Self::point_add_constant(cs, &cur_var, &cur, &point)?;
+            let (next, next_var) = Self::point_add_constant(cs, &cur_var, &cur, point)?;
             let (new_cur, new_cur_var) =
                 Self::point_select(cs, bit_var, bit, &next_var, &next, &cur_var, &cur)?;
 
@@ -225,8 +225,8 @@ impl ScalarMulProof {
             (None, res_var)
         };
 
-        let (_, _, x_delta) = cs.multiply(bit_var.clone().into(), yes_var.x_var - no_var.x_var);
-        let (_, _, y_delta) = cs.multiply(bit_var.clone().into(), yes_var.y_var - no_var.y_var);
+        let (_, _, x_delta) = cs.multiply((*bit_var).into(), yes_var.x_var - no_var.x_var);
+        let (_, _, y_delta) = cs.multiply((*bit_var).into(), yes_var.y_var - no_var.y_var);
 
         cs.constrain(res_var.x_var - no_var.x_var - x_delta);
         cs.constrain(res_var.y_var - no_var.y_var - y_delta);
@@ -239,10 +239,10 @@ impl ScalarMulProof {
     /// Attempt to construct a proof that `output` is a permutation of `input`.
     ///
     /// Returns a tuple `(proof, x_comm || y_comm || scalar_fq_comm )`.
-    pub fn prove<'a, 'b, R: CryptoRng + RngCore>(
+    pub fn prove<R: CryptoRng + RngCore>(
         prng: &mut R,
-        bp_gens: &'b BulletproofGens<AffineBig>,
-        transcript: &'a mut Transcript,
+        bp_gens: &BulletproofGens<AffineBig>,
+        transcript: &mut Transcript,
         public_key: &SECP256K1G1,
         secret_key: &SECP256K1Scalar,
     ) -> Result<(ScalarMulProof, Vec<SECQ256K1G1>, Vec<SECQ256K1Scalar>)> {
@@ -266,8 +266,8 @@ impl ScalarMulProof {
         // 4. Allocate `public_key`.
         let x_blinding = Fq::rand(prng);
         let y_blinding = Fq::rand(prng);
-        let (x_comm, x_var) = prover.commit(public_key.x, x_blinding.clone());
-        let (y_comm, y_var) = prover.commit(public_key.y, y_blinding.clone());
+        let (x_comm, x_var) = prover.commit(public_key.x, x_blinding);
+        let (y_comm, y_var) = prover.commit(public_key.y, y_blinding);
 
         let public_key_var = PointVar::new(x_var, y_var);
 
@@ -277,7 +277,7 @@ impl ScalarMulProof {
 
         let secret_key_blinding = Fq::rand(prng);
         let (secret_key_comm, secret_key_var) =
-            prover.commit(secret_key_fq, secret_key_blinding.clone());
+            prover.commit(secret_key_fq, secret_key_blinding);
 
         let secret_key_var = ScalarVar(secret_key_var);
 
@@ -289,14 +289,14 @@ impl ScalarMulProof {
             &Some(secret_key),
         )?;
 
-        let proof = prover.prove(prng, &bp_gens)?;
+        let proof = prover.prove(prng, bp_gens)?;
 
         Ok((
             ScalarMulProof(proof),
             vec![
-                SECQ256K1G1::from_raw(x_comm.clone()),
-                SECQ256K1G1::from_raw(y_comm.clone()),
-                SECQ256K1G1::from_raw(secret_key_comm.clone()),
+                SECQ256K1G1::from_raw(x_comm),
+                SECQ256K1G1::from_raw(y_comm),
+                SECQ256K1G1::from_raw(secret_key_comm),
             ],
             vec![
                 SECQ256K1Scalar::from_raw(x_blinding),
@@ -309,10 +309,10 @@ impl ScalarMulProof {
 
 impl ScalarMulProof {
     /// Attempt to verify a `ScalarMulProof`.
-    pub fn verify<'a, 'b>(
+    pub fn verify(
         &self,
-        bp_gens: &'b BulletproofGens<AffineBig>,
-        transcript: &'a mut Transcript,
+        bp_gens: &BulletproofGens<AffineBig>,
+        transcript: &mut Transcript,
         commitments: &Vec<SECQ256K1G1>,
     ) -> Result<()> {
         let pc_gens = PedersenCommitmentSecq256k1::default();
@@ -326,9 +326,9 @@ impl ScalarMulProof {
 
         let mut verifier = Verifier::new(transcript);
 
-        let x_var = verifier.commit(commitments[0].clone());
-        let y_var = verifier.commit(commitments[1].clone());
-        let s_var = verifier.commit(commitments[2].clone());
+        let x_var = verifier.commit(commitments[0]);
+        let y_var = verifier.commit(commitments[1]);
+        let s_var = verifier.commit(commitments[2]);
 
         let public_key_var = PointVar::new(x_var, y_var);
         let secret_key_var = ScalarVar(s_var);
@@ -342,7 +342,7 @@ impl ScalarMulProof {
         )?;
 
         let pc_gens_for_verifier = PedersenGens::<AffineBig>::from(&pc_gens);
-        verifier.verify(&self.0, &pc_gens_for_verifier, &bp_gens)?;
+        verifier.verify(&self.0, &pc_gens_for_verifier, bp_gens)?;
         Ok(())
     }
 }

@@ -53,7 +53,7 @@ impl<G: CurveGroup, P: SWParameters<G>> SWMap<G, P> {
 
     /// second candidate for solution x
     pub fn x2(_t: &G::BaseType, x1: &G::BaseType) -> Result<G::BaseType> {
-        Ok(P::C4.sub(&x1))
+        Ok(P::C4.sub(x1))
     }
 
     /// third candidate for solution x
@@ -77,11 +77,7 @@ impl<G: CurveGroup, P: SWParameters<G>> SWMap<G, P> {
             rhs += &(*x * P::B);
         }
 
-        if rhs.legendre() == LegendreSymbol::QuadraticNonResidue {
-            false
-        } else {
-            true
-        }
+        rhs.legendre() != LegendreSymbol::QuadraticNonResidue
     }
 }
 
@@ -108,7 +104,7 @@ impl<G: CurveGroup, P: SWParameters<G>> HashingToCurve<G> for SWMap<G, P> {
 
         let temp3 = t_sq.mul(temp.square());
         let x3 = P::C5.add(P::C6.mul(temp3));
-        return Ok(x3);
+        Ok(x3)
     }
 
     fn get_cofactor_uncleared_x_and_trace(t: &G::BaseType) -> Result<(G::BaseType, Self::Trace)> {
@@ -174,7 +170,7 @@ impl<G: CurveGroup, P: SWParameters<G>> HashingToCurve<G> for SWMap<G, P> {
         let temp3 = t_sq.mul(temp.square());
         let x3 = P::C5.add(P::C6.mul(temp3));
 
-        return Ok((x3, trace));
+        Ok((x3, trace))
     }
 
     fn get_cofactor_uncleared_point(t: &G::BaseType) -> Result<(G::BaseType, G::BaseType)> {
@@ -228,7 +224,7 @@ impl<G: CurveGroup, P: SWParameters<G>> HashingToCurve<G> for SWMap<G, P> {
         }
 
         let y = y_squared_3.sqrt().unwrap();
-        return Ok((x3, y));
+        Ok((x3, y))
     }
 
     fn get_cofactor_uncleared_point_and_trace(
@@ -306,7 +302,7 @@ impl<G: CurveGroup, P: SWParameters<G>> HashingToCurve<G> for SWMap<G, P> {
         }
 
         let y = y_squared_3.sqrt().unwrap();
-        return Ok((x3, y, trace));
+        Ok((x3, y, trace))
     }
 
     fn verify_trace(t: &G::BaseType, final_x: &G::BaseType, trace: &Self::Trace) -> bool {
@@ -342,10 +338,8 @@ impl<G: CurveGroup, P: SWParameters<G>> HashingToCurve<G> for SWMap<G, P> {
             if y_squared_1 != trace.a4.square() {
                 return false;
             }
-        } else {
-            if y_squared_1 * P::QNR != trace.a4.square() {
-                return false;
-            }
+        } else if y_squared_1 * P::QNR != trace.a4.square() {
+            return false;
         }
 
         let x2 = P::C4.sub(&x1);
@@ -360,31 +354,21 @@ impl<G: CurveGroup, P: SWParameters<G>> HashingToCurve<G> for SWMap<G, P> {
         let b1 = trace.b1;
 
         if b1 {
-            if *final_x != x1 {
-                return false;
-            } else {
-                return true;
-            }
+            return *final_x == x1
         }
 
         if trace.b2 {
             if y_squared_2 != trace.a5.square() {
                 return false;
             }
-        } else {
-            if y_squared_2 * P::QNR != trace.a5.square() {
-                return false;
-            }
+        } else if y_squared_2 * P::QNR != trace.a5.square() {
+            return false;
         }
 
         let b2 = trace.b2;
 
         if b2 {
-            if *final_x != x2 {
-                return false;
-            } else {
-                return true;
-            }
+            return *final_x == x2
         }
 
         let temp3 = t_sq.mul(temp.square());
@@ -394,7 +378,7 @@ impl<G: CurveGroup, P: SWParameters<G>> HashingToCurve<G> for SWMap<G, P> {
             return false;
         }
 
-        return true;
+        true
     }
 
     fn convert_to_group(x: &G::BaseType, y: &G::BaseType) -> Result<G> {

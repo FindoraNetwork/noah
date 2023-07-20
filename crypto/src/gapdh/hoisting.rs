@@ -47,7 +47,7 @@ impl<G: CurveGroup, H: HashingToCurve<G>> GapDHSignature<G, H> for HoistingGDH<G
         m: &G,
         sigma: &G,
     ) -> Self::Proof {
-        let pk = G::get_base().mul(&sk);
+        let pk = G::get_base().mul(sk);
 
         let r1 = G::ScalarType::random(prng);
         let r2 = G::ScalarType::random(prng);
@@ -88,7 +88,9 @@ impl<G: CurveGroup, H: HashingToCurve<G>> GapDHSignature<G, H> for HoistingGDH<G
         let response_2 = r3 * &beta + r1;
         let response_3 = r4 * &beta + sk.square();
 
-        let proof = HoistingGDHProof {
+        
+
+        HoistingGDHProof {
             point_p,
             point_r_pk,
             point_r_p1,
@@ -97,9 +99,7 @@ impl<G: CurveGroup, H: HashingToCurve<G>> GapDHSignature<G, H> for HoistingGDH<G
             response_1,
             response_2,
             response_3,
-        };
-
-        proof
+        }
     }
 
     fn verify(

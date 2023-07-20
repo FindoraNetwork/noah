@@ -65,8 +65,8 @@ impl<F: Scalar, S: Scalar, G: Group<ScalarType = S>> DSProof<F, S, G> {
             .response_scalars
             .iter()
             .flat_map(|(first, second)| {
-                let first_biguint: BigUint = first.clone().into();
-                let second_biguint: BigUint = second.clone().into();
+                let first_biguint: BigUint = (*first).into();
+                let second_biguint: BigUint = (*second).into();
 
                 let first_sim_fr = SimFr::<F, P>::from(&first_biguint);
                 let second_sim_fr = SimFr::<F, P>::from(&second_biguint);
@@ -116,21 +116,21 @@ pub fn prove_delegated_schnorr<
     // 2. convert the first part of each entry in the committed data into biguint and sim_fr; these are in the inspector's state.
     let committed_data_biguint = committed_data
         .iter()
-        .map(|(v, _)| <S as Into<BigUint>>::into(v.clone()))
+        .map(|(v, _)| <S as Into<BigUint>>::into(*v))
         .collect::<Vec<BigUint>>();
     let committed_data_sim_fr = committed_data_biguint
         .iter()
-        .map(|v| SimFr::<F, P>::from(v))
+        .map(SimFr::<F, P>::from)
         .collect::<Vec<SimFr<F, P>>>();
 
     // 3. convert the first part of each pair of randomizer scalars; these are in the inspector's state.
     let randomizer_biguint = randomizer_scalars
         .iter()
-        .map(|(v, _)| <S as Into<BigUint>>::into(v.clone()))
+        .map(|(v, _)| <S as Into<BigUint>>::into(*v))
         .collect::<Vec<BigUint>>();
     let randomizer_sim_fr = randomizer_biguint
         .iter()
-        .map(|v| SimFr::<F, P>::from(v))
+        .map(SimFr::<F, P>::from)
         .collect::<Vec<SimFr<F, P>>>();
 
     // 3. merge limbs of the committed data as well as the randomizer scalars
@@ -149,7 +149,7 @@ pub fn prove_delegated_schnorr<
         let mut sum = BigUint::zero();
         for (i, limb) in limbs.iter().enumerate() {
             sum.add_assign(
-                <F as Into<BigUint>>::into(limb.clone())
+                <F as Into<BigUint>>::into(*limb)
                     .mul(&BigUint::from(1u32).shl(P::BIT_PER_LIMB * i)),
             );
         }
@@ -168,7 +168,7 @@ pub fn prove_delegated_schnorr<
     // 6. compute the randomizer points.
     let randomizers = randomizer_scalars
         .iter()
-        .map(|(v, r)| pc_gens.commit(v.clone(), r.clone()))
+        .map(|(v, r)| pc_gens.commit(*v, *r))
         .collect::<Vec<G>>();
 
     proof.randomizers = randomizers.clone();
@@ -219,7 +219,7 @@ pub fn prove_delegated_schnorr<
     inspection.committed_data_and_randomizer = committed_data
         .iter()
         .zip(randomizer_scalars.iter())
-        .map(|((ll, _), (rl, _))| (ll.clone(), rl.clone()))
+        .map(|((ll, _), (rl, _))| (*ll, *rl))
         .collect::<Vec<(S, S)>>();
     inspection.r = r;
 
@@ -299,7 +299,7 @@ pub fn verify_delegated_schnorr<
         .zip(proof.randomizers.iter())
     {
         let eqn_left = pc_gens.commit(scalars.0, scalars.1);
-        let eqn_right = committed_data.mul(&beta).add(&randomizer);
+        let eqn_right = committed_data.mul(&beta).add(randomizer);
 
         if eqn_left.ne(&eqn_right) {
             return Err(CryptoError::ZKProofVerificationError);

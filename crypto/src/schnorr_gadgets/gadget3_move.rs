@@ -104,7 +104,9 @@ impl<G: CurveGroup> SchnorrGadget<G> for Gadget3<G> {
         let response_3 = r3 * &beta + witness.a_square * &witness.b;
         let response_4 = r4 * &beta + witness.d;
 
-        let proof = Gadget3Proof {
+        
+
+        Gadget3Proof {
             point_r_q,
             point_r_r,
             point_r_s,
@@ -112,9 +114,7 @@ impl<G: CurveGroup> SchnorrGadget<G> for Gadget3<G> {
             response_2,
             response_3,
             response_4,
-        };
-
-        proof
+        }
     }
 
     fn verify(

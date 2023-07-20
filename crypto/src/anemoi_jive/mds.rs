@@ -19,8 +19,8 @@ pub trait ApplicableMDSMatrix<F: Scalar, const N: usize> {
 
     /// Perform the permutation and return the result.
     fn permute(&self, x: &[F; N], y: &[F; N]) -> ([F; N], [F; N]) {
-        let mut x: [F; N] = x.clone();
-        let mut y: [F; N] = y.clone();
+        let mut x: [F; N] = *x;
+        let mut y: [F; N] = *y;
         self.permute_in_place(&mut x, &mut y);
         (x, y)
     }
@@ -41,7 +41,7 @@ impl<F: Scalar> ApplicableMDSMatrix<F, 2> for MDSMatrix<F, 2> {
         // Reminder: a different matrix is applied to x and y
         // The one for y has a simple word permutation.
 
-        let old_x = x.clone();
+        let old_x = *x;
         for i in 0..2 {
             x[i] = F::zero();
             for j in 0..2 {

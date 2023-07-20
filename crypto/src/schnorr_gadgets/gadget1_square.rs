@@ -85,15 +85,15 @@ impl<G: CurveGroup> SchnorrGadget<G> for Gadget1<G> {
         let response_2 = r2 * &beta + witness.b;
         let response_3 = r3 * &beta + witness.c - &witness.a.mul(witness.b);
 
-        let proof = Gadget1Proof {
+        
+
+        Gadget1Proof {
             point_r_p,
             point_r_q,
             response_1,
             response_2,
             response_3,
-        };
-
-        proof
+        }
     }
 
     fn verify(

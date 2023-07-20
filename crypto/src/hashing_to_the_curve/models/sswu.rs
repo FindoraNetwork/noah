@@ -50,8 +50,8 @@ impl<G: CurveGroup, P: SSWUParameters<G>> SSWUMap<G, P> {
             return Ok(*x);
         }
 
-        let mut numerator: G::BaseType = P::get_isogeny_numerator_term(0).clone();
-        let mut denominator: G::BaseType = P::get_isogeny_denominator_term(0).clone();
+        let mut numerator: G::BaseType = *P::get_isogeny_numerator_term(0);
+        let mut denominator: G::BaseType = *P::get_isogeny_denominator_term(0);
 
         let mut cur = *x;
         for i in 1u32..degree {
@@ -85,11 +85,7 @@ impl<G: CurveGroup, P: SSWUParameters<G>> SSWUMap<G, P> {
         let mut y_squared = (*x * x * x).add(P::B);
         y_squared = y_squared.add(P::A.mul(x));
 
-        if y_squared.legendre() == LegendreSymbol::QuadraticNonResidue {
-            false
-        } else {
-            true
-        }
+        y_squared.legendre() != LegendreSymbol::QuadraticNonResidue
     }
 
     /// check whether candidate x lies on the original curve
@@ -97,11 +93,7 @@ impl<G: CurveGroup, P: SSWUParameters<G>> SSWUMap<G, P> {
         let mut y_squared = (*x * x * x).add(P::B_ORG);
         y_squared = y_squared.add(P::A_ORG.mul(x));
 
-        if y_squared.legendre() == LegendreSymbol::QuadraticNonResidue {
-            false
-        } else {
-            true
-        }
+        y_squared.legendre() != LegendreSymbol::QuadraticNonResidue
     }
 }
 
@@ -119,7 +111,7 @@ impl<G: CurveGroup, P: SSWUParameters<G>> HashingToCurve<G> for SSWUMap<G, P> {
             return Self::isogeny_map_x(&x1);
         }
         let x2 = x1.mul(t2);
-        return Self::isogeny_map_x(&x2);
+        Self::isogeny_map_x(&x2)
     }
 
     fn get_cofactor_uncleared_x_and_trace(t: &G::BaseType) -> Result<(G::BaseType, Self::Trace)> {
@@ -135,7 +127,7 @@ impl<G: CurveGroup, P: SSWUParameters<G>> HashingToCurve<G> for SSWUMap<G, P> {
 
         let b1 = y_squared.legendre() != LegendreSymbol::QuadraticNonResidue;
 
-        return if b1 {
+        if b1 {
             let a4 = y_squared.sqrt().unwrap();
             let trace = Self::Trace { a3, b1, a4 };
             Ok((Self::isogeny_map_x(&x1)?, trace))
@@ -144,7 +136,7 @@ impl<G: CurveGroup, P: SSWUParameters<G>> HashingToCurve<G> for SSWUMap<G, P> {
             let a4 = (y_squared * P::QNR).sqrt().unwrap();
             let trace = Self::Trace { a3, b1, a4 };
             Ok((Self::isogeny_map_x(&x2)?, trace))
-        };
+        }
     }
 
     fn get_cofactor_uncleared_point(t: &G::BaseType) -> Result<(G::BaseType, G::BaseType)> {
@@ -160,7 +152,7 @@ impl<G: CurveGroup, P: SSWUParameters<G>> HashingToCurve<G> for SSWUMap<G, P> {
 
         let b1 = y_squared.legendre() != LegendreSymbol::QuadraticNonResidue;
 
-        return if b1 {
+        if b1 {
             let x1_org = Self::isogeny_map_x(&x1)?;
             let mut y_squared_org = (x1_org * x1_org * x1_org).add(P::B_ORG);
             y_squared_org = y_squared_org.add(P::A_ORG.mul(x1_org));
@@ -176,7 +168,7 @@ impl<G: CurveGroup, P: SSWUParameters<G>> HashingToCurve<G> for SSWUMap<G, P> {
 
             let y_org = y_squared_org.sqrt().unwrap();
             Ok((x2_org, y_org))
-        };
+        }
     }
 
     fn get_cofactor_uncleared_point_and_trace(
@@ -194,7 +186,7 @@ impl<G: CurveGroup, P: SSWUParameters<G>> HashingToCurve<G> for SSWUMap<G, P> {
 
         let b1 = y_squared.legendre() != LegendreSymbol::QuadraticNonResidue;
 
-        return if b1 {
+        if b1 {
             let a4 = y_squared.sqrt().unwrap();
             let trace = Self::Trace { a3, b1, a4 };
 
@@ -217,7 +209,7 @@ impl<G: CurveGroup, P: SSWUParameters<G>> HashingToCurve<G> for SSWUMap<G, P> {
             let y_org = y_squared_org.sqrt().unwrap();
 
             Ok((x2_org, y_org, trace))
-        };
+        }
     }
 
     fn verify_trace(t: &G::BaseType, final_x: &G::BaseType, trace: &Self::Trace) -> bool {
@@ -240,20 +232,14 @@ impl<G: CurveGroup, P: SSWUParameters<G>> HashingToCurve<G> for SSWUMap<G, P> {
             if y_squared != trace.a4.square() {
                 return false;
             }
-        } else {
-            if y_squared * P::QNR != trace.a4.square() {
-                return false;
-            }
+        } else if y_squared * P::QNR != trace.a4.square() {
+            return false;
         }
 
         let b1 = trace.b1;
 
         if b1 {
-            if *final_x != Self::isogeny_map_x(&x1).unwrap() {
-                return false;
-            } else {
-                return true;
-            }
+            return *final_x == Self::isogeny_map_x(&x1).unwrap()
         }
 
         let x2 = x1.mul(t2);
@@ -262,7 +248,7 @@ impl<G: CurveGroup, P: SSWUParameters<G>> HashingToCurve<G> for SSWUMap<G, P> {
             return false;
         }
 
-        return true;
+        true
     }
 
     fn convert_to_group(x: &G::BaseType, y: &G::BaseType) -> Result<G> {

@@ -138,7 +138,7 @@ where
                 y[i] += &chunk[N + i];
             }
 
-            trace.before_permutation.push((x.clone(), y.clone()));
+            trace.before_permutation.push((x, y));
 
             let mut intermediate_values_before_constant_additions =
                 ([[F::zero(); N]; NUM_ROUNDS], [[F::zero(); N]; NUM_ROUNDS]);
@@ -160,8 +160,8 @@ where
                     x[i] += &(Self::GENERATOR * &(y[i].square()) + Self::GENERATOR_INV);
                 }
 
-                intermediate_values_before_constant_additions.0[r] = x.clone();
-                intermediate_values_before_constant_additions.1[r] = y.clone();
+                intermediate_values_before_constant_additions.0[r] = x;
+                intermediate_values_before_constant_additions.1[r] = y;
             }
 
             mds.permute_in_place(&mut x, &mut y);
@@ -176,7 +176,7 @@ where
                 .intermediate_values_before_constant_additions
                 .push(intermediate_values_before_constant_additions);
 
-            trace.after_permutation.push((x.clone(), y.clone()));
+            trace.after_permutation.push((x, y));
         }
         y[N - 1] += &sigma;
         // This step can be omitted since we only get one element.
@@ -190,8 +190,8 @@ where
     /// Eval the Anemoi-Jive hash function and return the result.
     fn eval_jive(x: &[F; N], y: &[F; N]) -> F {
         let sum_before_perm: F = x.iter().sum::<F>() + y.iter().sum::<F>();
-        let mut x = x.clone();
-        let mut y = y.clone();
+        let mut x = *x;
+        let mut y = *y;
         Self::anemoi_permutation(&mut x, &mut y);
         let sum_after_perm: F = x.iter().sum::<F>() + y.iter().sum::<F>();
         sum_before_perm + sum_after_perm
@@ -203,10 +203,10 @@ where
         let mds = MDSMatrix::<F, N>(Self::MDS_MATRIX);
         let alpha_inv = Self::get_alpha_inv();
         let mut trace = JiveTrace::default();
-        trace.input_x = x.clone();
-        trace.input_y = y.clone();
-        let mut x = x.clone();
-        let mut y = y.clone();
+        trace.input_x = *x;
+        trace.input_y = *y;
+        let mut x = *x;
+        let mut y = *y;
         let sum_before_perm: F = x.iter().sum::<F>() + y.iter().sum::<F>();
         for r in 0..NUM_ROUNDS {
             for i in 0..N {
@@ -339,7 +339,7 @@ where
 
         // applies an Anemoi permutation with trace to the state
         let mut anemoi_permutation_with_trace = |x: &mut [F; N], y: &mut [F; N]| {
-            trace.before_permutation.push((x.clone(), y.clone()));
+            trace.before_permutation.push((*x, *y));
 
             let mut intermediate_values_before_constant_additions =
                 ([[F::zero(); N]; NUM_ROUNDS], [[F::zero(); N]; NUM_ROUNDS]);
@@ -361,8 +361,8 @@ where
                     x[i] += &(Self::GENERATOR * &(y[i].square()) + Self::GENERATOR_INV);
                 }
 
-                intermediate_values_before_constant_additions.0[r] = x.clone();
-                intermediate_values_before_constant_additions.1[r] = y.clone();
+                intermediate_values_before_constant_additions.0[r] = *x;
+                intermediate_values_before_constant_additions.1[r] = *y;
             }
 
             mds.permute_in_place(x, y);
@@ -377,7 +377,7 @@ where
                 .intermediate_values_before_constant_additions
                 .push(intermediate_values_before_constant_additions);
 
-            trace.after_permutation.push((x.clone(), y.clone()));
+            trace.after_permutation.push((*x, *y));
         };
 
         // initialize the internal state.
