@@ -506,7 +506,7 @@ pub fn batch_verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default + Syn
             let mut online_inputs = vec![];
 
             online_inputs.push(input.clone());
-            online_inputs.push(*merkle_root.clone());
+            online_inputs.push(**merkle_root);
             online_inputs.push(delegated_schnorr_proof.inspection_comm);
             online_inputs.extend_from_slice(&beta_sim_fr.limbs);
             online_inputs.extend_from_slice(&lambda_sim_fr.limbs);
