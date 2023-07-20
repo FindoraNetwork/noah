@@ -65,24 +65,18 @@ impl Group for BLSG2 {
 
     #[inline]
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
-        let affine = G2Affine::deserialize_with_mode(bytes, Compress::Yes, Validate::Yes);
+        let affine = G2Affine::deserialize_with_mode(bytes, Compress::Yes, Validate::Yes)
+            .map_err(|_| AlgebraError::DeserializationError)?;
 
-        if affine.is_ok() {
-            Ok(Self(affine.unwrap().into_group()))
-        } else {
-            Err(AlgebraError::DeserializationError)
-        }
+        Ok(Self(affine.into_group()))
     }
 
     #[inline]
     fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
-        let affine = G2Affine::deserialize_with_mode(bytes, Compress::No, Validate::No);
+        let affine = G2Affine::deserialize_with_mode(bytes, Compress::No, Validate::No)
+            .map_err(|_| AlgebraError::DeserializationError)?;
 
-        if affine.is_ok() {
-            Ok(Self(affine.unwrap().into_group()))
-        } else {
-            Err(AlgebraError::DeserializationError)
-        }
+        Ok(Self(affine.into_group()))
     }
 
     #[inline]

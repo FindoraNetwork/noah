@@ -354,7 +354,7 @@ impl<G: CurveGroup, P: SWParameters<G>> HashingToCurve<G> for SWMap<G, P> {
         let b1 = trace.b1;
 
         if b1 {
-            return *final_x == x1
+            return *final_x == x1;
         }
 
         if trace.b2 {
@@ -368,7 +368,7 @@ impl<G: CurveGroup, P: SWParameters<G>> HashingToCurve<G> for SWMap<G, P> {
         let b2 = trace.b2;
 
         if b2 {
-            return *final_x == x2
+            return *final_x == x2;
         }
 
         let temp3 = t_sq.mul(temp.square());

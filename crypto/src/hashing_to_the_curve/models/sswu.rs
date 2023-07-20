@@ -239,7 +239,7 @@ impl<G: CurveGroup, P: SSWUParameters<G>> HashingToCurve<G> for SSWUMap<G, P> {
         let b1 = trace.b1;
 
         if b1 {
-            return *final_x == Self::isogeny_map_x(&x1).unwrap()
+            return *final_x == Self::isogeny_map_x(&x1).unwrap();
         }
 
         let x2 = x1.mul(t2);

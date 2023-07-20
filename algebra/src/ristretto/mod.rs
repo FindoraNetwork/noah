@@ -280,13 +280,13 @@ impl Scalar for RistrettoScalar {
     #[inline]
     fn sqrt(&self) -> Option<Self> {
         let biguint: BigUint = (*self).into();
-        let res = crate::ed25519::Ed25519Scalar::from(&biguint).sqrt();
-        if res.is_some() {
-            let v: BigUint = res.unwrap().0.into();
-            Some(Self::from(&v))
-        } else {
-            None
-        }
+
+        crate::ed25519::Ed25519Scalar::from(&biguint)
+            .sqrt()
+            .map(|v| {
+                let v: BigUint = v.0.into();
+                Self::from(&v)
+            })
     }
 
     #[inline]

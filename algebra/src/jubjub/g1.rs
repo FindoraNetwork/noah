@@ -15,8 +15,7 @@ use digest::consts::U64;
 use digest::Digest;
 
 /// The wrapped struct for `ark_ed_on_bls12_381::EdwardsProjective`
-#[derive(Clone, PartialEq, Debug, Copy)]
-#[derive(Default)]
+#[derive(Clone, PartialEq, Debug, Copy, Default)]
 pub struct JubjubPoint(pub EdwardsProjective);
 
 impl Hash for JubjubPoint {
@@ -25,8 +24,6 @@ impl Hash for JubjubPoint {
         self.0.to_string().as_bytes().hash(state)
     }
 }
-
-
 
 impl Ord for JubjubPoint {
     #[inline]

@@ -33,13 +33,9 @@ impl FromStr for SECQ256K1Scalar {
     type Err = AlgebraError;
 
     fn from_str(string: &str) -> StdResult<Self, AlgebraError> {
-        let res = Fr::from_str(string);
+        let res = Fr::from_str(string).map_err(|_| AlgebraError::DeserializationError)?;
 
-        if res.is_ok() {
-            Ok(Self(res.unwrap()))
-        } else {
-            Err(AlgebraError::DeserializationError)
-        }
+        Ok(Self(res))
     }
 }
 
@@ -269,12 +265,7 @@ impl Scalar for SECQ256K1Scalar {
 
     #[inline]
     fn sqrt(&self) -> Option<Self> {
-        let res = self.0.sqrt();
-        if res.is_some() {
-            Some(Self(res.unwrap()))
-        } else {
-            None
-        }
+        self.0.sqrt().map(Self)
     }
 
     #[inline]

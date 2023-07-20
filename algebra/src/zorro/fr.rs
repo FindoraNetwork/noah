@@ -274,12 +274,7 @@ impl Scalar for ZorroScalar {
 
     #[inline]
     fn sqrt(&self) -> Option<Self> {
-        let res = self.0.sqrt();
-        if res.is_some() {
-            Some(Self(res.unwrap()))
-        } else {
-            None
-        }
+        self.0.sqrt().map(Self)
     }
 
     #[inline]

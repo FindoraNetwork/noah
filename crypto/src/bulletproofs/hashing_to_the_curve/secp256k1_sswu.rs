@@ -123,8 +123,7 @@ impl HashingGadget {
             + cur_var
                 * Secp256k1SSWUParameters::get_isogeny_numerator_term(degree as usize).get_raw();
 
-        let (_, _, denominator_times_res_var) =
-            cs.multiply(denominator_var, (*final_var).into());
+        let (_, _, denominator_times_res_var) = cs.multiply(denominator_var, (*final_var).into());
         cs.constrain(numerator_var - denominator_times_res_var);
 
         Ok(())

@@ -146,24 +146,18 @@ impl Group for BN254Gt {
 
     #[inline]
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
-        let res = Fp12::<Fq12Config>::deserialize_with_mode(bytes, Compress::Yes, Validate::Yes);
+        let res = Fp12::<Fq12Config>::deserialize_with_mode(bytes, Compress::Yes, Validate::Yes)
+            .map_err(|_| AlgebraError::DeserializationError)?;
 
-        if res.is_ok() {
-            Ok(Self(res.unwrap()))
-        } else {
-            Err(AlgebraError::DeserializationError)
-        }
+        Ok(Self(res))
     }
 
     #[inline]
     fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
-        let res = Fp12::<Fq12Config>::deserialize_with_mode(bytes, Compress::No, Validate::No);
+        let res = Fp12::<Fq12Config>::deserialize_with_mode(bytes, Compress::No, Validate::No)
+            .map_err(|_| AlgebraError::DeserializationError)?;
 
-        if res.is_ok() {
-            Ok(Self(res.unwrap()))
-        } else {
-            Err(AlgebraError::DeserializationError)
-        }
+        Ok(Self(res))
     }
 
     #[inline]

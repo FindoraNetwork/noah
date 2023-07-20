@@ -17,8 +17,7 @@ use wasm_bindgen::prelude::*;
 
 /// The wrapped struct for `ark_ed25519::EdwardsProjective`
 #[wasm_bindgen]
-#[derive(Clone, PartialEq, Debug, Copy)]
-#[derive(Default)]
+#[derive(Clone, PartialEq, Debug, Copy, Default)]
 pub struct Ed25519Point(pub(crate) EdwardsProjective);
 
 impl Hash for Ed25519Point {
@@ -27,8 +26,6 @@ impl Hash for Ed25519Point {
         self.0.to_string().as_bytes().hash(state)
     }
 }
-
-
 
 impl Ord for Ed25519Point {
     #[inline]

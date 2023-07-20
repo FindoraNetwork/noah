@@ -213,9 +213,7 @@ pub fn indexer_with_lagrange<PCS: PolyComScheme, CS: ConstraintSystem<Field = PC
                 .map_err(|_| PlonkError::SetupError)?;
             Ok(cm)
         } else {
-            let cm = pcs
-                .commit(polynomial)
-                .map_err(|_| PlonkError::SetupError)?;
+            let cm = pcs.commit(polynomial).map_err(|_| PlonkError::SetupError)?;
             Ok(cm)
         }
     };

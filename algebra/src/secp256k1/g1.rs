@@ -88,24 +88,18 @@ impl Group for SECP256K1G1 {
 
     #[inline]
     fn from_compressed_bytes(bytes: &[u8]) -> Result<Self> {
-        let affine = Affine::deserialize_with_mode(bytes, Compress::Yes, Validate::Yes);
+        let affine = Affine::deserialize_with_mode(bytes, Compress::Yes, Validate::Yes)
+            .map_err(|_| AlgebraError::DeserializationError)?;
 
-        if affine.is_ok() {
-            Ok(Self(Projective::from(affine.unwrap()))) // safe unwrap
-        } else {
-            Err(AlgebraError::DeserializationError)
-        }
+        Ok(Self(Projective::from(affine)))
     }
 
     #[inline]
     fn from_unchecked_bytes(bytes: &[u8]) -> Result<Self> {
-        let affine = Affine::deserialize_with_mode(bytes, Compress::No, Validate::No);
+        let affine = Affine::deserialize_with_mode(bytes, Compress::No, Validate::No)
+            .map_err(|_| AlgebraError::DeserializationError)?;
 
-        if affine.is_ok() {
-            Ok(Self(Projective::from(affine.unwrap()))) // safe unwrap
-        } else {
-            Err(AlgebraError::DeserializationError)
-        }
+        Ok(Self(Projective::from(affine)))
     }
 
     #[inline]
@@ -194,12 +188,12 @@ impl CurveGroup for SECP256K1G1 {
 
     #[inline]
     fn get_x(&self) -> Self::BaseType {
-        SECQ256K1Scalar((self.0.into_affine().x))
+        SECQ256K1Scalar(self.0.into_affine().x)
     }
 
     #[inline]
     fn get_y(&self) -> Self::BaseType {
-        SECQ256K1Scalar((self.0.into_affine().y))
+        SECQ256K1Scalar(self.0.into_affine().y)
     }
 
     #[inline]

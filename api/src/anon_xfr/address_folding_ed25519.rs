@@ -360,9 +360,11 @@ pub fn prove_address_folding_in_cs_ed25519(
 
     // 5. allocate the simulated field elements for the delegated Schnorr protocol.
     // note: the verifier will combine the challenges using the power series of lambda.
-    let lambda_series = [ZorroScalar::one(),
+    let lambda_series = [
+        ZorroScalar::one(),
         witness.lambda,
-        witness.lambda * witness.lambda];
+        witness.lambda * witness.lambda,
+    ];
     let beta_lambda_series = lambda_series
         .iter()
         .map(|v| *v * witness.beta)
