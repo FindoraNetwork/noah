@@ -136,10 +136,10 @@ impl From<u64> for ZorroScalar {
     }
 }
 
-impl Into<BigUint> for ZorroScalar {
+impl From<ZorroScalar> for BigUint {
     #[inline]
-    fn into(self) -> BigUint {
-        self.0.into_bigint().into()
+    fn from(val: ZorroScalar) -> Self {
+        val.0.into_bigint().into()
     }
 }
 
@@ -164,7 +164,7 @@ impl ZorroScalar {
 
     /// Get the raw data.
     pub fn get_raw(&self) -> Fr {
-        self.0.clone()
+        self.0
     }
 
     /// From the raw data.
@@ -174,7 +174,7 @@ impl ZorroScalar {
 
     /// Create a new scalar element from the arkworks-rs representation.
     pub const fn new(is_positive: bool, limbs: &[u64]) -> Self {
-        ZorroScalar(Fr::from_sign_and_limbs(is_positive, &limbs))
+        ZorroScalar(Fr::from_sign_and_limbs(is_positive, limbs))
     }
 }
 

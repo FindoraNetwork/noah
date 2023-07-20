@@ -18,6 +18,7 @@ use wasm_bindgen::prelude::*;
 /// The wrapped struct for `ark_ed25519::EdwardsProjective`
 #[wasm_bindgen]
 #[derive(Clone, PartialEq, Debug, Copy)]
+#[derive(Default)]
 pub struct Ed25519Point(pub(crate) EdwardsProjective);
 
 impl Hash for Ed25519Point {
@@ -27,12 +28,7 @@ impl Hash for Ed25519Point {
     }
 }
 
-impl Default for Ed25519Point {
-    #[inline]
-    fn default() -> Self {
-        Self(EdwardsProjective::default())
-    }
-}
+
 
 impl Ord for Ed25519Point {
     #[inline]
@@ -176,7 +172,7 @@ impl<'a> SubAssign<&'a Ed25519Point> for Ed25519Point {
 impl<'a> MulAssign<&'a Ed25519Scalar> for Ed25519Point {
     #[inline]
     fn mul_assign(&mut self, rhs: &'a Ed25519Scalar) {
-        self.0.mul_assign(rhs.0.clone())
+        self.0.mul_assign(rhs.0)
     }
 }
 
@@ -191,7 +187,7 @@ impl Neg for Ed25519Point {
 impl Ed25519Point {
     /// Obtain a point using the y coordinate (which would be ZorroScalar).
     pub fn get_point_from_y(y: &ZorroScalar) -> Result<Self> {
-        let point = EdwardsAffine::get_point_from_y_unchecked(y.0.clone(), false)
+        let point = EdwardsAffine::get_point_from_y_unchecked(y.0, false)
             .ok_or(AlgebraError::DeserializationError)?
             .into_group();
         Ok(Self(point))
@@ -250,20 +246,20 @@ impl CurveGroup for Ed25519Point {
 impl TECurve for Ed25519Point {
     #[inline]
     fn get_edwards_d() -> Vec<u8> {
-        return [
+        [
             163, 120, 89, 19, 202, 77, 235, 117, 171, 216, 65, 65, 77, 10, 112, 0, 152, 232, 121,
             119, 121, 64, 199, 140, 115, 254, 111, 43, 238, 108, 3, 82,
         ]
-        .to_vec();
+        .to_vec()
     }
 
     #[inline]
     fn get_edwards_a() -> Vec<u8> {
-        return [
+        [
             236, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255,
             255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 255, 127,
         ]
-        .to_vec();
+        .to_vec()
     }
 }
 

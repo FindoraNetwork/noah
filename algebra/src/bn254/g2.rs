@@ -152,6 +152,6 @@ impl<'a> SubAssign<&'a BN254G2> for BN254G2 {
 impl<'a> MulAssign<&'a BN254Scalar> for BN254G2 {
     #[inline]
     fn mul_assign(&mut self, rhs: &'a BN254Scalar) {
-        self.0.mul_assign(rhs.0.clone())
+        self.0.mul_assign(rhs.0)
     }
 }

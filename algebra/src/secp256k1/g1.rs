@@ -20,7 +20,7 @@ pub struct SECP256K1G1(pub(crate) Projective);
 impl SECP256K1G1 {
     /// Obtain a point using the x coordinate (which would be SECQ256K1Scalar).
     pub fn get_point_from_x(x: &SECQ256K1Scalar) -> Result<Self> {
-        let point = Affine::get_point_from_x_unchecked(x.0.clone(), false)
+        let point = Affine::get_point_from_x_unchecked(x.0, false)
             .ok_or(AlgebraError::DeserializationError)?
             .into_group();
         Ok(Self(point))
@@ -136,7 +136,7 @@ impl Neg for SECP256K1G1 {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
-        let point = self.0.clone();
+        let point = self.0;
         Self(Projective::neg(point))
     }
 }
@@ -185,7 +185,7 @@ impl<'a> SubAssign<&'a SECP256K1G1> for SECP256K1G1 {
 impl<'a> MulAssign<&'a SECP256K1Scalar> for SECP256K1G1 {
     #[inline]
     fn mul_assign(&mut self, rhs: &'a SECP256K1Scalar) {
-        self.0.mul_assign(rhs.0.clone())
+        self.0.mul_assign(rhs.0)
     }
 }
 
@@ -194,12 +194,12 @@ impl CurveGroup for SECP256K1G1 {
 
     #[inline]
     fn get_x(&self) -> Self::BaseType {
-        SECQ256K1Scalar((self.0.into_affine().x).clone())
+        SECQ256K1Scalar((self.0.into_affine().x))
     }
 
     #[inline]
     fn get_y(&self) -> Self::BaseType {
-        SECQ256K1Scalar((self.0.into_affine().y).clone())
+        SECQ256K1Scalar((self.0.into_affine().y))
     }
 
     #[inline]

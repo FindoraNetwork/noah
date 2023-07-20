@@ -39,7 +39,7 @@ impl<'a> Sub<&'a BN254Gt> for BN254Gt {
 
     #[inline]
     fn sub(self, rhs: &'a BN254Gt) -> Self::Output {
-        let mut rhs_inverse = rhs.0.clone();
+        let mut rhs_inverse = rhs.0;
         rhs_inverse.conjugate_in_place();
 
         Self(self.0.mul(&rhs_inverse))
@@ -94,7 +94,7 @@ impl<'a> AddAssign<&'a BN254Gt> for BN254Gt {
 impl<'a> SubAssign<&'a BN254Gt> for BN254Gt {
     #[inline]
     fn sub_assign(&mut self, rhs: &'a BN254Gt) {
-        let mut rhs_inverse = rhs.0.clone();
+        let mut rhs_inverse = rhs.0;
         rhs_inverse.conjugate_in_place();
 
         self.0.mul_assign(&rhs_inverse)

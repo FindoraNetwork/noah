@@ -41,10 +41,10 @@ impl FromStr for BN254Fq {
     }
 }
 
-impl Into<BigUint> for BN254Fq {
+impl From<BN254Fq> for BigUint {
     #[inline]
-    fn into(self) -> BigUint {
-        self.0.into_bigint().into()
+    fn from(val: BN254Fq) -> Self {
+        val.0.into_bigint().into()
     }
 }
 
@@ -265,7 +265,7 @@ impl Scalar for BN254Fq {
         let len = exponent.len();
         let mut array = [0u64; 4];
         array[..len].copy_from_slice(exponent);
-        Self(self.0.pow(&array))
+        Self(self.0.pow(array))
     }
 
     #[inline]

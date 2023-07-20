@@ -16,6 +16,7 @@ use digest::Digest;
 
 /// The wrapped struct for `ark_ed_on_bn254::EdwardsProjective`
 #[derive(Clone, PartialEq, Debug, Copy)]
+#[derive(Default)]
 pub struct BabyJubjubPoint(pub EdwardsProjective);
 
 impl Hash for BabyJubjubPoint {
@@ -25,12 +26,7 @@ impl Hash for BabyJubjubPoint {
     }
 }
 
-impl Default for BabyJubjubPoint {
-    #[inline]
-    fn default() -> Self {
-        Self(EdwardsProjective::default())
-    }
-}
+
 
 impl Ord for BabyJubjubPoint {
     #[inline]
@@ -182,7 +178,7 @@ impl<'a> SubAssign<&'a BabyJubjubPoint> for BabyJubjubPoint {
 impl<'a> MulAssign<&'a BabyJubjubScalar> for BabyJubjubPoint {
     #[inline]
     fn mul_assign(&mut self, rhs: &'a BabyJubjubScalar) {
-        self.0.mul_assign(rhs.0.clone())
+        self.0.mul_assign(rhs.0)
     }
 }
 
@@ -242,20 +238,20 @@ impl CurveGroup for BabyJubjubPoint {
 impl TECurve for BabyJubjubPoint {
     #[inline]
     fn get_edwards_d() -> Vec<u8> {
-        return [
+        [
             115, 20, 40, 251, 6, 43, 108, 115, 41, 168, 1, 142, 238, 190, 152, 36, 97, 70, 132,
             231, 222, 210, 95, 122, 192, 22, 16, 130, 129, 189, 117, 21,
         ]
-        .to_vec();
+        .to_vec()
     }
 
     #[inline]
     fn get_edwards_a() -> Vec<u8> {
-        return [
+        [
             1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 0, 0,
         ]
-        .to_vec();
+        .to_vec()
     }
 }
 

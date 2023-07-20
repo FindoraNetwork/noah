@@ -175,6 +175,6 @@ impl<'a> SubAssign<&'a SECQ256K1G1> for SECQ256K1G1 {
 impl<'a> MulAssign<&'a SECQ256K1Scalar> for SECQ256K1G1 {
     #[inline]
     fn mul_assign(&mut self, rhs: &'a SECQ256K1Scalar) {
-        self.0.mul_assign(rhs.0.clone())
+        self.0.mul_assign(rhs.0)
     }
 }

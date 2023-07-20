@@ -135,10 +135,10 @@ impl From<u64> for ZorroFq {
     }
 }
 
-impl Into<BigUint> for ZorroFq {
+impl From<ZorroFq> for BigUint {
     #[inline]
-    fn into(self) -> BigUint {
-        self.0.into_bigint().into()
+    fn from(val: ZorroFq) -> Self {
+        val.0.into_bigint().into()
     }
 }
 

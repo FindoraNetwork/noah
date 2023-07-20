@@ -89,7 +89,7 @@ impl<'a> SubAssign<&'a ZorroG1> for ZorroG1 {
 impl<'a> MulAssign<&'a ZorroScalar> for ZorroG1 {
     #[inline]
     fn mul_assign(&mut self, rhs: &'a ZorroScalar) {
-        self.0.mul_assign(rhs.0.clone())
+        self.0.mul_assign(rhs.0)
     }
 }
 

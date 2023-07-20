@@ -46,14 +46,14 @@ impl FromStr for BLSScalar {
 impl BLSScalar {
     /// Create a new scalar element from the arkworks-rs representation.
     pub const fn new(is_positive: bool, limbs: &[u64]) -> Self {
-        BLSScalar(Fr::from_sign_and_limbs(is_positive, &limbs))
+        BLSScalar(Fr::from_sign_and_limbs(is_positive, limbs))
     }
 }
 
-impl Into<BigUint> for BLSScalar {
+impl From<BLSScalar> for BigUint {
     #[inline]
-    fn into(self) -> BigUint {
-        self.0.into_bigint().into()
+    fn from(val: BLSScalar) -> Self {
+        val.0.into_bigint().into()
     }
 }
 
@@ -281,7 +281,7 @@ impl Scalar for BLSScalar {
         let len = exponent.len();
         let mut array = [0u64; 4];
         array[..len].copy_from_slice(exponent);
-        Self(self.0.pow(&array))
+        Self(self.0.pow(array))
     }
 
     #[inline]

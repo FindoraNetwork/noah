@@ -135,10 +135,10 @@ impl From<u64> for BabyJubjubScalar {
     }
 }
 
-impl Into<BigUint> for BabyJubjubScalar {
+impl From<BabyJubjubScalar> for BigUint {
     #[inline]
-    fn into(self) -> BigUint {
-        self.0.into_bigint().into()
+    fn from(val: BabyJubjubScalar) -> Self {
+        val.0.into_bigint().into()
     }
 }
 

@@ -41,10 +41,10 @@ impl FromStr for BLSFq {
     }
 }
 
-impl Into<BigUint> for BLSFq {
+impl From<BLSFq> for BigUint {
     #[inline]
-    fn into(self) -> BigUint {
-        self.0.into_bigint().into()
+    fn from(val: BLSFq) -> Self {
+        val.0.into_bigint().into()
     }
 }
 
@@ -268,7 +268,7 @@ impl Scalar for BLSFq {
         let len = exponent.len();
         let mut array = [0u64; 6];
         array[..len].copy_from_slice(exponent);
-        Self(self.0.pow(&array))
+        Self(self.0.pow(array))
     }
 
     #[inline]

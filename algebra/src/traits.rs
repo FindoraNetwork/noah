@@ -96,7 +96,7 @@ pub trait Scalar:
 
     /// exponent form: least significant limb first, with u64 limbs
     fn pow(&self, exponent: &[u64]) -> Self {
-        let mut base = self.clone();
+        let mut base = *self;
         let mut result = Self::one();
         for exp_u64 in exponent {
             let mut e = *exp_u64;

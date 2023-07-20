@@ -169,10 +169,10 @@ impl From<u64> for RistrettoScalar {
     }
 }
 
-impl Into<BigUint> for RistrettoScalar {
+impl From<RistrettoScalar> for BigUint {
     #[inline]
-    fn into(self) -> BigUint {
-        BigUint::from_bytes_le(self.0.as_bytes())
+    fn from(val: RistrettoScalar) -> Self {
+        BigUint::from_bytes_le(val.0.as_bytes())
     }
 }
 
@@ -489,7 +489,7 @@ impl<'a> SubAssign<&'a RistrettoPoint> for RistrettoPoint {
 impl<'a> MulAssign<&'a RistrettoScalar> for RistrettoPoint {
     #[inline]
     fn mul_assign(&mut self, rhs: &'a RistrettoScalar) {
-        self.0.mul_assign(rhs.0.clone())
+        self.0.mul_assign(rhs.0)
     }
 }
 

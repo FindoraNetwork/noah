@@ -46,14 +46,14 @@ impl FromStr for BN254Scalar {
 impl BN254Scalar {
     /// Create a new scalar element from the arkworks-rs representation.
     pub const fn new(is_positive: bool, limbs: &[u64]) -> Self {
-        BN254Scalar(Fr::from_sign_and_limbs(is_positive, &limbs))
+        BN254Scalar(Fr::from_sign_and_limbs(is_positive, limbs))
     }
 }
 
-impl Into<BigUint> for BN254Scalar {
+impl From<BN254Scalar> for BigUint {
     #[inline]
-    fn into(self) -> BigUint {
-        self.0.into_bigint().into()
+    fn from(val: BN254Scalar) -> Self {
+        val.0.into_bigint().into()
     }
 }
 
@@ -281,7 +281,7 @@ impl Scalar for BN254Scalar {
         let len = exponent.len();
         let mut array = [0u64; 4];
         array[..len].copy_from_slice(exponent);
-        Self(self.0.pow(&array))
+        Self(self.0.pow(array))
     }
 
     #[inline]
