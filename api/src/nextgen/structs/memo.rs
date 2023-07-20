@@ -88,25 +88,11 @@ impl<'de> Deserialize<'de> for NabarAuditorMemo {
             deserializer.deserialize_bytes(noah_obj_serde::BytesVisitor)?
         };
 
-        let dh_point_unchecked = {
-            let res = BabyJubjubPoint::from_unchecked_bytes(&bytes[0..64]);
+        let dh_point_unchecked =
+            BabyJubjubPoint::from_unchecked_bytes(&bytes[0..64]).map_err(SerdeError::custom)?;
 
-            if res.is_err() {
-                return Err(SerdeError::custom(res.unwrap_err()));
-            }
-
-            res.unwrap()
-        };
-
-        let fast_detection = {
-            let res = BN254Scalar::noah_from_bytes(&bytes[64..96]);
-
-            if res.is_err() {
-                return Err(SerdeError::custom(res.unwrap_err()));
-            }
-
-            res.unwrap()
-        };
+        let fast_detection =
+            BN254Scalar::noah_from_bytes(&bytes[64..96]).map_err(SerdeError::custom)?;
 
         let remaining_bytes = bytes.len() - 96;
         if remaining_bytes % BN254_SCALAR_LEN != 0 {
@@ -117,11 +103,9 @@ impl<'de> Deserialize<'de> for NabarAuditorMemo {
 
         let mut body = Vec::with_capacity(remaining_bytes / BN254_SCALAR_LEN);
         for elem_bytes in bytes[96..].chunks_exact(96) {
-            let res = BN254Scalar::noah_from_bytes(elem_bytes);
-            if res.is_err() {
-                return Err(SerdeError::custom(res.unwrap_err()));
-            }
-            body.push(res.unwrap());
+            let res = BN254Scalar::noah_from_bytes(elem_bytes).map_err(SerdeError::custom)?;
+
+            body.push(res);
         }
 
         Ok(Self {

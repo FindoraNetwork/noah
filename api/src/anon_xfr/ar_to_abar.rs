@@ -170,10 +170,11 @@ pub fn verify_ar_to_abar_body(params: &VerifierParams, body: &ArToAbarBody) -> R
     let asset_type = body.input.asset_type.get_asset_type().unwrap();
 
     let mut transcript = Transcript::new(AR_TO_ABAR_PLONK_PROOF_TRANSCRIPT);
-    let mut online_inputs: Vec<BN254Scalar> = vec![];
-    online_inputs.push(BN254Scalar::from(amount));
-    online_inputs.push(asset_type.as_scalar());
-    online_inputs.push(body.output.commitment);
+    let online_inputs: Vec<BN254Scalar> = vec![
+        BN254Scalar::from(amount),
+        asset_type.as_scalar(),
+        body.output.commitment,
+    ];
 
     Ok(verifier(
         &mut transcript,

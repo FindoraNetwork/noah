@@ -240,11 +240,12 @@ pub fn verify_abar_to_ar_note<D: Digest<OutputSize = U64> + Default>(
     }
 
     let mut transcript = Transcript::new(ABAR_TO_AR_PLONK_PROOF_TRANSCRIPT);
-    let mut online_inputs = vec![];
-    online_inputs.push(note.body.input);
-    online_inputs.push(*merkle_root);
-    online_inputs.push(BN254Scalar::from(payer_amount));
-    online_inputs.push(payer_asset_type.as_scalar());
+    let mut online_inputs = vec![
+        note.body.input,
+        *merkle_root,
+        BN254Scalar::from(payer_amount),
+        payer_asset_type.as_scalar(),
+    ];
     online_inputs.extend_from_slice(&address_folding_public_input);
 
     Ok(verifier(

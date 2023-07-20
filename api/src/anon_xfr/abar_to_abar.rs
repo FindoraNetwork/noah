@@ -472,7 +472,7 @@ pub(crate) fn verify_xfr(
     params: &VerifierParams,
     pub_inputs: &AXfrPubInputs,
     proof: &AXfrPlonkPf,
-    address_folding_public_input: &Vec<BN254Scalar>,
+    address_folding_public_input: &[BN254Scalar],
 ) -> Result<()> {
     let mut transcript = Transcript::new(ANON_XFR_PLONK_PROOF_TRANSCRIPT);
     transcript.append_u64(N_INPUTS_TRANSCRIPT, pub_inputs.payers_inputs.len() as u64);

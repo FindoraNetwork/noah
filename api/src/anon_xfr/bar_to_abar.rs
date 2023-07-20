@@ -291,6 +291,7 @@ pub(crate) fn verify_bar_to_abar(
 }
 
 /// Generate the inspector's proof.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn prove_bar_to_abar_cs<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
@@ -376,6 +377,7 @@ pub(crate) fn verify_inspection(
 }
 
 /// Construct the confidential-to-anonymous constraint system.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn build_bar_to_abar_cs(
     amount: BN254Scalar,
     asset_type: BN254Scalar,

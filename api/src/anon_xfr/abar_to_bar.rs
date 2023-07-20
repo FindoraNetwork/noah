@@ -347,9 +347,9 @@ pub fn verify_abar_to_bar_note<D: Digest<OutputSize = U64> + Default>(
 
     let delegated_schnorr_proof = note.body.delegated_schnorr_proof.clone();
 
-    let beta_lambda = beta * &lambda;
+    let beta_lambda = beta * lambda;
     let s1_plus_lambda_s2 = delegated_schnorr_proof.response_scalars[0].0
-        + delegated_schnorr_proof.response_scalars[1].0 * &lambda;
+        + delegated_schnorr_proof.response_scalars[1].0 * lambda;
 
     let beta_sim_fr = SimFr::<BN254Scalar, SimFrParamsBN254Ristretto>::from(
         &BigUint::from_bytes_le(&beta.to_bytes()),
