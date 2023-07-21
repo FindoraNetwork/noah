@@ -431,7 +431,7 @@ impl<F: Scalar> TurboCS<F> {
             .mul(wiring_1)
             .mul(wiring_2)
             .mul(wiring_3)
-            .mul(wiring_0);
+            .mul(wiring_4);
         let out = selector_8.mul(wiring_4);
         let mut r = add1;
         r.add_assign(&add2);
