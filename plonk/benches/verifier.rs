@@ -55,7 +55,7 @@ fn bench_verifier(c: &mut Criterion) {
         &prover_params,
         &witness,
     )
-        .unwrap();
+    .unwrap();
 
     let verifier_cs = cs.shrink_to_verifier_only();
 
@@ -71,7 +71,7 @@ fn bench_verifier(c: &mut Criterion) {
                 &[],
                 &proof,
             )
-                .unwrap()
+            .unwrap()
         })
     });
     verifier_group.finish();
