@@ -3,6 +3,11 @@ name = 'fft'
 path = 'benches/fft.rs'
 harness = false
 
+[[bench]]
+name = 'verifier'
+path = 'benches/verifier.rs'
+harness = false
+
 [package]
 name = 'noah-plonk'
 version = '0.5.0'
