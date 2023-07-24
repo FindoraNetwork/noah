@@ -180,9 +180,11 @@ impl<'a> From<&'a BigUint> for RistrettoScalar {
     #[inline]
     fn from(x: &BigUint) -> Self {
         let biguint = x % RistrettoScalar::get_field_size_biguint();
+        let raw_bytes = biguint.to_bytes_le();
+        let n = core::cmp::min(raw_bytes.len(), RISTRETTO_SCALAR_LEN);
 
         let mut bytes = [0u8; 32];
-        bytes.copy_from_slice(&biguint.to_bytes_le()[0..32]);
+        bytes[0..n].copy_from_slice(&raw_bytes[0..n]);
 
         Self(curve25519_dalek::scalar::Scalar::from_bytes_mod_order(
             bytes,
