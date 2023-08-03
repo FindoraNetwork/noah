@@ -780,7 +780,7 @@ impl<F: Scalar> TurboCS<F> {
 
                 for (var, backtrace) in &self.witness_backtrace {
                     if animoi_witness_var.contains(var) {
-                        //  continue;
+                        continue;
                     }
 
                     panic!("dangling witness:\n{}", backtrace);
@@ -1574,7 +1574,7 @@ mod test_dangling_witness {
     }
 
     #[test]
-    // #[should_panic]
+    #[should_panic]
     fn test_dangling_witness_should_panic() {
         let one = F::one();
         let two = one.add(&one);
@@ -1601,7 +1601,7 @@ mod test_dangling_witness {
             h_var,
         );
         // This step is intentionally omitted.
-        cs.equal(comm_var, h_var);
+        // cs.equal(comm_var, h_var);
         cs.pad()
     }
 }
