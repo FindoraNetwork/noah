@@ -4,6 +4,7 @@ use super::{ConstraintSystem, CsIndex, VarIndex};
 use crate::errors::{PlonkError, Result};
 use ark_std::{borrow::ToOwned, format};
 use noah_algebra::prelude::*;
+use noah_crypto::anemoi_jive::N_ANEMOI_ROUNDS;
 
 use noah_crypto::anemoi_jive::AnemoiJive;
 #[cfg(feature = "debug")]
@@ -23,9 +24,9 @@ pub struct TurboCS<F> {
     /// the wiring of the circuit.
     pub wiring: [Vec<VarIndex>; N_WIRES_PER_GATE],
     /// the first part of the Anemoi preprocessed round keys.
-    pub anemoi_preprocessed_round_keys_x: [[F; 2]; 14],
+    pub anemoi_preprocessed_round_keys_x: [[F; 2]; N_ANEMOI_ROUNDS],
     /// the second part of the Anemoi preprocessed round keys.
-    pub anemoi_preprocessed_round_keys_y: [[F; 2]; 14],
+    pub anemoi_preprocessed_round_keys_y: [[F; 2]; N_ANEMOI_ROUNDS],
     /// the Anemoi generator.
     pub anemoi_generator: F,
     /// the Anemoi generator's inverse.
@@ -175,8 +176,8 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
         Self {
             selectors: vec![],
             wiring: [vec![], vec![], vec![], vec![], vec![]],
-            anemoi_preprocessed_round_keys_x: [[F::zero(); 2]; 14],
-            anemoi_preprocessed_round_keys_y: [[F::zero(); 2]; 14],
+            anemoi_preprocessed_round_keys_x: [[F::zero(); 2]; N_ANEMOI_ROUNDS],
+            anemoi_preprocessed_round_keys_y: [[F::zero(); 2]; N_ANEMOI_ROUNDS],
             anemoi_generator: F::zero(),
             anemoi_generator_inv: F::zero(),
             anemoi_constraints_indices: vec![],
@@ -203,7 +204,7 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
             empty_poly,
         ];
         for i in self.anemoi_constraints_indices.iter() {
-            for j in 0..14 {
+            for j in 0..N_ANEMOI_ROUNDS {
                 polys[0][*i + j] = self.anemoi_preprocessed_round_keys_x[j][0];
                 polys[1][*i + j] = self.anemoi_preprocessed_round_keys_x[j][1];
                 polys[2][*i + j] = self.anemoi_preprocessed_round_keys_y[j][0];
@@ -261,8 +262,8 @@ impl<F: Scalar> TurboCS<F> {
         Self {
             selectors,
             wiring: [vec![], vec![], vec![], vec![], vec![]],
-            anemoi_preprocessed_round_keys_x: [[F::zero(); 2]; 14],
-            anemoi_preprocessed_round_keys_y: [[F::zero(); 2]; 14],
+            anemoi_preprocessed_round_keys_x: [[F::zero(); 2]; N_ANEMOI_ROUNDS],
+            anemoi_preprocessed_round_keys_y: [[F::zero(); 2]; N_ANEMOI_ROUNDS],
             anemoi_generator: F::zero(),
             anemoi_generator_inv: F::zero(),
             anemoi_constraints_indices: vec![],
@@ -448,16 +449,24 @@ impl<F: Scalar> TurboCS<F> {
             println!("cs constraint not satisfied.");
         }
 
-        for var in [
-            wiring_0_var,
-            wiring_1_var,
-            wiring_2_var,
-            wiring_3_var,
-            wiring_4_var,
-        ]
-        .iter()
-        {
-            self.witness_backtrace.remove(var);
+        if !(selector_0.is_zero() && selector_4.is_zero() && selector_7.is_zero()) {
+            self.witness_backtrace.remove(&wiring_0_var);
+        }
+
+        if !(selector_1.is_zero() && selector_4.is_zero() && selector_7.is_zero()) {
+            self.witness_backtrace.remove(&wiring_1_var);
+        }
+
+        if !(selector_2.is_zero() && selector_5.is_zero() && selector_7.is_zero()) {
+            self.witness_backtrace.remove(&wiring_2_var);
+        }
+
+        if !(selector_3.is_zero() && selector_5.is_zero() && selector_7.is_zero()) {
+            self.witness_backtrace.remove(&wiring_3_var);
+        }
+
+        if !(selector_7.is_zero() && selector_8.is_zero()) {
+            self.witness_backtrace.remove(&wiring_4_var);
         }
     }
 
@@ -735,7 +744,7 @@ impl<F: Scalar> TurboCS<F> {
     }
 
     /// Set the parameters for the Anemoi/Jive hash function.
-    pub fn load_anemoi_jive_parameters<H: AnemoiJive<F, 2, 14>>(&mut self) {
+    pub fn load_anemoi_jive_parameters<H: AnemoiJive<F, 2, N_ANEMOI_ROUNDS>>(&mut self) {
         self.anemoi_preprocessed_round_keys_x = H::PREPROCESSED_ROUND_KEYS_X;
         self.anemoi_preprocessed_round_keys_y = H::PREPROCESSED_ROUND_KEYS_Y;
 
@@ -758,8 +767,23 @@ impl<F: Scalar> TurboCS<F> {
         #[cfg(feature = "debug")]
         {
             if !self.witness_backtrace.is_empty() {
-                for (_, v) in &self.witness_backtrace {
-                    panic!("dangling witness:\n{}", v);
+                let mut animoi_witness = Vec::new();
+                for cs_index in self.anemoi_constraints_indices.iter() {
+                    for r in 0..N_ANEMOI_ROUNDS {
+                        animoi_witness.push(self.get_witness_index(0, cs_index + r));
+                        animoi_witness.push(self.get_witness_index(1, cs_index + r));
+                        animoi_witness.push(self.get_witness_index(2, cs_index + r));
+                        animoi_witness.push(self.get_witness_index(3, cs_index + r));
+                        animoi_witness.push(self.get_witness_index(4, cs_index + r));
+                    }
+                }
+
+                for (var, backtrace) in &self.witness_backtrace {
+                    if animoi_witness.contains(var) {
+                        continue;
+                    }
+
+                    panic!("dangling witness:\n{}", backtrace);
                 }
             }
         }
@@ -823,7 +847,7 @@ impl<F: Scalar> TurboCS<F> {
         }
 
         for cs_index in self.anemoi_constraints_indices.iter() {
-            for r in 0..14 {
+            for r in 0..N_ANEMOI_ROUNDS {
                 let a_i = witness[self.get_witness_index(0, cs_index + r)];
                 let b_i = witness[self.get_witness_index(1, cs_index + r)];
                 let c_i = witness[self.get_witness_index(2, cs_index + r)];
@@ -1507,11 +1531,20 @@ mod test_turbo_bls12_381 {
     use noah_algebra::{bls12_381::BLSScalar, prelude::*};
 
     _test_turbo!(BLSScalar, BLSPairingEngine);
+}
+
+#[cfg(test)]
+#[cfg(feature = "debug")]
+mod test_dangling_witness {
+    use crate::plonk::constraint_system::TurboCS;
+    use noah_algebra::{bn254::BN254Scalar, prelude::*};
+    use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive254};
+
+    type F = BN254Scalar;
 
     #[test]
-    #[cfg(feature = "debug")]
     fn test_dangling_witness_without_panic() {
-        let one = BLSScalar::one();
+        let one = F::one();
         let two = one.add(&one);
         let three = one.add(&two);
         let four = one.add(&three);
@@ -1541,32 +1574,34 @@ mod test_turbo_bls12_381 {
     }
 
     #[test]
-    #[cfg(feature = "debug")]
     #[should_panic]
     fn test_dangling_witness_should_panic() {
-        use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive381};
-
-        let one = BLSScalar::one();
+        let one = F::one();
         let two = one.add(&one);
         let three = one.add(&two);
         let four = one.add(&three);
 
         let mut cs = TurboCS::new();
+        cs.load_anemoi_jive_parameters::<AnemoiJive254>();
         let var_0 = cs.new_variable(one);
         let var_1 = cs.new_variable(two);
         let var_2 = cs.new_variable(three);
         let var_3 = cs.new_variable(four);
 
-        let trace = AnemoiJive381::eval_variable_length_hash_with_trace(&[one, two, three, four]);
+        let trace = AnemoiJive254::eval_variable_length_hash_with_trace(&[one, two, three, four]);
         let comm = trace.output;
 
         let comm_var = cs.new_variable(comm);
         cs.prepare_pi_variable(comm_var);
 
         let h_var = cs.new_variable(comm);
-        cs.anemoi_variable_length_hash(&trace, &[var_0, var_1, var_2, var_3], h_var);
+        cs.anemoi_variable_length_hash::<AnemoiJive254>(
+            &trace,
+            &[var_0, var_1, var_2, var_3],
+            h_var,
+        );
         // This step is intentionally omitted.
-        // cs.equal(comm_var, h_var)
+        // cs.equal(comm_var, h_var);
         cs.pad()
     }
 }

@@ -26,7 +26,7 @@ use digest::{consts::U64, Digest};
 use merlin::Transcript;
 use noah_algebra::{bn254::BN254Scalar, prelude::*, ristretto::PedersenCommitmentRistretto};
 use noah_crypto::anemoi_jive::{
-    AnemoiJive, AnemoiJive254, AnemoiVLHTrace, ANEMOI_JIVE_BN254_SALTS,
+    AnemoiJive, AnemoiJive254, AnemoiVLHTrace, ANEMOI_JIVE_BN254_SALTS, N_ANEMOI_ROUNDS,
 };
 use noah_plonk::plonk::{
     constraint_system::{TurboCS, VarIndex},
@@ -61,9 +61,9 @@ pub struct AbarToArPreNote {
     /// Witness.
     pub witness: PayerWitness,
     /// The trace of the input commitment.
-    pub input_commitment_trace: AnemoiVLHTrace<BN254Scalar, 2, 14>,
+    pub input_commitment_trace: AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>,
     /// The trace of the nullifier.
-    pub nullifier_trace: AnemoiVLHTrace<BN254Scalar, 2, 14>,
+    pub nullifier_trace: AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>,
     /// Input key pair.
     pub input_keypair: KeyPair,
 }
@@ -340,8 +340,8 @@ fn prove_abar_to_ar<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
     payers_witness: &PayerWitness,
-    nullifier_trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
-    input_commitment_trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
+    nullifier_trace: &AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>,
+    input_commitment_trace: &AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>,
     folding_witness: &AXfrAddressFoldingWitness,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(ABAR_TO_AR_PLONK_PROOF_TRANSCRIPT);
@@ -368,8 +368,8 @@ fn prove_abar_to_ar<R: CryptoRng + RngCore>(
 /// Construct the anonymous-to-transparent constraint system.
 pub fn build_abar_to_ar_cs(
     payer_witness: &PayerWitness,
-    nullifier_trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
-    input_commitment_trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
+    nullifier_trace: &AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>,
+    input_commitment_trace: &AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>,
     folding_witness: &AXfrAddressFoldingWitness,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();

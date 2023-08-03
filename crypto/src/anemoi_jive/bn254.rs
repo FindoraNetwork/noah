@@ -1,3 +1,4 @@
+use super::N_ANEMOI_ROUNDS;
 use crate::anemoi_jive::AnemoiJive;
 use noah_algebra::bn254::BN254Scalar;
 use noah_algebra::new_bn254_fr;
@@ -5,14 +6,14 @@ use noah_algebra::new_bn254_fr;
 /// The structure that stores the parameters for the Anemoi-Jive hash function for BN254.
 pub struct AnemoiJive254;
 
-impl AnemoiJive<BN254Scalar, 2usize, 14usize> for AnemoiJive254 {
+impl AnemoiJive<BN254Scalar, 2usize, N_ANEMOI_ROUNDS> for AnemoiJive254 {
     const ALPHA: u32 = 5u32;
     const GENERATOR: BN254Scalar = new_bn254_fr!("5");
     const GENERATOR_INV: BN254Scalar = new_bn254_fr!(
         "8755297148735710088898562298102910035419345760166413737479281674630323398247"
     );
     const GENERATOR_SQUARE_PLUS_ONE: BN254Scalar = new_bn254_fr!("26");
-    const ROUND_KEYS_X: [[BN254Scalar; 2]; 14] = [
+    const ROUND_KEYS_X: [[BN254Scalar; 2]; N_ANEMOI_ROUNDS] = [
         [
             new_bn254_fr!("37"),
             new_bn254_fr!(
@@ -124,7 +125,7 @@ impl AnemoiJive<BN254Scalar, 2usize, 14usize> for AnemoiJive254 {
             ),
         ],
     ];
-    const ROUND_KEYS_Y: [[BN254Scalar; 2]; 14] = [
+    const ROUND_KEYS_Y: [[BN254Scalar; 2]; N_ANEMOI_ROUNDS] = [
         [
             new_bn254_fr!(
                 "8755297148735710088898562298102910035419345760166413737479281674630323398284"
@@ -238,7 +239,7 @@ impl AnemoiJive<BN254Scalar, 2usize, 14usize> for AnemoiJive254 {
             ),
         ],
     ];
-    const PREPROCESSED_ROUND_KEYS_X: [[BN254Scalar; 2]; 14] = [
+    const PREPROCESSED_ROUND_KEYS_X: [[BN254Scalar; 2]; N_ANEMOI_ROUNDS] = [
         [
             new_bn254_fr!(
                 "9875235397644879082677551174832367614794066768374461301425281161472772669364"
@@ -352,7 +353,7 @@ impl AnemoiJive<BN254Scalar, 2usize, 14usize> for AnemoiJive254 {
             ),
         ],
     ];
-    const PREPROCESSED_ROUND_KEYS_Y: [[BN254Scalar; 2]; 14] = [
+    const PREPROCESSED_ROUND_KEYS_Y: [[BN254Scalar; 2]; N_ANEMOI_ROUNDS] = [
         [
             new_bn254_fr!(
                 "13004335645468876947782817511996516830557692388848756239167689579223703209154"

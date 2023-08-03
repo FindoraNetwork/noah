@@ -29,7 +29,7 @@ use merlin::Transcript;
 use noah_algebra::bn254::BN254Scalar;
 use noah_algebra::prelude::*;
 use noah_crypto::anemoi_jive::{
-    AnemoiJive, AnemoiJive254, AnemoiVLHTrace, ANEMOI_JIVE_BN254_SALTS,
+    AnemoiJive, AnemoiJive254, AnemoiVLHTrace, ANEMOI_JIVE_BN254_SALTS, N_ANEMOI_ROUNDS,
 };
 use noah_plonk::plonk::{
     constraint_system::{TurboCS, VarIndex},
@@ -67,11 +67,11 @@ pub struct AXfrPreNote {
     /// Witness.
     pub witness: AXfrWitness,
     /// The traces of the input commitments.
-    pub input_commitments_traces: Vec<AnemoiVLHTrace<BN254Scalar, 2, 14>>,
+    pub input_commitments_traces: Vec<AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>>,
     /// The traces of the output commitments.
-    pub output_commitments_traces: Vec<AnemoiVLHTrace<BN254Scalar, 2, 14>>,
+    pub output_commitments_traces: Vec<AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>>,
     /// The traces of the nullifiers.
-    pub nullifiers_traces: Vec<AnemoiVLHTrace<BN254Scalar, 2, 14>>,
+    pub nullifiers_traces: Vec<AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>>,
     /// Input key pair.
     pub input_keypair: KeyPair,
 }
@@ -177,7 +177,7 @@ pub fn init_anon_xfr_note(
         .map(|output| output.owner_memo.clone().ok_or(NoahError::ParameterError))
         .collect();
 
-    let output_commitments_traces: Vec<AnemoiVLHTrace<BN254Scalar, 2, 14>> = outputs
+    let output_commitments_traces: Vec<AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>> = outputs
         .iter()
         .map(|output| {
             let (_, commitment_trace) = commit(
@@ -430,9 +430,9 @@ pub(crate) fn prove_xfr<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
     secret_inputs: &AXfrWitness,
-    nullifiers_traces: &[AnemoiVLHTrace<BN254Scalar, 2, 14>],
-    input_commitments_traces: &[AnemoiVLHTrace<BN254Scalar, 2, 14>],
-    output_commitments_traces: &[AnemoiVLHTrace<BN254Scalar, 2, 14>],
+    nullifiers_traces: &[AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>],
+    input_commitments_traces: &[AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>],
+    output_commitments_traces: &[AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>],
     folding_witness: &AXfrAddressFoldingWitness,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(ANON_XFR_PLONK_PROOF_TRANSCRIPT);
@@ -627,9 +627,9 @@ impl AXfrPubInputs {
 pub(crate) fn build_multi_xfr_cs(
     witness: &AXfrWitness,
     fee_type: BN254Scalar,
-    nullifiers_traces: &[AnemoiVLHTrace<BN254Scalar, 2, 14>],
-    input_commitments_traces: &[AnemoiVLHTrace<BN254Scalar, 2, 14>],
-    output_commitments_traces: &[AnemoiVLHTrace<BN254Scalar, 2, 14>],
+    nullifiers_traces: &[AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>],
+    input_commitments_traces: &[AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>],
+    output_commitments_traces: &[AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>],
     folding_witness: &AXfrAddressFoldingWitness,
 ) -> (TurboPlonkCS, usize) {
     assert_ne!(witness.payers_witnesses.len(), 0);
@@ -2182,8 +2182,9 @@ mod tests {
         )
         .unwrap();
 
-        let mut nullifiers_traces = Vec::<AnemoiVLHTrace<BN254Scalar, 2, 14>>::new();
-        let mut input_commitments_traces = Vec::<AnemoiVLHTrace<BN254Scalar, 2, 14>>::new();
+        let mut nullifiers_traces = Vec::<AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>>::new();
+        let mut input_commitments_traces =
+            Vec::<AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>>::new();
         for payer_witness in secret_inputs.payers_witnesses.iter() {
             let (_, nullifier_trace) = nullify(
                 &payer_witness.secret_key.clone().into_keypair(),
@@ -2204,7 +2205,8 @@ mod tests {
             input_commitments_traces.push(input_commitment_trace);
         }
 
-        let mut output_commitments_traces = Vec::<AnemoiVLHTrace<BN254Scalar, 2, 14>>::new();
+        let mut output_commitments_traces =
+            Vec::<AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>>::new();
         for payee_witness in secret_inputs.payees_witnesses.iter() {
             let (_, output_commitment_trace) = commit(
                 &payee_witness.public_key,

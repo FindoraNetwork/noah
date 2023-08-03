@@ -1,3 +1,4 @@
+use crate::anemoi_jive::N_ANEMOI_ROUNDS;
 use crate::anemoi_jive::{AnemoiJive, AnemoiJive254, ApplicableMDSMatrix, MDSMatrix};
 use noah_algebra::bn254::BN254Scalar;
 use noah_algebra::new_bn254_fr;
@@ -87,7 +88,7 @@ fn test_jive_flatten() {
     }
 
     // remaining rounds
-    for r in 1..14 {
+    for r in 1..N_ANEMOI_ROUNDS {
         let a_i_minus_1 = trace.intermediate_x_before_constant_additions[r - 1][0].clone();
         let b_i_minus_1 = trace.intermediate_x_before_constant_additions[r - 1][1].clone();
         let c_i_minus_1 = trace.intermediate_y_before_constant_additions[r - 1][0].clone();
@@ -263,7 +264,7 @@ fn test_anemoi_variable_length_hash_flatten() {
         }
 
         // remaining rounds
-        for r in 1..14 {
+        for r in 1..N_ANEMOI_ROUNDS {
             let a_i_minus_1 =
                 trace.intermediate_values_before_constant_additions[rr].0[r - 1][0].clone();
             let b_i_minus_1 =
@@ -495,7 +496,7 @@ fn test_eval_stream_cipher_flatten() {
         }
 
         // remaining rounds
-        for r in 1..14 {
+        for r in 1..N_ANEMOI_ROUNDS {
             let a_i_minus_1 =
                 trace.intermediate_values_before_constant_additions[rr].0[r - 1][0].clone();
             let b_i_minus_1 =
@@ -660,7 +661,7 @@ fn test_eval_stream_cipher_flatten() {
             }
 
             // remaining rounds
-            for r in 1..14 {
+            for r in 1..N_ANEMOI_ROUNDS {
                 let a_i_minus_1 = trace.intermediate_values_before_constant_additions
                     [absorbing_times + i]
                     .0[r - 1][0]
@@ -838,7 +839,7 @@ fn test_eval_stream_cipher_flatten() {
             }
 
             // remaining rounds
-            for r in 1..14 {
+            for r in 1..N_ANEMOI_ROUNDS {
                 let a_i_minus_1 = trace.intermediate_values_before_constant_additions
                     [absorbing_times + squeezing_times]
                     .0[r - 1][0]
@@ -925,11 +926,11 @@ fn test_eval_stream_cipher_flatten() {
 
             x = trace.intermediate_values_before_constant_additions
                 [absorbing_times + squeezing_times]
-                .0[14 - 1]
+                .0[N_ANEMOI_ROUNDS - 1]
                 .clone();
             y = trace.intermediate_values_before_constant_additions
                 [absorbing_times + squeezing_times]
-                .1[14 - 1]
+                .1[N_ANEMOI_ROUNDS - 1]
                 .clone();
             mds.permute_in_place(&mut x, &mut y);
             for i in 0..2 {

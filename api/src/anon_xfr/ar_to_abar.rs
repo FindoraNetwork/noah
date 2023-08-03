@@ -12,7 +12,7 @@ use crate::parameters::params::VerifierParams;
 use crate::xfr::structs::{BlindAssetRecord, OpenAssetRecord};
 use merlin::Transcript;
 use noah_algebra::{bn254::BN254Scalar, prelude::*};
-use noah_crypto::anemoi_jive::{AnemoiJive254, AnemoiVLHTrace};
+use noah_crypto::anemoi_jive::{AnemoiJive254, AnemoiVLHTrace, N_ANEMOI_ROUNDS};
 use noah_plonk::plonk::{
     constraint_system::TurboCS, prover::prover_with_lagrange, verifier::verifier,
 };
@@ -189,7 +189,7 @@ pub fn verify_ar_to_abar_body(params: &VerifierParams, body: &ArToAbarBody) -> R
 /// Construct the transparent-to-anonymous constraint system.
 pub fn build_ar_to_abar_cs(
     payee_data: PayeeWitness,
-    output_trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
+    output_trace: &AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
     cs.load_anemoi_jive_parameters::<AnemoiJive254>();
