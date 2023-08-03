@@ -203,7 +203,7 @@ impl<F: Scalar> ConstraintSystem for TurboCS<F> {
             empty_poly,
         ];
         for i in self.anemoi_constraints_indices.iter() {
-            for j in 0..12 {
+            for j in 0..14 {
                 polys[0][*i + j] = self.anemoi_preprocessed_round_keys_x[j][0];
                 polys[1][*i + j] = self.anemoi_preprocessed_round_keys_x[j][1];
                 polys[2][*i + j] = self.anemoi_preprocessed_round_keys_y[j][0];
