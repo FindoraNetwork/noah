@@ -569,8 +569,6 @@ fn test_eval_stream_cipher_flatten() {
             x[i] += &y[i];
         }
 
-        println!("{}", rr);
-
         assert_eq!(x, trace.after_permutation[rr].0);
         assert_eq!(y, trace.after_permutation[rr].1);
     }
