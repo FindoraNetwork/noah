@@ -77,7 +77,7 @@ version = '0.4'
 features = ['rand']
 
 [features]
-default = ["std","debug"]
+default = ["std"]
 debug = []
 std = ['ark-std/std', 'noah-algebra/std']
 asm = ['noah-algebra/asm']
