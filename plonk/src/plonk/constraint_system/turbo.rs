@@ -769,7 +769,7 @@ impl<F: Scalar> TurboCS<F> {
             if !self.witness_backtrace.is_empty() {
                 let mut animoi_witness_var = Vec::new();
                 for cs_index in self.anemoi_constraints_indices.iter() {
-                    for r in 0..N_ANEMOI_ROUNDS {
+                    for r in 0..N_ANEMOI_ROUNDS - 1 {
                         animoi_witness_var.push(self.get_witness_index(0, cs_index + r));
                         animoi_witness_var.push(self.get_witness_index(1, cs_index + r));
                         animoi_witness_var.push(self.get_witness_index(2, cs_index + r));
