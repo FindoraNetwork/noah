@@ -22,6 +22,9 @@ pub use mds::{ApplicableMDSMatrix, MDSMatrix};
 pub use salts::*;
 pub use traces::{AnemoiStreamCipherTrace, AnemoiVLHTrace, JiveTrace};
 
+/// The round number of Anemoi.
+pub const N_ANEMOI_ROUNDS: usize = 14;
+
 /// The trait for the Anemoi-Jive parameters.
 pub trait AnemoiJive<F: Scalar, const N: usize, const NUM_ROUNDS: usize>
 where

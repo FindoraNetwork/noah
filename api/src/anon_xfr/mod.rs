@@ -16,7 +16,7 @@ use noah_algebra::{
     prelude::*,
 };
 use noah_crypto::anemoi_jive::{
-    AnemoiJive, AnemoiJive254, AnemoiVLHTrace, JiveTrace, ANEMOI_JIVE_BN254_SALTS,
+    AnemoiJive, AnemoiJive254, AnemoiVLHTrace, JiveTrace, ANEMOI_JIVE_BN254_SALTS, N_ANEMOI_ROUNDS,
 };
 use noah_plonk::{
     plonk::{
@@ -236,7 +236,7 @@ pub fn nullify(
     amount: u64,
     asset_type_scalar: BN254Scalar,
     uid: u64,
-) -> Result<(BN254Scalar, AnemoiVLHTrace<BN254Scalar, 2, 14>)> {
+) -> Result<(BN254Scalar, AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>)> {
     let pub_key = key_pair.get_pk();
 
     let pow_2_64 = BN254Scalar::from(u64::MAX).add(&BN254Scalar::from(1u32));
@@ -282,7 +282,7 @@ pub fn commit_in_cs(
     asset_var: VarIndex,
     public_key_type_var: VarIndex,
     public_key_scalars: &[VarIndex; 3],
-    trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
+    trace: &AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>,
 ) -> VarIndex {
     let output_var = cs.new_variable(trace.output);
     let zero_var = cs.zero_var();
@@ -310,7 +310,7 @@ pub fn commit(
     blind: BN254Scalar,
     amount: u64,
     asset_type_scalar: BN254Scalar,
-) -> Result<(Commitment, AnemoiVLHTrace<BN254Scalar, 2, 14>)> {
+) -> Result<(Commitment, AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>)> {
     let address_format_number: BN254Scalar = match public_key.0 {
         PublicKeyInner::Ed25519(_) => BN254Scalar::one(),
         PublicKeyInner::Secp256k1(_) => BN254Scalar::zero(),
@@ -344,7 +344,7 @@ pub(crate) fn nullify_in_cs(
     asset_type: VarIndex,
     secret_key_type: VarIndex,
     public_key_scalars: &[VarIndex; 3],
-    trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
+    trace: &AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>,
 ) -> VarIndex {
     let output_var = cs.new_variable(trace.output);
     let zero_var = cs.zero_var();
@@ -467,8 +467,8 @@ pub fn compute_merkle_root_variables(
     cs: &mut TurboPlonkCS,
     elem: AccElemVars,
     path_vars: &MerklePathVars,
-    leaf_trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
-    traces: &[JiveTrace<BN254Scalar, 2, 14>],
+    leaf_trace: &AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>,
+    traces: &[JiveTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>],
 ) -> VarIndex {
     let (uid, commitment) = (elem.uid, elem.commitment);
 

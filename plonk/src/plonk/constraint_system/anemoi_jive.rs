@@ -1,14 +1,16 @@
 use crate::plonk::constraint_system::{TurboCS, VarIndex};
 use noah_algebra::prelude::*;
-use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiStreamCipherTrace, AnemoiVLHTrace, JiveTrace};
+use noah_crypto::anemoi_jive::{
+    AnemoiJive, AnemoiStreamCipherTrace, AnemoiVLHTrace, JiveTrace, N_ANEMOI_ROUNDS,
+};
 
 impl<F: Scalar> TurboCS<F> {
     /// Create constraints for the Anemoi permutation.
-    fn anemoi_permutation_round<P: AnemoiJive<F, 2usize, 14usize>>(
+    fn anemoi_permutation_round<P: AnemoiJive<F, 2usize, N_ANEMOI_ROUNDS>>(
         &mut self,
         input_var: &([VarIndex; 2], [VarIndex; 2]),
         output_var: &([Option<VarIndex>; 2], [Option<VarIndex>; 2]),
-        intermediate_val: &([[F; 2]; 14], [[F; 2]; 14]),
+        intermediate_val: &([[F; 2]; N_ANEMOI_ROUNDS], [[F; 2]; N_ANEMOI_ROUNDS]),
         checksum: Option<F>,
         salt: Option<F>,
     ) -> Option<VarIndex> {
@@ -21,9 +23,12 @@ impl<F: Scalar> TurboCS<F> {
         // Allocate the intermediate values
         // (the last line of the intermediate values is the output of the last round
         // before the final linear layer)
-        let mut intermediate_var = ([[zero_var; 2]; 14], [[zero_var; 2]; 14]);
+        let mut intermediate_var = (
+            [[zero_var; 2]; N_ANEMOI_ROUNDS],
+            [[zero_var; 2]; N_ANEMOI_ROUNDS],
+        );
 
-        for r in 0..14 {
+        for r in 0..N_ANEMOI_ROUNDS {
             intermediate_var.0[r][0] = self.new_variable(intermediate_val.0[r][0]);
             intermediate_var.0[r][1] = self.new_variable(intermediate_val.0[r][1]);
             intermediate_var.1[r][0] = self.new_variable(intermediate_val.1[r][0]);
@@ -53,7 +58,7 @@ impl<F: Scalar> TurboCS<F> {
         self.attach_anemoi_jive_constraints_to_gate();
 
         // Create the remaining 13 gates
-        for r in 1..14 {
+        for r in 1..N_ANEMOI_ROUNDS {
             self.push_add_selectors(zero, zero, zero, zero);
             self.push_mul_selectors(zero, zero);
             self.push_constant_selector(zero);
@@ -192,9 +197,9 @@ impl<F: Scalar> TurboCS<F> {
     }
 
     /// Create constraints for the Anemoi variable length hash function.
-    pub fn anemoi_variable_length_hash<P: AnemoiJive<F, 2usize, 14usize>>(
+    pub fn anemoi_variable_length_hash<P: AnemoiJive<F, 2usize, N_ANEMOI_ROUNDS>>(
         &mut self,
-        trace: &AnemoiVLHTrace<F, 2, 14>,
+        trace: &AnemoiVLHTrace<F, 2, N_ANEMOI_ROUNDS>,
         input_var: &[VarIndex],
         output_var: VarIndex,
     ) {
@@ -309,9 +314,9 @@ impl<F: Scalar> TurboCS<F> {
     }
 
     /// Create constraints for the Jive CRH.
-    pub fn jive_crh<P: AnemoiJive<F, 2usize, 14usize>>(
+    pub fn jive_crh<P: AnemoiJive<F, 2usize, N_ANEMOI_ROUNDS>>(
         &mut self,
-        trace: &JiveTrace<F, 2, 14>,
+        trace: &JiveTrace<F, 2, N_ANEMOI_ROUNDS>,
         input_var: &[VarIndex; 3],
         salt: F,
     ) -> VarIndex {
@@ -362,9 +367,9 @@ impl<F: Scalar> TurboCS<F> {
     }
 
     /// Create constraints for the Anemoi stream cipher
-    pub fn anemoi_stream_cipher<P: AnemoiJive<F, 2usize, 14usize>>(
+    pub fn anemoi_stream_cipher<P: AnemoiJive<F, 2usize, N_ANEMOI_ROUNDS>>(
         &mut self,
-        trace: &AnemoiStreamCipherTrace<F, 2, 14>,
+        trace: &AnemoiStreamCipherTrace<F, 2, N_ANEMOI_ROUNDS>,
         input_var: &[VarIndex],
         output_var: &[VarIndex],
     ) {

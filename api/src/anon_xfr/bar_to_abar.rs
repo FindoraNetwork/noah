@@ -18,7 +18,7 @@ use noah_algebra::{
     ristretto::{PedersenCommitmentRistretto, RistrettoPoint, RistrettoScalar},
     traits::PedersenCommitment,
 };
-use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive254, AnemoiVLHTrace};
+use noah_crypto::anemoi_jive::{AnemoiJive, AnemoiJive254, AnemoiVLHTrace, N_ANEMOI_ROUNDS};
 use noah_crypto::{
     delegated_schnorr::{prove_delegated_schnorr, verify_delegated_schnorr, DSInspection, DSProof},
     field_simulation::{SimFr, SimFrParams, SimFrParamsBN254Ristretto},
@@ -303,7 +303,7 @@ pub(crate) fn prove_bar_to_abar_cs<R: CryptoRng + RngCore>(
     inspection: &DSInspection<BN254Scalar, RistrettoScalar, RistrettoPoint>,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
-    comm_trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
+    comm_trace: &AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>,
 ) -> Result<AXfrPlonkPf> {
     let mut transcript = Transcript::new(BAR_TO_ABAR_PLONK_PROOF_TRANSCRIPT);
     let (mut cs, _) = build_bar_to_abar_cs(
@@ -387,7 +387,7 @@ pub(crate) fn build_bar_to_abar_cs(
     non_zk_state: &DSInspection<BN254Scalar, RistrettoScalar, RistrettoPoint>,
     beta: &RistrettoScalar,
     lambda: &RistrettoScalar,
-    comm_trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
+    comm_trace: &AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>,
 ) -> (TurboPlonkCS, usize) {
     let mut cs = TurboCS::new();
     cs.load_anemoi_jive_parameters::<AnemoiJive254>();

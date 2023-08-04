@@ -30,7 +30,7 @@ use noah_algebra::{
     traits::PedersenCommitment,
 };
 use noah_crypto::anemoi_jive::{
-    AnemoiJive, AnemoiJive254, AnemoiVLHTrace, ANEMOI_JIVE_BN254_SALTS,
+    AnemoiJive, AnemoiJive254, AnemoiVLHTrace, ANEMOI_JIVE_BN254_SALTS, N_ANEMOI_ROUNDS,
 };
 use noah_crypto::{
     delegated_schnorr::{prove_delegated_schnorr, verify_delegated_schnorr, DSInspection, DSProof},
@@ -69,9 +69,9 @@ pub struct AbarToBarPreNote {
     /// Witness.
     pub witness: PayerWitness,
     /// The trace of the input commitment.
-    pub input_commitment_trace: AnemoiVLHTrace<BN254Scalar, 2, 14>,
+    pub input_commitment_trace: AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>,
     /// The trace of the nullifier.
-    pub nullifier_trace: AnemoiVLHTrace<BN254Scalar, 2, 14>,
+    pub nullifier_trace: AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>,
     /// Input key pair.
     pub input_keypair: KeyPair,
     /// Inspection data in the delegated Schnorr proof on Ristretto.
@@ -536,8 +536,8 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
     rng: &mut R,
     params: &ProverParams,
     payers_witness: &PayerWitness,
-    nullifier_trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
-    input_commitment_trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
+    nullifier_trace: &AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>,
+    input_commitment_trace: &AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>,
     proof: &DSProof<BN254Scalar, RistrettoScalar, RistrettoPoint>,
     inspection: &DSInspection<BN254Scalar, RistrettoScalar, RistrettoPoint>,
     beta: &RistrettoScalar,
@@ -572,8 +572,8 @@ fn prove_abar_to_bar<R: CryptoRng + RngCore>(
 /// Construct the anonymous-to-confidential constraint system.
 pub fn build_abar_to_bar_cs(
     payer_witness: &PayerWitness,
-    nullifier_trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
-    input_commitment_trace: &AnemoiVLHTrace<BN254Scalar, 2, 14>,
+    nullifier_trace: &AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>,
+    input_commitment_trace: &AnemoiVLHTrace<BN254Scalar, 2, N_ANEMOI_ROUNDS>,
     proof: &DSProof<BN254Scalar, RistrettoScalar, RistrettoPoint>,
     inspection: &DSInspection<BN254Scalar, RistrettoScalar, RistrettoPoint>,
     beta: &RistrettoScalar,

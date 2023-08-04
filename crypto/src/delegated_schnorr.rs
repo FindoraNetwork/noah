@@ -1,4 +1,4 @@
-use crate::anemoi_jive::AnemoiJive;
+use crate::anemoi_jive::{AnemoiJive, N_ANEMOI_ROUNDS};
 use crate::errors::{CryptoError, Result};
 use crate::field_simulation::{SimFr, SimFrParams};
 use merlin::Transcript;
@@ -99,7 +99,7 @@ impl<F: Scalar, S: Scalar, G: Group<ScalarType = S>> DSProof<F, S, G> {
 /// Generate a proof in the delegated Schnorr protocol.
 pub fn prove_delegated_schnorr<
     F: Scalar,
-    H: AnemoiJive<F, 2usize, 14usize>,
+    H: AnemoiJive<F, 2usize, N_ANEMOI_ROUNDS>,
     R: CryptoRng + RngCore,
     S: Scalar,
     G: Group<ScalarType = S>,

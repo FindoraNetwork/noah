@@ -3,17 +3,19 @@ use noah_algebra::bls12_381::BLSScalar;
 use noah_algebra::new_bls12_381_fr;
 use noah_algebra::prelude::*;
 
+use super::N_ANEMOI_ROUNDS;
+
 /// The structure that stores the parameters for the Anemoi-Jive hash function for BLS12-381.
 pub struct AnemoiJive381;
 
-impl AnemoiJive<BLSScalar, 2usize, 14usize> for AnemoiJive381 {
+impl AnemoiJive<BLSScalar, 2usize, N_ANEMOI_ROUNDS> for AnemoiJive381 {
     const ALPHA: u32 = 5u32;
     const GENERATOR: BLSScalar = new_bls12_381_fr!("7");
     const GENERATOR_INV: BLSScalar = new_bls12_381_fr!(
         "14981678621464625851270783002338847382197300714436467949315331057125308909861"
     );
     const GENERATOR_SQUARE_PLUS_ONE: BLSScalar = new_bls12_381_fr!("50");
-    const ROUND_KEYS_X: [[BLSScalar; 2usize]; 14usize] = [
+    const ROUND_KEYS_X: [[BLSScalar; 2usize]; N_ANEMOI_ROUNDS] = [
         [
             new_bls12_381_fr!("39"),
             new_bls12_381_fr!(
@@ -125,7 +127,7 @@ impl AnemoiJive<BLSScalar, 2usize, 14usize> for AnemoiJive381 {
             ),
         ],
     ];
-    const ROUND_KEYS_Y: [[BLSScalar; 2usize]; 14usize] = [
+    const ROUND_KEYS_Y: [[BLSScalar; 2usize]; N_ANEMOI_ROUNDS] = [
         [
             new_bls12_381_fr!(
                 "14981678621464625851270783002338847382197300714436467949315331057125308909900"
@@ -239,7 +241,7 @@ impl AnemoiJive<BLSScalar, 2usize, 14usize> for AnemoiJive381 {
             ),
         ],
     ];
-    const PREPROCESSED_ROUND_KEYS_X: [[BLSScalar; 2usize]; 14usize] = [
+    const PREPROCESSED_ROUND_KEYS_X: [[BLSScalar; 2usize]; N_ANEMOI_ROUNDS] = [
         [
             new_bls12_381_fr!(
                 "35132796657602600463082375807523947538812231901617345651700352053179413136781"
@@ -353,7 +355,7 @@ impl AnemoiJive<BLSScalar, 2usize, 14usize> for AnemoiJive381 {
             ),
         ],
     ];
-    const PREPROCESSED_ROUND_KEYS_Y: [[BLSScalar; 2usize]; 14usize] = [
+    const PREPROCESSED_ROUND_KEYS_Y: [[BLSScalar; 2usize]; N_ANEMOI_ROUNDS] = [
         [
             new_bls12_381_fr!(
                 "15708940413097757154186986844111910752060195475863555301496544479594607502297"
