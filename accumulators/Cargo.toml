@@ -22,8 +22,8 @@ path = '../crypto'
 
 [dependencies.storage]
 git = 'https://github.com/FindoraNetwork/storage.git'
-tag = 'v1.1.6'
+tag = 'v1.1.8'
 
 [dev-dependencies.mem_db]
 git = 'https://github.com/FindoraNetwork/storage.git'
-tag = 'v1.1.6'
+tag = 'v1.1.8'
