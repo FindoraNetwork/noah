@@ -258,7 +258,7 @@ impl<F: Scalar> TurboCS<F> {
     /// With default witness [F::zero(), F::one()].
     pub fn new() -> TurboCS<F> {
         let selectors: Vec<Vec<F>> = core::iter::repeat(vec![]).take(N_SELECTORS).collect();
-        Self {
+        let mut cs = Self {
             selectors,
             wiring: [vec![], vec![], vec![], vec![], vec![]],
             anemoi_preprocessed_round_keys_x: [[F::zero(); 2]; 14],
@@ -276,7 +276,12 @@ impl<F: Scalar> TurboCS<F> {
 
             #[cfg(feature = "debug")]
             witness_backtrace: HashMap::new(),
-        }
+        };
+
+        cs.insert_constant_gate(cs.zero_var(), F::zero());
+        cs.insert_constant_gate(cs.one_var(), F::one());
+
+        cs
     }
 
     /// 0-index is Zero
