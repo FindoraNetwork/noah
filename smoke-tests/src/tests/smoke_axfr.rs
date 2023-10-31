@@ -147,8 +147,6 @@ mod smoke_axfr {
             gen_ar_to_abar_note(&mut prng, &params, &obar, &sender, &receiver.get_pk()).unwrap();
         assert!(verify_ar_to_abar_note(&verify_params, &note).is_ok());
 
-        println!("{}", serde_json::to_string(&note).unwrap());
-
         #[cfg(feature = "parallel")]
         {
             let notes = vec![&note; 6];
