@@ -514,8 +514,22 @@ impl<F: Scalar> TurboCS<F> {
 
     /// Add a constraint that `left_var` and `right_var` have the same value.
     pub fn equal(&mut self, left_var: VarIndex, right_var: VarIndex) {
-        let zero_var = self.zero_var();
-        self.insert_sub_gate(left_var, right_var, zero_var);
+        assert!(left_var < self.num_vars, "left_var index out of bound");
+        assert!(right_var < self.num_vars, "right_var index out of bound");
+        let zero = F::zero();
+
+        self.push_add_selectors(F::one(), F::one().neg(), zero, zero);
+        self.push_mul_selectors(zero, zero);
+        self.push_constant_selector(zero);
+        self.push_ecc_selector(zero);
+        self.push_out_selector(zero);
+
+        self.wiring[0].push(left_var);
+        self.wiring[1].push(right_var);
+        for i in 2..N_WIRES_PER_GATE {
+            self.wiring[i].push(self.zero_var());
+        }
+        self.finish_new_gate();
     }
 
     /// Create an output variable and insert a multiplication gate.
