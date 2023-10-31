@@ -258,7 +258,7 @@ impl<F: Scalar> TurboCS<F> {
     /// With default witness [F::zero(), F::one()].
     pub fn new() -> TurboCS<F> {
         let selectors: Vec<Vec<F>> = core::iter::repeat(vec![]).take(N_SELECTORS).collect();
-        Self {
+        let mut cs = Self {
             selectors,
             wiring: [vec![], vec![], vec![], vec![], vec![]],
             anemoi_preprocessed_round_keys_x: [[F::zero(); 2]; 14],
@@ -276,7 +276,12 @@ impl<F: Scalar> TurboCS<F> {
 
             #[cfg(feature = "debug")]
             witness_backtrace: HashMap::new(),
-        }
+        };
+
+        cs.insert_constant_gate(cs.zero_var(), F::zero());
+        cs.insert_constant_gate(cs.one_var(), F::one());
+
+        cs
     }
 
     /// 0-index is Zero
@@ -514,22 +519,8 @@ impl<F: Scalar> TurboCS<F> {
 
     /// Add a constraint that `left_var` and `right_var` have the same value.
     pub fn equal(&mut self, left_var: VarIndex, right_var: VarIndex) {
-        assert!(left_var < self.num_vars, "left_var index out of bound");
-        assert!(right_var < self.num_vars, "right_var index out of bound");
-        let zero = F::zero();
-
-        self.push_add_selectors(F::one(), F::one().neg(), zero, zero);
-        self.push_mul_selectors(zero, zero);
-        self.push_constant_selector(zero);
-        self.push_ecc_selector(zero);
-        self.push_out_selector(zero);
-
-        self.wiring[0].push(left_var);
-        self.wiring[1].push(right_var);
-        for i in 2..N_WIRES_PER_GATE {
-            self.wiring[i].push(self.zero_var());
-        }
-        self.finish_new_gate();
+        let zero_var = self.zero_var();
+        self.insert_sub_gate(left_var, right_var, zero_var);
     }
 
     /// Create an output variable and insert a multiplication gate.
